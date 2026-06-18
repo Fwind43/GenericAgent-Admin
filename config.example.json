@@ -4,6 +4,7 @@
   "port": 8787,
   "vite_host": "127.0.0.1",
   "vite_port": 5173,
+  "vite_allowed_hosts": [],
   "backend_proxy_host": "127.0.0.1",
   "log_tail_lines": 200,
   "buffer_lines": 1000,
