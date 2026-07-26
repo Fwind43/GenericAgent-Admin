@@ -22,6 +22,9 @@ gsap.registerPlugin(useGSAP)
 const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 const isNarrowChatViewport = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 900px)').matches
 const isMobileViewport = () => typeof window !== 'undefined' && window.matchMedia?.('(max-width: 560px)').matches
+const chatLanguage = () => typeof localStorage !== 'undefined' && localStorage.getItem('ga-admin-lang') === 'en' ? 'en' : 'zh'
+const ct = (zh, en) => chatLanguage() === 'en' ? en : zh
+const chatLocale = () => chatLanguage() === 'en' ? 'en-US' : 'zh-CN'
 
 const timestampMs = (v) => {
   if (v instanceof Date) return v.getTime()
@@ -38,18 +41,18 @@ const dateFromTimestamp = (v) => {
   const ms = timestampMs(v)
   return Number.isFinite(ms) ? new Date(ms) : null
 }
-const fmtTime = (v) => dateFromTimestamp(v)?.toLocaleString() || ''
+const fmtTime = (v) => dateFromTimestamp(v)?.toLocaleString(chatLocale()) || ''
 const fmtTimelineDate = (v) => {
-  if (!v) return '今天'
+  if (!v) return ct('今天', 'Today')
   const d = dateFromTimestamp(v)
   if (!d) return ''
   const now = new Date()
   const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
   const diff = Math.round((today - day) / 86400000)
-  if (diff === 0) return '今天'
-  if (diff === 1) return '昨天'
-  return d.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' })
+  if (diff === 0) return ct('今天', 'Today')
+  if (diff === 1) return ct('昨天', 'Yesterday')
+  return d.toLocaleDateString(chatLocale(), { year:'numeric', month:'long', day:'numeric' })
 }
 const timelineKey = (v) => {
   if (!v) return 'today'
@@ -71,25 +74,25 @@ const stripBTWEcho = (value) => {
   while (firstContent < lines.length && !lines[firstContent].trim()) lines.splice(firstContent, 1)
   return lines.join('\n').trimStart()
 }
-const shortTitle = (s) => s?.title || '新会话'
+const shortTitle = (s) => s?.title || ct('新会话', 'New chat')
 const fmtDate = (ts) => {
   const d = dateFromTimestamp(ts)
   if (!d) return ''
   const today = new Date(); const y = today.getFullYear(), mo = today.getMonth(), dy = today.getDate()
-  if (d.getFullYear() === y && d.getMonth() === mo && d.getDate() === dy) return '今天'
-  if (d.getFullYear() === y && d.getMonth() === mo && d.getDate() === dy - 1) return '昨天'
+  if (d.getFullYear() === y && d.getMonth() === mo && d.getDate() === dy) return ct('今天', 'Today')
+  if (d.getFullYear() === y && d.getMonth() === mo && d.getDate() === dy - 1) return ct('昨天', 'Yesterday')
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 const formatAge = (ts) => {
   const d = dateFromTimestamp(ts)
   if (!d) return ''
   const diff = Date.now() - d.getTime()
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return `${Math.floor(diff/60000)}分钟前`
-  if (diff < 86400000) return `${Math.floor(diff/3600000)}小时前`
-  return `${d.getMonth()+1}月${d.getDate()}日`
+  if (diff < 60000) return ct('刚刚', 'Just now')
+  if (diff < 3600000) return ct(`${Math.floor(diff/60000)}分钟前`, `${Math.floor(diff/60000)} min ago`)
+  if (diff < 86400000) return ct(`${Math.floor(diff/3600000)}小时前`, `${Math.floor(diff/3600000)} hr ago`)
+  return d.toLocaleDateString(chatLocale(), { month:'short', day:'numeric' })
 }
-const modelLabel = (m) => m?.label || [m?.name || m?.var_name || `模型 ${m?.index || ''}`, m?.model].filter(Boolean).join(' · ')
+const modelLabel = (m) => m?.label || [m?.name || m?.var_name || `${ct('模型', 'Model')} ${m?.index || ''}`, m?.model].filter(Boolean).join(' · ')
 const modelProvider = (m) => {
   const provider = String(m?.provider || '').trim()
   if (provider) return provider
@@ -97,7 +100,7 @@ const modelProvider = (m) => {
   const model = String(m?.model || '').trim()
   if (name && model && name.endsWith(`/${model}`)) return name.slice(0, -(model.length + 1))
   const split = name.lastIndexOf('/')
-  return (split > 0 ? name.slice(0, split) : name) || '未分组服务商'
+  return (split > 0 ? name.slice(0, split) : name) || ct('未分组服务商', 'Ungrouped provider')
 }
 const runtimeModelLabel = (m) => {
   const model = String(m?.model || '').trim()
@@ -107,23 +110,23 @@ const runtimeModelLabel = (m) => {
 }
 
 const BUILTIN_SLASH_COMMANDS = [
-	{ cmd: '/project', key: '/project', insert: '/project', desc: '列出项目并查看或切换 Project Mode', builtIn: true },
-  { cmd: '/continue', key: '/continue', insert: '/continue', desc: '列出可恢复的官方 GA 会话', builtIn: true },
-  { cmd: '/continue <编号>', key: '/continue', insert: '/continue ', desc: '恢复第 N 个官方 GA 会话，可继续对话', builtIn: true },
-  { cmd: '/review <自然语言请求>', key: '/review', insert: '/review ', desc: '审阅当前改动；可继续输入范围或关注点', builtIn: true },
-  { cmd: '/review help', key: '/review help', insert: '/review help', desc: '显示 /review 帮助，不启动审阅', builtIn: true },
-  { cmd: '/ultraplan <目标>', key: '/ultraplan', insert: '/ultraplan ', desc: '显式进入 UltraPlan 规划模式，并生成本地 run 目录', builtIn: true },
-  { cmd: '/improve', key: '/improve', insert: '/improve', desc: '发送记忆提炼请求（L3 skill + L1 索引）', builtIn: true },
-  { cmd: '/effort', key: '/effort', insert: '/effort', desc: '查看当前 reasoning effort', builtIn: true },
+  { cmd: '/project', key: '/project', insert: '/project', desc: ct('列出项目并查看或切换 Project Mode', 'List projects and view or switch Project Mode'), builtIn: true },
+  { cmd: '/continue', key: '/continue', insert: '/continue', desc: ct('列出可恢复的官方 GA 会话', 'List resumable official GA sessions'), builtIn: true },
+  { cmd: '/continue <number>', key: '/continue', insert: '/continue ', desc: ct('恢复第 N 个官方 GA 会话，可继续对话', 'Resume official GA session N'), builtIn: true },
+  { cmd: '/review <request>', key: '/review', insert: '/review ', desc: ct('审阅当前改动；可继续输入范围或关注点', 'Review current changes with an optional scope or focus'), builtIn: true },
+  { cmd: '/review help', key: '/review help', insert: '/review help', desc: ct('显示 /review 帮助，不启动审阅', 'Show /review help without starting a review'), builtIn: true },
+  { cmd: '/ultraplan <goal>', key: '/ultraplan', insert: '/ultraplan ', desc: ct('显式进入 UltraPlan 规划模式，并生成本地 run 目录', 'Enter UltraPlan explicitly and create a local run directory'), builtIn: true },
+  { cmd: '/improve', key: '/improve', insert: '/improve', desc: ct('发送记忆提炼请求（L3 skill + L1 索引）', 'Request memory distillation (L3 skill + L1 index)'), builtIn: true },
+  { cmd: '/effort', key: '/effort', insert: '/effort', desc: ct('查看当前 reasoning effort', 'Show the current reasoning effort'), builtIn: true },
   ...REASONING_EFFORT_LEVELS.map(level => ({
     cmd: `/effort ${level}`,
     key: `/effort ${level}`,
     insert: `/effort ${level}`,
-    desc: level === 'off' ? '清除 reasoning effort' : `设置 reasoning effort 为 ${level}`,
+    desc: level === 'off' ? ct('清除 reasoning effort', 'Clear reasoning effort') : ct(`设置 reasoning effort 为 ${level}`, `Set reasoning effort to ${level}`),
     builtIn: true,
   })),
-  { cmd: '/workspace <路径>', key: '/workspace', insert: '/workspace ', desc: '为当前会话绑定项目目录', builtIn: true },
-  { cmd: '/workspace off', key: '/workspace off', insert: '/workspace off', desc: '关闭当前会话 workspace', builtIn: true },
+  { cmd: '/workspace <path>', key: '/workspace', insert: '/workspace ', desc: ct('为当前会话绑定项目目录', 'Bind a project directory to the current session'), builtIn: true },
+  { cmd: '/workspace off', key: '/workspace off', insert: '/workspace off', desc: ct('关闭当前会话 workspace', 'Disable the current session workspace'), builtIn: true },
 ]
 const builtinSlashKey = (cmd = '') => String(cmd || '').trim().toLowerCase()
 const builtinSlashCommandKey = (c) => builtinSlashKey(c?.key || c?.cmd)
@@ -139,12 +142,12 @@ const slashCommandInsertText = (c, current = '') => {
   return c?.insert ?? `${c?.cmd || ''} `
 }
 const slashCommandProgressiveFilter = (c, nextText = '') => {
-  if (c?.cmd === '/review <自然语言请求>') return 'review '
+  if (c?.cmd === '/review <request>') return 'review '
   if (c?.cmd === '/continue') return 'continue '
   if (c?.cmd === '/improve') return 'improve '
   if (c?.cmd === '/effort') return 'effort '
-  if (c?.cmd === '/workspace <路径>') return 'workspace '
-  if (c?.cmd === '/ultraplan <目标>') return 'ultraplan '
+  if (c?.cmd === '/workspace <path>') return 'workspace '
+  if (c?.cmd === '/ultraplan <goal>') return 'ultraplan '
   const text = String(nextText || '').trimStart()
   if (text === '/review') return 'review '
   if (text === '/continue') return 'continue '
@@ -199,8 +202,8 @@ function CopyButton({ text, compact = false }) {
       setTimeout(() => setOk(false), 1200)
     } catch {}
   }
-  return <button className={compact ? 'oa-mini-copy' : 'oa-copy'} onClick={copy} title="复制">
-    {ok ? <Check size={14}/> : <Copy size={14}/>}<span>{ok ? '已复制' : '复制'}</span>
+  return <button className={compact ? 'oa-mini-copy' : 'oa-copy'} onClick={copy} title={ct('复制', 'Copy')}>
+    {ok ? <Check size={14}/> : <Copy size={14}/>}<span>{ok ? ct('已复制', 'Copied') : ct('复制', 'Copy')}</span>
   </button>
 }
 
@@ -209,8 +212,8 @@ function LongTextPreview({ text = '', stats }) {
   const preview = useMemo(() => previewLongText(text), [text])
   return <div className="oa-long-text-preview">
     <div className="oa-long-text-head">
-      <b>内容过大，已切换安全预览</b>
-      <span>{s.chars.toLocaleString()} 字符 · {s.linesLabel} 行</span>
+      <b>{ct('内容过大，已切换安全预览', 'Content is large; showing a safe preview')}</b>
+      <span>{s.chars.toLocaleString(chatLocale())} {ct('字符', 'characters')} · {s.linesLabel} {ct('行', 'lines')}</span>
       <CopyButton text={text} compact />
     </div>
     <pre>{preview}</pre>
@@ -238,7 +241,7 @@ function JsonTree({ data, name = 'root', depth = 0 }) {
     </button>
     {open && <div>
       {shownEntries.map(([k, v]) => <JsonTree key={String(k)} name={String(k)} data={v} depth={depth + 1} />)}
-      {hidden > 0 && <div className="oa-json-line oa-json-more" style={{ '--depth': depth + 1 }}>… 已隐藏 {hidden.toLocaleString()} 项，复制原始 JSON 查看全部</div>}
+      {hidden > 0 && <div className="oa-json-line oa-json-more" style={{ '--depth': depth + 1 }}>{ct(`… 已隐藏 ${hidden.toLocaleString(chatLocale())} 项，复制原始 JSON 查看全部`, `… ${hidden.toLocaleString(chatLocale())} items hidden; copy the raw JSON to view all`)}</div>}
     </div>}
   </div>
 }
@@ -270,36 +273,36 @@ const getFileVisual = (value) => FILE_KIND_RULES.find((rule) => rule.re.test(Str
 
 function FileAttachment({ path }) {
   const clean = String(path || '').trim()
-  const name = clean.split(/[\\/]/).filter(Boolean).pop() || clean || '文件'
+  const name = clean.split(/[\\/]/).filter(Boolean).pop() || clean || ct('文件', 'File')
   const extMatch = name.match(/\.([^.]+)$/)
   const extension = extMatch ? extMatch[1].slice(0, 6).toUpperCase() : 'FILE'
   const splitAt = Math.max(clean.lastIndexOf('\\'), clean.lastIndexOf('/'))
-  const directory = splitAt >= 0 ? clean.slice(0, splitAt) : '本地文件'
+  const directory = splitAt >= 0 ? clean.slice(0, splitAt) : ct('本地文件', 'Local file')
   const visual = getFileVisual(name)
   const { kind, Icon } = visual
   const isImage = kind === 'image'
   const imageUrl = `/api/files/image?path=${encodeURIComponent(clean)}`
   const open = async (mode) => {
-    if (!confirmDanger('chat-file-open', `使用系统桌面打开${mode === 'folder' ? '文件所在位置' : '文件'}：${clean}？`)) return
+    if (!confirmDanger('chat-file-open', ct(`使用系统桌面打开${mode === 'folder' ? '文件所在位置' : '文件'}：${clean}？`, `Open ${mode === 'folder' ? 'the containing folder' : 'this file'} in the desktop system: ${clean}?`))) return
     try {
       await api('/api/files/open', { dangerous:true, method:'POST', body: JSON.stringify({ path: clean, mode }) })
     } catch (e) {
-      alert(`打开失败：${e?.message || e}`)
+      alert(ct(`打开失败：${e?.message || e}`, `Open failed: ${e?.message || e}`))
     }
   }
   return <span className={`oa-file-card oa-file-kind-${kind}`} title={clean}>
-    <button type="button" className="oa-file-leading" onClick={() => open('file')} aria-label={`打开文件 ${name}`}>
+    <button type="button" className="oa-file-leading" onClick={() => open('file')} aria-label={ct(`打开文件 ${name}`, `Open file ${name}`)}>
       <Icon className="oa-file-fallback-icon" size={19}/>
       {isImage && <img src={imageUrl} alt="" loading="lazy" onError={(e)=>{ e.currentTarget.style.display='none' }} />}
     </button>
     <span className="oa-file-meta">
       <span className="oa-file-name-row"><b>{name}</b><small>{extension}</small></span>
-      <em>{directory || '本地文件'}</em>
+      <em>{directory || ct('本地文件', 'Local file')}</em>
     </span>
     <span className="oa-file-actions">
-      <a href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title="下载文件" aria-label={`下载文件 ${name}`}><Download size={15}/></a>
-      <button type="button" onClick={() => open('file')} title="打开文件" aria-label={`打开文件 ${name}`}><ExternalLink size={15}/></button>
-      <button type="button" onClick={() => open('folder')} title="打开所在位置" aria-label={`打开 ${name} 所在位置`}><FolderOpen size={15}/></button>
+      <a href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title={ct('下载文件', 'Download file')} aria-label={ct(`下载文件 ${name}`, `Download file ${name}`)}><Download size={15}/></a>
+      <button type="button" onClick={() => open('file')} title={ct('打开文件', 'Open file')} aria-label={ct(`打开文件 ${name}`, `Open file ${name}`)}><ExternalLink size={15}/></button>
+      <button type="button" onClick={() => open('folder')} title={ct('打开所在位置', 'Open containing folder')} aria-label={ct(`打开 ${name} 所在位置`, `Open folder containing ${name}`)}><FolderOpen size={15}/></button>
       <CopyButton text={clean} compact />
     </span>
   </span>
@@ -388,13 +391,13 @@ const MarkdownBlock = memo(function MarkdownBlock({ text = '', onAskReply }) {
   return <div className="oa-md">
     {parts.map((p, idx) => p.type === 'code'
       ? <div className="oa-code-card" key={idx}>
-          <div className="oa-code-head"><span>{p.lang || '代码'}</span><CopyButton text={p.text} compact /></div>
+          <div className="oa-code-head"><span>{p.lang || ct('代码', 'Code')}</span><CopyButton text={p.text} compact /></div>
           <pre><code>{p.text}</code></pre>
         </div>
       : p.type === 'tool'
         ? <ToolCallBlock key={idx} call={p.call} onAskReply={onAskReply} />
         : <TextMarkdown key={idx} text={p.text} onAskReply={onAskReply}/>) }
-    {parts.length >= MARKDOWN_BLOCK_LIMIT && <div className="oa-md-truncated">内容块过多，仅渲染前 {MARKDOWN_BLOCK_LIMIT} 块，可复制消息查看完整内容。</div>}
+    {parts.length >= MARKDOWN_BLOCK_LIMIT && <div className="oa-md-truncated">{ct(`内容块过多，仅渲染前 ${MARKDOWN_BLOCK_LIMIT} 块，可复制消息查看完整内容。`, `Too many content blocks. Only the first ${MARKDOWN_BLOCK_LIMIT} are rendered; copy the message to view everything.`)}</div>}
   </div>
 })
 
@@ -685,8 +688,8 @@ function UltraPlanResultCard({ text = '' }) {
   return <div className={`oa-ultraplan-result ${result.ok ? 'is-ok' : 'is-error'}`}>
     <div className="oa-ultraplan-head">
       <span className="oa-ultraplan-orb"><Sparkles size={16}/></span>
-      <div><b>UltraPlan</b><small>显式 /ultraplan 调用结果</small></div>
-      <em>{result.ok ? '完成' : '异常'} · Exit {result.exitCodeText || '0'}</em>
+      <div><b>UltraPlan</b><small>{ct('显式 /ultraplan 调用结果', 'Explicit /ultraplan result')}</small></div>
+      <em>{result.ok ? ct('完成', 'Completed') : ct('异常', 'Error')} · Exit {result.exitCodeText || '0'}</em>
     </div>
     {result.objective && <div className="oa-ultraplan-objective">{result.objective}</div>}
     <div className="oa-ultraplan-meta">
@@ -1001,11 +1004,11 @@ function UltraPlanTaskRow({ task, onAskReply }) {
           {!loading && !error && !content && status === 'running' && (
             <div className="oa-up-task-output-waiting">
               <span className="oa-up-task-output-waiting-dot" /><span className="oa-up-task-output-waiting-dot" /><span className="oa-up-task-output-waiting-dot" />
-              <span>等待输出…</span>
+              <span>{ct('等待输出…', 'Waiting for output…')}</span>
             </div>
           )}
           {!loading && !error && !content && status === 'done' && (
-            <div className="oa-up-task-output-meta" style={{color:'var(--muted-2)',fontStyle:'italic'}}>暂无输出内容</div>
+            <div className="oa-up-task-output-meta" style={{color:'var(--muted-2)',fontStyle:'italic'}}>{ct('暂无输出内容', 'No output yet')}</div>
           )}
         </div>
       )}
@@ -1026,12 +1029,18 @@ function UltraPlanDashboard({ state, onAskReply }) {
   const hasFailure = [...phases, ...phaseTasks, ...recentTasks].some((item) => item?.status === 'fail' || item?.status === 'failed')
   const hasWork = Boolean(current || phases.length || recentTasks.length)
   const statusTone = complete ? 'done' : hasFailure ? 'failed' : hasWork ? 'run' : 'pending'
-  const statusLabel = complete ? '\u5df2\u5b8c\u6210' : hasFailure ? '\u9700\u5173\u6ce8' : hasWork ? '\u6267\u884c\u4e2d' : '\u51c6\u5907\u4e2d'
+  const statusLabel = complete
+    ? ct('\u5df2\u5b8c\u6210', 'Completed')
+    : hasFailure
+      ? ct('\u9700\u5173\u6ce8', 'Needs attention')
+      : hasWork
+        ? ct('\u6267\u884c\u4e2d', 'Running')
+        : ct('\u51c6\u5907\u4e2d', 'Preparing')
   const progressLabel = phases.length
-    ? `${completedItems} / ${phases.length} \u9636\u6bb5\u5b8c\u6210`
+    ? ct(`${completedItems} / ${phases.length} \u9636\u6bb5\u5b8c\u6210`, `${completedItems} / ${phases.length} phases completed`)
     : recentTasks.length
-      ? `${completedItems} / ${recentTasks.length} \u4efb\u52a1\u5b8c\u6210`
-      : complete ? '\u6267\u884c\u5df2\u5b8c\u6210' : '\u7b49\u5f85\u6267\u884c\u6b65\u9aa4'
+      ? ct(`${completedItems} / ${recentTasks.length} \u4efb\u52a1\u5b8c\u6210`, `${completedItems} / ${recentTasks.length} tasks completed`)
+      : complete ? ct('\u6267\u884c\u5df2\u5b8c\u6210', 'Execution completed') : ct('\u7b49\u5f85\u6267\u884c\u6b65\u9aa4', 'Waiting for execution steps')
   const isEmpty = !current && phases.length === 0 && recentTasks.length === 0 && resultFiles.length === 0
   const openFile = (fp) => {
     if (!fp) return
@@ -1042,14 +1051,14 @@ function UltraPlanDashboard({ state, onAskReply }) {
     <div className={`oa-up-dash oa-up-${statusTone}${expanded ? '' : ' is-collapsed'}`}>
       <button type="button" className="oa-up-head" onClick={() => setExpanded(value => !value)}
         aria-expanded={expanded} aria-controls={panelId}
-        aria-label={expanded ? '\u6536\u8d77 UltraPlan \u6267\u884c\u9762\u677f' : '\u5c55\u5f00 UltraPlan \u6267\u884c\u9762\u677f'}>
+        aria-label={expanded ? ct('\u6536\u8d77 UltraPlan \u6267\u884c\u9762\u677f', 'Collapse UltraPlan execution panel') : ct('\u5c55\u5f00 UltraPlan \u6267\u884c\u9762\u677f', 'Expand UltraPlan execution panel')}>
         <span className="oa-up-icon oa-up-mark" aria-hidden="true"><Sparkles size={15} strokeWidth={2.1} /></span>
         <span className="oa-up-heading">
           <span className="oa-up-title-row">
             <span className="oa-up-title">UltraPlan</span>
-            <span className="oa-up-kicker">{'\u4efb\u52a1\u7f16\u6392'}</span>
+            <span className="oa-up-kicker">{ct('\u4efb\u52a1\u7f16\u6392', 'Task orchestration')}</span>
           </span>
-          <span className="oa-up-obj">{objective || '\u7b49\u5f85\u4efb\u52a1\u76ee\u6807'}</span>
+          <span className="oa-up-obj">{objective || ct('\u7b49\u5f85\u4efb\u52a1\u76ee\u6807', 'Waiting for task objective')}</span>
         </span>
         <span className={`oa-up-badge oa-up-${statusTone}`}>{statusLabel}</span>
         <span className="oa-up-chevron" aria-hidden="true">
@@ -1057,27 +1066,27 @@ function UltraPlanDashboard({ state, onAskReply }) {
         </span>
       </button>
       <div id={panelId} className="oa-up-body" hidden={!expanded}>
-        <section className="oa-up-overview" aria-label="UltraPlan \u6267\u884c\u6458\u8981">
+        <section className="oa-up-overview" aria-label={ct('UltraPlan \u6267\u884c\u6458\u8981', 'UltraPlan execution summary')}>
           <div className="oa-up-progress-head">
             <div>
-              <span className="oa-up-section-label">{'\u6267\u884c\u8fdb\u5ea6'}</span>
+              <span className="oa-up-section-label">{ct('\u6267\u884c\u8fdb\u5ea6', 'Execution progress')}</span>
               <strong className="oa-up-progress-copy">{progressLabel}</strong>
             </div>
             <span className="oa-up-progress-value">{progressPercent}<small>%</small></span>
           </div>
-          <div className="oa-up-progress-track" role="progressbar" aria-label="UltraPlan \u6267\u884c\u8fdb\u5ea6"
+          <div className="oa-up-progress-track" role="progressbar" aria-label={ct('UltraPlan \u6267\u884c\u8fdb\u5ea6', 'UltraPlan execution progress')}
             aria-valuemin="0" aria-valuemax="100" aria-valuenow={progressPercent}>
             <span style={{ '--oa-up-progress': progressPercent / 100 }} />
           </div>
-          <div className="oa-up-stats" aria-label="\u6267\u884c\u7edf\u8ba1">
-            <span><strong>{phases.length}</strong>{' \u9636\u6bb5'}</span>
-            <span><strong>{taskCount}</strong>{' \u4efb\u52a1'}</span>
-            <span><strong>{resultFiles.length}</strong>{' \u4ea7\u7269'}</span>
+          <div className="oa-up-stats" aria-label={ct('\u6267\u884c\u7edf\u8ba1', 'Execution statistics')}>
+            <span><strong>{phases.length}</strong>{ct(' \u9636\u6bb5', ' phases')}</span>
+            <span><strong>{taskCount}</strong>{ct(' \u4efb\u52a1', ' tasks')}</span>
+            <span><strong>{resultFiles.length}</strong>{ct(' \u4ea7\u7269', ' outputs')}</span>
           </div>
           {!complete && current && (
             <div className="oa-up-current">
               <span className="oa-up-current-dot" aria-hidden="true" />
-              <span className="oa-up-current-label">{'\u5f53\u524d'}</span>
+              <span className="oa-up-current-label">{ct('\u5f53\u524d', 'Current')}</span>
               <span>{current}</span>
             </div>
           )}
@@ -1086,14 +1095,14 @@ function UltraPlanDashboard({ state, onAskReply }) {
         {isEmpty && (
           <div className="oa-up-empty">
             <Clock3 size={16} aria-hidden="true" />
-            <div><strong>{'\u7b49\u5f85 UltraPlan \u53d1\u5e03\u6b65\u9aa4'}</strong><span>{'\u8ba1\u5212\u5f00\u59cb\u540e\uff0c\u9636\u6bb5\u548c\u4efb\u52a1\u4f1a\u5728\u8fd9\u91cc\u5b9e\u65f6\u66f4\u65b0\u3002'}</span></div>
+            <div><strong>{ct('\u7b49\u5f85 UltraPlan \u53d1\u5e03\u6b65\u9aa4', 'Waiting for UltraPlan steps')}</strong><span>{ct('\u8ba1\u5212\u5f00\u59cb\u540e\uff0c\u9636\u6bb5\u548c\u4efb\u52a1\u4f1a\u5728\u8fd9\u91cc\u5b9e\u65f6\u66f4\u65b0\u3002', 'Phases and tasks will update here in real time after the plan starts.')}</span></div>
           </div>
         )}
 
         {recentTasks.length > 0 && phases.length === 0 && (
           <section className="oa-up-section oa-up-recent">
             <div className="oa-up-section-head">
-              <span className="oa-up-section-label">{'\u6267\u884c\u4efb\u52a1'}</span>
+              <span className="oa-up-section-label">{ct('\u6267\u884c\u4efb\u52a1', 'Execution tasks')}</span>
               <span>{recentTasks.length}</span>
             </div>
             <div className="oa-up-tasks">
@@ -1109,7 +1118,7 @@ function UltraPlanDashboard({ state, onAskReply }) {
         {phases.length > 0 && (
           <section className="oa-up-section oa-up-phase-section">
             <div className="oa-up-section-head">
-              <span className="oa-up-section-label">{'\u6267\u884c\u9636\u6bb5'}</span>
+              <span className="oa-up-section-label">{ct('\u6267\u884c\u9636\u6bb5', 'Execution phases')}</span>
               <span>{completedItems}/{phases.length}</span>
             </div>
             <div className="oa-up-phases">
@@ -1146,7 +1155,7 @@ function UltraPlanDashboard({ state, onAskReply }) {
         {resultFiles.length > 0 && (
           <section className="oa-up-files">
             <div className="oa-up-files-head">
-              <span className="oa-up-section-label">{'\u4ea7\u51fa\u6587\u4ef6'}</span>
+              <span className="oa-up-section-label">{ct('\u4ea7\u51fa\u6587\u4ef6', 'Output files')}</span>
               <span>{resultFiles.length}</span>
             </div>
             <div className="oa-up-files-list">
@@ -1166,7 +1175,7 @@ function UltraPlanDashboard({ state, onAskReply }) {
 
         {events.length > 0 && (
           <details className="oa-up-events">
-            <summary><span>{'\u8fd0\u884c\u65e5\u5fd7'}</span><span className="oa-up-events-count">{events.length}</span></summary>
+            <summary><span>{ct('\u8fd0\u884c\u65e5\u5fd7', 'Run log')}</span><span className="oa-up-events-count">{events.length}</span></summary>
             <div className="oa-up-events-body">
               {events.map((event, i) => (
                 <div key={i} className={`oa-up-event oa-up-event-${event.tag}`}>
@@ -1208,11 +1217,11 @@ function AskUserPanel({ call, onReply }) {
   return <div className="oa-ask-panel">
     <div className="oa-ask-banner">
       <span className="oa-ask-avatar">?</span>
-      <div><b>{'需要用户确认'}</b><p>{'智能体正在等待你的选择或补充信息'}</p></div>
+      <div><b>{ct('需要用户确认', 'User confirmation required')}</b><p>{ct('智能体正在等待你的选择或补充信息', 'The agent is waiting for your choice or additional information')}</p></div>
     </div>
     {hasStructured ? <div className="oa-ask-body">
-      {ask.question && <div className="oa-ask-question"><span>{'问题'}</span><p>{ask.question}</p></div>}
-      {ask.candidates.length > 0 && <div className="oa-ask-options"><span>{'快捷回复'}</span><div>{ask.candidates.map((x,i)=><button type="button" key={`${x}-${i}`} onClick={(e)=>{e.stopPropagation(); onReply?.(x)}} title={'点击填入输入框'}>{x}</button>)}</div></div>}
+      {ask.question && <div className="oa-ask-question"><span>{ct('问题', 'Question')}</span><p>{ask.question}</p></div>}
+      {ask.candidates.length > 0 && <div className="oa-ask-options"><span>{ct('快捷回复', 'Quick replies')}</span><div>{ask.candidates.map((x,i)=><button type="button" key={`${x}-${i}`} onClick={(e)=>{e.stopPropagation(); onReply?.(x)}} title={ct('点击填入输入框', 'Insert into the input')}>{x}</button>)}</div></div>}
     </div> : call.args && <div className="oa-tool-args"><span>{'💬 question'}</span><pre>{call.args}</pre></div>}
     {call.result && <div className="oa-tool-result oa-ask-result"><span>{'📤 result'}</span><pre>{call.result}</pre></div>}
   </div>
@@ -1224,13 +1233,13 @@ function ToolCallBlock({ call, onAskReply }) {
   const [open, setOpen] = useState(isAskUser)
   const resultStatus = String(call.result || '').match(/\[Status\]\s*([^\n]+)/i)?.[1]?.trim()
   const askPayload = isAskUser ? getAskUserPayload(call) : null
-  const askSummary = askPayload?.question || '等待用户确认'
+  const askSummary = askPayload?.question || ct('等待用户确认', 'Waiting for confirmation')
   return <div className={`oa-tool-call ${isAskUser ? 'oa-tool-ask-user' : ''} ${open ? 'open' : 'collapsed'}`}>
     <button className="oa-tool-head" type="button" onClick={() => setOpen(v => !v)} aria-expanded={open}>
       <span className="oa-tool-icon">{isAskUser ? '❓' : '🛠️'}</span><span>{isAskUser ? 'Ask user' : 'Tool'}</span><b>{toolName}</b>
       {isAskUser && <strong className="oa-ask-headline">{askSummary}</strong>}
       {resultStatus && <em>{resultStatus}</em>}
-      {isAskUser && !resultStatus && <em>{askPayload?.candidates?.length ? `${askPayload.candidates.length} 个选项` : '等待回复'}</em>}
+      {isAskUser && !resultStatus && <em>{askPayload?.candidates?.length ? ct(`${askPayload.candidates.length} 个选项`, `${askPayload.candidates.length} options`) : ct('等待回复', 'Waiting for reply')}</em>}
       <ChevronDown size={15} className="oa-tool-chevron" />
     </button>
     {open && (isAskUser ? <AskUserPanel call={call} onReply={onAskReply} /> : <>
@@ -1297,7 +1306,7 @@ function renderListBlock(lines, i, ordered) {
       const liProps = ordered ? { value: itemNumber } : {}
       return <li key={j} {...liProps}><InlineRichText text={x.replace(itemRe, '')} /></li>
     })}
-    {hidden > 0 && <li className="oa-md-truncated">… 已隐藏 {hidden.toLocaleString()} 个列表项</li>}
+    {hidden > 0 && <li className="oa-md-truncated">{ct(`… 已隐藏 ${hidden.toLocaleString(chatLocale())} 个列表项`, `… ${hidden.toLocaleString(chatLocale())} list items hidden`)}</li>}
   </Tag>
 }
 
@@ -1388,7 +1397,7 @@ function TextMarkdown({ text = '', onAskReply }) {
     }
     nodes.push(renderTextBlock(blocks[i], i))
   }
-  if (hiddenBlocks > 0) nodes.push(<div key="__hidden_blocks" className="oa-md-truncated">… 已隐藏 {hiddenBlocks.toLocaleString()} 个内容块，可复制消息查看完整内容。</div>)
+  if (hiddenBlocks > 0) nodes.push(<div key="__hidden_blocks" className="oa-md-truncated">{ct(`… 已隐藏 ${hiddenBlocks.toLocaleString(chatLocale())} 个内容块，可复制消息查看完整内容。`, `… ${hiddenBlocks.toLocaleString(chatLocale())} content blocks hidden; copy the message to view all.`)}</div>)
   return <>{nodes}</>
 }
 
@@ -1603,7 +1612,7 @@ const AssistantContent = memo(function AssistantContent({ content, pending, onAs
   const parsed = useMemo(() => parseAssistantContent(content), [content])
   const hasTurnSplit = parsed.runs.length > 0
   const hasLiveUltraPlan = !!(liveUltraPlanState && (liveUltraPlanState.phases?.length > 0 || liveUltraPlanState.recentTasks?.length > 0 || liveUltraPlanState.objective))
-  if (!content && pending && !hasLiveUltraPlan) return <div className="oa-content oa-thinking">正在思考…</div>
+  if (!content && pending && !hasLiveUltraPlan) return <div className="oa-content oa-thinking">{ct('正在思考…', 'Thinking…')}</div>
   if (content && stats.tooLarge && !hasTurnSplit) return <div className="oa-content"><LongTextPreview text={content} stats={stats} /></div>
   const boxedRuns = parsed.runs.slice(0, -1)
   const lastRun = parsed.runs[parsed.runs.length - 1]
@@ -1617,11 +1626,11 @@ const AssistantContent = memo(function AssistantContent({ content, pending, onAs
   const toggleTurn = (r, i) => setOpenTurns(xs => ({ ...xs, [`${r.turn}-${i}`]: !isTurnOpen(r, i) }))
   return <div className={`oa-content ${parsed.runs.length ? 'oa-agent-output' : ''}`}>
     {parsed.runs.length > 0 && <div className={`oa-turn-stack ${stackOpen ? 'open' : 'collapsed'}`}>
-      <button className="oa-turn-stack-head" type="button" onClick={() => setStackOpen(v => !v)} aria-expanded={stackOpen} title={stackOpen ? '折叠执行过程' : '展开执行过程'}>
+      <button className="oa-turn-stack-head" type="button" onClick={() => setStackOpen(v => !v)} aria-expanded={stackOpen} title={stackOpen ? ct('折叠执行过程', 'Collapse execution') : ct('展开执行过程', 'Expand execution')}>
         <span className="oa-run-dot"/>
-        <span>执行过程</span>
+        <span>{ct('执行过程', 'Execution')}</span>
         <b>{parsed.runs.length}</b>
-        <em>{pending ? '正在生成' : '已完成'}</em>
+        <em>{pending ? ct('正在生成', 'Generating') : ct('已完成', 'Completed')}</em>
         <ChevronDown className="oa-stack-chevron" size={15}/>
       </button>
       {stackOpen && boxedRuns.map((r, i) => {
@@ -1629,26 +1638,26 @@ const AssistantContent = memo(function AssistantContent({ content, pending, onAs
         const tu = turnUsages && turnUsages[i]
         return <div className="oa-turn-node" key={`${r.turn}-${i}`}>
           <section className={`oa-turn-card ${open ? 'open' : 'collapsed'}`}>
-            <button className="oa-turn-toggle" type="button" onClick={() => toggleTurn(r, i)} aria-expanded={open} title={r.title || '执行步骤'}>
-              <span className="oa-turn-index">步骤 {r.turn}</span>
-              <b>{r.title || '执行步骤'}</b>
+            <button className="oa-turn-toggle" type="button" onClick={() => toggleTurn(r, i)} aria-expanded={open} title={r.title || ct('执行步骤', 'Execution step')}>
+              <span className="oa-turn-index">{ct('步骤', 'Step')} {r.turn}</span>
+              <b>{r.title || ct('执行步骤', 'Execution step')}</b>
               <UsageRow u={tu} className="oa-usage-inline" />
               <ChevronDown size={15} className="oa-turn-chevron"/>
             </button>
-            {open && (r.body ? renderAssistantBody(r.body, onAskReply) : <p className="oa-turn-empty">该轮暂无详细输出</p>)}
+            {open && (r.body ? renderAssistantBody(r.body, onAskReply) : <p className="oa-turn-empty">{ct('该轮暂无详细输出', 'No detailed output for this turn')}</p>)}
           </section>
         </div>
       })}
       {lastRun && <section className="oa-turn-current" key={`last-${lastRun.turn}`}>
-        <div className="oa-turn-current-head"><span className="oa-turn-index oa-turn-index-current">步骤 {lastRun.turn}</span><b>{lastRun.title || '正在执行'}</b><UsageRow u={turnUsages && turnUsages[boxedRuns.length]} className="oa-usage-inline" /><em>{pending ? '实时输出中' : '最新一轮'}</em></div>
+        <div className="oa-turn-current-head"><span className="oa-turn-index oa-turn-index-current">{ct('步骤', 'Step')} {lastRun.turn}</span><b>{lastRun.title || ct('正在执行', 'Running')}</b><UsageRow u={turnUsages && turnUsages[boxedRuns.length]} className="oa-usage-inline" /><em>{pending ? ct('实时输出中', 'Live output') : ct('最新一轮', 'Latest turn')}</em></div>
         {lastRun.body || ultraPlanStateForLastRun
           ? renderAssistantBody(lastRun.body || '', onAskReply, ultraPlanStateForLastRun)
-          : <p className="oa-turn-empty">正在等待该轮输出…</p>}
+          : <p className="oa-turn-empty">{ct('正在等待该轮输出…', 'Waiting for this turn’s output…')}</p>}
       </section>}
     </div>}
     {(parsed.summary || parsed.body || !parsed.runs.length) && <div className={parsed.runs.length ? 'oa-final-answer' : ''}>
-      {parsed.runs.length > 0 && <div className="oa-final-label">返回给用户</div>}
-      {parsed.summary && <div className="oa-response-summary" aria-label="响应摘要"><span>摘要</span><b>{parsed.summary}</b></div>}
+      {parsed.runs.length > 0 && <div className="oa-final-label">{ct('返回给用户', 'Response to user')}</div>}
+      {parsed.summary && <div className="oa-response-summary" aria-label={ct('响应摘要', 'Response summary')}><span>{ct('摘要', 'Summary')}</span><b>{parsed.summary}</b></div>}
       {renderAssistantBody(parsed.body || (!parsed.summary ? content : '') || '', onAskReply, liveUltraPlanState || ultraplan_state)}
     </div>}
   </div>
@@ -1697,10 +1706,10 @@ const UsageRow = ({ u, label, className, elapsedMs = 0, live = false }) => {
   if (!hasTokens && !hasElapsed) return null
   return <div className={`oa-usage ${className || ''}`}>
     {label && <span className="oa-usage-label">{label}</span>}
-    {hasElapsed && <span className={live ? 'oa-usage-time is-live' : 'oa-usage-time'} title={live ? '实时耗时' : '耗时'}><svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 1.5A4.5 4.5 0 1 1 8 11a4.5 4.5 0 0 1 0-7.5z"/><path d="M7.5 4.5h1v3.65l2.2 1.3-.5.9L7.5 9V4.5z"/></svg>耗时 <b>{formatElapsedMs(elapsedMs)}</b></span>}
-    {u?.input_tokens > 0 && <span className="oa-usage-in" title="输入 tokens"><svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M8 11.5 3.5 7l1.1-1.1L8 9.3l3.4-3.4L12.5 7 8 11.5Z"/></svg>输入 <b>{u.input_tokens.toLocaleString()}</b></span>}
-    {u?.cached_tokens > 0 && <span className="oa-usage-cache" title="缓存 tokens"><svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M8.5 1 2 9h4.2l-1 6L13 7H8.5l1-6Z"/></svg>缓存 <b>{u.cached_tokens.toLocaleString()}</b></span>}
-    {u?.output_tokens > 0 && <span className="oa-usage-out" title="输出 tokens"><svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M8 4.5 12.5 9l-1.1 1.1L8 6.7l-3.4 3.4L3.5 9 8 4.5Z"/></svg>输出 <b>{u.output_tokens.toLocaleString()}</b></span>}
+    {hasElapsed && <span className={live ? 'oa-usage-time is-live' : 'oa-usage-time'} title={live ? ct('实时耗时', 'Live elapsed time') : ct('耗时', 'Elapsed time')}><svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 1.5A4.5 4.5 0 1 1 8 11a4.5 4.5 0 0 1 0-7.5z"/><path d="M7.5 4.5h1v3.65l2.2 1.3-.5.9L7.5 9V4.5z"/></svg>{ct('耗时', 'Time')} <b>{formatElapsedMs(elapsedMs)}</b></span>}
+    {u?.input_tokens > 0 && <span className="oa-usage-in" title={ct('输入 tokens', 'Input tokens')}><svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M8 11.5 3.5 7l1.1-1.1L8 9.3l3.4-3.4L12.5 7 8 11.5Z"/></svg>{ct('输入', 'Input')} <b>{u.input_tokens.toLocaleString(chatLocale())}</b></span>}
+    {u?.cached_tokens > 0 && <span className="oa-usage-cache" title={ct('缓存 tokens', 'Cached tokens')}><svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M8.5 1 2 9h4.2l-1 6L13 7H8.5l1-6Z"/></svg>{ct('缓存', 'Cached')} <b>{u.cached_tokens.toLocaleString(chatLocale())}</b></span>}
+    {u?.output_tokens > 0 && <span className="oa-usage-out" title={ct('输出 tokens', 'Output tokens')}><svg viewBox="0 0 16 16" width="10" height="10" aria-hidden="true"><path d="M8 4.5 12.5 9l-1.1 1.1L8 6.7l-3.4 3.4L3.5 9 8 4.5Z"/></svg>{ct('输出', 'Output')} <b>{u.output_tokens.toLocaleString(chatLocale())}</b></span>}
   </div>
 }
 
@@ -1792,43 +1801,43 @@ export const WorldlineRestoreDialog = memo(function WorldlineRestoreDialog({ nod
         <header className="oa-worldline-dialog-head">
           <div>
             <small>WORLDLINE</small>
-            <h2 id="oa-worldline-title">选择回退点</h2>
-            <p>配置恢复范围与位置后填入命令，由你确认后发送。</p>
+            <h2 id="oa-worldline-title">{ct('选择回退点', 'Choose a rollback point')}</h2>
+            <p>{ct('配置恢复范围与位置后填入命令，由你确认后发送。', 'Choose the restore scope and position, then insert the command for review before sending.')}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="关闭回退点选择"><X size={17}/></button>
+          <button type="button" onClick={onClose} aria-label={ct('关闭回退点选择', 'Close rollback-point picker')}><X size={17}/></button>
         </header>
         <div className="oa-worldline-node-list">
           {nodes.map((node, index) => {
             const nodeID = String(node?.id || '').trim()
             const ordinal = node?.ordinal ?? index + 1
-            const title = node?.title || node?.summary || node?.name || `回退点 ${ordinal}`
+            const title = node?.title || node?.summary || node?.name || `${ct('回退点', 'Rollback point')} ${ordinal}`
             const selected = !!nodeID && nodeID === selectedNodeID
             return <button key={nodeID || index} className={`oa-worldline-node${selected ? ' is-selected' : ''}`} type="button" disabled={!nodeID} aria-pressed={selected} onClick={()=>setSelectedNodeID(nodeID)}>
               <span className="oa-worldline-node-no">{ordinal}</span>
-              <span className="oa-worldline-node-copy"><b>{title}</b><code>{nodeID || '缺少节点 ID'}</code></span>
-              <span className="oa-worldline-node-action">{selected ? '已选择' : '选择'}</span>
+              <span className="oa-worldline-node-copy"><b>{title}</b><code>{nodeID || ct('缺少节点 ID', 'Missing node ID')}</code></span>
+              <span className="oa-worldline-node-action">{selected ? ct('已选择', 'Selected') : ct('选择', 'Select')}</span>
             </button>
           })}
         </div>
         <div className="oa-worldline-options">
           <fieldset>
-            <legend>恢复范围</legend>
+            <legend>{ct('恢复范围', 'Restore scope')}</legend>
             <div>
-              {[['both', '对话与代码'], ['conversation', '仅对话'], ['code', '仅代码']].map(([value, label]) =>
+              {[['both', ct('对话与代码', 'Conversation and code')], ['conversation', ct('仅对话', 'Conversation only')], ['code', ct('仅代码', 'Code only')]].map(([value, label]) =>
                 <button key={value} type="button" className={restoreMode === value ? 'is-selected' : ''} aria-pressed={restoreMode === value} onClick={()=>setRestoreMode(value)}>{label}</button>)}
             </div>
           </fieldset>
           <fieldset>
-            <legend>恢复位置</legend>
+            <legend>{ct('恢复位置', 'Restore position')}</legend>
             <div>
-              {[['at', '定位到节点'], ['before', '节点之前']].map(([value, label]) =>
+              {[['at', ct('定位到节点', 'At the node')], ['before', ct('节点之前', 'Before the node')]].map(([value, label]) =>
                 <button key={value} type="button" className={restoreTarget === value ? 'is-selected' : ''} aria-pressed={restoreTarget === value} onClick={()=>setRestoreTarget(value)}>{label}</button>)}
             </div>
           </fieldset>
         </div>
         <footer>
-          <span>{nodes.length} 个可用回退点</span><kbd>Esc</kbd><span>关闭</span>
-          <button className="oa-worldline-confirm" type="button" disabled={!selectedNodeID} onClick={()=>onSelect?.(selectedNodeID, restoreMode, restoreTarget)}>确认并填入命令</button>
+          <span>{ct(`${nodes.length} 个可用回退点`, `${nodes.length} rollback points available`)}</span><kbd>Esc</kbd><span>{ct('关闭', 'Close')}</span>
+          <button className="oa-worldline-confirm" type="button" disabled={!selectedNodeID} onClick={()=>onSelect?.(selectedNodeID, restoreMode, restoreTarget)}>{ct('确认并填入命令', 'Confirm and insert command')}</button>
         </footer>
       </section>
     </div>
@@ -1902,7 +1911,7 @@ export const ChatMessage = memo(function ChatMessage({
         {m.role === 'assistant'
           ? (<>
               {(assistantModelId || assistantTime) && (
-                <div className="oa-meta" aria-label="回复信息">
+                <div className="oa-meta" aria-label={ct('回复信息', 'Response information')}>
                   {assistantModelId && (
                     <span className="oa-model-id" title={`Model ID: ${assistantModelId}`}>{assistantModelId}</span>
                   )}
@@ -1929,8 +1938,8 @@ export const ChatMessage = memo(function ChatMessage({
                   {imageFiles.map((f, i) => {
                     const src = f.url || f.data_url
                     return (
-                      <a key={i} className="oa-msg-image-link" href={src} target="_blank" rel="noreferrer" title="打开原图">
-                        <img src={src} alt={f.name || '图片'} className="oa-msg-image" />
+                      <a key={i} className="oa-msg-image-link" href={src} target="_blank" rel="noreferrer" title={ct('打开原图', 'Open original image')}>
+                        <img src={src} alt={f.name || ct('图片', 'Image')} className="oa-msg-image" />
                       </a>
                     )
                   })}
@@ -1944,13 +1953,13 @@ export const ChatMessage = memo(function ChatMessage({
                         if (e.key === 'Escape') cancelMessageEdit()
                         if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); submitMessageEdit() }
                       }}
-                      disabled={editSubmitting} aria-label="编辑已发送消息" />
+                      disabled={editSubmitting} aria-label={ct('编辑已发送消息', 'Edit sent message')} />
                     {editError && <div className="oa-message-editor-error" role="alert">{editError}</div>}
                     <div className="oa-message-editor-actions">
-                      <span className="oa-message-editor-hint">重发会从此消息继续，且不携带原附件</span>
-                      <button type="button" className="oa-message-editor-cancel" onClick={cancelMessageEdit} disabled={editSubmitting}>取消</button>
+                      <span className="oa-message-editor-hint">{ct('重发会从此消息继续，且不携带原附件', 'Resending continues from this message without its original attachments')}</span>
+                      <button type="button" className="oa-message-editor-cancel" onClick={cancelMessageEdit} disabled={editSubmitting}>{ct('取消', 'Cancel')}</button>
                       <button type="button" className="oa-message-editor-submit" onClick={submitMessageEdit}
-                        disabled={editSubmitting || !editDraft.trim()}>{editSubmitting ? '发送中…' : '发送'}</button>
+                        disabled={editSubmitting || !editDraft.trim()}>{editSubmitting ? ct('发送中…', 'Sending…') : ct('发送', 'Send')}</button>
                     </div>
                   </div>)
                 : (<div className={`oa-msg-text${btwDisplay ? ' oa-user-btw' : ''}`}>
@@ -1972,7 +1981,7 @@ export const ChatMessage = memo(function ChatMessage({
                   </div>)}
             </>)
         }
-        {showUsageRow && <UsageRow u={usageTotal} elapsedMs={elapsedMs} live={pending} label="总计" className="oa-usage-total" />}
+        {showUsageRow && <UsageRow u={usageTotal} elapsedMs={elapsedMs} live={pending} label={ct('总计', 'Total')} className="oa-usage-total" />}
       </div>
 
       {m.role === 'assistant' && (
@@ -1983,20 +1992,20 @@ export const ChatMessage = memo(function ChatMessage({
         {ageText && <span className="oa-msg-age" title={ageText}><Clock3 size={11}/>{ageText}</span>}
         {copyErr  && <span className="oa-copy-err">{copyErr}</span>}
         <button type="button" className="oa-icon-btn oa-copy-btn"
-          onClick={copyContent} title="复制" aria-label="复制消息">
+          onClick={copyContent} title={ct('复制', 'Copy')} aria-label={ct('复制消息', 'Copy message')}>
           {copied ? <Check size={13}/> : <Copy size={13}/>}
         </button>
         {m.role === 'user' && !pending && onEditResend && (
           <button type="button" className="oa-icon-btn oa-message-edit-trigger"
             onClick={startMessageEdit} disabled={editDisabled}
-            title={editDisabled ? '对话运行中，请等待完成后再编辑' : '编辑并重新发送'} aria-label="编辑并重新发送">
+            title={editDisabled ? ct('对话运行中，请等待完成后再编辑', 'Wait for the running conversation to finish before editing') : ct('编辑并重新发送', 'Edit and resend')} aria-label={ct('编辑并重新发送', 'Edit and resend')}>
             <Edit3 size={13}/>
           </button>
         )}
         {m.role === 'user' && !pending && onAskReply && (
           <button type="button" className="oa-icon-btn oa-ask-reply-btn"
             onClick={() => onAskReply(m.content)}
-            title="以此为上下文继续提问" aria-label="以此继续">
+            title={ct('以此为上下文继续提问', 'Continue from this context')} aria-label={ct('以此继续', 'Continue from here')}>
             <MessageSquarePlus size={13}/>
           </button>
         )}
@@ -2086,7 +2095,7 @@ export function ProviderModelCascade({ groups, selectedProvider, value, onChange
   const activeGroup = groups.find(group => group.value === selectedProvider)
   const previewGroup = groups.find(group => group.value === previewProvider) || activeGroup || groups[0]
   const activeModel = activeGroup?.models.find(model => String(model.value) === String(value))
-  const displayModel = activeModel?.label || '未发现模型'
+  const displayModel = activeModel?.label || ct('未发现模型', 'No models found')
   useLayoutEffect(() => {
     if (!open || previewGroup?.value !== selectedProvider) return
     const list = modelListRef.current
@@ -2100,15 +2109,15 @@ export function ProviderModelCascade({ groups, selectedProvider, value, onChange
 
   return (
     <div className="oa-model-select oa-composer-cascade" ref={ref}>
-      <span>模型</span>
+      <span>{ct('模型', 'Model')}</span>
       <button ref={triggerRef} type="button" disabled={disabled} title={displayModel}
-        aria-label={`模型：${displayModel}`} aria-haspopup="dialog" aria-expanded={open} aria-controls={menuId}
+        aria-label={ct(`模型：${displayModel}`, `Model: ${displayModel}`)} aria-haspopup="dialog" aria-expanded={open} aria-controls={menuId}
         onClick={toggleMenu}>
         <span className="oa-cascade-current-model">{displayModel}</span>
         <ChevronDown size={13} />
       </button>
-      {open && <div id={menuId} className="oa-cascade-menu" role="dialog" aria-label="服务商和模型">
-        <div className="oa-cascade-providers" aria-label="服务商">
+      {open && <div className="oa-cascade-menu" role="dialog" aria-label={ct('服务商和模型', 'Providers and models')}>
+        <div className="oa-cascade-providers" aria-label={ct('服务商', 'Providers')}>
           {groups.map(group => (
             <button key={group.value} type="button"
               className={group.value === previewGroup?.value ? 'active' : ''}
@@ -2121,8 +2130,8 @@ export function ProviderModelCascade({ groups, selectedProvider, value, onChange
             </button>
           ))}
         </div>
-        <div className="oa-cascade-models" ref={modelListRef} aria-label={previewGroup ? `${previewGroup.label} 模型` : '模型'}>
-          <div className="oa-cascade-heading">{previewGroup?.label || '模型'}</div>
+        <div className="oa-cascade-models" ref={modelListRef} aria-label={previewGroup ? ct(`${previewGroup.label} 模型`, `${previewGroup.label} models`) : ct('模型', 'Models')}>
+          <div className="oa-cascade-heading">{previewGroup?.label || ct('模型', 'Model')}</div>
           {previewGroup?.models.length ? previewGroup.models.map(model => {
             const isCurrent = previewGroup.value === selectedProvider && String(model.value) === String(value)
             return <button key={model.value} type="button"
@@ -2132,7 +2141,7 @@ export function ProviderModelCascade({ groups, selectedProvider, value, onChange
               {isCurrent && <Check size={12} />}
               <span>{model.label}</span>
             </button>
-          }) : <div className="oa-cascade-empty">{ '未发现模型' }</div>}
+          }) : <div className="oa-cascade-empty">{ct('未发现模型', 'No models found')}</div>}
         </div>
       </div>}
     </div>
@@ -2173,50 +2182,50 @@ export function PlanTodoCard({ plan }) {
     }
   }, [active, currentIndex, expanded, placeholder, total])
   if (!active) return null
-  const stateLabel = complete ? '已完成' : placeholder ? '规划中' : total > 0 ? '执行中' : '准备中'
+  const stateLabel = complete ? ct('已完成', 'Completed') : placeholder ? ct('规划中', 'Planning') : total > 0 ? ct('执行中', 'Running') : ct('准备中', 'Preparing')
   const detailLabel = complete
-    ? '所有步骤均已完成'
+    ? ct('所有步骤均已完成', 'All steps completed')
     : placeholder
-      ? '正在生成可执行步骤'
+      ? ct('正在生成可执行步骤', 'Generating executable steps')
       : currentIndex >= 0 && total > 0
-        ? `正在处理第 ${currentIndex + 1} 步`
-        : '等待任务步骤'
+        ? ct(`正在处理第 ${currentIndex + 1} 步`, `Processing step ${currentIndex + 1}`)
+        : ct('等待任务步骤', 'Waiting for task steps')
   return (
-    <section className={`oa-plan-card${complete ? ' is-complete' : ''}`} aria-label="任务执行计划">
+    <section className={`oa-plan-card${complete ? ' is-complete' : ''}`} aria-label={ct('任务执行计划', 'Task execution plan')}>
       <button type="button" className="oa-plan-head" onClick={() => setExpanded(value => !value)}
         aria-expanded={expanded} aria-controls={panelId}
         aria-label={expanded ? '\u6536\u8d77\u6267\u884c\u8ba1\u5212' : '\u5c55\u5f00\u6267\u884c\u8ba1\u5212'}>
         <span className="oa-plan-identity">
           <span className="oa-plan-mark" aria-hidden="true">{complete ? <Check size={15}/> : <Clock3 size={14}/>}</span>
           <span className="oa-plan-heading">
-            <span className="oa-plan-title">执行计划</span>
+            <span className="oa-plan-title">{ct('执行计划', 'Execution plan')}</span>
             <span className="oa-plan-detail">{detailLabel}</span>
           </span>
         </span>
         <span className="oa-plan-summary">
           <span className="oa-plan-state"><i aria-hidden="true"/>{stateLabel}</span>
-          <span className="oa-plan-count" aria-label={`已完成 ${done} 项，共 ${total} 项`}><strong>{done}</strong><span>/ {total}</span></span>
+          <span className="oa-plan-count" aria-label={ct(`已完成 ${done} 项，共 ${total} 项`, `${done} of ${total} complete`)}><strong>{done}</strong><span>/ {total}</span></span>
           <span className="oa-plan-chevron" aria-hidden="true">{expanded ? <ChevronDown size={15}/> : <ChevronLeft size={15}/>}</span>
         </span>
       </button>
       <div id={panelId} className="oa-plan-body" hidden={!expanded}>
-        <div className="oa-plan-progress" role="progressbar" aria-label="任务完成进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow={percent}>
+        <div className="oa-plan-progress" role="progressbar" aria-label={ct('任务完成进度', 'Task completion progress')} aria-valuemin="0" aria-valuemax="100" aria-valuenow={percent}>
           <span style={{ width: `${percent}%` }}/>
         </div>
-        {placeholder ? <div className="oa-plan-placeholder"><span aria-hidden="true"/><span>正在整理步骤</span><code title={plan.pathHint || 'plan.md'}>{plan.pathHint || 'plan.md'}</code></div> : (
+        {placeholder ? <div className="oa-plan-placeholder"><span aria-hidden="true"/><span>{ct('正在整理步骤', 'Organizing steps')}</span><code title={plan.pathHint || 'plan.md'}>{plan.pathHint || 'plan.md'}</code></div> : (
           <ol ref={listRef} className="oa-plan-list">
             {items.map((item, index) => {
               const itemComplete = item?.status === 'done'
               const current = !itemComplete && index === currentIndex
               return <li key={`${index}-${item?.content || ''}`} className={`${itemComplete ? 'is-done' : 'is-open'}${current ? ' is-current' : ''}`} aria-current={current ? 'step' : undefined}>
                 <span className="oa-plan-status" aria-hidden="true">{itemComplete ? <Check size={11}/> : current ? <Clock3 size={10}/> : <span>{index + 1}</span>}</span>
-                <span className="oa-plan-copy">{item?.content || `步骤 ${index + 1}`}</span>
-                {current && <span className="oa-plan-now">当前</span>}
+                <span className="oa-plan-copy">{item?.content || `${ct('步骤', 'Step')} ${index + 1}`}</span>
+                {current && <span className="oa-plan-now">{ct('当前', 'Current')}</span>}
               </li>
             })}
           </ol>
         )}
-        {plan.step && <div className="oa-plan-step"><span>当前动作</span><p>{plan.step}</p></div>}
+        {plan.step && <div className="oa-plan-step"><span>{ct('当前动作', 'Current action')}</span><p>{plan.step}</p></div>}
       </div>
     </section>
   )
@@ -2260,6 +2269,7 @@ export default function ChatApp() {
   useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem('ga-admin-theme', theme) }, [theme])
 
   useEffect(() => {
+    document.documentElement.lang = chatLanguage() === 'en' ? 'en' : 'zh-CN'
     api('/api/config').then(cfg => {
       setCfg(cfg)
     }).catch(() => {})
@@ -2444,17 +2454,17 @@ export default function ChatApp() {
       if (exactRootPrimary) return c === exactRootPrimary
       if (argumentFallback && c === argumentFallback) return true
       if (cmd === '/review help') return childAllowed('/review') && fuzzyMatch(cmd, slashFilter)
-      if (cmd === '/review <自然语言请求>') {
+      if (cmd === '/review <request>') {
         if (isReviewNaturalLanguage) return true
         if (slashFilter === '/review' || fuzzyMatch('/review', rawFilter) || fuzzyMatch('/review', slashFilter)) return true
         if (slashFilter.startsWith('/review ')) return false
       }
-      if (cmd === '/continue <编号>') {
+      if (cmd === '/continue <number>') {
         if (slashFilter === '/continue ') return true
         if (isContinueNumber) return true
         if (slashFilter.startsWith('/continue ')) return false
       }
-      if (cmd === '/ultraplan <目标>') {
+      if (cmd === '/ultraplan <goal>') {
         if (slashFilter === '/ultraplan ') return true
         if (isUltraPlanObjective) return true
         if (slashFilter === '/ultraplan' || fuzzyMatch('/ultraplan', rawFilter) || fuzzyMatch('/ultraplan', slashFilter)) return true
@@ -2462,10 +2472,10 @@ export default function ChatApp() {
       }
       if (cmd === '/project' && slashFilter.startsWith('/project ')) return true
       if (inProjectScope && !cmd.startsWith('/project')) return false
-      if (inContinueScope && cmd !== '/continue <编号>') return false
-      if (inReviewScope && cmd !== '/review <自然语言请求>') return false
+      if (inContinueScope && cmd !== '/continue <number>') return false
+      if (inReviewScope && cmd !== '/review <request>') return false
       if (inImproveScope && cmd !== '/improve') return false
-      if (inUltraPlanScope && cmd !== '/ultraplan <目标>') return false
+      if (inUltraPlanScope && cmd !== '/ultraplan <goal>') return false
       return fuzzyMatch(cmd, rawFilter) || fuzzyMatch(cmd, slashFilter) || fuzzyMatch(c.desc || '', rawFilter)
     })
   }, [cmdDrawer.open, cmdDrawer.filter, allSlashCommands])
@@ -2480,7 +2490,7 @@ export default function ChatApp() {
     if (!cmdManagerOpen) setCmdEditIdx(-1)
   }, [cmdManagerOpen])
   const saveSlashCmds = async (newCmds) => {
-    if (!confirmDanger('chat-slash-commands-save', '保存斜杠命令配置？会写入 GA Admin 配置文件。')) return
+    if (!confirmDanger('chat-slash-commands-save', ct('保存斜杠命令配置？会写入 GA Admin 配置文件。', 'Save slash-command configuration? This writes the GA Admin configuration file.'))) return
     try {
       const safeCmds = (newCmds || [])
         .filter(c => !isProtectedSlashCommand(c?.cmd))
@@ -2489,7 +2499,7 @@ export default function ChatApp() {
       const c = await api('/api/config', { method:'PUT', dangerous: true, body: JSON.stringify({...cfg, slash_commands: safeCmds}) })
       if (c?.slash_commands) { setCfg(c) }
       setCmdEditIdx(-1)
-    } catch(e) { setNotice('保存命令失败: ' + e.message); setCmdEditIdx(-1) }
+    } catch(e) { setNotice(ct('保存命令失败: ', 'Failed to save command: ') + e.message); setCmdEditIdx(-1) }
   }
   const startEdit = (idx, cmd, desc, content = '') => {
     if (idx < 0 && idx !== -2) return
@@ -2499,14 +2509,14 @@ export default function ChatApp() {
     const normalized = cmdEditCmd.trim()
     if (!normalized) return
     if (isProtectedSlashCommand(normalized)) {
-      setNotice('这是 GA Admin 内置命令，不能覆盖或修改')
+      setNotice(ct('这是 GA Admin 内置命令，不能覆盖或修改', 'This built-in GA Admin command cannot be overridden or edited'))
       setCmdEditIdx(-1)
       return
     }
     const cmds = cfg?.slash_commands || []
     const nextItem = { cmd: normalized, desc: cmdEditDesc.trim() || '', content: cmdEditContent.trim() || cmdEditDesc.trim() || '' }
     if (!nextItem.content) {
-      setNotice('请填写这个命令要展开成的指令内容')
+      setNotice(ct('请填写这个命令要展开成的指令内容', 'Enter the instruction content this command should expand into'))
       return
     }
     if (cmdEditIdx === -2) {
@@ -2518,7 +2528,7 @@ export default function ChatApp() {
     }
   }
   const deleteCmd = (idx) => {
-    if (idx < 0) { setNotice('这是 GA Admin 内置命令，不能删除'); return }
+    if (idx < 0) { setNotice(ct('这是 GA Admin 内置命令，不能删除', 'This built-in GA Admin command cannot be deleted')); return }
     const cmds = cfg?.slash_commands || []; saveSlashCmds(cmds.filter((_, i) => i !== idx))
   }
   const moveUpCmd = (cmd) => {
@@ -2739,9 +2749,9 @@ export default function ChatApp() {
     try {
       streamAbortRef.current?.abort?.()
       await api(`/api/chat/cancel/${id}`, { method:'POST', body:'{}' })
-      setMessages(xs => xs.map(m => (m.role === 'assistant' && !m.content) ? { ...m, content:'已中止。', error:true } : m))
+      setMessages(xs => xs.map(m => (m.role === 'assistant' && !m.content) ? { ...m, content:ct('已中止。', 'Stopped.'), error:true } : m))
       setSessions(xs => xs.map(s => s.id === id ? { ...s, running:false } : s))
-      setNotice('已中止当前执行')
+      setNotice(ct('已中止当前执行', 'Current run stopped'))
     } catch (e) { setErr(e.message || String(e)) }
     finally { setBusy(false); setStreamingSid(''); if (id) loadSessions(id).catch(()=>{}) }
   }
@@ -2859,12 +2869,12 @@ export default function ChatApp() {
     if (openToken !== openSeqRef.current) return
     activeSidRef.current = d.id
     scrollModeRef.current = 'auto'
-    setSid(d.id); setMessages([]); setRawHistory([]); setHistoryInfo([]); setWorkingState(null); setPlanState(null); setContextOpen(false); setPrompt(''); setErr(''); setNotice('已创建新对话'); setBusy(false); setStreamingSid(''); setAutoFollow(false); setShowFollow(false); setLlmNo(d.settings?.llm_no || 0)
+    setSid(d.id); setMessages([]); setRawHistory([]); setHistoryInfo([]); setWorkingState(null); setPlanState(null); setContextOpen(false); setPrompt(''); setErr(''); setNotice(ct('已创建新对话', 'New chat created')); setBusy(false); setStreamingSid(''); setAutoFollow(false); setShowFollow(false); setLlmNo(d.settings?.llm_no || 0)
     await loadChatState(d.id, openToken)
   }
 
   const deleteSession = async (id) => {
-    if (!id || !confirmDanger('chat-session-delete', '删除此会话？此操作不可恢复。')) return
+    if (!id || !confirmDanger('chat-session-delete', ct('删除此会话？此操作不可恢复。', 'Delete this session? This cannot be undone.'))) return
     await api(`/api/chat/session/${id}`, { method:'DELETE' })
     setSessions(xs => xs.filter(x => x.id !== id))
     setMenuOpen('')
@@ -2875,7 +2885,7 @@ export default function ChatApp() {
       streamAbortRef.current?.abort?.()
       streamAbortRef.current = null
       scrollModeRef.current = 'auto'
-      setSid(''); setMessages([]); setBusy(false); setStreamingSid(''); setAutoFollow(true); setShowFollow(false); setNotice('会话已删除')
+      setSid(''); setMessages([]); setBusy(false); setStreamingSid(''); setAutoFollow(true); setShowFollow(false); setNotice(ct('会话已删除', 'Session deleted'))
     }
     setTimeout(() => loadSessions('', { open:true }).catch(()=>{}), 0)
   }
@@ -2914,7 +2924,7 @@ export default function ChatApp() {
     if (batchDeleting) return
     const available = new Set(sessions.map(session => session.id))
     const ids = normalizeSessionIds(selectedSessionIds).filter(id => available.has(id))
-    if (!ids.length || !confirmDanger('chat-session-batch-delete', `永久删除已选的 ${ids.length} 个会话？此操作不可恢复。`)) return
+    if (!ids.length || !confirmDanger('chat-session-batch-delete', ct(`永久删除已选的 ${ids.length} 个会话？此操作不可恢复。`, `Permanently delete ${ids.length} selected sessions? This cannot be undone.`))) return
 
     setBatchDeleting(true)
     setErr('')
@@ -2956,12 +2966,12 @@ export default function ChatApp() {
       if (result.failedIds.length) {
         setSelectedSessionIds(result.failedIds)
         const detail = result.failures[0]?.error?.message || ''
-        setErr(`${result.failedIds.length} 个会话删除失败${detail ? `：${detail}` : ''}${refreshError ? `；刷新失败：${refreshError}` : ''}`)
+        setErr(ct(`${result.failedIds.length} 个会话删除失败${detail ? `：${detail}` : ''}${refreshError ? `；刷新失败：${refreshError}` : ''}`, `${result.failedIds.length} sessions could not be deleted${detail ? `: ${detail}` : ''}${refreshError ? `; refresh failed: ${refreshError}` : ''}`))
       } else {
         setSelectedSessionIds([])
         setSessionManagerOpen(false)
-        if (refreshError) setErr(`已删除 ${result.deletedIds.length} 个会话，但刷新列表失败：${refreshError}`)
-        else setNotice(`已删除 ${result.deletedIds.length} 个会话`)
+        if (refreshError) setErr(ct(`已删除 ${result.deletedIds.length} 个会话，但刷新列表失败：${refreshError}`, `${result.deletedIds.length} sessions deleted, but list refresh failed: ${refreshError}`))
+        else setNotice(ct(`已删除 ${result.deletedIds.length} 个会话`, `${result.deletedIds.length} sessions deleted`))
       }
     } finally {
       setBatchDeleting(false)
@@ -2974,14 +2984,14 @@ export default function ChatApp() {
     if (!title) return
     const d = await api(`/api/chat/session/${id}`, { method:'PATCH', body: JSON.stringify({ title }) })
     setSessions(xs => xs.map(x => x.id === id ? { ...x, title:d.title, updated_at:d.updated_at } : x))
-    setEditing(''); setDraftTitle(''); setNotice('会话已更名')
+    setEditing(''); setDraftTitle(''); setNotice(ct('会话已更名', 'Session renamed'))
   }
 
   const saveModel = async (next) => {
     setLlmNo(next)
     if (!sid) return
     await api(`/api/chat/settings/${sid}`, { method:'POST', body: JSON.stringify({ llm_no: next, reasoning_effort: reasoningEffort }) })
-    setNotice('模型已切换')
+    setNotice(ct('模型已切换', 'Model changed'))
   }
 
   const saveReasoningEffort = async (value) => {
@@ -2991,7 +3001,7 @@ export default function ChatApp() {
     if (!sid) return
     try {
       await api(`/api/chat/settings/${sid}`, { method:'POST', body: JSON.stringify({ llm_no: llmNo, reasoning_effort: next }) })
-      setNotice(next === 'off' ? '推理强度已设为默认' : `推理强度已设为 ${next}`)
+      setNotice(next === 'off' ? ct('推理强度已设为默认', 'Reasoning effort reset to default') : ct(`推理强度已设为 ${next}`, `Reasoning effort set to ${next}`))
     } catch (e) {
       setReasoningEffort(prev)
       setErr(e.message || String(e))
@@ -3041,12 +3051,12 @@ export default function ChatApp() {
   const saveExtraPromptSelection = async () => {
     const targetSid = extraPromptTargetSid
     if (!targetSid) {
-      setErr('请先创建或打开会话')
+      setErr(ct('请先创建或打开会话', 'Create or open a session first'))
       return
     }
     if (activeSidRef.current !== targetSid) {
       setExtraPromptOpen(false)
-      setErr('会话已切换，请重新选择系统提示预设')
+      setErr(ct('会话已切换，请重新选择系统提示预设', 'The session changed; choose the system-prompt preset again'))
       return
     }
     const targetOpenToken = openSeqRef.current
@@ -3066,7 +3076,7 @@ export default function ChatApp() {
       setExtraSysPrompts(savedPrompts)
       setExtraPromptSelection(savedID)
       setExtraPromptOpen(false)
-      setNotice(savedID ? `已为当前会话启用「${selectedPromptPresetView({ presets: promptPresets, selectedID: savedID, snapshot: savedPrompts }).name}」` : '当前会话已停用额外系统提示')
+      setNotice(savedID ? ct(`已为当前会话启用「${selectedPromptPresetView({ presets: promptPresets, selectedID: savedID, snapshot: savedPrompts }).name}」`, `Enabled “${selectedPromptPresetView({ presets: promptPresets, selectedID: savedID, snapshot: savedPrompts }).name}” for this session`) : ct('当前会话已停用额外系统提示', 'Extra system prompt disabled for this session'))
     } catch (e) {
       setErr(e.message || String(e))
     } finally {
@@ -3076,10 +3086,10 @@ export default function ChatApp() {
   const savePromptPresets = async () => {
     const next = normalizePromptPresets(extraPromptDraft)
     if (next.some(item => !item.name || !item.content)) {
-      setErr('每个预设都需要名称和提示内容')
+      setErr(ct('每个预设都需要名称和提示内容', 'Every preset needs a name and prompt content'))
       return
     }
-    if (!confirmDanger('chat-extra-system-prompt-presets-save', `保存 ${next.length} 个全局系统提示预设？这会写入 GA Admin 配置文件。`)) return
+    if (!confirmDanger('chat-extra-system-prompt-presets-save', ct(`保存 ${next.length} 个全局系统提示预设？这会写入 GA Admin 配置文件。`, `Save ${next.length} global system-prompt presets? This writes the GA Admin configuration file.`))) return
     setExtraPromptSaving(true)
     try {
       const d = await api('/api/extra-system-prompt-presets', {
@@ -3091,7 +3101,7 @@ export default function ChatApp() {
       setPromptPresets(saved)
       setExtraPromptDraft(saved.map(item => ({ ...item })))
       setPromptPresetManagerOpen(false)
-      setNotice(`已保存 ${saved.length} 个系统提示预设`)
+      setNotice(ct(`已保存 ${saved.length} 个系统提示预设`, `${saved.length} system-prompt presets saved`))
     } catch (e) {
       setErr(e.message || String(e))
     } finally {
@@ -3104,18 +3114,18 @@ export default function ChatApp() {
     const files = Array.from(fileList || []).filter(Boolean)
     if (!files.length) return
     if (attachments.length + files.length > MAX_CHAT_UPLOAD_FILES) {
-      setErr(`附件最多上传 ${MAX_CHAT_UPLOAD_FILES} 个`)
+      setErr(ct(`附件最多上传 ${MAX_CHAT_UPLOAD_FILES} 个`, `You can upload up to ${MAX_CHAT_UPLOAD_FILES} attachments`))
       return
     }
     const tooLarge = files.find((file) => (Number(file.size) || 0) > MAX_CHAT_UPLOAD_BYTES_PER_FILE)
     if (tooLarge) {
-      setErr(`附件过大：${tooLarge.name || 'attachment'}，单个限制 20MB`)
+      setErr(ct(`附件过大：${tooLarge.name || 'attachment'}，单个限制 20MB`, `Attachment too large: ${tooLarge.name || 'attachment'}; limit 20 MB per file`))
       return
     }
     const totalBytes = attachments.reduce((sum, file) => sum + (Number(file.size) || 0), 0)
       + files.reduce((sum, file) => sum + (Number(file.size) || 0), 0)
     if (totalBytes > MAX_CHAT_UPLOAD_BYTES_TOTAL) {
-      setErr('附件总大小限制 40MB')
+      setErr(ct('附件总大小限制 40MB', 'Total attachment size is limited to 40 MB'))
       return
     }
     const readOne = (file) => new Promise((resolve, reject) => {
@@ -3127,7 +3137,7 @@ export default function ChatApp() {
         size:Number(file.size) || 0,
         dataURL:String(reader.result || ''),
       })
-      reader.onerror = () => reject(reader.error || new Error('读取附件失败'))
+      reader.onerror = () => reject(reader.error || new Error(ct('读取附件失败', 'Failed to read attachment')))
       reader.readAsDataURL(file)
     })
     try {
@@ -3147,7 +3157,7 @@ export default function ChatApp() {
   const enqueueMessage = (item) => {
     const next = [...queuedRef.current, { ...item, id:`q-${Date.now()}-${Math.random().toString(16).slice(2)}`, queuedAt:Date.now() }]
     syncQueue(next)
-    setNotice(`已加入队列（${next.length} 条）。点击“引导”可中止当前回复并立即发送。`)
+    setNotice(ct(`已加入队列（${next.length} 条）。点击“引导”可中止当前回复并立即发送。`, `Added to queue (${next.length}). Use Guide to stop the current response and send immediately.`))
   }
   const removeQueued = (id) => {
     syncQueue(queuedRef.current.filter(x => x.id !== id))
@@ -3158,7 +3168,7 @@ export default function ChatApp() {
     if (!item) return
     setQueueEditingId(id)
     setQueueDraft(item.text || '')
-    setNotice('正在编辑队列消息')
+    setNotice(ct('正在编辑队列消息', 'Editing queued message'))
   }
   const cancelQueueEdit = () => {
     setQueueEditingId('')
@@ -3169,12 +3179,12 @@ export default function ChatApp() {
     const text = queueDraft.trim()
     const item = queuedRef.current.find(x => x.id === id)
     if (!item) return
-    if (!text && !(item.files || []).length) { setErr('队列消息不能为空'); return }
+    if (!text && !(item.files || []).length) { setErr(ct('队列消息不能为空', 'Queued message cannot be empty')); return }
     syncQueue(queuedRef.current.map(x => x.id === id ? { ...x, text } : x))
     setQueueEditingId('')
     setQueueDraft('')
     setErr('')
-    setNotice('队列消息已更新')
+    setNotice(ct('队列消息已更新', 'Queued message updated'))
   }
   const guideQueuedItem = (id) => {
     if (guidingQueueRef.current) return
@@ -3200,7 +3210,7 @@ export default function ChatApp() {
   const fillAskReply = useCallback((text) => {
     const value = String(text || '')
     setPrompt(value)
-    setNotice('已填入快捷回复，确认后可发送')
+    setNotice(ct('已填入快捷回复，确认后可发送', 'Quick reply inserted; review and send when ready'))
     const focusPrompt = () => {
       const el = promptRef.current
       if (!el) return
@@ -3225,13 +3235,13 @@ export default function ChatApp() {
 
   const sendBTW = async (text, sessionId = activeSidRef.current || sid, retryId = '') => {
     if (!sessionId) {
-      setNotice('请先打开一个对话再使用 /btw')
+      setNotice(ct('请先打开一个对话再使用 /btw', 'Open a conversation before using /btw'))
       return
     }
     const prompt = String(text || '').trim()
     const question = prompt.replace(/^\/btw(?:\s+|$)/i, '').trim()
     if (!question) {
-      setNotice('请在 /btw 后输入问题')
+      setNotice(ct('请在 /btw 后输入问题', 'Enter a question after /btw'))
       return
     }
     const placeholderId = retryId || `btw-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -3300,7 +3310,7 @@ export default function ChatApp() {
       setSessions(xs => xs.map(s => s.id === id ? { ...s, running:true } : s))
       setAutoFollow(true); setShowFollow(false)
       const fileNote = files.length ? `\n\n[附件]\n${files.map((file) => `- ${uploadFileName(file)}`).join('\n')}` : ''
-      const attachmentPrompt = text || '请处理这些附件'
+      const attachmentPrompt = text || ct('请处理这些附件', 'Please process these attachments')
       optimistic = { id:clientUserID, role:'user', content:attachmentPrompt + fileNote, files, created_at:Math.floor(Date.now()/1000) }
       pending = { id:`a-${Date.now()}`, role:'assistant', content:'', created_at:Math.floor(Date.now()/1000), run_started_at_ms:Date.now() }
       const sourceMessageID = String(item.sourceUserMessageId || '').trim()
@@ -3366,7 +3376,7 @@ export default function ChatApp() {
       }
       const next = popQueued()
       if (next) {
-        setNotice(`继续发送队列消息（剩余 ${Math.max(queuedRef.current.length, 0)} 条）`)
+        setNotice(ct(`继续发送队列消息（剩余 ${Math.max(queuedRef.current.length, 0)} 条）`, `Continuing queued messages (${Math.max(queuedRef.current.length, 0)} remaining)`))
         setTimeout(() => runSend(next), 0)
       } else {
         activeRunRef.current = false
@@ -3381,7 +3391,7 @@ export default function ChatApp() {
     if (!command) return
     setPrompt(command)
     setWorldlineRestorePicker(null)
-    setNotice('已填入恢复命令，确认后发送')
+    setNotice(ct('已填入恢复命令，确认后发送', 'Restore command inserted; review before sending'))
     window.setTimeout(() => {
       const input = promptRef.current
       if (!input) return
@@ -3418,7 +3428,7 @@ export default function ChatApp() {
     if (text === '/new' && !files.length) {
       setPrompt('')
       if (busy || activeRunRef.current) {
-        setNotice('当前正在执行，完成后可使用 /new 创建新对话')
+        setNotice(ct('当前正在执行，完成后可使用 /new 创建新对话', 'A run is in progress. Use /new after it completes.'))
         return
       }
       await newSession()
@@ -3476,12 +3486,12 @@ export default function ChatApp() {
       }
       if (e.key === 'Enter' || e.key === 'Tab') {
         const cmd = filteredCmds[cmdDrawer.selectedIdx]
-        const selectingNaturalReview = cmd?.cmd === '/review <自然语言请求>' && /^\s*\/review\s+\S/.test(currentValue)
+        const selectingNaturalReview = cmd?.cmd === '/review <request>' && /^\s*\/review\s+\S/.test(currentValue)
         const selectingBareContinue = e.key === 'Enter' && /^\s*\/continue\s*$/.test(currentValue)
         const selectingBareEffort = e.key === 'Enter' && /^\s*\/effort\s*$/.test(currentValue)
         const selectingBareImprove = e.key === 'Enter' && /^\s*\/improve\s*$/.test(currentValue)
-        const selectingContinueNumber = cmd?.cmd === '/continue <编号>' && /^\s*\/continue\s+\d+\s*$/.test(currentValue)
-        const selectingUltraPlanObjective = cmd?.cmd === '/ultraplan <目标>' && /^\s*\/ultraplan\s+\S/.test(currentValue)
+        const selectingContinueNumber = cmd?.cmd === '/continue <number>' && /^\s*\/continue\s+\d+\s*$/.test(currentValue)
+        const selectingUltraPlanObjective = cmd?.cmd === '/ultraplan <goal>' && /^\s*\/ultraplan\s+\S/.test(currentValue)
         if (selectingNaturalReview || selectingBareContinue || selectingBareEffort || selectingBareImprove || selectingContinueNumber || selectingUltraPlanObjective) {
           e.preventDefault()
           setCmdDrawer({ open:false, filter:'', selectedIdx:0 })
@@ -3527,14 +3537,14 @@ export default function ChatApp() {
       if (wasRunning) {
         streamAbortRef.current?.abort?.()
         if (id) await api(`/api/chat/cancel/${id}`, { method:'POST', body:'{}' })
-        setMessages(xs => xs.map((m, idx) => (idx === xs.length - 1 && m.role === 'assistant' && !m.content) ? { ...m, content:'已中止，改为执行引导消息。', error:true } : m))
+        setMessages(xs => xs.map((m, idx) => (idx === xs.length - 1 && m.role === 'assistant' && !m.content) ? { ...m, content:ct('已中止，改为执行引导消息。', 'Stopped and switched to the guided message.'), error:true } : m))
       }
     } catch (e) {
       setErr(e.message || String(e))
     } finally {
       setBusy(false)
       setStreamingSid('')
-      setNotice('已引导：中止当前回复并发送队列消息')
+      setNotice(ct('已引导：中止当前回复并发送队列消息', 'Guided: stopped the current response and sent the queued message'))
       setTimeout(() => runSend(next), 0)
     }
   }
@@ -3649,9 +3659,9 @@ export default function ChatApp() {
   const copyContext = async () => {
     try {
       await navigator.clipboard.writeText(contextJson)
-      setNotice('模型上下文 JSON 已复制')
+      setNotice(ct('模型上下文 JSON 已复制', 'Model context JSON copied'))
     } catch {
-      setErr('复制失败，请手动选择 JSON')
+      setErr(ct('复制失败，请手动选择 JSON', 'Copy failed; select the JSON manually'))
     }
   }
 
@@ -3659,12 +3669,12 @@ export default function ChatApp() {
     <aside className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-logo"><Bot size={18}/><span>GenericAgent</span></div>
-        <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title="折叠"><Menu size={18}/></button>
+        <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('折叠', 'Collapse')}><Menu size={18}/></button>
       </div>
-      <button className="oa-new-chat" onClick={newSession} disabled={batchDeleting}><MessageSquarePlus size={16}/><span>新对话</span></button>
+      <button className="oa-new-chat" onClick={newSession} disabled={batchDeleting}><MessageSquarePlus size={16}/><span>{ct('新对话', 'New chat')}</span></button>
       <div className="oa-session-manager-head">
-        <span className="oa-session-manager-title">历史会话 <small>{sessions.length}</small></span>
-        <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length}>管理</button>
+        <span className="oa-session-manager-title">{ct('历史会话', 'History')} <small>{sessions.length}</small></span>
+        <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理', 'Manage')}</button>
       </div>
       <div className="oa-session-list">
         {sessions.map(s => <div key={s.id} className={`oa-session-row ${s.id===sid?'active':''} ${s.running?'is-running':''}`}>
@@ -3673,7 +3683,7 @@ export default function ChatApp() {
             <button onClick={()=>saveRename(s.id)}><Check size={14}/></button><button onClick={()=>setEditing('')}><X size={14}/></button>
           </div> : <button className="oa-session" onClick={()=>openSession(s.id)} title={shortTitle(s)}>
             <span className="oa-session-title" title={shortTitle(s)}>{s.running && <i className="oa-session-running-dot" aria-hidden="true"/>}<b>{shortTitle(s)}</b></span>
-            <small><Clock3 size={11}/>{fmtTime(s.updated_at) || '刚刚'} · {s.count || 0} 条{s.running && <em className="oa-session-running-label">运行中</em>}</small>
+            <small><Clock3 size={11}/>{fmtTime(s.updated_at) || ct('刚刚', 'Just now')} · {ct(`${s.count || 0} 条`, `${s.count || 0} messages`)}{s.running && <em className="oa-session-running-label">{ct('运行中', 'Running')}</em>}</small>
           </button>}
           {editing !== s.id && <button className={`oa-session-more ${menuOpen === s.id ? 'is-open' : ''}`} onClick={(e)=>{
             e.stopPropagation()
@@ -3681,49 +3691,49 @@ export default function ChatApp() {
             const r = e.currentTarget.getBoundingClientRect()
             setMenuPos({ top: Math.max(8, r.top - 78), left: Math.max(8, r.right - 136) })
             setMenuOpen(s.id)
-          }} aria-label="会话操作"><MoreHorizontal size={16}/></button>}
+          }} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
         </div>)}
-        {!sessions.length && <div className="oa-empty-list">暂无历史会话</div>}
+        {!sessions.length && <div className="oa-empty-list">{ct('暂无历史会话', 'No session history')}</div>}
       </div>
       {!sessionManagerOpen && menuOpen && menuPos && (() => {
         const s = sessions.find(x => x.id === menuOpen)
         if (!s) return null
         return <div className="oa-session-menu" style={{ top: menuPos.top, left: menuPos.left }} onClick={e=>e.stopPropagation()}>
-          <button onClick={()=>startRename(s)}><Edit3 size={14}/>重命名</button>
-          <button className="danger" onClick={()=>deleteSession(s.id)}><Trash2 size={14}/>删除</button>
+          <button onClick={()=>startRename(s)}><Edit3 size={14}/>{ct('重命名', 'Rename')}</button>
+          <button className="danger" onClick={()=>deleteSession(s.id)}><Trash2 size={14}/>{ct('删除', 'Delete')}</button>
         </div>
       })()}
       <div className="oa-sidebar-foot">
-        <button onClick={()=>loadSessions().catch(e=>setErr(e.message))}><RefreshCw size={15}/>刷新会话</button>
-        <button onClick={()=>window.location.href='/'}><ChevronLeft size={15}/>返回管理台</button>
+        <button onClick={()=>loadSessions().catch(e=>setErr(e.message))}><RefreshCw size={15}/>{ct('刷新会话', 'Refresh sessions')}</button>
+        <button onClick={()=>window.location.href='/'}><ChevronLeft size={15}/>{ct('返回管理台', 'Back to admin')}</button>
       </div>
     </aside>
 
     <main className="oa-main">
       <header className="oa-topbar">
         {collapsed && <div className="oa-collapsed-actions">
-          <button className="oa-icon-btn oa-sidebar-toggle" onClick={()=>setCollapsed(false)} title="展开侧栏" aria-label="展开侧栏"><Menu size={18}/></button>
-          <button className="oa-icon-btn oa-collapsed-new" onClick={newSession} title="新对话" aria-label="新对话"><MessageSquarePlus size={18}/></button>
+          <button className="oa-icon-btn oa-sidebar-toggle" onClick={()=>setCollapsed(false)} title={ct('展开侧栏', 'Expand sidebar')} aria-label={ct('展开侧栏', 'Expand sidebar')}><Menu size={18}/></button>
+          <button className="oa-icon-btn oa-collapsed-new" onClick={newSession} title={ct('新对话', 'New chat')} aria-label={ct('新对话', 'New chat')}><MessageSquarePlus size={18}/></button>
         </div>}
-        <div className="oa-title"><b>{current ? shortTitle(current) : '新对话'}</b><span>ChatGPT-style workspace for GenericAgent</span>{current?.project_mode && <span className="oa-project-badge" title={`Project Mode: ${current.project_mode}`}>Project: {current.project_mode}</span>}{current?.workspace && <span className="oa-workspace-badge" title={current.workspace}>Workspace: {current.workspace}</span>}</div>
-        <button className={`oa-context-btn ${contextOpen ? 'is-open' : ''}`} type="button" onClick={()=>setContextOpen(v=>!v)} disabled={!sid} title="查看发给模型的 raw_history">
-          <PanelRightOpen size={16}/>上下文<span>{rawHistory?.length || 0}</span>
+        <div className="oa-title"><b>{current ? shortTitle(current) : ct('新对话', 'New chat')}</b><span>ChatGPT-style workspace for GenericAgent</span>{current?.project_mode && <span className="oa-project-badge" title={`Project Mode: ${current.project_mode}`}>Project: {current.project_mode}</span>}{current?.workspace && <span className="oa-workspace-badge" title={current.workspace}>Workspace: {current.workspace}</span>}</div>
+        <button className={`oa-context-btn ${contextOpen ? 'is-open' : ''}`} type="button" onClick={()=>setContextOpen(v=>!v)} disabled={!sid} title={ct('查看发给模型的 raw_history', 'View raw_history sent to the model')}>
+          <PanelRightOpen size={16}/>{ct('上下文', 'Context')}<span>{rawHistory?.length || 0}</span>
         </button>
       </header>
 
-      {contextOpen && <aside className="oa-context-drawer" aria-label="模型上下文">
+      {contextOpen && <aside className="oa-context-drawer" aria-label={ct('模型上下文', 'Model context')}>
         <div className="oa-context-head">
-          <div><b>模型上下文</b><span>agent.llmclient.backend.history 完成后的快照</span></div>
-          <div className="oa-context-actions"><button type="button" onClick={copyContext}>复制 JSON</button><button type="button" onClick={()=>setContextOpen(false)} aria-label="关闭上下文"><X size={15}/></button></div>
+          <div><b>{ct('模型上下文', 'Model context')}</b><span>{ct('agent.llmclient.backend.history 完成后的快照', 'Snapshot after agent.llmclient.backend.history completes')}</span></div>
+          <div className="oa-context-actions"><button type="button" onClick={copyContext}>{ct('复制 JSON', 'Copy JSON')}</button><button type="button" onClick={()=>setContextOpen(false)} aria-label={ct('关闭上下文', 'Close context')}><X size={15}/></button></div>
         </div>
         <div className="oa-context-json-tree"><JsonTree data={{ raw_history: rawHistory || [], history_info: historyInfo || [], working: workingState || {} }} /></div>
-        <details className="oa-context-raw"><summary>原始 JSON</summary><pre className="oa-context-raw-json">{contextJson}</pre></details>
+        <details className="oa-context-raw"><summary>{ct('原始 JSON', 'Raw JSON')}</summary><pre className="oa-context-raw-json">{contextJson}</pre></details>
       </aside>}
       <div className={`oa-workspace ${btwMessages.length && btwRailOpen ? 'has-btw' : ''}`}>
         <section className="oa-thread" ref={threadRef} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) breakFollow() }} onTouchMove={breakFollow}>
           {messages.length === 0 && <div className="oa-empty">
-            <h1>今天想让 GenericAgent 做什么？</h1>
-            <p>支持 Markdown、代码块复制、图片输入、模型切换、会话重命名与删除。</p>
+            <h1>{ct('今天想让 GenericAgent 做什么？', 'What should GenericAgent do today?')}</h1>
+            <p>{ct('支持 Markdown、代码块复制、图片输入、模型切换、会话重命名与删除。', 'Supports Markdown, code copying, image input, model switching, and session management.')}</p>
           </div>}
           <MessageList
             messages={messages}
@@ -3733,13 +3743,13 @@ export default function ChatApp() {
             onRetryBTW={(message)=>sendBTW(`/btw ${message.side_question}`, activeSidRef.current, message.id)}
             clockNow={streamClock}
           />
-          {showFollow && <div className="oa-follow-row"><button className="oa-follow-btn" type="button" onClick={resumeFollow}><ChevronDown size={16}/>继续跟随</button></div>}
+          {showFollow && <div className="oa-follow-row"><button className="oa-follow-btn" type="button" onClick={resumeFollow}><ChevronDown size={16}/>{ct('继续跟随', 'Resume following')}</button></div>}
           <div ref={endRef}/>
         </section>
-        {btwMessages.length > 0 && btwRailOpen && <aside className="oa-btw-rail" aria-label="侧问">
+        {btwMessages.length > 0 && btwRailOpen && <aside className="oa-btw-rail" aria-label={ct('侧问', 'Side questions')}>
           <header>
-            <div className="oa-btw-title"><span>BTW</span><b>侧问</b><em>{btwMessages.length}</em></div>
-            <button type="button" className="oa-btw-toggle" onClick={()=>setBtwRailOpen(false)} aria-expanded="true" aria-controls="oa-btw-rail-list" title="收起侧问栏"><ChevronRight size={15}/><span>收起</span></button>
+            <div className="oa-btw-title"><span>BTW</span><b>{ct('侧问', 'Side questions')}</b><em>{btwMessages.length}</em></div>
+            <button type="button" className="oa-btw-toggle" onClick={()=>setBtwRailOpen(false)} aria-expanded="true" aria-controls="oa-btw-rail-list" title={ct('收起侧问栏', 'Collapse side question panel')}><ChevronRight size={15}/><span>{ct('收起', 'Collapse')}</span></button>
           </header>
           <div className="oa-btw-rail-list" id="oa-btw-rail-list">
             {btwMessages.map(message => <ChatMessage
@@ -3751,43 +3761,43 @@ export default function ChatApp() {
             />)}
           </div>
         </aside>}
-        {btwMessages.length > 0 && !btwRailOpen && <button type="button" className="oa-btw-collapsed" onClick={()=>setBtwRailOpen(true)} aria-expanded="false" aria-controls="oa-btw-rail-list" title="展开侧问栏"><ChevronLeft size={15}/><span>BTW</span><b>{btwMessages.length}</b></button>}
+        {btwMessages.length > 0 && !btwRailOpen && <button type="button" className="oa-btw-collapsed" onClick={()=>setBtwRailOpen(true)} aria-expanded="false" aria-controls="oa-btw-rail-list" title={ct('展开侧问栏', 'Expand side question panel')}><ChevronLeft size={15}/><span>BTW</span><b>{btwMessages.length}</b></button>}
       </div>
 
       <footer className="oa-composer-wrap">
         <PlanTodoCard plan={planState}/>
-        {queuedMessages.length > 0 && <div className={`oa-queue-dock ${isCurrentRunning ? 'is-running' : 'is-idle'}`} aria-label="待发送队列">
+        {queuedMessages.length > 0 && <div className={`oa-queue-dock ${isCurrentRunning ? 'is-running' : 'is-idle'}`} aria-label={ct('待发送队列', 'Send queue')}>
           <div className="oa-queue-guide-hint">
             <Sparkles className="oa-queue-guide-icon" size={14} aria-hidden="true"/>
-            <span className="oa-queue-guide-copy"><b>待发送</b><small>{isCurrentRunning ? '回复进行中，可接管任意一条立即发送' : '回复结束后将按顺序发送'}</small></span>
-            <span className="oa-queue-count" aria-label={`${queuedMessages.length} 条待发送消息`}>{queuedMessages.length} 条</span>
+            <span className="oa-queue-guide-copy"><b>{ct('待发送', 'Queued')}</b><small>{isCurrentRunning ? ct('回复进行中，可接管任意一条立即发送', 'A response is in progress. Take over with any queued message.') : ct('回复结束后将按顺序发送', 'Messages will be sent in order after the response.')}</small></span>
+            <span className="oa-queue-count" aria-label={ct(`${queuedMessages.length} 条待发送消息`, `${queuedMessages.length} queued messages`)}>{ct(`${queuedMessages.length} 条`, `${queuedMessages.length}`)}</span>
           </div>
           {queuedMessages.map((q, i) => {
             const isEditingQueue = queueEditingId === q.id
             const isGuidingQueue = guidingQueueId === q.id
             return <div key={q.id} className={`oa-queued-item ${isEditingQueue ? 'is-editing' : ''} ${isGuidingQueue ? 'is-guiding' : ''}`}>
               <span className="oa-queue-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-              <div className="oa-queue-content" title={isEditingQueue ? '' : (q.text || '请处理这些附件')}>
+              <div className="oa-queue-content" title={isEditingQueue ? '' : (q.text || ct('请处理这些附件', 'Please process these attachments'))}>
                 {isEditingQueue ? <textarea className="oa-queue-edit-input" value={queueDraft} autoFocus rows={2} onChange={e=>setQueueDraft(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter' && (e.ctrlKey || e.metaKey)) saveQueueEdit(q.id); if(e.key==='Escape') cancelQueueEdit() }} /> : <>
-                  <b>{q.text || '请处理这些附件'}</b>
-                  {q.files?.length ? <em>{q.files.length} {'个附件'}</em> : null}
+                  <b>{q.text || ct('请处理这些附件', 'Please process these attachments')}</b>
+                  {q.files?.length ? <em>{ct(`${q.files.length} 个附件`, `${q.files.length} attachments`)}</em> : null}
                 </>}
               </div>
               <div className="oa-queue-actions">
                 {isEditingQueue ? <>
-                  <button className="oa-queue-action is-confirm" type="button" onClick={()=>saveQueueEdit(q.id)} title="保存队列消息" aria-label="保存队列消息"><Check size={14}/></button>
-                  <button className="oa-queue-action" type="button" onClick={cancelQueueEdit} title="取消编辑" aria-label="取消编辑"><X size={14}/></button>
+                  <button className="oa-queue-action is-confirm" type="button" onClick={()=>saveQueueEdit(q.id)} title={ct('保存队列消息', 'Save queued message')} aria-label={ct('保存队列消息', 'Save queued message')}><Check size={14}/></button>
+                  <button className="oa-queue-action" type="button" onClick={cancelQueueEdit} title={ct('取消编辑', 'Cancel editing')} aria-label={ct('取消编辑', 'Cancel editing')}><X size={14}/></button>
                 </> : <>
-                  <button className="oa-guide-btn" type="button" onClick={()=>guideQueuedItem(q.id)} disabled={!isCurrentRunning || Boolean(guidingQueueId)} title={isGuidingQueue ? '正在中止当前回复并发送这条消息' : (isCurrentRunning ? `暂停当前输出，立即发送消息${i + 1}` : '回复结束后会自动发送')}><Sparkles size={14}/>{isGuidingQueue ? '接管中…' : '引导发送'}</button>
-                  <button className="oa-queue-action is-danger" type="button" onClick={()=>removeQueued(q.id)} title="删除这条队列消息" aria-label="删除这条队列消息"><Trash2 size={14}/></button>
-                  <button className="oa-queue-action" type="button" onClick={()=>editQueued(q.id)} title="编辑这条队列消息" aria-label="编辑这条队列消息"><Edit3 size={14}/></button>
+                  <button className="oa-guide-btn" type="button" onClick={()=>guideQueuedItem(q.id)} disabled={!isCurrentRunning || Boolean(guidingQueueId)} title={isGuidingQueue ? ct('正在中止当前回复并发送这条消息', 'Stopping the current response and sending this message') : (isCurrentRunning ? ct(`暂停当前输出，立即发送消息${i + 1}`, `Pause the current output and send message ${i + 1}`) : ct('回复结束后会自动发送', 'This message will be sent after the response.'))}><Sparkles size={14}/>{isGuidingQueue ? ct('接管中…', 'Taking over…') : ct('引导发送', 'Send now')}</button>
+                  <button className="oa-queue-action is-danger" type="button" onClick={()=>removeQueued(q.id)} title={ct('删除这条队列消息', 'Delete this queued message')} aria-label={ct('删除这条队列消息', 'Delete this queued message')}><Trash2 size={14}/></button>
+                  <button className="oa-queue-action" type="button" onClick={()=>editQueued(q.id)} title={ct('编辑这条队列消息', 'Edit this queued message')} aria-label={ct('编辑这条队列消息', 'Edit this queued message')}><Edit3 size={14}/></button>
                 </>}
               </div>
             </div>
           })}
         </div>}
         {cmdDrawer.open && <div className="oa-cmd-drawer" ref={cmdDrawerRef}>
-          {filteredCmds.length === 0 && <div className="oa-cmd-item" style={{color:'var(--text-secondary)',justifyContent:'center',cursor:'default',padding:'12px 14px'}}>无匹配命令</div>}
+          {filteredCmds.length === 0 && <div className="oa-cmd-item" style={{color:'var(--text-secondary)',justifyContent:'center',cursor:'default',padding:'12px 14px'}}>{ct('无匹配命令', 'No matching commands')}</div>}
           {filteredCmds.map((c,i)=>{
             return (
               <div key={c.cmd+i} ref={i===cmdDrawer.selectedIdx ? selectedCmdRef : null} className={`oa-cmd-item${i===cmdDrawer.selectedIdx?' selected':''}`} onMouseEnter={() => setCmdDrawer(d => ({ ...d, selectedIdx: i }))} onMouseDown={e=>{e.preventDefault();applySlashCommand(c,promptRef.current?.value ?? prompt)}}>
@@ -3798,97 +3808,97 @@ export default function ChatApp() {
           })}
         </div>}
         {cmdManagerOpen && <div className="oa-cmd-manager-backdrop" onMouseDown={()=>setCmdManagerOpen(false)}>
-          <div className="oa-cmd-manager" role="dialog" aria-modal="true" aria-label="自定义斜杠命令" onMouseDown={e=>e.stopPropagation()}>
+          <div className="oa-cmd-manager" role="dialog" aria-modal="true" aria-label={ct('自定义斜杠命令', 'Custom slash commands')} onMouseDown={e=>e.stopPropagation()}>
             <div className="oa-cmd-manager-head">
-              <div><h3>自定义斜杠命令</h3><p>官方命令只读锁定；用户命令可新增、编辑、删除。</p></div>
-              <button className="oa-icon-btn" type="button" onClick={()=>setCmdManagerOpen(false)} title="关闭"><X size={16}/></button>
+              <div><h3>{ct('自定义斜杠命令', 'Custom slash commands')}</h3><p>{ct('官方命令只读锁定；用户命令可新增、编辑、删除。', 'Official commands are read-only; custom commands can be added, edited, and deleted.')}</p></div>
+              <button className="oa-icon-btn" type="button" onClick={()=>setCmdManagerOpen(false)} title={ct('关闭', 'Close')}><X size={16}/></button>
             </div>
             <div className="oa-cmd-manager-actions">
-              <button className="oa-guide-btn" type="button" onClick={()=>startEdit(-2, '/', '', '')}><Plus size={14}/>新增自定义命令</button>
-              <span>{(cfg?.slash_commands || []).filter(c => !isProtectedSlashCommand(c?.cmd)).length} 个自定义 · {effectiveSlashCommands.length} 个官方</span>
+              <button className="oa-guide-btn" type="button" onClick={()=>startEdit(-2, '/', '', '')}><Plus size={14}/>{ct('新增自定义命令', 'Add custom command')}</button>
+              <span>{ct(`${(cfg?.slash_commands || []).filter(c => !isProtectedSlashCommand(c?.cmd)).length} 个自定义 · ${effectiveSlashCommands.length} 个官方`, `${(cfg?.slash_commands || []).filter(c => !isProtectedSlashCommand(c?.cmd)).length} custom · ${effectiveSlashCommands.length} official`)}</span>
             </div>
             {cmdEditIdx !== -1 && <div className="oa-cmd-edit-card">
-              <input value={cmdEditCmd} onChange={e=>setCmdEditCmd(e.target.value)} placeholder="命令，例如 /hello" autoFocus />
-              <input value={cmdEditDesc} onChange={e=>setCmdEditDesc(e.target.value)} placeholder="描述，例如 代码审查模板" />
-              <textarea value={cmdEditContent} onChange={e=>setCmdEditContent(e.target.value)} placeholder="发送时展开成的指令内容。可用 {args} 插入 /命令 后面的参数。" rows={4}/>
-              <button type="button" onClick={saveEdit}>保存</button>
-              <button type="button" onClick={()=>setCmdEditIdx(-1)}>取消</button>
+              <input value={cmdEditCmd} onChange={e=>setCmdEditCmd(e.target.value)} placeholder={ct('命令，例如 /hello', 'Command, for example /hello')} autoFocus />
+              <input value={cmdEditDesc} onChange={e=>setCmdEditDesc(e.target.value)} placeholder={ct('描述，例如 代码审查模板', 'Description, for example Code review template')} />
+              <textarea value={cmdEditContent} onChange={e=>setCmdEditContent(e.target.value)} placeholder={ct('发送时展开成的指令内容。可用 {args} 插入 /命令 后面的参数。', 'Instruction content expanded on send. Use {args} for arguments after /command.')} rows={4}/>
+              <button type="button" onClick={saveEdit}>{ct('保存', 'Save')}</button>
+              <button type="button" onClick={()=>setCmdEditIdx(-1)}>{ct('取消', 'Cancel')}</button>
             </div>}
             <div className="oa-cmd-manager-list">
-              <div className="oa-cmd-section-title">用户自定义</div>
-              {(cfg?.slash_commands || []).filter(c => !isProtectedSlashCommand(c?.cmd)).length === 0 && <div className="oa-cmd-empty">暂无自定义命令，点击上方新增。</div>}
+              <div className="oa-cmd-section-title">{ct('用户自定义', 'Custom')}</div>
+              {(cfg?.slash_commands || []).filter(c => !isProtectedSlashCommand(c?.cmd)).length === 0 && <div className="oa-cmd-empty">{ct('暂无自定义命令，点击上方新增。', 'No custom commands. Use the button above to add one.')}</div>}
               {(cfg?.slash_commands || []).map((c, i) => {
                 if (isProtectedSlashCommand(c?.cmd)) return null
                 return <div className="oa-cmd-manage-row" key={`${c.cmd}-${i}`}>
-                  <div><b>{c.cmd}</b><small>{c.desc || '无描述'}</small>{(c.content || c.prompt) && <em>{c.content || c.prompt}</em>}</div>
-                  <button type="button" onClick={()=>startEdit(i, c.cmd || '/', c.desc || '', c.content || c.prompt || '')}><Edit3 size={14}/>编辑</button>
-                  <button type="button" onClick={()=>deleteCmd(i)}><Trash2 size={14}/>删除</button>
+                  <div><b>{c.cmd}</b><small>{c.desc || ct('无描述', 'No description')}</small>{(c.content || c.prompt) && <em>{c.content || c.prompt}</em>}</div>
+                  <button type="button" onClick={()=>startEdit(i, c.cmd || '/', c.desc || '', c.content || c.prompt || '')}><Edit3 size={14}/>{ct('编辑', 'Edit')}</button>
+                  <button type="button" onClick={()=>deleteCmd(i)}><Trash2 size={14}/>{ct('删除', 'Delete')}</button>
                 </div>
               })}
-              <div className="oa-cmd-section-title">官方命令</div>
+              <div className="oa-cmd-section-title">{ct('官方命令', 'Official commands')}</div>
               {effectiveSlashCommands.map((c, i) => <div className="oa-cmd-manage-row is-locked" key={`${c.cmd}-${i}`}>
-                <div><b>{c.cmd}</b><small>{c.desc || '官方命令'}</small></div>
-                <span><Lock size={13}/>只读</span>
+                <div><b>{c.cmd}</b><small>{c.desc || ct('官方命令', 'Official command')}</small></div>
+                <span><Lock size={13}/>{ct('只读', 'Read-only')}</span>
               </div>)}
             </div>
           </div>
         </div>}
         {extraPromptOpen && <div className="oa-cmd-manager-backdrop" onMouseDown={()=>setExtraPromptOpen(false)}>
-          <div className={`oa-cmd-manager oa-prompt-preset-dialog ${promptPresetManagerOpen ? 'is-managing' : 'is-picking'}`} role="dialog" aria-modal="true" aria-label="系统提示预设" onMouseDown={e=>e.stopPropagation()}>
+          <div className={`oa-cmd-manager oa-prompt-preset-dialog ${promptPresetManagerOpen ? 'is-managing' : 'is-picking'}`} role="dialog" aria-modal="true" aria-label={ct('系统提示预设', 'System-prompt presets')} onMouseDown={e=>e.stopPropagation()}>
             <div className="oa-cmd-manager-head">
               <div>
-                <h3>{promptPresetManagerOpen ? '管理系统提示预设' : '选择系统提示预设'}</h3>
-                <p>{promptPresetManagerOpen ? '预设全局可用；已绑定会话会保留选择时的内容快照。' : '每个会话可启用一个预设，运行 Agent 时动态追加。'}</p>
+                <h3>{promptPresetManagerOpen ? ct('管理系统提示预设', 'Manage system-prompt presets') : ct('选择系统提示预设', 'Choose a system-prompt preset')}</h3>
+                <p>{promptPresetManagerOpen ? ct('预设全局可用；已绑定会话会保留选择时的内容快照。', 'Presets are global; bound sessions keep a snapshot of the selected content.') : ct('每个会话可启用一个预设，运行 Agent 时动态追加。', 'Each session can enable one preset that is appended when the agent runs.')}</p>
               </div>
-              <button className="oa-icon-btn" type="button" onClick={()=>setExtraPromptOpen(false)} title="关闭"><X size={16}/></button>
+              <button className="oa-icon-btn" type="button" onClick={()=>setExtraPromptOpen(false)} title={ct('关闭', 'Close')}><X size={16}/></button>
             </div>
             {promptPresetManagerOpen ? <>
               <div className="oa-cmd-manager-actions">
-                <button className="oa-guide-btn" type="button" onClick={()=>setExtraPromptDraft(items => [...items, createPromptPreset(items)])}><Plus size={14}/>新增预设</button>
-                <span>{extraPromptDraft.length} 个预设</span>
+                <button className="oa-guide-btn" type="button" onClick={()=>setExtraPromptDraft(items => [...items, createPromptPreset(items)])}><Plus size={14}/>{ct('新增预设', 'Add preset')}</button>
+                <span>{ct(`${extraPromptDraft.length} 个预设`, `${extraPromptDraft.length} presets`)}</span>
               </div>
               <div className="oa-cmd-manager-list oa-prompt-preset-editor-list">
-                {extraPromptDraft.length === 0 && <div className="oa-cmd-empty">暂无预设。新增后填写名称和提示内容。</div>}
+                {extraPromptDraft.length === 0 && <div className="oa-cmd-empty">{ct('暂无预设。新增后填写名称和提示内容。', 'No presets yet. Add one, then enter its name and prompt content.')}</div>}
                 {extraPromptDraft.map((item, index) => <div className="oa-cmd-edit-card oa-prompt-preset-edit-card" key={item.id}>
                   <div className="oa-prompt-preset-edit-head">
-                    <input value={item.name} onChange={e=>updateExtraPromptDraft(item.id, 'name', e.target.value)} placeholder={`预设名称 ${index + 1}`} aria-label={`预设名称 ${index + 1}`}/>
-                    <code title="稳定预设 ID">{item.id}</code>
+                    <input value={item.name} onChange={e=>updateExtraPromptDraft(item.id, 'name', e.target.value)} placeholder={`${ct('预设名称', 'Preset name')} ${index + 1}`} aria-label={`${ct('预设名称', 'Preset name')} ${index + 1}`}/>
+                    <code title={ct('稳定预设 ID', 'Stable preset ID')}>{item.id}</code>
                   </div>
-                  <textarea value={item.content} onChange={e=>updateExtraPromptDraft(item.id, 'content', e.target.value)} placeholder="输入追加到 Agent 系统提示中的内容" rows={5}/>
-                  <button type="button" onClick={()=>setExtraPromptDraft(items => items.filter(preset => preset.id !== item.id))}><Trash2 size={14}/>删除</button>
+                  <textarea value={item.content} onChange={e=>updateExtraPromptDraft(item.id, 'content', e.target.value)} placeholder={ct('输入追加到 Agent 系统提示中的内容', 'Enter content to append to the agent system prompt')} rows={5}/>
+                  <button type="button" onClick={()=>setExtraPromptDraft(items => items.filter(preset => preset.id !== item.id))}><Trash2 size={14}/>{ct('删除', 'Delete')}</button>
                 </div>)}
               </div>
               <div className="oa-cmd-manager-actions oa-prompt-preset-footer">
-                <button className="oa-guide-btn" type="button" onClick={savePromptPresets} disabled={extraPromptSaving}>{extraPromptSaving ? '保存中…' : '保存全局预设'}</button>
-                <button type="button" onClick={()=>setPromptPresetManagerOpen(false)} disabled={extraPromptSaving}><ChevronLeft size={14}/>返回选择</button>
+                <button className="oa-guide-btn" type="button" onClick={savePromptPresets} disabled={extraPromptSaving}>{extraPromptSaving ? ct('保存中…', 'Saving…') : ct('保存全局预设', 'Save global presets')}</button>
+                <button type="button" onClick={()=>setPromptPresetManagerOpen(false)} disabled={extraPromptSaving}><ChevronLeft size={14}/>{ct('返回选择', 'Back to selection')}</button>
               </div>
             </> : <>
               <div className="oa-cmd-manager-actions">
-                <span>{promptPresets.length} 个可用预设</span>
-                <button type="button" onClick={openPromptPresetManager}><Edit3 size={14}/>管理预设</button>
+                <span>{ct(`${promptPresets.length} 个可用预设`, `${promptPresets.length} presets available`)}</span>
+                <button type="button" onClick={openPromptPresetManager}><Edit3 size={14}/>{ct('管理预设', 'Manage presets')}</button>
               </div>
-              <div className="oa-cmd-manager-list oa-prompt-preset-picker" role="radiogroup" aria-label="当前会话系统提示预设">
+              <div className="oa-cmd-manager-list oa-prompt-preset-picker" role="radiogroup" aria-label={ct('当前会话系统提示预设', 'Current session system-prompt preset')}>
                 <label className={`oa-prompt-preset-option ${extraPromptSelection === '' ? 'is-selected' : ''}`}>
                   <input type="radio" name="extra-system-prompt-preset" value="" checked={extraPromptSelection === ''} onChange={()=>selectExtraPromptPreset('')}/>
                   <span className="oa-prompt-preset-radio"><Check size={13}/></span>
-                  <span className="oa-prompt-preset-copy"><b>不使用预设</b><small>仅使用 Agent 默认系统提示</small></span>
+                  <span className="oa-prompt-preset-copy"><b>{ct('不使用预设', 'Do not use a preset')}</b><small>{ct('仅使用 Agent 默认系统提示', 'Use only the default agent system prompt')}</small></span>
                 </label>
                 {activePromptPreset.orphaned && <label className={`oa-prompt-preset-option is-orphaned ${extraPromptSelection === activePromptPreset.id ? 'is-selected' : ''}`}>
                   <input type="radio" name="extra-system-prompt-preset" value={activePromptPreset.id} checked={extraPromptSelection === activePromptPreset.id} onChange={()=>selectExtraPromptPreset(activePromptPreset.id)}/>
                   <span className="oa-prompt-preset-radio"><Check size={13}/></span>
-                  <span className="oa-prompt-preset-copy"><b>已删除的预设</b><small>{activePromptPreset.content || '当前会话仍保留原内容快照'}</small></span>
-                  <em>快照</em>
+                  <span className="oa-prompt-preset-copy"><b>{ct('已删除的预设', 'Deleted preset')}</b><small>{activePromptPreset.content || ct('当前会话仍保留原内容快照', 'This session still retains the original content snapshot')}</small></span>
+                  <em>{ct('快照', 'Snapshot')}</em>
                 </label>}
                 {promptPresets.map(item => <label className={`oa-prompt-preset-option ${extraPromptSelection === item.id ? 'is-selected' : ''}`} key={item.id}>
                   <input type="radio" name="extra-system-prompt-preset" value={item.id} checked={extraPromptSelection === item.id} onChange={()=>selectExtraPromptPreset(item.id)}/>
                   <span className="oa-prompt-preset-radio"><Check size={13}/></span>
                   <span className="oa-prompt-preset-copy"><b>{item.name}</b><small>{item.content}</small></span>
                 </label>)}
-                {promptPresets.length === 0 && !activePromptPreset.orphaned && <div className="oa-cmd-empty">还没有预设。先进入“管理预设”新建一个。</div>}
+                {promptPresets.length === 0 && !activePromptPreset.orphaned && <div className="oa-cmd-empty">{ct('还没有预设。先进入“管理预设”新建一个。', 'No presets yet. Open Manage presets to create one.')}</div>}
               </div>
               <div className="oa-cmd-manager-actions oa-prompt-preset-footer">
-                <button className="oa-guide-btn" type="button" onClick={saveExtraPromptSelection} disabled={extraPromptSaving}>{extraPromptSaving ? '应用中…' : '应用到当前会话'}</button>
-                <button type="button" onClick={()=>setExtraPromptOpen(false)} disabled={extraPromptSaving}>取消</button>
+                <button className="oa-guide-btn" type="button" onClick={saveExtraPromptSelection} disabled={extraPromptSaving}>{extraPromptSaving ? ct('应用中…', 'Applying…') : ct('应用到当前会话', 'Apply to current session')}</button>
+                <button type="button" onClick={()=>setExtraPromptOpen(false)} disabled={extraPromptSaving}>{ct('取消', 'Cancel')}</button>
               </div>
             </>}
           </div>
@@ -3905,28 +3915,28 @@ export default function ChatApp() {
               return <div className={`oa-attach-thumb ${image ? 'is-image' : `is-file oa-file-kind-${visual.kind}`}`} key={attachment.id} title={name}>
                 {image ? <img src={uploadFileSource(attachment)} alt={name}/> : <div className="oa-attach-file-icon"><Icon size={25}/><small>{extension}</small></div>}
                 <span>{image ? <FileImage size={12}/> : <Icon size={12}/>} {name}</span>
-                <button type="button" onClick={()=>removeAttachment(attachment.id)} title={'移除附件'} aria-label={`移除附件 ${name}`}><X size={12}/></button>
+                <button type="button" onClick={()=>removeAttachment(attachment.id)} title={ct('移除附件', 'Remove attachment')} aria-label={ct(`移除附件 ${name}`, `Remove attachment ${name}`)}><X size={12}/></button>
               </div>
             })}
           </div>}
-          {isUltraPlanPrompt && <div className="oa-ultraplan-mode" aria-live="polite"><span><Sparkles size={14}/>UltraPlan</span><b>将以规划模式执行，并在完成后展示 run 目录与日志摘要</b></div>}
-          <textarea ref={promptRef} value={prompt} onPaste={onPaste} onChange={handlePromptChange} onKeyDown={handlePromptKeyDown} placeholder={'向 GenericAgent 发送消息，可选择/粘贴/拖拽任意文件…'} rows={1}/>
+          {isUltraPlanPrompt && <div className="oa-ultraplan-mode" aria-live="polite"><span><Sparkles size={14}/>UltraPlan</span><b>{ct('将以规划模式执行，并在完成后展示 run 目录与日志摘要', 'Runs in planning mode and shows the run directory and log summary when complete')}</b></div>}
+          <textarea ref={promptRef} value={prompt} onPaste={onPaste} onChange={handlePromptChange} onKeyDown={handlePromptKeyDown} placeholder={ct('向 GenericAgent 发送消息，可选择/粘贴/拖拽任意文件…', 'Message GenericAgent; select, paste, or drag any file…')} rows={1}/>
           <div className="oa-composer-bar">
-            <button className="oa-attach-btn" type="button" onClick={()=>fileRef.current?.click()} title={'添加附件'}><Paperclip size={17}/><span>{'附件'}</span></button>
-            <button className={`oa-attach-btn ${cmdManagerOpen ? 'is-open' : ''}`} type="button" onClick={()=>setCmdManagerOpen(true)} title="管理自定义斜杠命令"><Sparkles size={16}/><span>命令</span></button>
-            <button className={`oa-attach-btn ${extraPromptOpen || extraSysPromptPresetID ? 'is-open' : ''}`} type="button" onClick={openExtraPromptEditor} title={extraSysPromptPresetID ? `当前预设：${activePromptPreset.name}` : '选择本会话的系统提示预设'}><Bot size={16}/><span>系统提示{extraSysPromptPresetID ? ` · ${activePromptPreset.name}` : ''}</span></button>
+            <button className="oa-attach-btn" type="button" onClick={()=>fileRef.current?.click()} title={ct('添加附件', 'Add attachment')}><Paperclip size={17}/><span>{ct('附件', 'Attachments')}</span></button>
+            <button className={`oa-attach-btn ${cmdManagerOpen ? 'is-open' : ''}`} type="button" onClick={()=>setCmdManagerOpen(true)} title={ct('管理自定义斜杠命令', 'Manage custom slash commands')}><Sparkles size={16}/><span>{ct('命令', 'Commands')}</span></button>
+            <button className={`oa-attach-btn ${extraPromptOpen || extraSysPromptPresetID ? 'is-open' : ''}`} type="button" onClick={openExtraPromptEditor} title={extraSysPromptPresetID ? ct(`当前预设：${activePromptPreset.name}`, `Current preset: ${activePromptPreset.name}`) : ct('选择本会话的系统提示预设', 'Choose a system-prompt preset for this session')}><Bot size={16}/><span>{ct('系统提示', 'System prompt')}{extraSysPromptPresetID ? ` · ${activePromptPreset.name}` : ''}</span></button>
             <ProviderModelCascade groups={providerGroups} selectedProvider={selectedProvider}
               value={selectedModelNo} disabled={!providerGroups.length}
               onChange={v=>saveModel(Number(v))} />
-            <div className="oa-model-select oa-effort-select"><span>推理</span>
+            <div className="oa-model-select oa-effort-select"><span>{ct('推理', 'Reasoning')}</span>
               <CustomSelect value={reasoningEffort} onChange={v=>saveReasoningEffort(v)}
-                options={REASONING_EFFORT_OPTIONS} />
+                options={REASONING_EFFORT_OPTIONS.map(option => option.value === 'off' ? { ...option, label: ct('默认', 'Default') } : option)} />
             </div>
-            <button className="oa-send" type="button" disabled={!prompt.trim() && !attachments.length} onClick={() => send()} title={isCurrentRunning ? '加入发送队列' : '发送'} aria-label={isCurrentRunning ? '加入发送队列' : '发送'}><Send size={17}/></button>
-            {isCurrentRunning && <button className="oa-stop" type="button" onClick={()=>cancelRun(sid)} title="停止生成" aria-label="停止生成"><Square size={14}/></button>}
+            <button className="oa-send" type="button" disabled={!prompt.trim() && !attachments.length} onClick={() => send()} title={isCurrentRunning ? ct('加入发送队列', 'Add to send queue') : ct('发送', 'Send')} aria-label={isCurrentRunning ? ct('加入发送队列', 'Add to send queue') : ct('发送', 'Send')}><Send size={17}/></button>
+            {isCurrentRunning && <button className="oa-stop" type="button" onClick={()=>cancelRun(sid)} title={ct('停止生成', 'Stop generating')} aria-label={ct('停止生成', 'Stop generating')}><Square size={14}/></button>}
           </div>
         </div>
-        <p>Enter 发送 · Shift + Enter 换行 · 回复中发送会排队</p>
+        <p>{ct('Enter 发送 · Shift + Enter 换行 · 回复中发送会排队', 'Enter to send · Shift + Enter for a new line · Messages queue while responding')}</p>
       </footer>
     </main>
 
@@ -3935,17 +3945,17 @@ export default function ChatApp() {
       <section className="oa-session-manager-modal" role="dialog" aria-modal="true" aria-labelledby="oa-session-manager-dialog-title" onMouseDown={e=>e.stopPropagation()}>
         <header className="oa-session-manager-dialog-head">
           <div>
-            <h2 id="oa-session-manager-dialog-title">管理历史会话</h2>
-            <p>选择不再需要的会话并批量删除</p>
+            <h2 id="oa-session-manager-dialog-title">{ct('管理历史会话', 'Manage session history')}</h2>
+            <p>{ct('选择不再需要的会话并批量删除', 'Select sessions you no longer need and delete them in a batch')}</p>
           </div>
-          <button className="oa-icon-btn" type="button" onClick={closeSessionManager} disabled={batchDeleting} aria-label="关闭会话管理" autoFocus><X size={17}/></button>
+          <button className="oa-icon-btn" type="button" onClick={closeSessionManager} disabled={batchDeleting} aria-label={ct('关闭会话管理', 'Close session manager')} autoFocus><X size={17}/></button>
         </header>
         <div className="oa-session-manager-toolbar">
           <button className="oa-session-dialog-select-all" type="button" role="checkbox" aria-checked={allSessionsSelected ? true : (selectedSessionCount ? 'mixed' : false)} onClick={toggleAllSessions} disabled={!sessions.length || batchDeleting}>
             <span className={`oa-session-check ${allSessionsSelected ? 'is-checked' : ''} ${!allSessionsSelected && selectedSessionCount ? 'is-partial' : ''}`}>{allSessionsSelected && <Check size={12}/>}</span>
-            <span>{allSessionsSelected ? '取消全选' : '全选'}</span>
+            <span>{allSessionsSelected ? ct('取消全选', 'Clear selection') : ct('全选', 'Select all')}</span>
           </button>
-          <span className="oa-session-dialog-count">已选 {selectedSessionCount} / {sessions.length}</span>
+          <span className="oa-session-dialog-count">{ct(`已选 ${selectedSessionCount} / ${sessions.length}`, `${selectedSessionCount} / ${sessions.length} selected`)}</span>
         </div>
         <div className="oa-session-manager-dialog-list">
           {sessions.map(s => {
@@ -3953,19 +3963,19 @@ export default function ChatApp() {
             return <button key={s.id} className={`oa-session-manager-dialog-row ${selected ? 'is-selected' : ''}`} type="button" role="checkbox" aria-checked={selected} onClick={()=>toggleSessionSelection(s.id)} disabled={batchDeleting}>
               <span className={`oa-session-check ${selected ? 'is-checked' : ''}`}>{selected && <Check size={12}/>}</span>
               <span className="oa-session-dialog-copy">
-                <span className="oa-session-dialog-title">{s.running && <i className="oa-session-running-dot" aria-hidden="true"/>}<b>{shortTitle(s)}</b>{s.id === sid && <em>当前</em>}</span>
-                <small><Clock3 size={12}/>{fmtTime(s.updated_at) || '刚刚'} · {s.count || 0} 条{s.running && <span>运行中</span>}</small>
+                <span className="oa-session-dialog-title">{s.running && <i className="oa-session-running-dot" aria-hidden="true"/>}<b>{shortTitle(s)}</b>{s.id === sid && <em>{ct('当前', 'Current')}</em>}</span>
+                <small><Clock3 size={12}/>{fmtTime(s.updated_at) || ct('刚刚', 'Just now')} · {ct(`${s.count || 0} 条`, `${s.count || 0} messages`)}{s.running && <span>{ct('运行中', 'Running')}</span>}</small>
               </span>
             </button>
           })}
-          {!sessions.length && <div className="oa-session-manager-dialog-empty">暂无历史会话</div>}
+          {!sessions.length && <div className="oa-session-manager-dialog-empty">{ct('暂无历史会话', 'No session history')}</div>}
         </div>
         <footer className="oa-session-manager-dialog-foot">
-          <small>删除后无法恢复</small>
+          <small>{ct('删除后无法恢复', 'Deleted sessions cannot be recovered')}</small>
           <div>
-            <button className="oa-session-dialog-cancel" type="button" onClick={closeSessionManager} disabled={batchDeleting}>取消</button>
+            <button className="oa-session-dialog-cancel" type="button" onClick={closeSessionManager} disabled={batchDeleting}>{ct('取消', 'Cancel')}</button>
             <button className="oa-session-dialog-delete" type="button" onClick={deleteSelectedSessions} disabled={!selectedSessionCount || batchDeleting}>
-              <Trash2 size={15}/><span>{batchDeleting ? '正在删除…' : `删除所选${selectedSessionCount ? ` (${selectedSessionCount})` : ''}`}</span>
+              <Trash2 size={15}/><span>{batchDeleting ? ct('正在删除…', 'Deleting…') : ct(`删除所选${selectedSessionCount ? ` (${selectedSessionCount})` : ''}`, `Delete selected${selectedSessionCount ? ` (${selectedSessionCount})` : ''}`)}</span>
             </button>
           </div>
         </footer>

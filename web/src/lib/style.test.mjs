@@ -42,6 +42,16 @@ test('shared status feedback stays keyboard-visible and readable at narrow width
   )
 })
 
+test('language controls reserve stable space for translated labels', () => {
+  assert.match(css, /\.sidebar \.lang-switch\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto 30px/s)
+  assert.match(css, /\.sidebar \.lang-switch-label\s*\{[^}]*white-space:\s*nowrap/s)
+  assert.match(css, /\.sidebar \.theme-toggle\s*\{[^}]*width:\s*30px[^}]*height:\s*30px/s)
+  assert.match(
+    css,
+    /html\[data-theme="dark"\] \.app:not\(\.app-tab-chat\) \.sidebar nav button\.active,[\s\S]*?\{[^}]*background:\s*var\(--surface-muted\)\s*!important[^}]*color:\s*var\(--text\)\s*!important/s,
+  )
+})
+
 test('sent-message editor exposes keyboard focus and a narrow action layout', () => {
   const focusRule = ruleBodies('.oa-message-editor-actions button:focus-visible').join('\n')
   assert.match(focusRule, /outline\s*:\s*2px\s+solid/i)

@@ -3445,6 +3445,33 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255
 .theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
 .theme-toggle svg { display: block; }
 
+/* Keep the language picker stable when the translated label grows. */
+.sidebar .lang-switch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 30px;
+  align-items: center;
+  gap: 6px;
+}
+.sidebar .lang-switch-label {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.sidebar .theme-toggle {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  justify-content: center;
+  border-radius: 8px;
+}
+html[data-theme="dark"] .app:not(.app-tab-chat) .sidebar nav button.active,
+html[data-theme="dark"] .app:not(.app-tab-chat) .sidebar nav button:hover {
+  background: var(--surface-muted) !important;
+  border-color: var(--border);
+  color: var(--text) !important;
+}
+
 /* ------------------------------------------------------------
    Dark theme — semantic status colours.
    The success/warning/error/link hues were hard-coded as *dark*

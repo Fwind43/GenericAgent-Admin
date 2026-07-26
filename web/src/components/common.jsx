@@ -11,24 +11,25 @@ const serviceLogPath = (svc) => svc?.log_path || svc?.log || ''
 function ServiceMeta({ svc, compact = false, llms = [], onModel, t }) {
   const cmd = serviceCommand(svc)
   const logPath = serviceLogPath(svc)
+  const text = t?.service || {}
   const isReflect = svc?.kind === 'reflect' || String(svc?.name || '').startsWith('reflect/')
   const modelMatch = (svc?.model_no === null || svc?.model_no === undefined) ? null : llms.find(m => m.index === svc.model_no)
-  const defaultLabel = (t && t.runModelDefault) || '默认（启动时选择）'
+  const defaultLabel = text.defaultModel || 'Default'
   const modelText = modelMatch ? modelLabel(modelMatch) : (isReflect ? defaultLabel : null)
   const editable = isReflect && !svc?.running && typeof onModel === 'function'
   return <div className={compact ? 'service-meta service-meta-compact' : 'service-meta'}>
     {editable
-      ? <span className="model-edit"><em>模型</em><select value={svc.model_no ?? ''} onChange={e => onModel(svc.name, e.target.value === '' ? null : Number(e.target.value))}>
+      ? <span className="model-edit"><em>{text.model}</em><select value={svc.model_no ?? ''} onChange={e => onModel(svc.name, e.target.value === '' ? null : Number(e.target.value))}>
           <option value="">{defaultLabel}</option>
           {llms.map(m => <option key={m.index} value={m.index}>{modelLabel(m)}</option>)}
         </select></span>
-      : (modelText !== null && <span><em>模型</em><code title={modelText}>{modelText}</code></span>)}
+      : (modelText !== null && <span><em>{text.model}</em><code title={modelText}>{modelText}</code></span>)}
     <span><em>PID</em><b>{servicePid(svc)}</b></span>
-    <span><em>返回码</em><b>{serviceReturnCode(svc)}</b></span>
-    <span><em>启动时间</em><code title={serviceStartedAt(svc)}>{serviceStartedAt(svc)}</code></span>
-    <span><em>工作目录</em><code title={svc?.workdir}>{svc?.workdir || '-'}</code></span>
-    <span><em>命令</em><code title={cmd}>{cmd}</code></span>
-    {logPath && <span><em>日志</em><code title={logPath}>{logPath}</code></span>}
+    <span><em>{text.returnCode}</em><b>{serviceReturnCode(svc)}</b></span>
+    <span><em>{text.startedAt}</em><code title={serviceStartedAt(svc)}>{serviceStartedAt(svc)}</code></span>
+    <span><em>{text.workdir}</em><code title={svc?.workdir}>{svc?.workdir || '-'}</code></span>
+    <span><em>{text.command}</em><code title={cmd}>{cmd}</code></span>
+    {logPath && <span><em>{text.log}</em><code title={logPath}>{logPath}</code></span>}
   </div>
 }
 
@@ -73,7 +74,7 @@ export function ChannelServiceTable({ services = [], onStart, onStop, onLogs, on
       <div><b>{svc.name}</b><small>{svc.kind}</small></div>
       <span className={svc.running ? 'status-pill running' : 'status-pill stopped'}>{svc.running ? t.running : t.stopped}</span>
     </div>
-    <ServiceMeta svc={svc} compact/>
+    <ServiceMeta svc={svc} compact t={t}/>
     <div className="channel-service-actions">
       <label className="toggle-inline"><input type="checkbox" checked={!!svc.autostart} onChange={e => onAutostart?.(svc.name, e.target.checked)} />{svc.autostart ? t.enabled : t.disabled}</label>
       <div className="svc-actions"><button disabled={isPending || svc.running} onClick={() => startAction(svc.name)}><Play size={14}/>{t.start}</button><button disabled={isPending || !svc.running} onClick={() => onStop(svc.name)}><Square size={14}/>{t.stop}</button><button onClick={() => onLogs?.(svc.name)}><Eye size={14}/>{t.logs}</button></div>
@@ -109,25 +110,39 @@ export function DangerRecoveryNotice({
   </aside>
 }
 
-export function ObservabilityCard({ snapshot, error = '', onRefresh }) {
+export function ObservabilityCard({ snapshot, error = '', onRefresh, labels = {} }) {
+  const text = {
+    observability: '只读观测',
+    healthChecks: '健康检查',
+    coreFiles: '核心文件',
+    memorySops: '记忆 SOP',
+    riskRules: '风险规则',
+    healthy: '健康端点报告正常',
+    needsAttention: '健康端点需要关注',
+    awaitingSnapshot: '等待只读快照',
+    generatedAt: '生成时间',
+    missingCore: '核心文件缺失',
+    refresh: '刷新',
+    ...labels,
+  }
   const stats = [
-    ['Health checks', count(snapshot?.checks)],
-    ['核心文件', count(snapshot?.coreFiles?.filter?.(item => item?.exists) || [])],
-    ['记忆 SOP', count(snapshot?.memory?.sops)],
-    ['Risk rules', count(snapshot?.riskItems)],
+    [text.healthChecks, count(snapshot?.checks)],
+    [text.coreFiles, count(snapshot?.coreFiles?.filter?.(item => item?.exists) || [])],
+    [text.memorySops, count(snapshot?.memory?.sops)],
+    [text.riskRules, count(snapshot?.riskItems)],
   ]
   const missing = snapshot?.missingCore || []
-  return <section className="observability-card" aria-label="只读观测">
+  return <section className="observability-card" aria-label={text.observability}>
     <div className="observability-head">
-      <div><b>只读观测</b><span>{snapshot?.root || 'GET /api/health + /api/ga/inventory + /api/risk/catalog'}</span></div>
-      <button type="button" onClick={onRefresh}>刷新</button>
+      <div><b>{text.observability}</b><span>{snapshot?.root || 'GET /api/health + /api/ga/inventory + /api/risk/catalog'}</span></div>
+      <button type="button" onClick={onRefresh}>{text.refresh}</button>
     </div>
     {error ? <p className="err-text">{error}</p> : <>
       <div className="observability-stats">{stats.map(([label, value]) => <span key={label}><em>{label}</em><b>{value}</b></span>)}</div>
       <div className="observability-body">
-        <p className={snapshot?.ok ? 'ok' : 'warn'}>{snapshot ? (snapshot.ok ? '健康端点报告正常' : '健康端点需要关注') : '等待只读快照'}</p>
-        {snapshot?.generatedAt && <p className="muted">生成时间：{snapshot.generatedAt}</p>}
-        {missing.length > 0 && <p className="warn">核心文件缺失：{missing.map(x => x.path || x.name).join(', ')}</p>}
+        <p className={snapshot?.ok ? 'ok' : 'warn'}>{snapshot ? (snapshot.ok ? text.healthy : text.needsAttention) : text.awaitingSnapshot}</p>
+        {snapshot?.generatedAt && <p className="muted">{text.generatedAt}: {snapshot.generatedAt}</p>}
+        {missing.length > 0 && <p className="warn">{text.missingCore}: {missing.map(x => x.path || x.name).join(', ')}</p>}
       </div>
     </>}
   </section>

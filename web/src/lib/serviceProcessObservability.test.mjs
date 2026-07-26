@@ -41,5 +41,5 @@ test('reflect services can start with a safe model fallback', () => {
   assert.match(app, /setReflectLLMNo\(current => current !== '' \? current : \(fallbackModel\?\.index\?\.toString\(\) \|\| '0'\)\)/)
   assert.match(app, /if \(!\/\^\\d\+\$\/\.test\(selectedLLMNo\)\)/)
   assert.match(app, /llms\.length \? llms\.map/)
-  assert.match(app, /<option value="0">.*0<\/option>/)
+  assert.match(app, /<option value="0">\{t\.service\.noModelsDefault\}<\/option>/)
 })

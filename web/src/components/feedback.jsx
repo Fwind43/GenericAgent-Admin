@@ -3,7 +3,9 @@ import { Component } from 'react'
 // 统一的加载/错误反馈组件：路由级 Suspense fallback、行内 spinner、骨架屏、错误边界。
 // 设计：沿用暖白磨砂 + 绿色强调色，尊重 prefers-reduced-motion。
 
-export function StatusNotice({ kind = 'success', message, onRetry, onDismiss, retryLabel = '刷新状态' }) {
+const localized = (zh, en) => typeof document !== 'undefined' && document.documentElement.lang === 'en' ? en : zh
+
+export function StatusNotice({ kind = 'success', message, onRetry, onDismiss, retryLabel, dismissLabel }) {
   if (!message) return null
   const isError = kind === 'error'
   return (
@@ -16,8 +18,8 @@ export function StatusNotice({ kind = 'success', message, onRetry, onDismiss, re
       <span className="ga-status-mark" aria-hidden="true" />
       <span className="ga-status-message">{message}</span>
       <span className="ga-status-actions">
-        {isError && onRetry ? <button type="button" onClick={onRetry}>{retryLabel}</button> : null}
-        {kind !== 'pending' && onDismiss ? <button type="button" className="ga-status-dismiss" onClick={onDismiss}>关闭</button> : null}
+        {isError && onRetry ? <button type="button" onClick={onRetry}>{retryLabel || localized('刷新状态', 'Retry')}</button> : null}
+        {kind !== 'pending' && onDismiss ? <button type="button" className="ga-status-dismiss" onClick={onDismiss}>{dismissLabel || localized('关闭', 'Close')}</button> : null}
       </span>
     </div>
   )
@@ -33,10 +35,10 @@ export function Spinner({ label }) {
 }
 
 // 路由/页面级 Suspense 回退：居中显示，避免布局抖动。
-export function RouteFallback({ label = '加载中…' }) {
+export function RouteFallback({ label }) {
   return (
     <div className="ga-route-fallback" role="status" aria-live="polite">
-      <Spinner label={label} />
+      <Spinner label={label || localized('加载中…', 'Loading…')} />
     </div>
   )
 }
@@ -53,16 +55,16 @@ export function Skeleton({ lines = 3, className = '' }) {
 }
 
 
-export function ErrorFallback({ error, onReset, title = '页面加载失败' }) {
+export function ErrorFallback({ error, onReset, title }) {
   const message = error?.message || String(error || 'Unknown error')
   return (
     <div className="ga-error-boundary" role="alert" aria-live="assertive">
       <div>
-        <strong>{title}</strong>
-        <p>当前页面模块渲染异常，其他导航仍可继续使用。</p>
+        <strong>{title || localized('页面加载失败', 'Page failed to load')}</strong>
+        <p>{localized('当前页面模块渲染异常，其他导航仍可继续使用。', 'This page module failed to render. Other navigation remains available.')}</p>
         <code>{message}</code>
       </div>
-      {onReset && <button type="button" onClick={onReset}>重试</button>}
+      {onReset && <button type="button" onClick={onReset}>{localized('重试', 'Retry')}</button>}
     </div>
   )
 }

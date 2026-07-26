@@ -3,7 +3,7 @@ import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ChannelServiceTable } from './components/common.jsx'
-import App, { ChannelsPage } from './App.jsx'
+import App, { ChannelsPage, I18N } from './App.jsx'
 import { ChatMessage, PlanTodoCard, ProviderModelCascade } from './ChatApp.jsx'
 import { Models } from './pages/ModelsPage.jsx'
 import { FilesPage } from './pages/FilesPage.jsx'
@@ -14,6 +14,7 @@ const appStyles = readFileSync('src/style.css', 'utf8')
 globalThis.React = React
 
 const t = {
+  ...I18N.en,
   refresh: 'Refresh',
   save: 'Save',
   busy: 'Busy',
@@ -78,6 +79,7 @@ const reflectService = {
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
   vi.restoreAllMocks()
 })
 
@@ -173,7 +175,7 @@ function ModelsHarness({
 
   return (
     <Models
-      t={{}}
+      t={I18N.zh}
       profiles={profiles}
       persistedProfiles={[{ ...initialProfile }]}
       setProfiles={setProfiles}
@@ -774,6 +776,7 @@ describe('chat model cascade', () => {
 
 describe('file workflow confidence', () => {
   const fileT = {
+    ...I18N.en,
     lists: { fileList: 'Files', filePreview: 'Preview' },
     hints: { filePath: 'Path', searchText: 'Search text', tailLines: 'Tail lines' },
     read: 'Read',
@@ -819,7 +822,7 @@ describe('file workflow confidence', () => {
     expect(save.disabled).toBe(true)
     expect(save.getAttribute('aria-describedby')).toBe('file-save-reason')
     expect(document.getElementById('file-save-reason')?.textContent).toMatch(/Read a file before saving/i)
-    expect(screen.getByText(/尚未加载文件/)).toBeTruthy()
+    expect(screen.getByText(/No file loaded/)).toBeTruthy()
   })
 
   test('shows dirty and retargeted state, saves explicitly, and can discard', () => {
@@ -832,7 +835,7 @@ describe('file workflow confidence', () => {
     })
     render(<FilesPage {...props} />)
 
-    expect(screen.getByText('有未保存更改')).toBeTruthy()
+    expect(screen.getByText('Unsaved changes')).toBeTruthy()
     expect(screen.getByText('Save target changed')).toBeTruthy()
     expect(document.querySelector('.file-save-review')?.textContent).toMatch(/renamed\.txt/)
     const save = screen.getByRole('button', { name: 'Save' })
@@ -951,6 +954,24 @@ describe('operator shell feedback', () => {
     expect(files.disabled).toBe(false)
   })
 
+  test('switches the complete overview shell to English without stale Chinese labels', async () => {
+    installBrowserPolyfills()
+    globalThis.fetch = vi.fn(async (url) => shellPayload(url))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'EN' }))
+
+    expect(await screen.findByText('Version management')).toBeTruthy()
+    expect(screen.getByText('Read-only observability')).toBeTruthy()
+    expect(screen.getByText('GA source update')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Switch to dark theme' })).toBeTruthy()
+    expect(screen.queryByText('只读观测')).toBeNull()
+    expect(screen.queryByText('版本管理')).toBeNull()
+    expect(screen.queryByText('GA 源代码更新')).toBeNull()
+    expect(document.documentElement.lang).toBe('en')
+    expect(window.localStorage.getItem('ga-admin-lang')).toBe('en')
+  })
+
   test('refresh shows pending, success, and a recoverable error', async () => {
     installBrowserPolyfills()
     let configCalls = 0
@@ -979,7 +1000,7 @@ describe('operator shell feedback', () => {
     fireEvent.click(refresh)
     const alert = await screen.findByRole('alert')
     expect(alert.textContent).toMatch(/刷新失败.*network offline/i)
-    expect(screen.getByRole('button', { name: /刷新状态/ }).disabled).toBe(false)
+    expect(screen.getByRole('button', { name: /重试|Retry/ }).disabled).toBe(false)
   })
 
   test('service actions stay local to one card and expose failure recovery', async () => {
