@@ -22,7 +22,12 @@ test('version update UI keeps destructive update behind status-aware controls', 
   assert.match(app, /confirmDanger\('version-update'/)
   assert.match(app, /api\('\/api\/version\/update', \{ dangerous:true, method:'POST'/)
   assert.match(app, /disabled=\{versionBusy \|\| versionStatus\?\.running \|\| !versionCheck\?\.update\}/)
-  assert.match(app, /setInterval\(\(\) => refreshVersionStatus\(\)\.catch\(e => setMsg\(e\.message\)\), 1500\)/)
+  assert.match(app, /setInterval\(\(\) => refreshVersionStatus\(\)\.catch\(error =>/)
+  assert.match(app, /shouldReportVersionPollError\(versionRestartGraceUntil\.current\)/)
+  assert.match(app, /versionRestartGraceUntil\.current = beginVersionRestartGrace\(\)/)
+  assert.match(app, /shouldReloadAfterVersionUpdate\(versionStatus, versionUpdateNeedsReload\.current\)/)
+  assert.match(app, /versionMatchesExpectedRelease\(info\?\.version, expectedVersion\)/)
+  assert.match(app, /window\.location\.reload\(\)/)
   assert.match(app, /api\('\/api\/version\/status'\)/)
 })
 
@@ -97,4 +102,3 @@ test('frontend sends dangerous header for every protected mutating API route it 
   assert.ok(seen.get('/api/ga/processes/kill') > 0, 'process kill call should be covered')
   assert.ok(seen.get('/api/ga/processes/adopt') > 0, 'process adopt call should be covered')
 })
-

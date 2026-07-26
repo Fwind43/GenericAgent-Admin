@@ -10,6 +10,14 @@ import { DEFAULT_SCHEDULE_TASK, buildScheduleCreateRequest, normalizeScheduleTas
 import { modelValidationSummary, validateModelProfiles } from './lib/modelsValidation'
 import { applyModelOrder, applyProviderOrder, mergePersistedModelOrder, orderedProviderProfiles } from './lib/modelsEditor'
 import { NAV_ITEMS, TASK_SUB_TABS, parseRoute, buildRoute } from './lib/routing'
+import {
+  VERSION_RELOAD_DELAY_MS,
+  VERSION_RELOAD_RETRY_MS,
+  beginVersionRestartGrace,
+  shouldReloadAfterVersionUpdate,
+  shouldReportVersionPollError,
+  versionMatchesExpectedRelease,
+} from './lib/versionUpdatePolling'
 import { emptyProfile, formatBytes, formatDuration, formatGoalTime, group, modelLabel, outputLineCount, safeJson } from './lib/format'
 import { ChannelServiceTable, EntryList, ObservabilityCard, Panel, SecretInput, ServiceRow, Stat } from './components/common'
 import { TurnList } from './components/turns'
@@ -40,7 +48,7 @@ export const I18N = {
       updateAvailable: '有更新', current: '已是最新', commit: '提交', unknown: '未知', runtime: '运行时', executable: '程序', updateUnavailable: '一键升级不可用', platformUnsupported: '当前平台暂不支持', latestVersion: '最新版本', updateRunning: '升级中', updateFailed: '升级失败', updateStatus: '升级状态', updateQueued: '升级任务已启动', checkUpdate: '检查更新', oneClickUpdate: '一键升级', refreshProgress: '刷新进度',
       sourceTitle: 'GA 源代码更新', gitUpdate: 'Git 更新', checkFailed: '检查失败', upstreamMissing: '未配置上游', notChecked: '未检查', sourceDescription: '自动 fetch 后对比上游分支；更新只执行 git pull --ff-only。', branch: '分支', upstream: '上游', ahead: '领先', behind: '落后', dirty: '工作区有未提交修改', upstreamHelp: '当前分支没有 tracking 分支，请先在 GA 仓库中配置上游。', checkLatest: '检查是否最新', updateSource: '更新 GA 源代码',
       refreshing: '正在刷新运行状态…', refreshed: '运行状态已刷新', refreshFailed: error => `刷新失败：${error}`, sourceMissingMessage: '当前 GA 分支未配置上游，无法判断是否最新', sourceCurrentMessage: 'GA 源代码已是最新', sourceBehindMessage: count => `GA 源代码落后 ${count} 个提交`, sourceUpdatedMessage: (before, after) => `GA 源代码已更新：${before} → ${after}`, sourceCheckConfirm: '使用 git pull --ff-only 更新当前 GA 源代码？请确保本地修改已提交或可快进。', sourceStatusBehind: count => `落后 ${count} 个提交`,
-      versionFound: version => `发现新版本 ${version}`, versionCurrent: '已是最新版本', versionUpdateConfirm: '下载并重启 GA Admin 以完成升级？页面可刷新，进度会自动恢复。',
+      versionFound: version => `发现新版本 ${version}`, versionCurrent: '已是最新版本', versionUpdateConfirm: '下载并重启 GA Admin 以完成升级？页面可刷新，进度会自动恢复。', updateReconnectFailed: '升级后服务未能恢复，请手动刷新页面',
     },
     service: {
       model: '模型', defaultModel: '默认（启动时选择）', returnCode: '返回码', startedAt: '启动时间', workdir: '工作目录', command: '命令', log: '日志',
@@ -86,7 +94,7 @@ export const I18N = {
       updateAvailable: 'Update available', current: 'Up to date', commit: 'Commit', unknown: 'Unknown', runtime: 'Runtime', executable: 'Executable', updateUnavailable: 'One-click update unavailable', platformUnsupported: 'Not supported on this platform', latestVersion: 'Latest version', updateRunning: 'Updating', updateFailed: 'Update failed', updateStatus: 'Update status', updateQueued: 'Update task started', checkUpdate: 'Check for updates', oneClickUpdate: 'Update now', refreshProgress: 'Refresh progress',
       sourceTitle: 'GA source update', gitUpdate: 'Git update', checkFailed: 'Check failed', upstreamMissing: 'No upstream', notChecked: 'Not checked', sourceDescription: 'Fetches remotes before comparing the tracking branch; updates use git pull --ff-only.', branch: 'Branch', upstream: 'Upstream', ahead: 'Ahead', behind: 'Behind', dirty: 'The working tree has uncommitted changes', upstreamHelp: 'This branch has no tracking branch. Configure an upstream in the GA repository first.', checkLatest: 'Check source', updateSource: 'Update GA source',
       refreshing: 'Refreshing runtime status…', refreshed: 'Runtime status refreshed', refreshFailed: error => `Refresh failed: ${error}`, sourceMissingMessage: 'The current GA branch has no upstream, so its update status cannot be determined', sourceCurrentMessage: 'GA source is up to date', sourceBehindMessage: count => `GA source is behind by ${count} commit${count === 1 ? '' : 's'}`, sourceUpdatedMessage: (before, after) => `GA source updated: ${before} → ${after}`, sourceCheckConfirm: 'Update the current GA source with git pull --ff-only? Commit or preserve local changes first.', sourceStatusBehind: count => `Behind by ${count} commit${count === 1 ? '' : 's'}`,
-      versionFound: version => `New version found: ${version}`, versionCurrent: 'GA Admin is up to date', versionUpdateConfirm: 'Download and restart GA Admin to finish the update? Progress is restored after refresh.',
+      versionFound: version => `New version found: ${version}`, versionCurrent: 'GA Admin is up to date', versionUpdateConfirm: 'Download and restart GA Admin to finish the update? Progress is restored after refresh.', updateReconnectFailed: 'The updated service did not recover; refresh the page manually',
     },
     service: {
       model: 'Model', defaultModel: 'Default (choose at startup)', returnCode: 'Return code', startedAt: 'Started', workdir: 'Working directory', command: 'Command', log: 'Log',
@@ -336,6 +344,8 @@ export default function App() {
   const [goalAutoRefresh, setGoalAutoRefresh] = useState(() => localStorage.getItem('ga-admin-goal-auto-refresh') !== 'false')
   const goalOutputSeq = useRef(0), goalRefreshBusy = useRef(false)
   const modelImportAttempted = useRef(false)
+  const versionRestartGraceUntil = useRef(0)
+  const versionUpdateNeedsReload = useRef(false)
   const [llms, setLLMs] = useState([]), [reflectLLMNo, setReflectLLMNo] = useState(''), [showLLMPicker, setShowLLMPicker] = useState(false), [pendingServiceName, setPendingServiceName] = useState('')
   const appScope = useRef(null)
 
@@ -768,26 +778,48 @@ export default function App() {
 
   const refreshVersionStatus = async () => {
     const d = await api('/api/version/status')
+    if (d?.running) versionRestartGraceUntil.current = beginVersionRestartGrace()
     setVersionStatus(d)
     if (d?.check) setVersionCheck(d.check)
     return d
   }
   useEffect(() => {
-    let stop = false
-    const tick = async () => {
-      try {
-        const d = await refreshVersionStatus()
-        if (!stop && d?.running) setTimeout(tick, 1500)
-      } catch (_) {}
-    }
-    tick()
-    return () => { stop = true }
+    refreshVersionStatus().catch(() => {})
   }, [])
   useEffect(() => {
     if (!versionStatus?.running) return
-    const timer = setInterval(() => refreshVersionStatus().catch(e => setMsg(e.message)), 1500)
+    versionUpdateNeedsReload.current = true
+    const timer = setInterval(() => refreshVersionStatus().catch(error => {
+      if (shouldReportVersionPollError(versionRestartGraceUntil.current)) setMsg(error.message)
+    }), 1500)
     return () => clearInterval(timer)
   }, [versionStatus?.running])
+  useEffect(() => {
+    if (!shouldReloadAfterVersionUpdate(versionStatus, versionUpdateNeedsReload.current)) return
+    versionRestartGraceUntil.current = beginVersionRestartGrace()
+    let cancelled = false
+    let timer
+    const expectedVersion = versionStatus?.check?.latest?.tag_name || ''
+    const reloadWhenReady = async () => {
+      try {
+        const info = await api('/api/version')
+        if (!versionMatchesExpectedRelease(info?.version, expectedVersion)) throw new Error('updated service is not ready')
+        if (!cancelled) window.location.reload()
+      } catch (_) {
+        if (cancelled) return
+        if (shouldReportVersionPollError(versionRestartGraceUntil.current)) {
+          setMsg(t.overview.updateReconnectFailed)
+          return
+        }
+        timer = setTimeout(reloadWhenReady, VERSION_RELOAD_RETRY_MS)
+      }
+    }
+    timer = setTimeout(reloadWhenReady, VERSION_RELOAD_DELAY_MS)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [versionStatus?.running, versionStatus?.stage])
   const checkVersion = async () => {
     setVersionBusy(true)
     try { const d = await api('/api/version/check'); setVersionCheck(d); setMsg(d.update ? t.overview.versionFound(d.latest?.tag_name || '') : t.overview.versionCurrent) }
@@ -796,9 +828,11 @@ export default function App() {
   }
   const updateVersion = async () => {
     if (!confirmDanger('version-update', t.overview.versionUpdateConfirm)) return
+    versionRestartGraceUntil.current = beginVersionRestartGrace()
+    versionUpdateNeedsReload.current = true
     setVersionBusy(true)
     try { const d = await api('/api/version/update', { dangerous:true, method:'POST', body:'{}' }); setVersionStatus(d); setMsg(t.overview.updateQueued) }
-    catch(e){ setMsg(e.message) }
+    catch(e){ versionRestartGraceUntil.current = 0; versionUpdateNeedsReload.current = false; setMsg(e.message) }
     finally{ setVersionBusy(false) }
   }
   const installTMWebDriverDeps = async () => {

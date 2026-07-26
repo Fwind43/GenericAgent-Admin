@@ -228,6 +228,8 @@ ApplyUpdate()  → 异步执行
   └─ 重新启动
 ```
 
+平台范围为 Windows、Linux，以及 macOS 的 `darwin-amd64`/`darwin-arm64` 官方 ZIP 包。Linux/macOS 共用基于 `/bin/sh` 的 Unix 替换脚本，并以位置参数传递安装路径、旧进程 PID 和原启动参数，避免空格或 shell 特殊字符破坏路径；脚本会等待旧进程释放端口，并将重启日志写入临时更新目录的 `apply-update.log`。安装目录必须对当前用户可写；此流程不替换 `.app` bundle，也不管理 Homebrew、代码签名或公证。
+
 **状态文件**: `ga-admin-update-status.json` (持久化更新进度，支持进程重启后恢复)。
 
 ### 4.5 前后端合同测试

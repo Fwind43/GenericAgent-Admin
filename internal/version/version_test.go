@@ -70,6 +70,26 @@ func TestSelectAssetsRequiresExactPlatformSuffix(t *testing.T) {
 	}
 }
 
+func TestSelectAssetsForDarwinArchitectures(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			want := fmt.Sprintf("ga-admin-v2.0.0-darwin-%s.zip", arch)
+			rel := Release{Assets: []Asset{
+				{Name: "ga-admin-v2.0.0-linux-" + arch + ".zip"},
+				{Name: want},
+				{Name: want + ".sha256"},
+			}}
+			asset, checksum := selectAssetsFor(rel, "darwin", arch)
+			if asset == nil || asset.Name != want {
+				t.Fatalf("Darwin asset = %#v, want %q", asset, want)
+			}
+			if checksum == nil || checksum.Name != want+".sha256" {
+				t.Fatalf("Darwin checksum = %#v, want %q", checksum, want+".sha256")
+			}
+		})
+	}
+}
+
 func TestEffectiveVersionFallsBackToGit(t *testing.T) {
 	oldVersion := Version
 	defer func() { Version = oldVersion }()
@@ -165,6 +185,161 @@ func TestWindowsUpdateScriptRestoresExeWhenWorkerMoveFails(t *testing.T) {
 	}
 }
 
+func TestUnixUpdateScriptUsesPositionalArguments(t *testing.T) {
+	script := unixUpdateScript()
+	want := []string{
+		"OLD=$1",
+		"NEW=$2",
+		"BAK=$3",
+		"WORKER=$4",
+		"NEW_WORKER=$5",
+		"WORKER_BAK=$6",
+		"OLD_PID=$7",
+		"RESTART_LOG=$8",
+		"shift 8",
+		`kill -0 "$OLD_PID"`,
+		`mv "$OLD" "$BAK"`,
+		`cp "$NEW" "$OLD"`,
+		`chmod +x "$OLD"`,
+		`cp "$WORKER" "$WORKER_BAK"`,
+		`cp "$NEW_WORKER" "$WORKER"`,
+		`cp "$BAK" "$OLD"`,
+		`exec "$OLD" "$@"`,
+	}
+	for _, sub := range want {
+		if !strings.Contains(script, sub) {
+			t.Fatalf("Unix update script missing %q in:\n%s", sub, script)
+		}
+	}
+
+	paths := []string{
+		`/tmp/GA Admin $current/ga-admin`,
+		`/tmp/GA Admin $payload/ga-admin`,
+		`/tmp/GA Admin $current/ga-admin.bak`,
+		`/tmp/GA Admin $current/cmd/chat_worker.py`,
+		`/tmp/GA Admin $payload/cmd/chat_worker.py`,
+		`/tmp/GA Admin $current/cmd/chat_worker.py.bak`,
+	}
+	launchArgs := []string{"--headless", "--port", "8791", `--label=value with $shell characters`}
+	restartLog := `/tmp/GA Admin $current/apply-update.log`
+	cmd := unixUpdateCommand("/tmp/apply update.sh", paths[0], paths[1], paths[2], paths[3], paths[4], paths[5], 4242, restartLog, launchArgs...)
+	wantArgs := append([]string{"/bin/sh", "/tmp/apply update.sh"}, paths...)
+	wantArgs = append(wantArgs, "4242")
+	wantArgs = append(wantArgs, restartLog)
+	wantArgs = append(wantArgs, "--")
+	wantArgs = append(wantArgs, launchArgs...)
+	if fmt.Sprint(cmd.Args) != fmt.Sprint(wantArgs) {
+		t.Fatalf("Unix update command args = %#v, want %#v", cmd.Args, wantArgs)
+	}
+}
+
+func TestUnixUpdateScriptReplacesPayloadAndRestarts(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a Unix shell")
+	}
+	root := filepath.Join(t.TempDir(), "GA Admin $test")
+	installDir := filepath.Join(root, "installed")
+	payloadDir := filepath.Join(root, "payload")
+	if err := os.MkdirAll(filepath.Join(installDir, "cmd"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(payloadDir, "cmd"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	oldExe := filepath.Join(installDir, "ga-admin")
+	newExe := filepath.Join(payloadDir, "ga-admin")
+	backup := oldExe + ".bak"
+	worker := filepath.Join(installDir, "cmd", "chat_worker.py")
+	newWorker := filepath.Join(payloadDir, "cmd", "chat_worker.py")
+	workerBackup := worker + ".bak"
+	for path, data := range map[string]string{
+		oldExe:    "#!/bin/sh\nprintf 'old-version\\n'\n",
+		newExe:    "#!/bin/sh\nprintf 'new-version %s\\n' \"$*\"\n",
+		worker:    "old worker\n",
+		newWorker: "new worker\n",
+	} {
+		if err := os.WriteFile(path, []byte(data), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	scriptPath := filepath.Join(root, "apply update.sh")
+	restartLog := filepath.Join(root, "apply update.log")
+	if err := os.WriteFile(scriptPath, []byte(unixUpdateScript()), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := unixUpdateCommand(scriptPath, oldExe, newExe, backup, worker, newWorker, workerBackup, 99999999, restartLog, "--headless", "--port", "8791")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("run Unix update script: %v\n%s", err, output)
+	}
+	if len(output) != 0 {
+		t.Fatalf("Unix update command output = %q, want redirected restart log", output)
+	}
+	assertFileContent(t, restartLog, "new-version --headless --port 8791\n")
+	assertFileContent(t, oldExe, "#!/bin/sh\nprintf 'new-version %s\\n' \"$*\"\n")
+	assertFileContent(t, backup, "#!/bin/sh\nprintf 'old-version\\n'\n")
+	assertFileContent(t, worker, "new worker\n")
+	assertFileContent(t, workerBackup, "old worker\n")
+	info, err := os.Stat(oldExe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm()&0111 == 0 {
+		t.Fatalf("updated executable mode = %v, want executable bit", info.Mode())
+	}
+}
+
+func TestUnixUpdateScriptRollsBackWhenWorkerCopyFails(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("requires a Unix shell")
+	}
+	root := t.TempDir()
+	installDir := filepath.Join(root, "installed")
+	if err := os.MkdirAll(filepath.Join(installDir, "cmd"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	oldExe := filepath.Join(installDir, "ga-admin")
+	newExe := filepath.Join(root, "new-ga-admin")
+	backup := oldExe + ".bak"
+	worker := filepath.Join(installDir, "cmd", "chat_worker.py")
+	workerBackup := worker + ".bak"
+	if err := os.WriteFile(oldExe, []byte("old executable"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newExe, []byte("new executable"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(worker, []byte("old worker"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	scriptPath := filepath.Join(root, "apply-update.sh")
+	restartLog := filepath.Join(root, "apply-update.log")
+	if err := os.WriteFile(scriptPath, []byte(unixUpdateScript()), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	missingWorker := filepath.Join(root, "missing", "chat_worker.py")
+	cmd := unixUpdateCommand(scriptPath, oldExe, newExe, backup, worker, missingWorker, workerBackup, 99999999, restartLog)
+	if output, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("Unix update script unexpectedly succeeded: %s", output)
+	}
+	assertFileContent(t, oldExe, "old executable")
+	assertFileContent(t, worker, "old worker")
+}
+
+func assertFileContent(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != want {
+		t.Fatalf("%s content = %q, want %q", path, got, want)
+	}
+}
+
 func TestReleaseAssetContract(t *testing.T) {
 	want := fmt.Sprintf("ga-admin-v2.0.0-%s-%s.zip", runtime.GOOS, runtime.GOARCH)
 	rel := Release{Assets: []Asset{
@@ -193,16 +368,39 @@ func TestCurrentIncludesBuildDate(t *testing.T) {
 	}
 }
 
-func TestCurrentReportsUpdateSupportStatus(t *testing.T) {
-	cur := Current()
-	if runtime.GOOS == "windows" {
-		if !cur.UpdateSupported || cur.UpdateUnsupportedReason != "" {
-			t.Fatalf("Current()=%#v, want Windows update support", cur)
-		}
-		return
+func TestUpdateSupportStatusForPlatform(t *testing.T) {
+	for _, tc := range []struct {
+		goos      string
+		supported bool
+	}{
+		{goos: "windows", supported: true},
+		{goos: "linux", supported: true},
+		{goos: "darwin", supported: true},
+		{goos: "freebsd", supported: false},
+	} {
+		t.Run(tc.goos, func(t *testing.T) {
+			supported, reason := updateSupportStatusFor(tc.goos)
+			if supported != tc.supported {
+				t.Fatalf("updateSupportStatusFor(%q) supported = %v, want %v", tc.goos, supported, tc.supported)
+			}
+			if tc.supported && reason != "" {
+				t.Fatalf("supported platform %q returned reason %q", tc.goos, reason)
+			}
+			if !tc.supported && reason == "" {
+				t.Fatalf("unsupported platform %q returned no reason", tc.goos)
+			}
+		})
 	}
-	if cur.UpdateSupported || cur.UpdateUnsupportedReason == "" {
-		t.Fatalf("Current()=%#v, want explicit non-Windows unsupported reason", cur)
+}
+
+func TestCurrentReportsHostUpdateSupportStatus(t *testing.T) {
+	cur := Current()
+	wantSupported := runtime.GOOS == "windows" || runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+	if cur.UpdateSupported != wantSupported {
+		t.Fatalf("Current()=%#v, update support = %v want %v", cur, cur.UpdateSupported, wantSupported)
+	}
+	if wantSupported && cur.UpdateUnsupportedReason != "" {
+		t.Fatalf("Current()=%#v, supported host returned unsupported reason", cur)
 	}
 }
 
@@ -461,20 +659,21 @@ func TestStartApplyLatestChecksumFailureWritesReadableStatus(t *testing.T) {
 	statusPathOverride = filepath.Join(t.TempDir(), "ga-admin-update-status.json")
 	defer func() { repoLatestURL = oldURL; statusPathOverride = oldStatus }()
 
-	zipPath := filepath.Join(t.TempDir(), "ga-admin-v9.9.9-windows-amd64.zip")
+	assetName := fmt.Sprintf("ga-admin-v9.9.9-%s-%s.zip", runtime.GOOS, runtime.GOARCH)
+	zipPath := filepath.Join(t.TempDir(), assetName)
 	makeUpdateZip(t, zipPath)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/latest":
 			_ = json.NewEncoder(w).Encode(Release{TagName: "v9.9.9", Assets: []Asset{
-				{Name: "ga-admin-v9.9.9-windows-amd64.zip", BrowserDownloadURL: serverURL(r, "/asset.zip")},
-				{Name: "ga-admin-v9.9.9-windows-amd64.zip.sha256", BrowserDownloadURL: serverURL(r, "/asset.zip.sha256")},
+				{Name: assetName, BrowserDownloadURL: serverURL(r, "/asset.zip")},
+				{Name: assetName + ".sha256", BrowserDownloadURL: serverURL(r, "/asset.zip.sha256")},
 			}})
 		case "/asset.zip":
 			http.ServeFile(w, r, zipPath)
 		case "/asset.zip.sha256":
-			_, _ = w.Write([]byte("0000000000000000000000000000000000000000000000000000000000000000  ga-admin-v9.9.9-windows-amd64.zip\n"))
+			_, _ = fmt.Fprintf(w, "0000000000000000000000000000000000000000000000000000000000000000  %s\n", assetName)
 		default:
 			http.NotFound(w, r)
 		}

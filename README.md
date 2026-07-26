@@ -24,7 +24,7 @@ GenericAgent Admin Go 是 GenericAgent 的桌面级管理面板：Go 后端负�
 - **TMWebDriver 监控**：检查浏览器自动化环境、`18766` master 端口、Python 依赖和 `tmwd_cdp_bridge` 扩展路径，并提供依赖安装、启动/修复入口。
 - **更新辅助**：支持一键配置/关闭 GitHub `insteadOf` 镜像，网络受限时可配合自更新、源码拉取和发布流程使用。
 - **Windows 桌面集成**：托盘菜单、开机自启、桌面宠物、窗口显示/隐藏和常用动作触发。
-- **自更新能力**：展示构建版本、提交与时间；按 GitHub Release 资产约定下载 `ga-admin-<tag>-<goos>-<goarch>.zip` 与 `.sha256` 进行更新。
+- **自更新能力**：展示构建版本、提交与时间；Windows、macOS 和 Linux 官方 ZIP 包可按 GitHub Release 资产约定下载 `ga-admin-<tag>-<goos>-<goarch>.zip` 与 `.sha256` 完成一键更新。
 
 - **界面体验**：支持浅色/深色主题切换（顶栏开关，偏好持久化到 `localStorage`，并跟随系统 `prefers-color-scheme`）；按路由/页面做代码分割并提供骨架屏加载反馈；侧边导航与头部补充 `aria-current`/`aria-pressed`/`role=status` 等无障碍语义。
 
@@ -169,6 +169,8 @@ README.txt            # 简短运行说明
 ```
 
 仓库的 `.github/workflows/release-assets.yml` 会在推送 `v*` tag 后构建 Windows/macOS/Linux 资产并上传到 GitHub Release。
+
+一键更新支持 Windows、Linux，以及 macOS 的 `darwin-amd64`/`darwin-arm64` 官方 ZIP 包。macOS/Linux 会共用 Unix 替换脚本，在 SHA256 校验通过后备份并替换 `ga-admin` 与 `cmd/chat_worker.py`，等待旧进程释放端口，再保留原启动参数重新启动。安装目录必须对当前用户可写；`.app` bundle、Homebrew Formula、代码签名和公证不在此更新流程内。
 
 ## 配置与私密文件
 
