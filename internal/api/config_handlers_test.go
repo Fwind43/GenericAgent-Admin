@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -287,6 +288,88 @@ func TestGaGitStatusRejectsMalformedAheadBehind(t *testing.T) {
 	_, err := gaGitStatusForRoot(context.Background(), root)
 	if err == nil || !strings.Contains(err.Error(), "invalid git ahead count") {
 		t.Fatalf("expected invalid ahead count error, got %v", err)
+	}
+}
+
+func TestGaGitStatusHandlesMissingUpstream(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	oldRunGit := runGitCommandFunc
+	t.Cleanup(func() { runGitCommandFunc = oldRunGit })
+	runGitCommandFunc = func(ctx context.Context, root string, args ...string) (string, error) {
+		joined := strings.Join(args, " ")
+		switch joined {
+		case "branch --show-current":
+			return "main", nil
+		case "rev-parse --short HEAD":
+			return "abc1234", nil
+		case "status --short":
+			return "", nil
+		case "rev-parse --abbrev-ref --symbolic-full-name @{u}":
+			return "fatal: no upstream configured for branch 'main'", errors.New("exit status 128")
+		case "rev-list --left-right --count HEAD...@{u}":
+			t.Fatal("rev-list must not run without an upstream branch")
+			return "", nil
+		default:
+			t.Fatalf("unexpected git command: %s", joined)
+			return "", nil
+		}
+	}
+
+	status, err := gaGitStatusForRoot(context.Background(), root)
+	if err != nil {
+		t.Fatalf("gaGitStatusForRoot error: %v", err)
+	}
+	if status["upstream"] != "" || status["upstream_configured"] != false {
+		t.Fatalf("unexpected upstream status: %#v", status)
+	}
+	if status["latest"] != false {
+		t.Fatalf("repository without upstream must not be reported as latest: %#v", status)
+	}
+}
+
+func TestGaGitUpdateRejectsMissingUpstreamBeforePull(t *testing.T) {
+	s := newConfigTestServer(t)
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".git"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	s.CfgStore.Cfg.GARoot = root
+
+	oldRunGit := runGitCommandFunc
+	t.Cleanup(func() { runGitCommandFunc = oldRunGit })
+	runGitCommandFunc = func(ctx context.Context, root string, args ...string) (string, error) {
+		joined := strings.Join(args, " ")
+		switch joined {
+		case "rev-parse --short HEAD":
+			return "abc1234", nil
+		case "branch --show-current":
+			return "main", nil
+		case "status --short", "fetch --all --prune":
+			return "", nil
+		case "rev-parse --abbrev-ref --symbolic-full-name @{u}":
+			return "fatal: no upstream configured for branch 'main'", errors.New("exit status 128")
+		case "pull --ff-only":
+			t.Fatal("pull must not run without an upstream branch")
+			return "", nil
+		default:
+			t.Fatalf("unexpected git command: %s", joined)
+			return "", nil
+		}
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/ga/git-update", strings.NewReader(`{}`))
+	markDangerous(req)
+	s.Routes().ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d want=400 body=%s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "has no upstream") {
+		t.Fatalf("expected actionable missing-upstream error, body=%s", rr.Body.String())
 	}
 }
 

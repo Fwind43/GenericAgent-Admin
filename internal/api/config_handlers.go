@@ -419,10 +419,16 @@ func gaGitStatusForRoot(ctx context.Context, abs string) (map[string]interface{}
 	}
 	commit, _ := runGitCommand(ctx, abs, "rev-parse", "--short", "HEAD")
 	status, _ := runGitCommand(ctx, abs, "status", "--short")
-	upstream, _ := runGitCommand(ctx, abs, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	upstream, upstreamErr := runGitCommand(ctx, abs, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	upstreamConfigured := upstreamErr == nil && strings.TrimSpace(upstream) != ""
+	if !upstreamConfigured {
+		// runGitCommand returns Git's stderr as output. Do not mistake an error such
+		// as "no upstream configured" for the name of a tracking branch.
+		upstream = ""
+	}
 	ahead := 0
 	behind := 0
-	if strings.TrimSpace(upstream) != "" {
+	if upstreamConfigured {
 		aheadBehind, err := runGitCommand(ctx, abs, "rev-list", "--left-right", "--count", "HEAD...@{u}")
 		if err != nil {
 			return nil, err
@@ -442,8 +448,9 @@ func gaGitStatusForRoot(ctx context.Context, abs string) (map[string]interface{}
 	}
 	return map[string]interface{}{
 		"ok": true, "root": abs, "branch": strings.TrimSpace(branch), "commit": strings.TrimSpace(commit),
-		"upstream": strings.TrimSpace(upstream), "ahead": ahead, "behind": behind,
-		"latest": behind == 0, "dirty": strings.TrimSpace(status) != "", "status": status,
+		"upstream": strings.TrimSpace(upstream), "upstream_configured": upstreamConfigured,
+		"ahead": ahead, "behind": behind, "latest": upstreamConfigured && behind == 0,
+		"dirty": strings.TrimSpace(status) != "", "status": status,
 	}, nil
 }
 
@@ -517,6 +524,11 @@ func (s *Server) gaGitUpdate(w http.ResponseWriter, r *http.Request) {
 	fetchOut, err := runGitCommand(ctx, abs, "fetch", "--all", "--prune")
 	if err != nil {
 		bad(w, 500, strings.TrimSpace(fetchOut+"\n"+err.Error()))
+		return
+	}
+	upstream, upstreamErr := runGitCommand(ctx, abs, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+	if upstreamErr != nil || strings.TrimSpace(upstream) == "" {
+		bad(w, 400, "current GA branch has no upstream; configure a tracking branch before updating")
 		return
 	}
 	pullOut, err := runGitCommand(ctx, abs, "pull", "--ff-only")
