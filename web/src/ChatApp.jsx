@@ -1530,9 +1530,9 @@ function UltraPlanMessageDrawer({ content = '', state, pending = false, onAskRep
     : (phaseTasks.length ? phaseTasks : (recentTasks.length ? recentTasks : phases))
       .filter(item => String(item?.status || '').toLowerCase() === 'done').length
   const statusText = mergedState.complete
-    ? '\u5df2\u5b8c\u6210'
-    : (pending ? '\u6267\u884c\u4e2d' : '\u53ef\u67e5\u770b')
-  const objective = String(mergedState.objective || mergedState.current || '\u67e5\u770b\u8ba1\u5212\u4e0e\u5b50\u4efb\u52a1\u8fdb\u5c55')
+    ? ct('\u5df2\u5b8c\u6210', 'Completed')
+    : (pending ? ct('\u6267\u884c\u4e2d', 'Running') : ct('\u53ef\u67e5\u770b', 'View details'))
+  const objective = String(mergedState.objective || mergedState.current || ct('\u67e5\u770b\u8ba1\u5212\u4e0e\u5b50\u4efb\u52a1\u8fdb\u5c55', 'View plan and subtask progress'))
 
   return (
     <div className="oa-message-ultraplan">
@@ -1567,7 +1567,7 @@ function UltraPlanMessageDrawer({ content = '', state, pending = false, onAskRep
             <div
               className="oa-up-drawer-resize"
               role="separator"
-              aria-label={'\u8c03\u6574 UltraPlan \u4fa7\u680f\u5bbd\u5ea6'}
+              aria-label={ct('\u8c03\u6574 UltraPlan \u4fa7\u680f\u5bbd\u5ea6', 'Resize UltraPlan sidebar')}
               aria-orientation="vertical"
               aria-controls={drawerId}
               aria-valuemin={ULTRAPLAN_DRAWER_MIN_WIDTH}
@@ -1587,7 +1587,7 @@ function UltraPlanMessageDrawer({ content = '', state, pending = false, onAskRep
                 <h2 id={titleId}>UltraPlan</h2>
                 <p>{objective}</p>
               </div>
-              <button type="button" className="oa-up-drawer-close" aria-label={'\u5173\u95ed UltraPlan \u8be6\u60c5'} onClick={closeDrawer}>
+              <button type="button" className="oa-up-drawer-close" aria-label={ct('\u5173\u95ed UltraPlan \u8be6\u60c5', 'Close UltraPlan details')} onClick={closeDrawer}>
                 <X size={18} />
               </button>
             </header>
@@ -1725,7 +1725,7 @@ const sumUsages = (usages) => {
 
 export const CommandResultCard = memo(function CommandResultCard({ result = {} }) {
   const command = `/${String(result.command || '').replace(/^\//, '')}`
-  const summary = commandResultSummary(result)
+  const summary = commandResultSummary(result, chatLanguage())
   const treeNodes = Array.isArray(result.tree?.nodes) ? result.tree.nodes : []
   const services = Array.isArray(result.services) ? result.services : []
   const commands = Array.isArray(result.commands) ? result.commands : []
@@ -1733,24 +1733,24 @@ export const CommandResultCard = memo(function CommandResultCard({ result = {} }
   const status = result.session && typeof result.session === 'object' ? result.session : null
 
   return (
-    <section className="oa-command-result" aria-label={`${command} \u547d\u4ee4\u7ed3\u679c`}>
+    <section className="oa-command-result" aria-label={ct(`${command} \u547d\u4ee4\u7ed3\u679c`, `${command} command result`)}>
       <header><Check size={17}/><div><b>{summary}</b><span>{command}</span></div></header>
       {command === '/worldline' && result.action !== 'restore' && (
         treeNodes.length > 0
-          ? <div className="oa-command-list" aria-label="\u4e16\u754c\u7ebf\u8282\u70b9">
+          ? <div className="oa-command-list" aria-label={ct('\u4e16\u754c\u7ebf\u8282\u70b9', 'Worldline nodes')}>
               {treeNodes.map((node, index) => {
                 const id = String(node?.id || node?.node_id || node?.key || '')
                 const title = String(node?.title || node?.label || node?.summary || node?.content_preview || '')
-                return <div key={id || index}><code>{id || `#${index + 1}`}</code><span>{title || '\u672a\u547d\u540d\u8282\u70b9'}</span></div>
+                return <div key={id || index}><code>{id || `#${index + 1}`}</code><span>{title || ct('\u672a\u547d\u540d\u8282\u70b9', 'Unnamed node')}</span></div>
               })}
             </div>
-          : <div className="oa-command-empty">{'\u6682\u65e0\u4e16\u754c\u7ebf\u8282\u70b9'}</div>
+          : <div className="oa-command-empty">{ct('\u6682\u65e0\u4e16\u754c\u7ebf\u8282\u70b9', 'No worldline nodes')}</div>
       )}
       {services.length > 0 && <div className="oa-command-services">
         {services.map((service, index) => <div key={service?.name || index}>
           <i className={`oa-command-dot ${service?.running ? 'is-running' : ''}`}/>
           <b>{service?.name || `service-${index + 1}`}</b>
-          <span>{service?.running ? '\u8fd0\u884c\u4e2d' : '\u672a\u8fd0\u884c'}</span>
+          <span>{service?.running ? ct('\u8fd0\u884c\u4e2d', 'Running') : ct('\u672a\u8fd0\u884c', 'Not running')}</span>
           <em>{service?.status || service?.message || ''}</em>
         </div>)}
       </div>}
@@ -1762,11 +1762,11 @@ export const CommandResultCard = memo(function CommandResultCard({ result = {} }
         })}
       </div>}
       {status && command === '/status' && <dl className="oa-command-kv">
-        <div><dt>Session</dt><dd>{status.id || '-'}</dd></div>
-        <div><dt>Messages</dt><dd>{Number(status.message_count || 0)}</dd></div>
+        <div><dt>{ct('会话', 'Session')}</dt><dd>{status.id || '-'}</dd></div>
+        <div><dt>{ct('消息', 'Messages')}</dt><dd>{Number(status.message_count || 0)}</dd></div>
       </dl>}
-      {records.length > 0 && <details className="oa-command-records"><summary>{records.length} \u6761\u5de5\u5177\u5ba1\u8ba1\u8bb0\u5f55</summary><pre>{JSON.stringify(records, null, 2)}</pre></details>}
-      {command === '/export' && result.filename && <div className="oa-command-download"><FileOutput size={15}/><span>{result.filename}</span><b>{'\u5df2\u4e0b\u8f7d'}</b></div>}
+      {records.length > 0 && <details className="oa-command-records"><summary>{ct(`${records.length} \u6761\u5de5\u5177\u5ba1\u8ba1\u8bb0\u5f55`, `${records.length} tool audit records`)}</summary><pre>{JSON.stringify(records, null, 2)}</pre></details>}
+      {command === '/export' && result.filename && <div className="oa-command-download"><FileOutput size={15}/><span>{result.filename}</span><b>{ct('\u5df2\u4e0b\u8f7d', 'Downloaded')}</b></div>}
     </section>
   )
 })
@@ -1923,13 +1923,13 @@ export const ChatMessage = memo(function ChatMessage({
               )}
               {isBTW && <div className="oa-btw-head">
                 <span className="oa-btw-mark" aria-hidden="true" />
-                <div><span>侧问</span><strong>{m.side_question || '未记录问题'}</strong></div>
-                {m.btw_status !== 'done' && <em>{m.btw_status === 'pending' ? '思考中…' : '未完成'}</em>}
+                <div><span>{ct('侧问', 'Side question')}</span><strong>{m.side_question || ct('未记录问题', 'Question not recorded')}</strong></div>
+                {m.btw_status !== 'done' && <em>{m.btw_status === 'pending' ? ct('思考中…', 'Thinking…') : ct('未完成', 'Incomplete')}</em>}
               </div>}
               {m.commandResult
                 ? <CommandResultCard result={m.commandResult} />
                 : m.btw_status === 'error'
-                  ? <div className="oa-btw-error" role="alert"><span>{m.content || '侧问失败，请重试'}</span><button type="button" onClick={() => onRetryBTW?.(m)}>重试</button></div>
+                  ? <div className="oa-btw-error" role="alert"><span>{m.content || ct('侧问失败，请重试', 'Side question failed. Try again.')}</span><button type="button" onClick={() => onRetryBTW?.(m)}>{ct('重试', 'Retry')}</button></div>
                   : <AssistantContent content={isBTW ? stripBTWEcho(m.content) : m.content} pending={m.btw_status === 'pending' || pending} onAskReply={onAskReply} turnUsages={turnUsages} ultraplan_state={m.ultraplan_state} />}
             </>)
           : (<>
@@ -1964,7 +1964,7 @@ export const ChatMessage = memo(function ChatMessage({
                   </div>)
                 : (<div className={`oa-msg-text${btwDisplay ? ' oa-user-btw' : ''}`}>
                     {btwDisplay
-                      ? <><span className="oa-user-btw-command"><i aria-hidden="true"/>/btw</span><span className="oa-user-btw-prompt">{btwDisplay.prompt || '侧问'}</span></>
+                      ? <><span className="oa-user-btw-command"><i aria-hidden="true"/>/btw</span><span className="oa-user-btw-prompt">{btwDisplay.prompt || ct('侧问', 'Side question')}</span></>
                       : userText}
                     {savedFilePaths.length > 0 && (
                       <div className="oa-msg-saved-paths">
@@ -2116,7 +2116,7 @@ export function ProviderModelCascade({ groups, selectedProvider, value, onChange
         <span className="oa-cascade-current-model">{displayModel}</span>
         <ChevronDown size={13} />
       </button>
-      {open && <div className="oa-cascade-menu" role="dialog" aria-label={ct('服务商和模型', 'Providers and models')}>
+      {open && <div id={menuId} className="oa-cascade-menu" role="dialog" aria-label={ct('服务商和模型', 'Providers and models')}>
         <div className="oa-cascade-providers" aria-label={ct('服务商', 'Providers')}>
           {groups.map(group => (
             <button key={group.value} type="button"
@@ -2194,7 +2194,7 @@ export function PlanTodoCard({ plan }) {
     <section className={`oa-plan-card${complete ? ' is-complete' : ''}`} aria-label={ct('任务执行计划', 'Task execution plan')}>
       <button type="button" className="oa-plan-head" onClick={() => setExpanded(value => !value)}
         aria-expanded={expanded} aria-controls={panelId}
-        aria-label={expanded ? '\u6536\u8d77\u6267\u884c\u8ba1\u5212' : '\u5c55\u5f00\u6267\u884c\u8ba1\u5212'}>
+        aria-label={expanded ? ct('\u6536\u8d77\u6267\u884c\u8ba1\u5212', 'Collapse execution plan') : ct('\u5c55\u5f00\u6267\u884c\u8ba1\u5212', 'Expand execution plan')}>
         <span className="oa-plan-identity">
           <span className="oa-plan-mark" aria-hidden="true">{complete ? <Check size={15}/> : <Clock3 size={14}/>}</span>
           <span className="oa-plan-heading">
@@ -3350,7 +3350,7 @@ export default function ChatApp() {
           const showWorldlinePicker = isWorldlinePickerResult(commandPatch.commandResult)
           const resultMessage = {
             ...pending,
-            content: commandResultSummary(commandPatch.commandResult),
+            content: commandResultSummary(commandPatch.commandResult, chatLanguage()),
             commandResult: commandPatch.commandResult,
             run_started_at_ms: undefined,
           }

@@ -52,15 +52,19 @@ export const reduceCommandResult = (payload) => {
   return patch
 }
 
-export const commandResultSummary = (result = {}) => {
+export const commandResultSummary = (result = {}, language = 'zh') => {
+  const en = language === 'en'
   const command = normalizeResultCommand(result.command)
-  if (command === '/rewind') return `已回退 ${Number(result.removed_messages || 0)} 条消息`
-  if (command === '/clear') return result.cleared ? '当前会话已清空' : '清空未完成'
-  if (command === '/export') return `导出已就绪：${result.filename || 'chat-export.md'}`
-  if (command === '/scheduler') return result.mode === 'start' ? '服务启动请求已完成' : '服务状态'
-  if (command === '/help') return '可用管理命令'
-  if (command === '/status') return '会话与服务状态'
-  if (command === '/verbose') return `${Array.isArray(result.records) ? result.records.length : 0} 条工具审计记录`
-  if (command === '/worldline') return result.action === 'restore' ? '世界线恢复完成' : `${Array.isArray(result.tree?.nodes) ? result.tree.nodes.length : 0} 个世界线节点`
-  return command || '命令已完成'
+  if (command === '/rewind') return en ? `Rewound ${Number(result.removed_messages || 0)} messages` : `已回退 ${Number(result.removed_messages || 0)} 条消息`
+  if (command === '/clear') return en ? (result.cleared ? 'Current session cleared' : 'Clear did not complete') : (result.cleared ? '当前会话已清空' : '清空未完成')
+  if (command === '/export') return en ? `Export ready: ${result.filename || 'chat-export.md'}` : `导出已就绪：${result.filename || 'chat-export.md'}`
+  if (command === '/scheduler') return en ? (result.mode === 'start' ? 'Service start request completed' : 'Service status') : (result.mode === 'start' ? '服务启动请求已完成' : '服务状态')
+  if (command === '/help') return en ? 'Available management commands' : '可用管理命令'
+  if (command === '/status') return en ? 'Session and service status' : '会话与服务状态'
+  if (command === '/verbose') return en ? `${Array.isArray(result.records) ? result.records.length : 0} tool audit records` : `${Array.isArray(result.records) ? result.records.length : 0} 条工具审计记录`
+  if (command === '/worldline') {
+    const nodeCount = Array.isArray(result.tree?.nodes) ? result.tree.nodes.length : 0
+    return en ? (result.action === 'restore' ? 'Worldline restore completed' : `${nodeCount} worldline node${nodeCount === 1 ? '' : 's'}`) : (result.action === 'restore' ? '世界线恢复完成' : `${nodeCount} 个世界线节点`)
+  }
+  return command || (en ? 'Command completed' : '命令已完成')
 }

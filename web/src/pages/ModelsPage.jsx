@@ -629,7 +629,7 @@ function AddProfileForm({ profiles, addModelProfiles, t, onClose, onAdded }) {
         </label>
         <label className="model-field model-field--key">
           <span className="model-field-label">API Key <em>{text.optionalKey}</em></span>
-          <Input type="password" value={form.apiKey} onChange={event => patchForm({ apiKey: event.target.value })} placeholder={t.hints?.savedSecret || '填写密钥'} />
+          <Input type="password" value={form.apiKey} onChange={event => patchForm({ apiKey: event.target.value })} placeholder={t.hints?.savedSecret || text.keyPlaceholder} />
         </label>
       </div>
       {error && <Alert className="model-inline-alert" type="error" showIcon message={error} />}
@@ -786,16 +786,16 @@ export function Models({
     if (interaction.fromIndex === interaction.currentIndex || providerOrderBusyRef.current) return
     const orderedProfiles = providerProfilesRef.current
     if (!saveProviderOrderRef.current) {
-      setProviderOrderError('当前页面未提供服务商顺序保存能力，请刷新后重试。')
+      setProviderOrderError(text.providerOrderUnavailable)
       return
     }
     providerOrderBusyRef.current = true
     setProviderOrderError('')
     try {
       const ok = await saveProviderOrderRef.current(orderedProfiles)
-      if (!ok) setProviderOrderError('服务商顺序保存失败，当前排序草稿已保留，请检查页面提示后重试。')
+      if (!ok) setProviderOrderError(text.providerOrderSaveFailed)
     } catch (error) {
-      setProviderOrderError(error?.message || '服务商顺序保存失败，当前排序草稿已保留。')
+      setProviderOrderError(error?.message || text.providerOrderSaveError)
     } finally {
       providerOrderBusyRef.current = false
     }

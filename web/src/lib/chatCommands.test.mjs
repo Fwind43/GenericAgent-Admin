@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseImmediateChatCommand, isDangerousChatCommand, reduceCommandResult, requiresDangerousChatCommandConfirmation } from './chatCommands.js'
+import { commandResultSummary, parseImmediateChatCommand, isDangerousChatCommand, reduceCommandResult, requiresDangerousChatCommandConfirmation } from './chatCommands.js'
 
 test('parses immediate commands including worldline without capturing resume', () => {
   assert.equal(parseImmediateChatCommand('/status')?.name, '/status')
@@ -29,4 +29,10 @@ test('reduces real backend command results without a leading slash', () => {
   assert.deepEqual(reduceCommandResult({ result:{ command:'clear', cleared:true, session:{ id:'empty' } } }).session, { id:'empty' })
   assert.deepEqual(reduceCommandResult({ result:{ command:'export', content:'x', filename:'a.md', mime_type:'text/markdown' } }).download, { content:'x', filename:'a.md', mime:'text/markdown' })
   assert.deepEqual(reduceCommandResult({ result:{ command:'worldline', action:'restore', session:{ id:'restored' } } }).session, { id:'restored' })
+})
+
+test('localizes command result summaries without changing the Chinese default', () => {
+  assert.equal(commandResultSummary({ command:'worldline', tree:{ nodes:[{}] } }), '1 个世界线节点')
+  assert.equal(commandResultSummary({ command:'worldline', tree:{ nodes:[{}] } }, 'en'), '1 worldline node')
+  assert.equal(commandResultSummary({ command:'clear', cleared:true }, 'en'), 'Current session cleared')
 })
