@@ -7,6 +7,7 @@ import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { Bot, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, Copy, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, FolderOpen, GitBranch, Lock, Paperclip, Menu, MessageSquarePlus, MoreHorizontal, PanelRightOpen, Plus, RefreshCw, RotateCw, Search, Send, Sparkles, Square, Target, Trash2, X } from 'lucide-react'
 import { api, apiStream } from './lib/api'
+import { isComposingKeyboardEvent, isPromptSendShortcut } from './lib/chatComposerKeyboard.js'
 import { confirmDanger } from './lib/danger'
 import { formatDuration, fuzzyMatch, goalBudgetPercent, goalTurnPercent } from './lib/format'
 import { JSON_TREE_CHILD_LIMIT, JSON_TREE_STRING_LIMIT, LIST_ITEM_LIMIT, LONG_TEXT_PREVIEW_CHARS, MARKDOWN_BLOCK_LIMIT, MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, isToolResultText, parseAssistantContent, previewLongText, splitMarkdownParts, textRenderStats } from './lib/chatTextSafety'
@@ -4251,6 +4252,14 @@ export default function ChatApp() {
 
   const handlePromptKeyDown = (e) => {
     const currentValue = e.currentTarget.value
+    if (isComposingKeyboardEvent(e)) return
+    if (isPromptSendShortcut(e)) {
+      e.preventDefault()
+      setCmdDrawer({ open:false, filter:'', selectedIdx:0 })
+      setCmdEditIdx(-1)
+      send(currentValue)
+      return
+    }
     if (cmdDrawer.open && cmdEditIdx === -1) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -4270,8 +4279,8 @@ export default function ChatApp() {
         const selectingBareImprove = e.key === 'Enter' && /^\s*\/improve\s*$/.test(currentValue)
         const selectingContinueNumber = cmd?.cmd === '/continue <编号>' && /^\s*\/continue\s+\d+\s*$/.test(currentValue)
         const selectingUltraPlanObjective = cmd?.cmd === '/ultraplan <目标>' && /^\s*\/ultraplan\s+\S/.test(currentValue)
-        // 通用参数式命令（如 /goal [goal]）：输入框已是「根命令 + 自由文本」时，Enter 直接发送当前值，
-        // 不再走 applySlashCommand（否则 insert 模板会清空用户后面的内容）。
+        // 通用参数式命令（如 /goal [goal]）：输入框已是「根命令 + 自由文本」时，
+        // Enter 只确认并关闭候选框，保留当前文本；Ctrl/Command + Enter 才发送。
         const selectedCmdText = String(cmd?.cmd || '')
         const selectedCmdRoot = selectedCmdText.split(/\s+/, 1)[0]
         const selectingArgumentFreeText = !!cmd && isArgumentStyleSlashCmd(selectedCmdText)
@@ -4280,7 +4289,6 @@ export default function ChatApp() {
           e.preventDefault()
           setCmdDrawer({ open:false, filter:'', selectedIdx:0 })
           setCmdEditIdx(-1)
-          if (e.key === 'Enter') send(currentValue)
           return
         }
         if (cmd) {
@@ -4291,7 +4299,6 @@ export default function ChatApp() {
         e.preventDefault()
         setCmdDrawer({ open:false, filter:'', selectedIdx:0 })
         setCmdEditIdx(-1)
-        if (e.key === 'Enter') send(currentValue)
         return
       }
       if (e.key === 'Escape') {
@@ -4299,10 +4306,6 @@ export default function ChatApp() {
         setCmdEditIdx(-1)
         return
       }
-    }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send(currentValue)
     }
   }
 
@@ -4815,7 +4818,7 @@ export default function ChatApp() {
             {isCurrentRunning && <button className="oa-stop" type="button" onClick={()=>cancelRun(sid)} title={ct('停止生成', 'Stop generating')} aria-label={ct('停止生成', 'Stop generating')}><Square size={14}/></button>}
           </div>
         </div>
-        <p>{ct('Enter 发送 · Shift + Enter 换行 · 回复中发送会排队', 'Enter to send · Shift + Enter for a new line · Messages queue while responding')}</p>
+        <p>{ct('Enter 换行 · Ctrl / ⌘ + Enter 发送 · 回复中发送会排队', 'Enter for a new line · Ctrl / ⌘ + Enter to send · Messages queue while responding')}</p>
       </footer>
     </main>
 

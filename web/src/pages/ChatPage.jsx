@@ -3,6 +3,7 @@ import { Paperclip, Play, RefreshCw, Square, X } from 'lucide-react'
 import { api, apiStream } from '../lib/api'
 import { fuzzyMatch } from '../lib/format'
 import { createStreamDeltaBatcher } from '../lib/chatStream.js'
+import { isComposingKeyboardEvent, isPromptSendShortcut } from '../lib/chatComposerKeyboard.js'
 import { pollGeneratedChatTitle, shouldPollGeneratedTitle } from '../lib/chatTitlePolling.js'
 import { TurnList } from '../components/turns'
 
@@ -193,6 +194,30 @@ export function ChatPage({ t, slashCommands }) {
     } finally { setBusy(false) }
   }
 
+  const handlePromptKeyDown = (e) => {
+    if (isComposingKeyboardEvent(e)) return
+    if (isPromptSendShortcut(e)) {
+      e.preventDefault()
+      closeCmdDrawer()
+      send()
+      return
+    }
+    if (!cmdDrawer.open) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setCmdDrawer(d => ({ ...d, selectedIdx:Math.min(d.selectedIdx + 1, filteredCmds.length - 1) }))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setCmdDrawer(d => ({ ...d, selectedIdx:Math.max(d.selectedIdx - 1, 0) }))
+    } else if ((e.key === 'Enter' || e.key === 'Tab') && filteredCmds[cmdDrawer.selectedIdx]) {
+      e.preventDefault()
+      applyCmd(filteredCmds[cmdDrawer.selectedIdx].cmd, e.currentTarget.value)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      closeCmdDrawer()
+    }
+  }
+
   return <section className="chat-shell native-chat">
     <div className="chat-top"><div><h3>{t.nav.chat}</h3><p>Admin 原生对话：由 Go API 管理会话，按需启动 Python GA Worker。</p></div><div className="actions"><button onClick={loadSessions}><RefreshCw size={14}/>{t.refresh}</button><button onClick={newSession}><Play size={14}/>新会话</button><span className="ok">Native</span></div></div>
     {err && <div className="message">{err}</div>}
@@ -201,7 +226,7 @@ export function ChatPage({ t, slashCommands }) {
         <div className="chat-settings"><label>LLM <input type="number" min="0" value={settings.llm_no} onChange={e=>setSettings(v => ({...v, llm_no:Number(e.target.value)||0}))}/></label></div>
         {files.length > 0 && <div className="chat-attachments">{files.map((f, i) => <span key={`${f.name}-${i}`}><Paperclip size={13}/>{f.name}<small>{compactFileSize(f.size)}</small><button type="button" onClick={()=>removeFile(i)}><X size={12}/></button></span>)}</div>}
         {cmdDrawer.open && <div className="chat-cmd-drawer" ref={cmdDrawerRef}>{filteredCmds.length === 0 ? <div className="chat-cmd-empty">无匹配命令</div> : filteredCmds.map((c, i) => <div key={c.cmd} ref={i === cmdDrawer.selectedIdx ? selectedCmdRef : null} className={`chat-cmd-item${i === cmdDrawer.selectedIdx ? ' selected' : ''}`} onMouseDown={() => applyCmd(c.cmd, promptRef.current?.value ?? prompt)} onMouseEnter={() => setCmdDrawer(d => ({...d, selectedIdx: i}))}><span className="chat-cmd-name">{c.cmd}</span><span className="chat-cmd-desc">{c.desc}</span></div>)}</div>}
-        <div className="chat-compose"><input ref={fileInputRef} type="file" multiple hidden onChange={e=>addFiles(e.target.files)}/><button className="icon" type="button" onClick={()=>fileInputRef.current?.click()} disabled={busy}><Paperclip size={16}/></button><textarea ref={promptRef} value={prompt} onChange={e => { const v = e.target.value; setPrompt(v); if (v.startsWith('/')) { const after = v.slice(1).split(' ')[0]; setCmdDrawer(d => ({ open: true, filter: after, selectedIdx: 0 })); } else if (cmdDrawer.open) closeCmdDrawer() }} onKeyDown={e => { if (cmdDrawer.open) { if (e.key === 'ArrowDown') { e.preventDefault(); setCmdDrawer(d => ({...d, selectedIdx: Math.min(d.selectedIdx + 1, filteredCmds.length - 1)})) } else if (e.key === 'ArrowUp') { e.preventDefault(); setCmdDrawer(d => ({...d, selectedIdx: Math.max(d.selectedIdx - 1, 0)})) } else if ((e.key === 'Enter' || e.key === 'Tab') && filteredCmds[cmdDrawer.selectedIdx]) { e.preventDefault(); applyCmd(filteredCmds[cmdDrawer.selectedIdx].cmd, e.currentTarget.value) } else if (e.key === 'Escape') { e.preventDefault(); closeCmdDrawer() } else if (e.key === 'Enter' && e.ctrlKey) { closeCmdDrawer(); send() } } else if (e.key === 'Enter' && e.ctrlKey) send() }} placeholder="输入给 GenericAgent 的任务，Ctrl+Enter 发送；可附加图片/文件"/><button disabled={busy || (!prompt.trim() && files.length===0)} onClick={send}>{busy?'执行中...':'发送'}</button>{busy && <button className="danger" type="button" onClick={stop}><Square size={14}/>停止</button>}</div>
+        <div className="chat-compose"><input ref={fileInputRef} type="file" multiple hidden onChange={e=>addFiles(e.target.files)}/><button className="icon" type="button" onClick={()=>fileInputRef.current?.click()} disabled={busy}><Paperclip size={16}/></button><textarea ref={promptRef} value={prompt} onChange={e => { const v = e.target.value; setPrompt(v); if (v.startsWith('/')) { const after = v.slice(1).split(' ')[0]; setCmdDrawer(d => ({ open: true, filter: after, selectedIdx: 0 })); } else if (cmdDrawer.open) closeCmdDrawer() }} onKeyDown={handlePromptKeyDown} placeholder="输入给 GenericAgent 的任务，Enter 换行，Ctrl/⌘+Enter 发送；可附加图片/文件"/><button disabled={busy || (!prompt.trim() && files.length===0)} onClick={send}>{busy?'执行中...':'发送'}</button>{busy && <button className="danger" type="button" onClick={stop}><Square size={14}/>停止</button>}</div>
       </main></div>
   </section>
 }
