@@ -365,26 +365,48 @@ describe('assistant pre-token feedback', () => {
     expect(view.container.textContent).toContain('\u7b2c\u4e00\u4e2a token')
   })
 
+  test('renders markdown image with Windows local path via /api/files/image endpoint', () => {
+    const markdown = '![桌面截图](D:\\Program Files\\GenericAgent\\temp\\desktop_screenshot.png)'
+    const container = renderAssistant(markdown)
+    const img = container.querySelector('img.oa-md-image')
+    expect(img).toBeTruthy()
+    expect(img.getAttribute('alt')).toBe('桌面截图')
+    expect(img.getAttribute('src')).toBe(
+      '/api/files/image?path=' + encodeURIComponent('D:\\Program Files\\GenericAgent\\temp\\desktop_screenshot.png')
+    )
+    const actions = container.querySelectorAll('.oa-md-image-action')
+    // 应当有 3 个操作按钮：下载、系统默认程序打开、在文件夹中显示
+    expect(actions.length).toBe(3)
+  })
+
   test('renders numeric markdown footnotes with matching scoped anchors', () => {
     const markdown = [
-      'Alpha[^doc] and beta[^details].',
+      '在此处引用了外部附件文件[^doc]以及相关图片资源[^img]。',
       '',
-      '[^doc]: Documentation link [guide](https://example.com/guide).',
-      '[^details]: Footnote with **strong text**.',
+      '[^doc]: [test_render_doc.txt](file:///E:/Work/GenericAgent/temp/test_render_doc.txt) - 文本测试文件',
+      '[^img]: ![测试图片](file:///E:/Work/GenericAgent/temp/test_render_image.png) - 尺寸 400x200 PNG',
     ].join('\n')
     const container = renderAssistant(markdown)
 
-    const refs = [...container.querySelectorAll('.oa-footnote-ref')]
-    expect(refs.map(ref => ref.textContent)).toEqual(['[1]', '[2]'])
+    const refs = container.querySelectorAll('.oa-footnote-ref')
+    expect(refs.length).toBe(2)
+    expect(refs[0].textContent).toBe('[1]')
+    expect(refs[1].textContent).toBe('[2]')
 
-    const footnotes = container.querySelector('.oa-md-footnotes')
-    expect(footnotes).toBeTruthy()
-    const items = [...footnotes.querySelectorAll('.oa-md-footnote-item')]
+    const fnList = container.querySelector('.oa-md-footnotes')
+    expect(fnList).toBeTruthy()
+    const items = fnList.querySelectorAll('.oa-md-footnote-item')
     expect(items.length).toBe(2)
-    expect(refs.map(ref => ref.querySelector('a').getAttribute('href'))).toEqual(items.map(item => `#${item.id}`))
+    expect(refs[0].querySelector('a').getAttribute('href')).toBe(`#${items[0].id}`)
+    expect(refs[1].querySelector('a').getAttribute('href')).toBe(`#${items[1].id}`)
     expect(items[0].id).not.toBe(items[1].id)
-    expect(items[0].querySelector('a').textContent).toBe('guide')
-    expect(items[1].querySelector('strong').textContent).toBe('strong text')
+
+    const docLink = items[0].querySelector('a.oa-md-file-link')
+    expect(docLink).toBeTruthy()
+    expect(docLink.textContent).toBe('test_render_doc.txt')
+
+    const imgNode = items[1].querySelector('img.oa-md-image')
+    expect(imgNode).toBeTruthy()
   })
 
   test('collects footnotes after fenced code and gives repeated references distinct back links', () => {
@@ -407,7 +429,7 @@ describe('assistant pre-token feedback', () => {
     expect(refs.map(ref => ref.textContent)).toEqual(['[1]', '[1]'])
     expect(new Set(refs.map(ref => ref.id)).size).toBe(2)
     expect(refs.map(ref => ref.querySelector('a').getAttribute('href'))).toEqual([`#${items[0].id}`, `#${items[0].id}`])
-    expect(markdownRoot.textContent).toContain('Missing[^missing].')
+    expect(container.querySelector('.oa-md').textContent).toContain('Missing[^missing].')
     expect(items.length).toBe(1)
     expect(items[0].querySelector('strong').textContent).toBe('body')
 
@@ -430,5 +452,4 @@ describe('assistant pre-token feedback', () => {
     expect(new Set(items.map(item => item.id)).size).toBe(2)
     expect(refs.map(ref => ref.querySelector('a').getAttribute('href'))).toEqual(items.map(item => `#${item.id}`))
   })
-
 })

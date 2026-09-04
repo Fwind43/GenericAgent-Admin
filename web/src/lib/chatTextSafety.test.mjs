@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, parseAssistantContent, splitMarkdownParts, textRenderStats, previewLongText } from './chatTextSafety.js'
+import { MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, parseAssistantContent, splitMarkdownParts, parseCodeFenceInfo, textRenderStats, previewLongText } from './chatTextSafety.js'
 
 test('many content lines do not trigger safe preview by line count alone', () => {
   const text = Array.from({ length: MARKDOWN_LINE_LIMIT + 20 }, (_, i) => `line ${i}`).join('\n')
@@ -190,4 +190,24 @@ test('trailing unclosed fence remains a code part while tool output streams', ()
 test('Info is recognized as a tool result marker', () => {
   assert.equal(isToolResultText("[Info] {'status': 'success'}"), true)
   assert.equal(isToolResultText('[Information] ordinary prose'), false)
+})
+
+test('parseCodeFenceInfo handles lang:filename and title attributes', () => {
+  assert.deepEqual(parseCodeFenceInfo('text:test_render_doc.txt'), { lang: 'text', filename: 'test_render_doc.txt' })
+  assert.deepEqual(parseCodeFenceInfo('python:app.py'), { lang: 'python', filename: 'app.py' })
+  assert.deepEqual(parseCodeFenceInfo('json title="config.json"'), { lang: 'json', filename: 'config.json' })
+  assert.deepEqual(parseCodeFenceInfo("ts filename='src/index.ts'"), { lang: 'ts', filename: 'src/index.ts' })
+  assert.deepEqual(parseCodeFenceInfo('js main.js'), { lang: 'js', filename: 'main.js' })
+  assert.deepEqual(parseCodeFenceInfo('python'), { lang: 'python', filename: '' })
+  assert.deepEqual(parseCodeFenceInfo(':README.md'), { lang: '', filename: 'README.md' })
+  assert.deepEqual(parseCodeFenceInfo(''), { lang: '', filename: '' })
+})
+
+test('splitMarkdownParts preserves filename from fence info', () => {
+  const parts = splitMarkdownParts('```text:test_render_doc.txt\nHello Doc\n```')
+  assert.equal(parts.length, 1)
+  assert.equal(parts[0].type, 'code')
+  assert.equal(parts[0].lang, 'text')
+  assert.equal(parts[0].filename, 'test_render_doc.txt')
+  assert.equal(parts[0].text, 'Hello Doc\n')
 })

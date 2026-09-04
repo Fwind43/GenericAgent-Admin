@@ -14,18 +14,114 @@ export const BLOCK_DEPTH_LIMIT = 6
 // Only these schemes may reach an href/src. React renders `javascript:` URLs
 // with nothing more than a console warning, and model output is untrusted
 // input, so an allowlist is the only safe default here.
-const ALLOWED_URL_SCHEMES = new Set(['http', 'https', 'mailto', 'tel'])
+const ALLOWED_URL_SCHEMES = new Set(['http', 'https', 'mailto', 'tel', 'file'])
 
 const ASCII_PUNCTUATION_RE = /[!-/:-@[-`{-~]/
 
+// Checks if a path resembles a Windows drive path (e.g. C:\path or D:/path) or UNC (\\server\share)
+const isWindowsPath = (str = '') => /^[a-zA-Z]:[\\/]/.test(str) || /^\\\\[^\\]/.test(str)
+
 export const safeUrl = (raw = '') => {
-  // Control characters are stripped before the scheme test so that obfuscated
-  // payloads such as "java\tscript:alert(1)" cannot slip past it.
-  const href = String(raw || '').replace(/[\u0000-\u0020\u007f]+/g, '').trim()
-  if (!href) return ''
-  const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(href)
-  if (!scheme) return href // relative path, "#anchor" or "//host" — all harmless
-  return ALLOWED_URL_SCHEMES.has(scheme[1].toLowerCase()) ? href : ''
+  const trimmed = String(raw || '').trim()
+  if (!trimmed) return ''
+
+  // Windows absolute paths (e.g. D:\dir\file.png or D:/dir/file.png or \\unc\path)
+  // must be preserved with internal spaces intact, stripped only of control chars.
+  if (isWindowsPath(trimmed)) {
+    return trimmed.replace(/[\u0000-\u001f\u007f]+/g, '')
+  }
+
+  // Scheme test check for obfuscated payloads such as "java\tscript:alert(1)".
+  // We strip internal whitespace & controls for scheme detection.
+  const normalized = trimmed.replace(/[\u0000-\u0020\u007f]+/g, '')
+  const schemeMatch = /^([a-z][a-z0-9+.-]*):/i.exec(normalized)
+  if (!schemeMatch) {
+    // Relative path, anchor "#...", or absolute Unix path "/..."
+    // Strip control characters but preserve internal spaces.
+    return trimmed.replace(/[\u0000-\u001f\u007f]+/g, '')
+  }
+
+  const scheme = schemeMatch[1].toLowerCase()
+  if (ALLOWED_URL_SCHEMES.has(scheme)) {
+    // Return original stripped of control characters
+    return trimmed.replace(/[\u0000-\u001f\u007f]+/g, '')
+  }
+  return ''
+}
+
+/**
+ * Extracts a normalized filesystem path if the given target is a local file path
+ * (Windows drive path, UNC path, Unix root path, or file:// URL). Returns null otherwise.
+ */
+export const extractLocalFilePath = (rawPath = '') => {
+  const src = String(rawPath || '').trim()
+  if (!src) return null
+
+  if (/^file:\/\//i.test(src)) {
+    let stripped = src.replace(/^file:\/\//i, '')
+    if (/^\/[a-zA-Z]:[\\/]/.test(stripped)) {
+      stripped = stripped.slice(1)
+    }
+    try {
+      stripped = decodeURIComponent(stripped)
+    } catch {
+      // ignore malformed URI
+    }
+    return stripped
+  }
+
+  if (isWindowsPath(src) || (src.startsWith('/') && !src.startsWith('//'))) {
+    return src
+  }
+
+  return null
+}
+
+/**
+ * Resolves an image source into a browser-renderable URL.
+ * Local absolute paths (Windows drive, Unix absolute, UNC, or file://)
+ * are proxied through `/api/files/image?path=...`.
+ */
+export const resolveMarkdownImageUrl = (rawSrc = '') => {
+  const src = String(rawSrc || '').trim()
+  if (!src) return ''
+
+  // Already a proxy or web/data URL
+  if (/^(?:https?:|\/\/|data:|\/api\/)/i.test(src)) {
+    return src
+  }
+
+  const localPath = extractLocalFilePath(src)
+  if (localPath) {
+    return `/api/files/image?path=${encodeURIComponent(localPath)}`
+  }
+
+  return src
+}
+
+/**
+ * Resolves a markdown link target.
+ * If it points to a local file/directory path, returns an object:
+ * { isLocal: true, href: '/api/files/download?path=...', localPath: '...', downloadName: '...' }
+ * Otherwise returns:
+ * { isLocal: false, href: src }
+ */
+export const resolveMarkdownLink = (rawHref = '') => {
+  const href = String(rawHref || '').trim()
+  if (!href) return { isLocal: false, href: '' }
+
+  const localPath = extractLocalFilePath(href)
+  if (localPath) {
+    const downloadName = localPath.split(/[\\/]/).filter(Boolean).pop() || 'download'
+    return {
+      isLocal: true,
+      href: `/api/files/download?path=${encodeURIComponent(localPath)}`,
+      localPath,
+      downloadName,
+    }
+  }
+
+  return { isLocal: false, href }
 }
 
 const isAlphaNumeric = (ch) => !!ch && /[\p{L}\p{N}]/u.test(ch)

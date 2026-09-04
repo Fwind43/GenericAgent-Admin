@@ -45,7 +45,7 @@ describe('chat file attachments', () => {
 
     expect(screen.getByText('Review this')).toBeTruthy()
     expect(screen.getByText('report.pdf')).toBeTruthy()
-    expect(container.querySelector('.oa-msg-saved-paths')).toBeTruthy()
+    expect(container.querySelector('.oa-message-files')).toBeTruthy()
     expect(container.textContent).not.toContain('[FILE:')
   })
 
@@ -63,5 +63,29 @@ describe('chat file attachments', () => {
     const download = screen.getByRole('link', { name:'下载文件 report.pdf' })
     expect(download.getAttribute('href')).toBe('/api/files/download?path=C%3A%2Ftmp%2Freport.pdf')
     expect(download.getAttribute('download')).toBe('report.pdf')
+  })
+
+  test('renders markdown link with local path as a downloadable link with action buttons', () => {
+    const { container } = render(
+      <ChatMessage
+        message={{ id:'a-link', role:'assistant', content:'请查阅 [业务报告](D:\\Work\\final_report.pdf) 以及 [说明文档](file:///C:/docs/spec.docx)', created_at:0 }}
+        pending={false}
+        onAskReply={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('业务报告')).toBeTruthy()
+    expect(screen.getByText('说明文档')).toBeTruthy()
+
+    const links = container.querySelectorAll('.oa-md-file-link')
+    expect(links.length).toBe(2)
+    expect(links[0].getAttribute('href')).toBe('/api/files/download?path=D%3A%5CWork%5Cfinal_report.pdf')
+    expect(links[0].getAttribute('download')).toBe('final_report.pdf')
+
+    expect(links[1].getAttribute('href')).toBe('/api/files/download?path=C%3A%2Fdocs%2Fspec.docx')
+    expect(links[1].getAttribute('download')).toBe('spec.docx')
+
+    const actionBtns = container.querySelectorAll('.oa-md-file-link-action')
+    expect(actionBtns.length).toBe(4) // 2 for each link (open + reveal)
   })
 })

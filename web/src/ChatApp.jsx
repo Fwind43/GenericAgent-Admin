@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useId, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
@@ -27,7 +27,7 @@ import { formatDuration, fuzzyMatch, goalBudgetPercent, goalTurnPercent } from '
 import { JSON_TREE_CHILD_LIMIT, JSON_TREE_STRING_LIMIT, LIST_ITEM_LIMIT, LONG_TEXT_PREVIEW_CHARS, MARKDOWN_BLOCK_LIMIT, MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, parseAssistantContent, previewLongText, splitMarkdownParts, textRenderStats } from './lib/chatTextSafety'
 import { parseStructuredContent } from './lib/structuredContent'
 import { segmentAgentProtocolBlocks } from './lib/agentProtocol'
-import { parseBlocks, parseInline } from './lib/markdown.js'
+import { parseBlocks, parseInline, resolveMarkdownImageUrl, resolveMarkdownLink } from './lib/markdown.js'
 import { getAskUserPayload } from './lib/askUserPayload'
 import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ultraPlanTasks'
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
@@ -310,13 +310,10 @@ function InlineNodes({ nodes = [] }) {
       if (node.type === 'math') return <MathFormula key={i} value={node.value} display={node.display} />
       if (node.type === 'br') return <br key={i} />
       if (node.type === 'image') {
-        return <img key={i} className="oa-md-image" src={node.src} alt={node.alt}
-          title={node.title || undefined} loading="lazy" />
+        return <MarkdownImage key={i} node={node} />
       }
       if (node.type === 'link') {
-        return <a key={i} href={node.href} title={node.title || undefined} target="_blank" rel="noreferrer noopener">
-          <InlineNodes nodes={node.children} />
-        </a>
+        return <MarkdownLink key={i} node={node} />
       }
       if (node.type === 'footnote_ref') {
         if (!node.footnoteNumber || !node.footnoteId) {
@@ -335,6 +332,147 @@ function InlineNodes({ nodes = [] }) {
       return <Tag key={i}><InlineNodes nodes={node.children} /></Tag>
     })}
   </>
+}
+
+function MarkdownImage({ node }) {
+  const src = resolveMarkdownImageUrl(node.src)
+  const resolved = resolveMarkdownLink(node.src)
+  const [opening, setOpening] = useState(false)
+
+  const openLocal = async (e, mode = 'file') => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (opening) return
+    const targetDesc = mode === 'folder' ? ct('所在文件夹', 'containing folder') : ct('图片文件', 'image file')
+    if (!await confirmDanger('chat-file-open', ct(`使用系统桌面打开${targetDesc}：${resolved.localPath}？`, `Open ${targetDesc} in desktop system: ${resolved.localPath}?`))) return
+    setOpening(true)
+    try {
+      await api('/api/files/open', { dangerous: true, method: 'POST', body: JSON.stringify({ path: resolved.localPath, mode }) })
+    } catch (err) {
+      await showAppAlert(ct(`打开失败：${err?.message || err}`, `Open failed: ${err?.message || err}`), { operation: 'chat-file-open' })
+    } finally {
+      setOpening(false)
+    }
+  }
+
+  const downloadHref = resolved.isLocal ? resolved.href : src
+  const downloadName = resolved.isLocal ? resolved.downloadName : (String(node.src || '').split(/[\\/]/).filter(Boolean).pop() || 'image')
+
+  return (
+    <span className="oa-md-image-wrap">
+      <img
+        className="oa-md-image"
+        src={src}
+        alt={node.alt}
+        title={node.title || undefined}
+        loading="lazy"
+      />
+      <span className="oa-md-image-actions">
+        <a
+          href={downloadHref}
+          download={downloadName}
+          className="oa-md-image-action"
+          title={ct('下载图片', 'Download image')}
+          aria-label={ct('下载图片', 'Download image')}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          <Download size={13} />
+        </a>
+        {resolved.isLocal && (
+          <>
+            <button
+              type="button"
+              className="oa-md-image-action"
+              title={ct('在系统默认程序中打开', 'Open with system default app')}
+              aria-label={ct('在系统默认程序中打开', 'Open with system default app')}
+              disabled={opening}
+              onClick={(e) => openLocal(e, 'file')}
+            >
+              <ExternalLink size={13} />
+            </button>
+            <button
+              type="button"
+              className="oa-md-image-action"
+              title={ct('在文件夹中显示', 'Show in folder')}
+              aria-label={ct('在文件夹中显示', 'Show in folder')}
+              disabled={opening}
+              onClick={(e) => openLocal(e, 'folder')}
+            >
+              <FolderOpen size={13} />
+            </button>
+          </>
+        )}
+      </span>
+    </span>
+  )
+}
+
+function MarkdownLink({ node }) {
+  const resolved = resolveMarkdownLink(node.href)
+  const [opening, setOpening] = useState(false)
+
+  if (!resolved.isLocal) {
+    return (
+      <a href={node.href} title={node.title || undefined} target="_blank" rel="noreferrer noopener">
+        <InlineNodes nodes={node.children} />
+      </a>
+    )
+  }
+
+  const openLocal = async (e, mode = 'file') => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (opening) return
+    const targetDesc = mode === 'folder' ? ct('所在文件夹', 'containing folder') : ct('文件', 'file')
+    if (!await confirmDanger('chat-file-open', ct(`使用系统桌面打开${targetDesc}：${resolved.localPath}？`, `Open ${targetDesc} in desktop system: ${resolved.localPath}?`))) return
+    setOpening(true)
+    try {
+      await api('/api/files/open', { dangerous: true, method: 'POST', body: JSON.stringify({ path: resolved.localPath, mode }) })
+    } catch (err) {
+      await showAppAlert(ct(`打开失败：${err?.message || err}`, `Open failed: ${err?.message || err}`), { operation: 'chat-file-open' })
+    } finally {
+      setOpening(false)
+    }
+  }
+
+  const titleText = node.title || resolved.localPath
+
+  return (
+    <span className="oa-md-file-link-wrap">
+      <a
+        href={resolved.href}
+        download={resolved.downloadName}
+        className="oa-md-file-link"
+        title={ct(`点击下载：${titleText} (Ctrl/Cmd+点击在文件夹中显示)`, `Click to download: ${titleText} (Ctrl/Cmd+click to reveal in folder)`)}
+        onClick={(e) => {
+          if (e.ctrlKey || e.metaKey) {
+            openLocal(e, 'folder')
+          }
+        }}
+      >
+        <InlineNodes nodes={node.children} />
+      </a>
+      <button
+        type="button"
+        className="oa-md-file-link-action"
+        title={ct('在系统默认程序中打开', 'Open with system default app')}
+        disabled={opening}
+        onClick={(e) => openLocal(e, 'file')}
+      >
+        <ExternalLink size={12} />
+      </button>
+      <button
+        type="button"
+        className="oa-md-file-link-action"
+        title={ct('在文件夹中显示', 'Show in folder')}
+        disabled={opening}
+        onClick={(e) => openLocal(e, 'folder')}
+      >
+        <FolderOpen size={12} />
+      </button>
+    </span>
+  )
 }
 
 function InlineMarkdown({ text = '', nodes }) {
@@ -772,6 +910,45 @@ function MermaidDiagram({ source = '' }) {
   </>
 }
 
+function CodeBlockCard({ lang = '', filename = '', text = '' }) {
+  const { Icon, kind } = getFileVisual(filename || (lang ? `file.${lang}` : 'file'))
+  const onDownload = useCallback((e) => {
+    e?.stopPropagation?.()
+    if (!text) return
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename || `snippet.${lang || 'txt'}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [text, filename, lang])
+
+  return <div className="oa-code-card">
+    <div className="oa-code-head">
+      <div className="oa-code-head-meta">
+        {filename ? <>
+          <span className={`oa-code-file-icon oa-file-kind-${kind}`}>
+            <Icon size={14} />
+          </span>
+          <span className="oa-code-filename" title={filename}>{filename}</span>
+          {lang && <span className="oa-code-lang-badge">{lang}</span>}
+        </> : <span>{lang || ct('代码', 'Code')}</span>}
+      </div>
+      <div className="oa-code-actions">
+        {filename && <button type="button" className="oa-code-action-btn" onClick={onDownload} title={ct(`下载为 ${filename}`, `Download as ${filename}`)}>
+          <Download size={13} />
+          <span>{ct('下载', 'Download')}</span>
+        </button>}
+        <CopyButton text={text} compact />
+      </div>
+    </div>
+    <pre><code>{text}</code></pre>
+  </div>
+}
+
 function extractFootnotesFromBlocks(blocks = [], definitions) {
   return blocks.flatMap((block) => {
     if (block.type === 'footnotes') {
@@ -930,10 +1107,7 @@ const MarkdownBlock = memo(function MarkdownBlock({ text = '', onAskReply }) {
             <div className="oa-mermaid-status oa-mermaid-stream-note" role="status">{ct('正在接收图表内容，完成后将自动渲染', 'Receiving diagram source; it will render when complete')}</div>
             <pre className="oa-mermaid-source"><code>{p.text}</code></pre>
           </div>
-        : <div className="oa-code-card" key={idx}>
-          <div className="oa-code-head"><span>{p.lang || ct('代码', 'Code')}</span><CopyButton text={p.text} compact /></div>
-          <pre><code>{p.text}</code></pre>
-        </div>
+        : <CodeBlockCard key={idx} lang={p.lang} filename={p.filename} text={p.text} />
       : p.type === 'tool'
         ? null  // Skip tool parts - rendered via parsed.tools in AssistantContent
         : <TextMarkdown key={idx} text={p.text} prepared={p.prepared} onAskReply={onAskReply}/>) }

@@ -6,6 +6,40 @@ export const LONG_TEXT_PREVIEW_CHARS = 18000
 export const JSON_TREE_CHILD_LIMIT = 160
 export const JSON_TREE_STRING_LIMIT = 1400
 
+export const parseCodeFenceInfo = (info = '') => {
+  const raw = String(info || '').trim()
+  if (!raw) return { lang: '', filename: '' }
+
+  // 1) Explicit filename="..." or title="..." or file="..."
+  const explicitMatch = raw.match(/(?:title|filename|file)=["']([^"']+)["']/i)
+  let filename = explicitMatch ? explicitMatch[1].trim() : ''
+  let rest = explicitMatch ? (raw.slice(0, explicitMatch.index) + ' ' + raw.slice(explicitMatch.index + explicitMatch[0].length)).trim() : raw
+
+  // 2) Colon separator: `lang:filename` e.g. `text:test_render_doc.txt` or `python:src/main.py`
+  if (!filename) {
+    const colonIdx = rest.indexOf(':')
+    if (colonIdx !== -1) {
+      const candidateLang = rest.slice(0, colonIdx).trim()
+      const candidateName = rest.slice(colonIdx + 1).trim()
+      if (candidateName) {
+        return { lang: candidateLang, filename: candidateName }
+      }
+    }
+  }
+
+  // 3) Space separator: `lang filename.ext` e.g. `python app.py`
+  if (!filename) {
+    const tokens = rest.split(/\s+/)
+    if (tokens.length >= 2 && tokens[1].includes('.')) {
+      filename = tokens[1]
+      rest = tokens[0]
+    }
+  }
+
+  const lang = rest.split(/\s+/)[0] || ''
+  return { lang, filename }
+}
+
 export const splitMarkdownParts = (text = '') => {
   const src = String(text || '')
   const parts = []
@@ -13,7 +47,9 @@ export const splitMarkdownParts = (text = '') => {
   let last = 0, match
   while ((match = closedFenceRe.exec(src)) !== null) {
     if (match.index > last) parts.push({ type:'text', text:src.slice(last, match.index) })
-    parts.push({ type:'code', fence:match[1], lang:(match[2] || '').trim(), text:match[3] || '', closed:true })
+    const rawInfo = (match[2] || '').trim()
+    const { lang, filename } = parseCodeFenceInfo(rawInfo)
+    parts.push({ type:'code', fence:match[1], rawInfo, lang, filename, text:match[3] || '', closed:true })
     last = closedFenceRe.lastIndex
   }
   if (last < src.length) {
@@ -22,7 +58,9 @@ export const splitMarkdownParts = (text = '') => {
     if (open) {
       const fenceAt = open.index + open[1].length
       if (fenceAt > 0) parts.push({ type:'text', text:tail.slice(0, fenceAt) })
-      parts.push({ type:'code', fence:open[2], lang:(open[3] || '').trim(), text:tail.slice(open.index + open[0].length), closed:false })
+      const rawInfo = (open[3] || '').trim()
+      const { lang, filename } = parseCodeFenceInfo(rawInfo)
+      parts.push({ type:'code', fence:open[2], rawInfo, lang, filename, text:tail.slice(open.index + open[0].length), closed:false })
     } else {
       parts.push({ type:'text', text:tail })
     }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parseBlocks, parseInline, parseTableRows, safeUrl } from './markdown.js'
+import { parseBlocks, parseInline, parseTableRows, resolveMarkdownImageUrl, safeUrl } from './markdown.js'
 
 // Collapses an inline tree into a compact string so assertions stay readable.
 const shape = (nodes) => nodes.map((n) => {
@@ -87,6 +87,32 @@ test('dangerous url schemes are refused', () => {
   assert.equal(safeUrl('vbscript:msgbox'), '')
   assert.equal(safeUrl('https://a.test'), 'https://a.test')
   assert.equal(safeUrl('/local/path'), '/local/path')
+  assert.equal(safeUrl('D:\\Program Files\\GenericAgent\\temp\\desktop_screenshot.png'), 'D:\\Program Files\\GenericAgent\\temp\\desktop_screenshot.png')
+  assert.equal(safeUrl('C:/Users/test/image.png'), 'C:/Users/test/image.png')
+  assert.equal(safeUrl('file:///D:/Program%20Files/test.png'), 'file:///D:/Program%20Files/test.png')
+})
+
+test('local absolute paths and file URLs are resolved for images', () => {
+  assert.equal(
+    resolveMarkdownImageUrl('D:\\Program Files\\GenericAgent\\temp\\desktop_screenshot.png'),
+    '/api/files/image?path=' + encodeURIComponent('D:\\Program Files\\GenericAgent\\temp\\desktop_screenshot.png'),
+  )
+  assert.equal(
+    resolveMarkdownImageUrl('C:/Users/test/image.png'),
+    '/api/files/image?path=' + encodeURIComponent('C:/Users/test/image.png'),
+  )
+  assert.equal(
+    resolveMarkdownImageUrl('/home/user/img.png'),
+    '/api/files/image?path=' + encodeURIComponent('/home/user/img.png'),
+  )
+  assert.equal(
+    resolveMarkdownImageUrl('file:///D:/temp/test.png'),
+    '/api/files/image?path=' + encodeURIComponent('D:/temp/test.png'),
+  )
+  assert.equal(
+    resolveMarkdownImageUrl('https://example.com/pic.png'),
+    'https://example.com/pic.png',
+  )
 })
 
 test('a blocked link destination degrades to its label text', () => {
