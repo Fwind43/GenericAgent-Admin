@@ -36,6 +36,7 @@ import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, 
 import { groupProjectSessions } from './lib/chatProjectSessions.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
+import { reconcileScalarList, reconcileSessionSummaries } from './lib/chatSessionReconcile.js'
 import { createPromptPreset, normalizePromptPresets, promptPresetPatch, selectedPromptPresetView } from './lib/promptPresets'
 import { commandResultSummary, reduceCommandResult } from './lib/chatCommands'
 import { buildChatRunPayload, buildEditResendItem } from './lib/worldlineEdit'
@@ -218,6 +219,31 @@ export const SessionAutorunBadge = memo(function SessionAutorunBadge({ enabled =
   if (!enabled || !sessionId || sessionId !== targetSessionId) return null
   const label = ct('Autorun 已开启', 'Autorun enabled')
   return <em className="oa-session-autorun-badge" title={label} aria-label={label}>Autorun</em>
+})
+
+const SidebarSessionRow = memo(function SidebarSessionRow({
+  session,
+  active = false,
+  editing = false,
+  menuOpen = false,
+  draftTitle = '',
+  hasDraft = false,
+  autorunEnabled = false,
+  ageText = '',
+  actionsRef,
+}) {
+  const sidebarLoop = loopSidebarView(session.loop)
+  const title = shortTitle(session)
+  return <div className={`oa-session-row ${active?'active':''} ${session.running?'is-running':''} ${session.pinned?'is-pinned':''}`}>
+    {editing ? <div className="oa-rename">
+      <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>actionsRef.current.setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') actionsRef.current.saveRename(session.id); if(event.key==='Escape') actionsRef.current.cancelRename() }}/>
+      <button onClick={()=>actionsRef.current.saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>actionsRef.current.cancelRename()} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
+    </div> : <button className="oa-session" onClick={()=>actionsRef.current.openSession(session.id)} title={title}>
+      <span className="oa-session-title" title={title}>{session.running && <i className="oa-session-running-dot" aria-hidden="true"/>}{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b><SessionAutorunBadge enabled={autorunEnabled} sessionId={session.id} targetSessionId={active ? session.id : ''}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
+      <small title={fmtTime(session.updated_at)}>{session.running ? <em className="oa-session-running-label">{ct('运行中', 'Running')}</em> : ageText}</small>
+    </button>}
+    {!editing && <button className={`oa-session-more ${menuOpen ? 'is-open' : ''}`} onClick={(event)=>actionsRef.current.toggleMenu(session.id, event)} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
+  </div>
 })
 
 const BUILTIN_SLASH_COMMANDS = [
@@ -4373,6 +4399,7 @@ export default function ChatApp() {
   const [hubUpdatingSessionId, setHubUpdatingSessionId] = useState('')
   const [attachments, setAttachments] = useState([])
   const [queuedMessages, setQueuedMessages] = useState([])
+  const sidebarSessionActionsRef = useRef(null)
   const [queueEditingId, setQueueEditingId] = useState('')
   const [queueDraft, setQueueDraft] = useState('')
   const [guidingQueueId, setGuidingQueueId] = useState('')
@@ -5242,10 +5269,12 @@ export default function ChatApp() {
   const loadSessions = async (prefer = sid, options = {}) => {
     const { open = false } = options
     const d = await chatApi('/api/chat/sessions')
-    const list = mergeChatSessionDraftSessions(d.sessions, chatInstanceRef.current)
+    const incoming = mergeChatSessionDraftSessions(d.sessions, chatInstanceRef.current)
+    const list = reconcileSessionSummaries(sessionsRef.current, incoming)
+    sessionsRef.current = list
     setSessions(list)
-    setProjects(Array.isArray(d.projects) ? d.projects : [])
-    setPinnedProjects(Array.isArray(d.pinned_projects) ? d.pinned_projects : [])
+    setProjects(previous => reconcileScalarList(previous, d.projects))
+    setPinnedProjects(previous => reconcileScalarList(previous, d.pinned_projects))
     if (open) {
       const restored = loadSelectedChatSessionID(chatInstanceRef.current)
       const next = chooseChatSessionID(list, prefer, restored)
@@ -6334,11 +6363,12 @@ export default function ChatApp() {
         const d = await chatApi('/api/chat/sessions')
         if (!stopped) {
           const previous = sessionsRef.current
-          const next = mergeChatSessionDraftSessions(d.sessions, chatInstanceRef.current)
+          const incoming = mergeChatSessionDraftSessions(d.sessions, chatInstanceRef.current)
+          const next = reconcileSessionSummaries(previous, incoming)
           sessionsRef.current = next
           setSessions(next)
-          setProjects(Array.isArray(d.projects) ? d.projects : [])
-          setPinnedProjects(Array.isArray(d.pinned_projects) ? d.pinned_projects : [])
+          setProjects(current => reconcileScalarList(current, d.projects))
+          setPinnedProjects(current => reconcileScalarList(current, d.pinned_projects))
           const activeID = activeSidRef.current
           const before = previous.find(item => item.id === activeID)
           const after = next.find(item => item.id === activeID)
@@ -6696,26 +6726,33 @@ export default function ChatApp() {
     }
   }
 
-  const renderSidebarSession = (session) => {
-    const sidebarLoop = loopSidebarView(session.loop)
-    return <div key={session.id} className={`oa-session-row ${session.id===sid?'active':''} ${session.running?'is-running':''} ${session.pinned?'is-pinned':''}`}>
-      {editing === session.id ? <div className="oa-rename">
-        <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') saveRename(session.id); if(event.key==='Escape') setEditing('') }}/>
-        <button onClick={()=>saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>setEditing('')} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
-      </div> : <button className="oa-session" onClick={()=>openSession(session.id)} title={shortTitle(session)}>
-        <span className="oa-session-title" title={shortTitle(session)}>{session.running && <i className="oa-session-running-dot" aria-hidden="true"/>}{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{shortTitle(session)}</b><SessionAutorunBadge enabled={autorunEnabled} sessionId={session.id} targetSessionId={sid}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{draftSessionIds.has(session.id) && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
-        <small title={fmtTime(session.updated_at)}>{session.running ? <em className="oa-session-running-label">{ct('运行中', 'Running')}</em> : sessionAgeText(session.updated_at)}</small>
-      </button>}
-      {editing !== session.id && <button className={`oa-session-more ${menuOpen === session.id ? 'is-open' : ''}`} onClick={(event)=>{
-        event.stopPropagation()
-        if (menuOpen === session.id) { closeSessionMenu(); return }
-        const rect = event.currentTarget.getBoundingClientRect()
-        menuTriggerRef.current = event.currentTarget
-        setMenuPos({ top: Math.max(8, rect.top - 78), left: Math.max(8, rect.right - 136) })
-        setMenuOpen(session.id)
-      }} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
-    </div>
+  sidebarSessionActionsRef.current = {
+    openSession,
+    saveRename,
+    setDraftTitle,
+    cancelRename: () => setEditing(''),
+    toggleMenu: (sessionId, event) => {
+      event.stopPropagation()
+      if (menuOpen === sessionId) { closeSessionMenu(); return }
+      const rect = event.currentTarget.getBoundingClientRect()
+      menuTriggerRef.current = event.currentTarget
+      setMenuPos({ top: Math.max(8, rect.top - 78), left: Math.max(8, rect.right - 136) })
+      setMenuOpen(sessionId)
+    },
   }
+
+  const renderSidebarSession = (session) => <SidebarSessionRow
+    key={session.id}
+    session={session}
+    active={session.id === sid}
+    editing={editing === session.id}
+    menuOpen={menuOpen === session.id}
+    draftTitle={editing === session.id ? draftTitle : ''}
+    hasDraft={draftSessionIds.has(session.id)}
+    autorunEnabled={autorunEnabled}
+    ageText={sessionAgeText(session.updated_at)}
+    actionsRef={sidebarSessionActionsRef}
+  />
 
   return <div ref={chatScope} className={`oa-chat ${collapsed ? 'is-collapsed' : ''}`}>
     <aside className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
