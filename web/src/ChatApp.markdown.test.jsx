@@ -364,4 +364,71 @@ describe('assistant pre-token feedback', () => {
     expect(view.container.querySelector('.oa-thinking')).toBeNull()
     expect(view.container.textContent).toContain('\u7b2c\u4e00\u4e2a token')
   })
+
+  test('renders numeric markdown footnotes with matching scoped anchors', () => {
+    const markdown = [
+      'Alpha[^doc] and beta[^details].',
+      '',
+      '[^doc]: Documentation link [guide](https://example.com/guide).',
+      '[^details]: Footnote with **strong text**.',
+    ].join('\n')
+    const container = renderAssistant(markdown)
+
+    const refs = [...container.querySelectorAll('.oa-footnote-ref')]
+    expect(refs.map(ref => ref.textContent)).toEqual(['[1]', '[2]'])
+
+    const footnotes = container.querySelector('.oa-md-footnotes')
+    expect(footnotes).toBeTruthy()
+    const items = [...footnotes.querySelectorAll('.oa-md-footnote-item')]
+    expect(items.length).toBe(2)
+    expect(refs.map(ref => ref.querySelector('a').getAttribute('href'))).toEqual(items.map(item => `#${item.id}`))
+    expect(items[0].id).not.toBe(items[1].id)
+    expect(items[0].querySelector('a').textContent).toBe('guide')
+    expect(items[1].querySelector('strong').textContent).toBe('strong text')
+  })
+
+  test('collects footnotes after fenced code and gives repeated references distinct back links', () => {
+    const markdown = [
+      'First reference[^note].',
+      '',
+      '[^note]: Footnote **body**.',
+      '',
+      '```text',
+      'literal [^note] inside code',
+      '```',
+      '',
+      'Second reference[^note]. Missing[^missing].',
+    ].join('\n')
+    const container = renderAssistant(markdown)
+    const markdownRoot = container.querySelector('.oa-md')
+    const refs = [...container.querySelectorAll('.oa-footnote-ref')]
+    const items = [...container.querySelectorAll('.oa-md-footnote-item')]
+
+    expect(refs.map(ref => ref.textContent)).toEqual(['[1]', '[1]'])
+    expect(new Set(refs.map(ref => ref.id)).size).toBe(2)
+    expect(refs.map(ref => ref.querySelector('a').getAttribute('href'))).toEqual([`#${items[0].id}`, `#${items[0].id}`])
+    expect(markdownRoot.textContent).toContain('Missing[^missing].')
+    expect(items.length).toBe(1)
+    expect(items[0].querySelector('strong').textContent).toBe('body')
+
+    const backRefs = [...items[0].querySelectorAll('.oa-md-footnote-backref')]
+    expect(backRefs.map(link => link.getAttribute('href'))).toEqual(refs.map(ref => `#${ref.id}`))
+    expect(markdownRoot.lastElementChild).toBe(container.querySelector('.oa-md-footnotes'))
+  })
+
+  test('isolates footnote anchor ids between assistant messages', () => {
+    const makeMessage = (id, content) => ({ id, role: 'assistant', content, files: [], created_at: 0 })
+    const container = render(<div>
+      <ChatMessage message={makeMessage('footnote-a', 'Alpha[^same].\n\n[^same]: First.')} pending={false} onAskReply={vi.fn()} />
+      <ChatMessage message={makeMessage('footnote-b', 'Beta[^same].\n\n[^same]: Second.')} pending={false} onAskReply={vi.fn()} />
+    </div>).container
+    const refs = [...container.querySelectorAll('.oa-footnote-ref')]
+    const items = [...container.querySelectorAll('.oa-md-footnote-item')]
+
+    expect(refs.map(ref => ref.textContent)).toEqual(['[1]', '[1]'])
+    expect(new Set(refs.map(ref => ref.id)).size).toBe(2)
+    expect(new Set(items.map(item => item.id)).size).toBe(2)
+    expect(refs.map(ref => ref.querySelector('a').getAttribute('href'))).toEqual(items.map(item => `#${item.id}`))
+  })
+
 })

@@ -1784,6 +1784,19 @@ html[data-color-scheme="dark"] .oa-cselect > ul li:hover{background:rgba(255,255
 .oa-copy,.oa-mini-copy{border:0;background:transparent;color: var(--muted);display:inline-flex;align-items:center;gap:5px;border-radius:7px;cursor:pointer;font-size:12px;height:28px;padding:0 7px}
 .oa-copy:hover,.oa-mini-copy:hover{background:var(--n-f1f1f1);color: var(--text)}
 .oa-md-truncated{margin:10px 0;padding:10px 12px;border:1px dashed var(--n-d1d5db);border-radius:10px;background:var(--n-fafafa);color:var(--i-6b7280);font-size:13px;line-height:1.55}
+
+/* Footnotes & Footnote References */
+.oa-footnote-ref{font-size:0.75em;line-height:0;vertical-align:super;padding:0 2px}
+.oa-footnote-ref a{color:var(--accent,#08785f);text-decoration:none;font-weight:500;padding:1px 3px;border-radius:4px;transition:background .15s ease}
+.oa-footnote-ref a:hover{background:color-mix(in srgb,var(--accent,#08785f) 12%,transparent);text-decoration:underline}
+
+.oa-md-footnotes{margin-top:20px;padding-top:12px;font-size:12.5px;color:var(--text-muted,var(--muted))}
+.oa-md-footnotes-sep{border:0;border-top:1px solid var(--border);margin:0 0 12px 0;width:100%}
+.oa-md-footnotes-list{margin:0;padding-left:20px}
+.oa-md-footnote-item{margin:6px 0;line-height:1.6}
+.oa-md-footnote-body{color:var(--text)}
+.oa-md-footnote-backref{display:inline-block;margin-left:6px;color:var(--accent,#08785f);text-decoration:none;font-family:system-ui,sans-serif;font-size:12px;opacity:.8;transition:opacity .15s ease}
+.oa-md-footnote-backref:hover{opacity:1;text-decoration:none}
 .oa-long-text-preview{margin:8px 0;border:1px solid var(--n-e5e7eb);border-radius:12px;background:var(--n-fafafa);overflow:hidden}
 .oa-long-text-head{min-height:38px;padding:8px 12px;border-bottom:1px solid var(--n-e5e7eb);background:var(--n-f7f7f8);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .oa-long-text-head b{font-size:13px;color:var(--text);font-weight:650}.oa-long-text-head span{font-size:12px;color:var(--muted)}.oa-long-text-head .oa-mini-copy{margin-left:auto}

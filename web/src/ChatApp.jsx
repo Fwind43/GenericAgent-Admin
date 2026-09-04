@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useLayoutEffect, useMemo, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
@@ -318,6 +318,18 @@ function InlineNodes({ nodes = [] }) {
           <InlineNodes nodes={node.children} />
         </a>
       }
+      if (node.type === 'footnote_ref') {
+        if (!node.footnoteNumber || !node.footnoteId) {
+          return <span key={i}>{`[^${node.label}]`}</span>
+        }
+        return (
+          <sup key={i} className="oa-footnote-ref" id={node.refId}>
+            <a href={`#${node.footnoteId}`} title={ct(`脚注 ${node.footnoteNumber}：${node.label}`, `Footnote ${node.footnoteNumber}: ${node.label}`)}>
+              [{node.footnoteNumber}]
+            </a>
+          </sup>
+        )
+      }
       const Tag = INLINE_EMPHASIS_TAGS[node.type]
       if (!Tag) return null
       return <Tag key={i}><InlineNodes nodes={node.children} /></Tag>
@@ -325,8 +337,8 @@ function InlineNodes({ nodes = [] }) {
   </>
 }
 
-function InlineMarkdown({ text = '' }) {
-  return <InlineNodes nodes={parseInline(text)} />
+function InlineMarkdown({ text = '', nodes }) {
+  return <InlineNodes nodes={nodes || parseInline(text)} />
 }
 
 function CopyButton({ text, compact = false }) {
@@ -492,7 +504,12 @@ function FileAttachment({ path }) {
   </span>
 }
 
-function InlineRichText({ text = '' }) {
+function InlineRichText({ text = '', runs }) {
+  if (runs) {
+    return <>{runs.map((run, i) => run.type === 'file'
+      ? <FileAttachment key={i} path={run.path} />
+      : <InlineMarkdown key={i} nodes={run.nodes} />)}</>
+  }
   const src = String(text || '')
   const re = /\[FILE:([^\]]+)\]/g
   const nodes = []
@@ -755,12 +772,156 @@ function MermaidDiagram({ source = '' }) {
   </>
 }
 
+function extractFootnotesFromBlocks(blocks = [], definitions) {
+  return blocks.flatMap((block) => {
+    if (block.type === 'footnotes') {
+      for (const item of block.items || []) {
+        const label = String(item.label || '').trim()
+        if (label && !definitions.has(label)) definitions.set(label, { ...item, label })
+      }
+      return []
+    }
+    if (block.type === 'blockquote') {
+      return [{ ...block, blocks: extractFootnotesFromBlocks(block.blocks, definitions) }]
+    }
+    if (block.type === 'list') {
+      return [{
+        ...block,
+        items: (block.items || []).map(item => ({
+          ...item,
+          blocks: extractFootnotesFromBlocks(item.blocks, definitions),
+        })),
+      }]
+    }
+    return [block]
+  })
+}
+
+function annotateInlineNodes(nodes = [], state) {
+  return nodes.map((node) => {
+    if (node.type === 'footnote_ref') {
+      const label = String(node.label || '').trim()
+      if (!state.definitions.has(label)) return node
+      if (!state.numbers.has(label)) state.numbers.set(label, state.numbers.size + 1)
+      const number = state.numbers.get(label)
+      const occurrence = (state.refCounts.get(label) || 0) + 1
+      state.refCounts.set(label, occurrence)
+      const refId = `${state.scope}-fnref-${number}-${occurrence}`
+      const refIds = state.refIds.get(label) || []
+      refIds.push(refId)
+      state.refIds.set(label, refIds)
+      return {
+        ...node,
+        footnoteNumber: number,
+        footnoteId: `${state.scope}-fn-${number}`,
+        refId,
+      }
+    }
+    if (node.children) return { ...node, children: annotateInlineNodes(node.children, state) }
+    return node
+  })
+}
+
+function prepareInlineRuns(text = '', state) {
+  const src = String(text || '')
+  const fileRe = /\[FILE:([^\]]+)\]/g
+  const runs = []
+  let last = 0
+  let match
+  while ((match = fileRe.exec(src)) !== null) {
+    if (match.index > last) {
+      runs.push({ type: 'inline', nodes: annotateInlineNodes(parseInline(src.slice(last, match.index)), state) })
+    }
+    runs.push({ type: 'file', path: match[1] })
+    last = fileRe.lastIndex
+  }
+  if (last < src.length) {
+    runs.push({ type: 'inline', nodes: annotateInlineNodes(parseInline(src.slice(last)), state) })
+  }
+  return runs
+}
+
+function annotateMarkdownBlocks(blocks = [], state) {
+  return blocks.map((block) => {
+    if (block.type === 'paragraph' || block.type === 'heading') {
+      return { ...block, runs: prepareInlineRuns(block.text, state) }
+    }
+    if (block.type === 'table') {
+      return {
+        ...block,
+        headRuns: (block.head || []).map(cell => prepareInlineRuns(cell, state)),
+        rowRuns: (block.rows || []).map(row => row.map(cell => prepareInlineRuns(cell, state))),
+      }
+    }
+    if (block.type === 'blockquote') {
+      return { ...block, blocks: annotateMarkdownBlocks(block.blocks, state) }
+    }
+    if (block.type === 'list') {
+      return {
+        ...block,
+        items: (block.items || []).map(item => ({
+          ...item,
+          blocks: annotateMarkdownBlocks(item.blocks, state),
+        })),
+      }
+    }
+    return block
+  })
+}
+
+function prepareMarkdownParts(parts = [], scope = 'oa') {
+  const definitions = new Map()
+  const parsedParts = parts.map((part) => {
+    if (part.type !== 'text') return part
+    const parsed = segmentMarkdownText(part.text)
+    return {
+      ...part,
+      prepared: {
+        ...parsed,
+        segments: parsed.segments.map(seg => seg.type === 'prose'
+          ? { ...seg, blocks: extractFootnotesFromBlocks(parseBlocks(seg.text), definitions) }
+          : seg),
+      },
+    }
+  })
+  const state = {
+    scope,
+    definitions,
+    numbers: new Map(),
+    refCounts: new Map(),
+    refIds: new Map(),
+  }
+  for (const part of parsedParts) {
+    if (!part.prepared) continue
+    part.prepared = {
+      ...part.prepared,
+      segments: part.prepared.segments.map(seg => seg.type === 'prose'
+        ? { ...seg, blocks: annotateMarkdownBlocks(seg.blocks, state) }
+        : seg),
+    }
+  }
+  for (const label of definitions.keys()) {
+    if (!state.numbers.has(label)) state.numbers.set(label, state.numbers.size + 1)
+  }
+  const ordered = [...definitions.values()].sort((a, b) => state.numbers.get(a.label) - state.numbers.get(b.label))
+  const preparedDefinitions = ordered.map(item => ({
+    ...item,
+    number: state.numbers.get(item.label),
+    footnoteId: `${scope}-fn-${state.numbers.get(item.label)}`,
+    runs: prepareInlineRuns(item.text, state),
+  }))
+  for (const item of preparedDefinitions) item.refIds = state.refIds.get(item.label) || []
+  return { parts: parsedParts, footnotes: preparedDefinitions }
+}
+
 const MarkdownBlock = memo(function MarkdownBlock({ text = '', onAskReply }) {
   const stats = useMemo(() => textRenderStats(text), [text])
   const parts = useMemo(() => stats.tooLarge ? [] : normalizeToolParts(splitMarkdownParts(text)).slice(0, MARKDOWN_BLOCK_LIMIT), [text, stats.tooLarge])
+  const footnoteScope = `oa${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+  const prepared = useMemo(() => prepareMarkdownParts(parts, footnoteScope), [parts, footnoteScope])
   if (stats.tooLarge) return <div className="oa-md"><LongTextPreview text={text} stats={stats} /></div>
   return <div className="oa-md">
-    {parts.map((p, idx) => p.type === 'code'
+    {prepared.parts.map((p, idx) => p.type === 'code'
       ? isMermaidFence(p.lang)
         ? p.closed
           ? <MermaidDiagram key={idx} source={p.text} />
@@ -775,8 +936,9 @@ const MarkdownBlock = memo(function MarkdownBlock({ text = '', onAskReply }) {
         </div>
       : p.type === 'tool'
         ? null  // Skip tool parts - rendered via parsed.tools in AssistantContent
-        : <TextMarkdown key={idx} text={p.text} onAskReply={onAskReply}/>) }
+        : <TextMarkdown key={idx} text={p.text} prepared={p.prepared} onAskReply={onAskReply}/>) }
     {parts.length >= MARKDOWN_BLOCK_LIMIT && <div className="oa-md-truncated">{ct(`内容块过多，仅渲染前 ${MARKDOWN_BLOCK_LIMIT} 块，可复制消息查看完整内容。`, `Too many content blocks. Only the first ${MARKDOWN_BLOCK_LIMIT} are rendered; copy the message to view everything.`)}</div>}
+    <FootnotesSection items={prepared.footnotes} />
   </div>
 })
 
@@ -2250,8 +2412,8 @@ function ToolCallBlock({ call, onAskReply }) {
 function MarkdownTable({ table }) {
   return <div className="oa-table-wrap">
     <table className="oa-md-table">
-      <thead><tr>{table.head.map((cell, i) => <th key={i} style={{ textAlign: table.aligns[i] || 'left' }}><InlineRichText text={cell} /></th>)}</tr></thead>
-      <tbody>{table.rows.map((row, r) => <tr key={r}>{table.head.map((_, c) => <td key={c} style={{ textAlign: table.aligns[c] || 'left' }}><InlineRichText text={row[c] || ''} /></td>)}</tr>)}</tbody>
+      <thead><tr>{table.head.map((cell, i) => <th key={i} style={{ textAlign: table.aligns[i] || 'left' }}><InlineRichText text={cell} runs={table.headRuns?.[i]} /></th>)}</tr></thead>
+      <tbody>{table.rows.map((row, r) => <tr key={r}>{table.head.map((_, c) => <td key={c} style={{ textAlign: table.aligns[c] || 'left' }}><InlineRichText text={row[c] || ''} runs={table.rowRuns?.[r]?.[c]} /></td>)}</tr>)}</tbody>
     </table>
   </div>
 }
@@ -2263,7 +2425,7 @@ function ListItemBody({ item, tight }) {
   if (!blocks.length) return null
   if (tight && blocks[0].type === 'paragraph') {
     return <>
-      <InlineRichText text={blocks[0].text} />
+      <InlineRichText text={blocks[0].text} runs={blocks[0].runs} />
       {blocks.length > 1 && <MarkdownNodes blocks={blocks.slice(1)} />}
     </>
   }
@@ -2293,10 +2455,10 @@ function MarkdownList({ list }) {
 function MarkdownNodes({ blocks = [] }) {
   return <>
     {blocks.map((block, i) => {
-      if (block.type === 'paragraph') return <p key={i}><InlineRichText text={block.text} /></p>
+      if (block.type === 'paragraph') return <p key={i}><InlineRichText text={block.text} runs={block.runs} /></p>
       if (block.type === 'heading') {
         const Tag = `h${block.depth}`
-        return <Tag key={i}><InlineRichText text={block.text} /></Tag>
+        return <Tag key={i}><InlineRichText text={block.text} runs={block.runs} /></Tag>
       }
       if (block.type === 'hr') return <hr key={i} />
       if (block.type === 'math') return <MathFormula key={i} value={block.value} display block />
@@ -2305,9 +2467,35 @@ function MarkdownNodes({ blocks = [] }) {
       if (block.type === 'blockquote') {
         return <blockquote key={i} className="oa-md-quote"><MarkdownNodes blocks={block.blocks} /></blockquote>
       }
+      if (block.type === 'footnotes') {
+        return <FootnotesSection key={i} items={block.items} />
+      }
       return null
     })}
   </>
+}
+
+function FootnotesSection({ items = [] }) {
+  if (!items || !items.length) return null
+  return (
+    <div className="oa-md-footnotes">
+      <hr className="oa-md-footnotes-sep" />
+      <ol className="oa-md-footnotes-list">
+        {items.map((item) => (
+          <li key={item.footnoteId} id={item.footnoteId} className="oa-md-footnote-item">
+            <span className="oa-md-footnote-body">
+              <InlineRichText text={item.text} runs={item.runs} />
+            </span>
+            {item.refIds.map((refId, idx) => (
+              <a key={refId} href={`#${refId}`} className="oa-md-footnote-backref" title={ct(`返回引用 ${idx + 1}`, `Back to reference ${idx + 1}`)} aria-label={ct(`返回引用 ${idx + 1}`, `Back to reference ${idx + 1}`)}>
+                &#x21a9;&#xfe0e;{item.refIds.length > 1 ? idx + 1 : ''}
+              </a>
+            ))}
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
 }
 
 // Splits the message into tool segments and prose segments. Tool detection still
@@ -2349,14 +2537,16 @@ const segmentMarkdownText = (text = '') => {
   return { segments, hidden }
 }
 
-function TextMarkdown({ text = '', onAskReply }) {
-  const { segments, hidden } = useMemo(() => {
+function TextMarkdown({ text = '', prepared, onAskReply }) {
+  const parsedText = useMemo(() => {
+    if (prepared) return prepared
     const parsed = segmentMarkdownText(text)
     return {
       ...parsed,
       segments: parsed.segments.map(seg => seg.type === 'prose' ? { ...seg, blocks: parseBlocks(seg.text) } : seg),
     }
-  }, [text])
+  }, [text, prepared])
+  const { segments, hidden } = parsedText
   return <>
     {segments.map((seg, i) => seg.type === 'tool'
       ? <ToolCallBlock key={i} call={seg.call} onAskReply={onAskReply} />

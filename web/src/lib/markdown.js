@@ -265,6 +265,20 @@ export const parseInline = (text = '', options = {}) => {
     }
 
     if (ch === '[') {
+      // Footnote reference: [^label]
+      if (src[i + 1] === '^') {
+        const fnEnd = findClosingBracket(src, i + 2, '[', ']')
+        if (fnEnd !== -1) {
+          const label = src.slice(i + 2, fnEnd).trim()
+          if (label) {
+            flush()
+            out.push({ type: 'footnote_ref', label })
+            i = fnEnd + 1
+            continue
+          }
+        }
+      }
+
       const labelEnd = findClosingBracket(src, i + 1, '[', ']')
       if (labelEnd !== -1 && src[labelEnd + 1] === '(') {
         const targetEnd = findClosingBracket(src, labelEnd + 2, '(', ')')
@@ -396,9 +410,12 @@ export const parseTableRows = (lines = []) => {
  * Inline content is kept as a raw string; the renderer runs it through
  * parseInline so it can also expand app-specific tokens such as [FILE:...].
  */
+const FOOTNOTE_DEF_RE = /^\[\^([^\]]+)\]:\s*(.*)$/
+
 export const parseBlocks = (text = '', depth = 0) => {
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n')
   const blocks = []
+  const footnotes = []
   let paragraph = []
 
   const flushParagraph = () => {
@@ -510,10 +527,41 @@ export const parseBlocks = (text = '', depth = 0) => {
       continue
     }
 
+    const fnDef = line.match(FOOTNOTE_DEF_RE)
+    if (fnDef) {
+      flushParagraph()
+      const label = fnDef[1].trim()
+      const fnLines = [fnDef[2]]
+      let j = i + 1
+      while (j < lines.length) {
+        const nextLine = lines[j]
+        if (BLANK_LINE_RE.test(nextLine)) {
+          if (j + 1 < lines.length && /^( {2,}|\t)/.test(lines[j + 1])) {
+            fnLines.push('')
+            j += 1
+            continue
+          }
+          break
+        }
+        if (/^( {2,}|\t)/.test(nextLine)) {
+          fnLines.push(nextLine.replace(/^( {2,}|\t)/, ''))
+          j += 1
+          continue
+        }
+        break
+      }
+      footnotes.push({ label, text: fnLines.join('\n').trim() })
+      i = j - 1
+      continue
+    }
+
     paragraph.push(line)
   }
 
   flushParagraph()
+  if (footnotes.length > 0) {
+    blocks.push({ type: 'footnotes', items: footnotes })
+  }
   return blocks
 }
 
