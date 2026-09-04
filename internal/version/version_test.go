@@ -67,6 +67,8 @@ func TestSelectAssets(t *testing.T) {
 	want := fmt.Sprintf("ga-admin-v1.2.3-%s-%s.zip", runtime.GOOS, runtime.GOARCH)
 	rel := Release{Assets: []Asset{
 		{Name: "other.zip"},
+		{Name: strings.TrimSuffix(want, ".zip") + "-app.zip"},
+		{Name: strings.TrimSuffix(want, ".zip") + "-app.zip.sha256"},
 		{Name: want},
 		{Name: want + ".sha256"},
 	}}
@@ -411,6 +413,36 @@ func TestUpdatePayloadUsesReleaseTopLevelDirectory(t *testing.T) {
 		t.Fatalf("executable = %q, want %q", gotExe, want)
 	}
 	if want := filepath.Join(root, "cmd", "chat_worker.py"); gotWorker != want {
+		t.Fatalf("worker = %q, want %q", gotWorker, want)
+	}
+}
+
+func TestUpdatePayloadFallsBackToMacOSAppBundle(t *testing.T) {
+	const assetName = "ga-admin-v9.9.9-darwin-arm64.zip"
+	dest := t.TempDir()
+	root := filepath.Join(dest, strings.TrimSuffix(assetName, ".zip"))
+	bundleBin := filepath.Join(root, "ga-admin.app", "Contents", "MacOS")
+	for name, content := range map[string]string{
+		"ga-admin":           "new exe",
+		"cmd/chat_worker.py": "new worker",
+	} {
+		path := filepath.Join(bundleBin, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	gotExe, gotWorker, err := updatePayload(dest, assetName, "ga-admin")
+	if err != nil {
+		t.Fatalf("updatePayload: %v", err)
+	}
+	if want := filepath.Join(bundleBin, "ga-admin"); gotExe != want {
+		t.Fatalf("executable = %q, want %q", gotExe, want)
+	}
+	if want := filepath.Join(bundleBin, "cmd", "chat_worker.py"); gotWorker != want {
 		t.Fatalf("worker = %q, want %q", gotWorker, want)
 	}
 }

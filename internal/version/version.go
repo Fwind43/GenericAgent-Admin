@@ -1389,15 +1389,24 @@ func updatePayload(dir, assetName, binName string) (string, string, error) {
 	}
 
 	root := filepath.Join(dir, rootName)
-	newExe := filepath.Join(root, binName)
+	payloadRoot := root
+	newExe := filepath.Join(payloadRoot, binName)
+	if _, err := os.Stat(newExe); errors.Is(err, os.ErrNotExist) && isDarwinUpdateAsset(rootName) {
+		payloadRoot = filepath.Join(root, "ga-admin.app", "Contents", "MacOS")
+		newExe = filepath.Join(payloadRoot, binName)
+	}
 	if err := requireRegularFile(newExe, binName); err != nil {
 		return "", "", err
 	}
-	newWorker := filepath.Join(root, "cmd", "chat_worker.py")
+	newWorker := filepath.Join(payloadRoot, "cmd", "chat_worker.py")
 	if err := requireRegularFile(newWorker, "cmd/chat_worker.py"); err != nil {
 		return "", "", err
 	}
 	return newExe, newWorker, nil
+}
+
+func isDarwinUpdateAsset(rootName string) bool {
+	return strings.HasSuffix(rootName, "-darwin-amd64") || strings.HasSuffix(rootName, "-darwin-arm64")
 }
 
 func requireRegularFile(path, label string) error {

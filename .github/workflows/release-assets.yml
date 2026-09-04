@@ -155,20 +155,20 @@ jobs:
           version="${tag#v}"
           name="ga-admin-${tag}-${{ matrix.goos }}-${{ matrix.goarch }}"
           mkdir -p package "$name"
-          if [ "${{ matrix.goos }}" != "darwin" ]; then
-            cp -R dist/* "$name"/
-          fi
+          cp -R dist/* "$name"/
           cat > "$name/README.txt" <<EOF
           GenericAgent Admin Go ${tag}
 
-          Run ga-admin.exe on Windows. On macOS, double-click ga-admin.app in Finder; do not launch the executable inside the app bundle directly.
+          Run ga-admin.exe on Windows. On macOS, download the archive ending in -app.zip and double-click ga-admin.app in Finder; do not launch the executable inside the app bundle directly.
           Linux servers without DISPLAY/Wayland enter headless mode automatically; use --headless or GA_ADMIN_HEADLESS=1 to force it.
           The executable embeds the React/Vite web UI.
           GenericAgent services still require your local GenericAgent Python environment.
           EOF
           if [ "${{ matrix.goos }}" = "darwin" ]; then
-            app="$name/ga-admin.app"
+            app_name="${name}-app"
+            app="$app_name/ga-admin.app"
             mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+            cp "$name/README.txt" "$app_name/README.txt"
             cp -R dist/* "$app/Contents/MacOS/"
             iconset="$RUNNER_TEMP/ga-admin.iconset"
             mkdir -p "$iconset"
@@ -199,9 +199,12 @@ jobs:
             zip -r "package/$name.zip" "$name"
           fi
           if [ "${{ matrix.goos }}" = "darwin" ]; then
-            test ! -e "$name/ga-admin"
+            test -x "$name/ga-admin"
+            test -f "$name/cmd/chat_worker.py"
             test -x "$app/Contents/MacOS/ga-admin"
+            test -f "$app/Contents/MacOS/cmd/chat_worker.py"
             zip -r "package/$name.zip" "$name"
+            zip -r "package/$app_name.zip" "$app_name"
           fi
           cd package
           python -c "import hashlib, pathlib; [p.with_suffix(p.suffix + '.sha256').write_text(hashlib.sha256(p.read_bytes()).hexdigest() + '  ' + p.name + '\\n', encoding='utf-8') for p in pathlib.Path('.').glob('*.zip')]"
@@ -365,13 +368,13 @@ jobs:
           echo "| | ARM64 | [ga-admin-linux-arm64](https://github.com/${repo}/releases/download/${tag}/ga-admin-${tag}-linux-arm64.zip) | [ga-admin-portable-linux-arm64-${tag}.tar.gz](https://github.com/${repo}/releases/download/${tag}/ga-admin-portable-linux-arm64-${tag}.tar.gz) |" >> release-body.md
           
           # macOS
-          echo "| **macOS** | x86-64 (Intel) | [ga-admin-darwin-amd64](https://github.com/${repo}/releases/download/${tag}/ga-admin-${tag}-darwin-amd64.zip) | Not available |" >> release-body.md
-          echo "| | ARM64 (Apple Silicon) | [ga-admin-darwin-arm64](https://github.com/${repo}/releases/download/${tag}/ga-admin-${tag}-darwin-arm64.zip) | [ga-admin-portable-darwin-arm64-${tag}.tar.gz](https://github.com/${repo}/releases/download/${tag}/ga-admin-portable-darwin-arm64-${tag}.tar.gz) |" >> release-body.md
+          echo "| **macOS** | x86-64 (Intel) | [ga-admin.app](https://github.com/${repo}/releases/download/${tag}/ga-admin-${tag}-darwin-amd64-app.zip) | Not available |" >> release-body.md
+          echo "| | ARM64 (Apple Silicon) | [ga-admin.app](https://github.com/${repo}/releases/download/${tag}/ga-admin-${tag}-darwin-arm64-app.zip) | [ga-admin-portable-darwin-arm64-${tag}.tar.gz](https://github.com/${repo}/releases/download/${tag}/ga-admin-portable-darwin-arm64-${tag}.tar.gz) |" >> release-body.md
           
           # Add description
           cat >> release-body.md <<'EOF'
 
-          **Binary**: Single executable file, requires Python 3.8+ and GenericAgent source code on your system.  
+          **Binary**: Single executable archive on Windows/Linux and a Finder-ready `.app` archive on macOS; requires Python 3.8+ and GenericAgent source code on your system.
           **Portable Bundle**: Complete standalone package with GA source code + Python 3.12.7 + venv, ready to run after extraction.
 
           ---
