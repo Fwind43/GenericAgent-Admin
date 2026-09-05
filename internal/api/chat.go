@@ -1428,8 +1428,14 @@ func (s *Server) endChatRunOwned(sid string, token *chatRun) {
 
 func (s *Server) endChatRun(sid string) { s.endChatRunOwned(sid, nil) }
 
-func (s *Server) streamChatRun(w http.ResponseWriter, r *http.Request, sid string, from int) {
+func setChatStreamHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
+	w.Header().Set("X-Accel-Buffering", "no")
+}
+
+func (s *Server) streamChatRun(w http.ResponseWriter, r *http.Request, sid string, from int) {
+	setChatStreamHeaders(w)
 	flusher, _ := w.(http.Flusher)
 	s.ChatMu.Lock()
 	run := s.ChatRuns[sid]

@@ -695,6 +695,12 @@ func TestStreamChatRunExposesRunIdentity(t *testing.T) {
 	if got := rec.Header().Get("X-Chat-Run-Started-At-Ms"); got != "987654321" {
 		t.Fatalf("X-Chat-Run-Started-At-Ms = %q", got)
 	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-cache, no-transform" {
+		t.Fatalf("Cache-Control = %q", got)
+	}
+	if got := rec.Header().Get("X-Accel-Buffering"); got != "no" {
+		t.Fatalf("X-Accel-Buffering = %q", got)
+	}
 	if got := rec.Body.String(); got != "{\"type\":\"done\"}\n" {
 		t.Fatalf("stream body = %q", got)
 	}

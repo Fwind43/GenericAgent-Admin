@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldFinishStreamFollow, shouldRefreshChatSnapshot } from './chatStream.js'
+import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamTerminalMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldFinishStreamFollow, shouldRefreshChatSnapshot } from './chatStream.js'
 
 test('scroll follow preserves auto mode when fast content growth moves the bottom away', () => {
   assert.equal(scrollFollowAction({ nearBottom: false, previousScrollTop: 320, scrollTop: 320 }), 'preserve')
@@ -111,6 +111,44 @@ test('authoritative final usage wins when present', () => {
   assert.equal(merged.usages[0].input_tokens, 2)
 })
 
+
+test('terminal replay keeps the final history position and removes only matching placeholders', () => {
+  const user = { id:'u1', role:'user', content:'Question' }
+  const saved = { id:'a1', role:'assistant', content:'Answer', elapsed_ms:100, usage:{ output_tokens:9 } }
+  const nextUser = { id:'u2', role:'user', content:'Next' }
+  const nextPending = { id:'a2', role:'assistant', content:'' }
+  const pending = { id:'resume-1', role:'assistant', content:'Answer', elapsed_ms:9999 }
+  const messages = [user, saved, nextUser, nextPending, pending]
+  const before = structuredClone(messages)
+  const finalMessage = { id:'a1', role:'assistant', content:'Answer' }
+  const result = mergeStreamTerminalMessage(messages, pending.id, finalMessage)
+  assert.deepEqual(result.map(m => m.id), ['u1', 'a1', 'u2', 'a2'])
+  assert.equal(result[1].elapsed_ms, 100)
+  assert.deepEqual(result[1].usage, saved.usage)
+  assert.equal(result[2], nextUser)
+  assert.equal(result[3], nextPending)
+  assert.deepEqual(messages, before)
+  assert.deepEqual(mergeStreamTerminalMessage(result, pending.id, finalMessage), result)
+})
+
+test('normal terminal replaces the pending message and preserves streamed metadata', () => {
+  const pending = { id:'pending', role:'assistant', content:'Partial', model_id:'model-a', usages:[{ output_tokens:2 }] }
+  const finalMessage = { id:'final', role:'assistant', content:'Finished' }
+  const result = mergeStreamTerminalMessage([pending], pending.id, finalMessage)
+  assert.deepEqual(result, [{ ...finalMessage, model_id:'model-a', usages:pending.usages }])
+})
+
+test('terminal handles a stable server ID and removes already duplicated final IDs', () => {
+  const finalMessage = { id:'a1', role:'assistant', content:'Finished' }
+  const result = mergeStreamTerminalMessage([{ ...finalMessage, content:'' }, finalMessage], 'a1', finalMessage)
+  assert.deepEqual(result, [finalMessage])
+  assert.deepEqual(mergeStreamTerminalMessage(result, 'a1', finalMessage), result)
+})
+
+test('terminal ignores an event with neither a matching final ID nor a pending message', () => {
+  const messages = [{ id:'other-run', role:'assistant', content:'' }]
+  assert.equal(mergeStreamTerminalMessage(messages, 'absent', { id:'old-run', content:'Done' }), messages)
+})
 
 test('stream delta batcher combines chunks into one scheduled render', () => {
   const callbacks = []

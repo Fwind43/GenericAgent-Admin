@@ -76,6 +76,26 @@ export const mergeFinalStreamMessage = (streamed = {}, finalMessage = {}) => {
 }
 
 
+export const mergeStreamTerminalMessage = (messages, pendingId, finalMessage, merge = mergeFinalStreamMessage) => {
+  const list = Array.isArray(messages) ? messages : []
+  const finalId = finalMessage?.id
+  const existingIndex = finalId ? list.findIndex(m => m.id === finalId) : -1
+  const pendingIndex = list.findIndex(m => m.id === pendingId)
+  const targetIndex = existingIndex >= 0 ? existingIndex : pendingIndex
+  if (targetIndex < 0) return list
+
+  // History may already contain this reply when an older running snapshot triggers replay.
+  // Keep its position and metadata, then remove only this run's redundant placeholders.
+  const streamed = pendingIndex >= 0 ? list[pendingIndex] : list[targetIndex]
+  const base = existingIndex >= 0 ? { ...streamed, ...list[existingIndex] } : streamed
+  const merged = merge(base, finalMessage)
+  return list.flatMap((message, index) => {
+    if (index === targetIndex) return [merged]
+    if (message.id === pendingId || (finalId && message.id === finalId)) return []
+    return [message]
+  })
+}
+
 // live=true (default): deltas animate frame-by-frame as before.
 // live=false: deltas accumulate silently until beginLive() flushes the backlog
 // in one shot (used for replayed events when reattaching after a page refresh,

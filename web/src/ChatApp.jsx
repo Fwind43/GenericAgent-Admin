@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import ThemePicker from './ThemePicker'
-import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldRefreshChatSnapshot } from './lib/chatStream.js'
+import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamTerminalMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldRefreshChatSnapshot } from './lib/chatStream.js'
 import { cacheHitPercent, cacheReadTokens, measuredOutputRate } from './lib/chatUsage.js'
 import { autorunInitialReplyAt, isAutorunTargetRunning, shouldTriggerAutorun } from './lib/chatAutorun.js'
 import { computeLineDiff, computeWriteRows } from './lib/lineDiff.js'
@@ -12,8 +12,11 @@ import { projectNameError, projectNameErrorText } from './lib/projectName.js'
 import { Collapse, Tag } from 'antd'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { Bot, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Lock, Maximize, Maximize2, Menu, MessageSquarePlus, MoreHorizontal, Orbit, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Bot, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Loader2, Lock, Maximize, Maximize2, Menu, MessageSquarePlus, MoreHorizontal, Orbit, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { api, apiStream } from './lib/api'
+import { createChatSessionCache } from './lib/chatSessionCache.js'
+import { useChatHistoryPages } from './lib/useChatHistoryPages.js'
+import { historyStatsMessages } from './lib/chatHistoryPages.js'
 import { SETTINGS_TEXT } from './lib/i18n'
 import { KeychainPage } from './pages/KeychainPage'
 import { addChatInstanceToURL, chatInstanceOptions, initialChatInstanceID, persistChatInstanceID } from './lib/chatInstanceScope'
@@ -4332,6 +4335,8 @@ export default function ChatApp() {
   const [draftSessionIds, setDraftSessionIds] = useState(() => new Set(listChatSessionDraftIds(undefined, chatInstanceID)))
   const [sid, setSid] = useState('')
   const [messages, setMessages] = useState([])
+  const [sessionLoading, setSessionLoading] = useState(false)
+  const [sessionLoadFailed, setSessionLoadFailed] = useState(false)
   const [rawHistory, setRawHistory] = useState([])
   const [historyInfo, setHistoryInfo] = useState([])
   const [workingState, setWorkingState] = useState(null)
@@ -4390,6 +4395,7 @@ export default function ChatApp() {
   const [menuPos, setMenuPos] = useState(null)
   const menuRef = useRef(null)
   const menuTriggerRef = useRef(null)
+  const sidebarSessionActionsRef = useRef(null)
   const [editing, setEditing] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false)
@@ -4399,7 +4405,6 @@ export default function ChatApp() {
   const [hubUpdatingSessionId, setHubUpdatingSessionId] = useState('')
   const [attachments, setAttachments] = useState([])
   const [queuedMessages, setQueuedMessages] = useState([])
-  const sidebarSessionActionsRef = useRef(null)
   const [queueEditingId, setQueueEditingId] = useState('')
   const [queueDraft, setQueueDraft] = useState('')
   const [guidingQueueId, setGuidingQueueId] = useState('')
@@ -4442,6 +4447,22 @@ export default function ChatApp() {
     if (epoch !== chatRequestEpochRef.current) throw new DOMException('Chat instance changed', 'AbortError')
     return result
   }, [])
+  const sessionCacheRef = useRef(null)
+  if (!sessionCacheRef.current) sessionCacheRef.current = createChatSessionCache()
+  const sessionLoadAbortRef = useRef(null)
+  const loadSessionDetail = (id, options = {}) => sessionCacheRef.current.load(
+    addChatInstanceToURL(`/api/chat/session/${id}?view=page`, chatInstanceRef.current), options,
+  )
+  const cancelSessionLoad = () => {
+    sessionLoadAbortRef.current?.abort()
+    sessionLoadAbortRef.current = null
+    setSessionLoading(false)
+    setSessionLoadFailed(false)
+  }
+  useEffect(() => () => {
+    sessionLoadAbortRef.current?.abort()
+    sessionCacheRef.current.clear()
+  }, [])
   const chatFetch = useCallback(async (url, options) => {
     const epoch = chatRequestEpochRef.current
     const result = await fetch(addChatInstanceToURL(url, chatInstanceRef.current), options)
@@ -4452,6 +4473,7 @@ export default function ChatApp() {
     return result
   }, [])
   const runSeqRef = useRef(0)
+  const streamActivitySeqRef = useRef(0)
   const activeRunRef = useRef(false)
   const queueWriteRef = useRef(Promise.resolve())
   const guidingQueueRef = useRef('')
@@ -4488,6 +4510,36 @@ export default function ChatApp() {
     )
   }
   useLayoutEffect(() => { autoFollowRef.current = autoFollow }, [autoFollow])
+  const historyPages = useChatHistoryPages({
+    api: chatApi, setMessages, messagesRef, threadRef,
+    pauseFollow: () => {
+      autoFollowRef.current = false
+      scrollModeRef.current = 'manual'
+      setAutoFollow(false)
+    },
+    onConflict: () => openSession(activeSidRef.current, false),
+  })
+  const [contextLoading, setContextLoading] = useState(false)
+  const [contextError, setContextError] = useState('')
+  const [contextRefresh, setContextRefresh] = useState(0)
+  useEffect(() => {
+    if (!contextOpen || !sid || sessionLoading) return undefined
+    const controller = new AbortController()
+    const openToken = openSeqRef.current
+    const activity = streamActivitySeqRef.current
+    setContextLoading(true)
+    setContextError('')
+    chatApi(`/api/chat/session/${encodeURIComponent(sid)}?view=context`, { signal: controller.signal })
+      .then(data => {
+        if (controller.signal.aborted || openToken !== openSeqRef.current || activeSidRef.current !== sid || activity !== streamActivitySeqRef.current) return
+        setRawHistory(data.raw_history || [])
+        setHistoryInfo(data.history_info || [])
+        setWorkingState(data.working || null)
+      })
+      .catch(error => { if (!controller.signal.aborted && error.name !== 'AbortError') setContextError(error.message || String(error)) })
+      .finally(() => { if (!controller.signal.aborted) setContextLoading(false) })
+    return () => controller.abort()
+  }, [contextOpen, sid, sessionLoading, contextRefresh, chatApi])
   const queuedRef = useRef([])
   const chatScope = useRef(null)
   const persistSessionDraft = useCallback((sessionId, value) => {
@@ -4786,8 +4838,7 @@ export default function ChatApp() {
     }
     if (ev.message && (ev.type === 'done' || ev.type === 'error')) {
       if (typeof ev.reasoning_effort === 'string') setReasoningEffort(normalizeReasoningEffort(ev.reasoning_effort))
-      setMessages(xs => isActiveSession(sessionId) ? xs.map(m => {
-        if (m.id !== pendingId) return m
+      setMessages(xs => isActiveSession(sessionId) ? mergeStreamTerminalMessage(xs, pendingId, ev.message, m => {
         const elapsedMs = getElapsedMs(m)
         const terminalFields = ['usage', 'usages', 'elapsed_ms', 'llm_elapsed_ms', 'tool_elapsed_ms', 'first_token_ms', 'run_started_at_ms', 'ctx_chars', 'ctx_msgs']
         const finalPayload = { ...ev.message }
@@ -5079,6 +5130,7 @@ export default function ChatApp() {
 
   const attachRunningStream = async (id, { waitForRun = false, clientUserID = '' } = {}) => {
     if (!id) return
+    ++streamActivitySeqRef.current
     streamAbortRef.current?.abort?.()
     const ctrl = new AbortController()
     streamAbortRef.current = ctrl
@@ -5126,8 +5178,11 @@ export default function ChatApp() {
     void attachRunningStream(sid, { waitForRun:true })
   }, [sid, streamingSid, loopState?.enabled, loopState?.status])
 
-  const loadChatState = async (id = '', openToken = openSeqRef.current) => {
-    const st = await chatApi(id ? `/api/chat/state/${id}` : '/api/chat/state')
+  const loadChatState = async (id = '', openToken = openSeqRef.current, prefetchedState = null) => {
+    const result = prefetchedState ? await prefetchedState : null
+    if (openToken !== openSeqRef.current || !isActiveSession(id)) return null
+    if (result?.error) throw result.error
+    const st = result ? result.state : await chatApi(id ? `/api/chat/state/${id}` : '/api/chat/state')
     if (openToken !== openSeqRef.current || !isActiveSession(id)) return null
     const nextLlms = st.llms || []
     const nextNo = st.settings?.llm_no ?? st.llm_no ?? nextLlms[0]?.index ?? 0
@@ -5159,11 +5214,26 @@ export default function ChatApp() {
   }
 
   const openSession = async (id, refreshList = true) => {
+    historyPages.begin()
     rememberRenderedSessionScroll()
+    renderedSessionRef.current = ''
     pendingSessionScrollRestoreRef.current = null
     pendingRenderedSessionRef.current = ''
     setWorldlineRestorePicker(null)
     const openToken = ++openSeqRef.current
+    sessionLoadAbortRef.current?.abort()
+    const controller = new AbortController()
+    sessionLoadAbortRef.current = controller
+    setSessionLoading(true)
+    setSessionLoadFailed(false)
+    setMessages([])
+    messagesRef.current = []
+    setRawHistory([])
+    setHistoryInfo([])
+    setWorkingState(null)
+    setPlanState(null)
+    setErr('')
+    setShowFollow(false)
     activeSidRef.current = id
     applyQueueSnapshot([])
     setQueueEditingId('')
@@ -5177,46 +5247,74 @@ export default function ChatApp() {
     setSessionPrompt(loadChatSessionDraft(id, undefined, chatInstanceRef.current), id)
     setBusy(false)
     setStreamingSid('')
-    const d = await chatApi(`/api/chat/session/${id}`)
-    if (openToken !== openSeqRef.current || activeSidRef.current !== id) return
-    const scrollRestore = sessionScrollRestore(sessionScrollSnapshotsRef.current, d.id)
-    pendingSessionScrollRestoreRef.current = scrollRestore ? { sessionID: d.id, ...scrollRestore } : null
-    pendingRenderedSessionRef.current = d.id
-    autoFollowRef.current = !scrollRestore
-    setAutoFollow(!scrollRestore)
-    setShowFollow(false)
-    activeSidRef.current = d.id
-    persistSelectedChatSessionID(chatInstanceRef.current, d.id)
-    scrollModeRef.current = 'auto'
-    setSid(d.id)
-    setMessages(d.messages || [])
-    applyQueueSnapshot(d.queued_messages, d.id)
-    setQueueEditingId('')
-    setQueueDraft('')
-    guidingQueueRef.current = ''
-    setGuidingQueueId('')
-    setRawHistory(Array.isArray(d.raw_history) ? d.raw_history : [])
-    setHistoryInfo(Array.isArray(d.history_info) ? d.history_info : [])
-    setWorkingState(d.working || null)
-    setPlanState(d.plan || null)
-    setLlmNo(d.settings?.llm_no || 0)
-    setErr('')
-    setNotice('')
-    setMenuOpen('')
-    setMenuPos(null)
-    setSessions(xs => xs.map(x => x.id === d.id ? { ...x, title: d.title, workspace: d.workspace || '', project_mode: d.project_mode || '', count: d.messages?.length || x.count, updated_at: d.updated_at || x.updated_at } : x))
-    await loadChatState(d.id, openToken)
-    if (openToken === openSeqRef.current && worldlineOpen) loadWorldline(d.id, { force: true }).catch(() => {})
+    try {
+      // Fetch concurrently, but apply state only after history to avoid overwriting stream events.
+      const prefetchedState = chatApi(`/api/chat/state/${id}`, { signal: controller.signal }).then(
+        state => ({ state }),
+        error => ({ error }),
+      )
+      const d = await loadSessionDetail(id, { signal: controller.signal })
+      if (openToken !== openSeqRef.current || activeSidRef.current !== id) return
+      const scrollRestore = sessionScrollRestore(sessionScrollSnapshotsRef.current, d.id)
+      pendingSessionScrollRestoreRef.current = scrollRestore ? { sessionID: d.id, ...scrollRestore } : null
+      pendingRenderedSessionRef.current = d.id
+      autoFollowRef.current = !scrollRestore
+      setAutoFollow(!scrollRestore)
+      setShowFollow(false)
+      activeSidRef.current = d.id
+      persistSelectedChatSessionID(chatInstanceRef.current, d.id)
+      scrollModeRef.current = 'auto'
+      setSid(d.id)
+      historyPages.apply(d, addChatInstanceToURL(`/api/chat/session/${d.id}?view=page`, chatInstanceRef.current))
+      applyQueueSnapshot(d.queued_messages, d.id)
+      setQueueEditingId('')
+      setQueueDraft('')
+      guidingQueueRef.current = ''
+      setGuidingQueueId('')
+      setRawHistory(Array.isArray(d.raw_history) ? d.raw_history : [])
+      setHistoryInfo(Array.isArray(d.history_info) ? d.history_info : [])
+      setWorkingState(d.working || null)
+      setPlanState(d.plan || null)
+      setLlmNo(d.settings?.llm_no || 0)
+      setErr('')
+      setNotice('')
+      setMenuOpen('')
+      setMenuPos(null)
+      setSessions(xs => xs.map(x => x.id === d.id ? { ...x, title: d.title, workspace: d.workspace || '', project_mode: d.project_mode || '', count: d.messages?.length || x.count, updated_at: d.updated_at || x.updated_at } : x))
+      await loadChatState(d.id, openToken, prefetchedState)
+      if (openToken === openSeqRef.current && worldlineOpen) loadWorldline(d.id, { force: true }).catch(() => {})
+    } catch (e) {
+      if (openToken === openSeqRef.current && activeSidRef.current === id && e?.name !== 'AbortError') {
+        setSessionLoadFailed(true)
+        setErr(e?.message || String(e))
+      }
+    } finally {
+      controller.abort()
+      if (sessionLoadAbortRef.current === controller) {
+        sessionLoadAbortRef.current = null
+        setSessionLoading(false)
+      }
+    }
   }
 
   const refreshActiveSessionSnapshot = async (id) => {
     if (!id || activeSidRef.current !== id) return
-    const d = await chatApi(`/api/chat/session/${id}`)
-    if (activeSidRef.current !== id || streamAbortRef.current || activeRunRef.current) return
-    setMessages(Array.isArray(d.messages) ? d.messages : [])
-    setRawHistory(Array.isArray(d.raw_history) ? d.raw_history : [])
-    setHistoryInfo(Array.isArray(d.history_info) ? d.history_info : [])
-    setWorkingState(d.working || null)
+    const streamActivityToken = streamActivitySeqRef.current
+    const observedStream = streamAbortRef.current
+    const d = await chatApi(`/api/chat/session/${id}?view=page`)
+    if (activeSidRef.current !== id || streamActivitySeqRef.current !== streamActivityToken) return
+    if (streamAbortRef.current || activeRunRef.current) {
+      const summary = sessionsRef.current.find(session => session.id === id)
+      if (summary?.running || streamAbortRef.current !== observedStream) return
+      // The authoritative session is terminal, but this tab still has a live
+      // fetch. A buffering proxy can leave that fetch waiting forever even
+      // after another client has already received and persisted the reply.
+      // Abort only the stream observed before the detail request. Its owner
+      // remains responsible for clearing the ref and local busy state.
+      observedStream?.abort?.()
+    }
+    historyPages.apply(d, addChatInstanceToURL(`/api/chat/session/${d.id}?view=page`, chatInstanceRef.current))
+    if (contextOpen) setContextRefresh(value => value + 1)
     setPlanState(d.plan || null)
   }
 
@@ -5290,6 +5388,8 @@ export default function ChatApp() {
   }
 
   const createSession = async (projectMode = '') => {
+    cancelSessionLoad()
+    historyPages.begin()
     const selectedProject = typeof projectMode === 'string' ? projectMode.trim() : ''
     rememberRenderedSessionScroll()
     pendingSessionScrollRestoreRef.current = null
@@ -5392,6 +5492,8 @@ export default function ChatApp() {
     setMenuOpen('')
     setMenuPos(null)
     if (id === sid) {
+      historyPages.clear()
+      cancelSessionLoad()
       ++openSeqRef.current
       activeSidRef.current = ''
       renderedSessionRef.current = ''
@@ -5455,6 +5557,8 @@ export default function ChatApp() {
       if (deleted.size) setSessions(xs => xs.filter(session => !deleted.has(session.id)))
 
       if (activeDeleted) {
+        historyPages.clear()
+        cancelSessionLoad()
         ++openSeqRef.current
         activeSidRef.current = ''
         renderedSessionRef.current = ''
@@ -5923,6 +6027,7 @@ export default function ChatApp() {
     const files = (item.files || []).map(({ name, type, dataURL }) => ({ name, type, dataURL }))
     if (!text && !files.length) return
     const runToken = ++runSeqRef.current
+    ++streamActivitySeqRef.current
     const openToken = openSeqRef.current
     const ctrl = new AbortController()
     activeRunRef.current = true
@@ -6114,6 +6219,7 @@ export default function ChatApp() {
   }, [cfg?.slash_commands, isProtectedSlashCommand])
 
   const send = async (textOverride = null) => {
+    if (sessionLoadAbortRef.current || sessionLoading || sessionLoadFailed) return
     const hasStringOverride = typeof textOverride === 'string'
     const sourceText = hasStringOverride ? textOverride : prompt
     const text = expandCustomSlashCommand(String(sourceText || '').trim())
@@ -6463,6 +6569,9 @@ export default function ChatApp() {
   const switchChatInstance = (nextValue) => {
     const nextID = String(nextValue || '').trim()
     if (!nextID || nextID === chatInstanceRef.current) return
+    historyPages.clear()
+    cancelSessionLoad()
+    sessionCacheRef.current.clear()
     rememberRenderedSessionScroll()
     sessionScrollSnapshotsRef.current.clear()
     pendingSessionScrollRestoreRef.current = null
@@ -6586,6 +6695,9 @@ export default function ChatApp() {
       scrollHeight,
       programmatic: Date.now() < followSettleUntilRef.current,
     })
+    if (!sessionLoading && Date.now() >= followSettleUntilRef.current && scrollTop < previousScrollTopRef.current && scrollHeight === previousScrollHeightRef.current) {
+      historyPages.loadOlderNearTop()
+    }
     previousScrollTopRef.current = scrollTop
     previousScrollHeightRef.current = scrollHeight
     if (action === 'resume' && !autoFollowRef.current) {
@@ -6893,7 +7005,7 @@ export default function ChatApp() {
         <div className="oa-topbar-tools" role="toolbar" aria-label={ct('聊天工具', 'Chat tools')}>
           <div className="oa-topbar-view-tools" role="group" aria-label={ct('对话视图', 'Conversation views')}>
             <button className={`oa-context-btn ${contextOpen ? 'is-open' : ''}`} type="button" onClick={()=>setContextOpen(v=>!v)} disabled={!sid} title={ct('查看发给模型的 raw_history', 'View raw_history sent to the model')}>
-              <PanelRightOpen size={16}/>{ct('上下文', 'Context')}<span>{rawHistory?.length || 0}</span>
+              <PanelRightOpen size={16}/>{ct('上下文', 'Context')}<span>{rawHistory?.length || historyPages.page?.context_count || 0}</span>
             </button>
             <button className={`oa-context-btn oa-worldline-btn ${worldlineOpen ? 'is-open' : ''}`} type="button" onClick={toggleWorldline} disabled={!sid} title={ct('查看/切换对话世界线分支', 'View or switch conversation timeline branches')}>
               <GitBranch size={16}/>{ct('世界线', 'Timeline')}{(worldlineForView?.nodes?.length || 0) > 0 && <span>{worldlineForView.nodes.length}</span>}
@@ -6923,7 +7035,7 @@ export default function ChatApp() {
             disabled={!sid}
             onClick={()=>{ setMobileToolsOpen(false); setContextOpen(v=>!v) }}
           >
-            <PanelRightOpen size={17}/><span className="oa-mobile-tools-item-copy">{ct('上下文', 'Context')}</span><b className="oa-mobile-tools-item-badge">{rawHistory?.length || 0}</b>
+            <PanelRightOpen size={17}/><span className="oa-mobile-tools-item-copy">{ct('上下文', 'Context')}</span><b className="oa-mobile-tools-item-badge">{rawHistory?.length || historyPages.page?.context_count || 0}</b>
           </button>
           <button
             className={`oa-mobile-tools-item ${worldlineOpen ? 'is-active' : ''}`}
@@ -6946,10 +7058,14 @@ export default function ChatApp() {
       {contextOpen && <aside className="oa-context-drawer" aria-label={ct('模型上下文', 'Model context')}>
         <div className="oa-context-head">
           <div><b>{ct('模型上下文', 'Model context')}</b><span>{ct('agent.llmclient.backend.history 完成后的快照', 'Snapshot after agent.llmclient.backend.history completes')}</span></div>
-          <div className="oa-context-actions"><button type="button" onClick={copyContext}>{ct('复制 JSON', 'Copy JSON')}</button><button type="button" onClick={()=>setContextOpen(false)} aria-label={ct('关闭上下文', 'Close context')}><X size={15}/></button></div>
+          <div className="oa-context-actions"><button type="button" onClick={() => setContextRefresh(value => value + 1)} disabled={contextLoading} aria-label={ct('刷新上下文', 'Refresh context')}><RotateCw size={15}/></button><button type="button" onClick={copyContext} disabled={contextLoading || Boolean(contextError)}>{ct('复制 JSON', 'Copy JSON')}</button><button type="button" onClick={()=>setContextOpen(false)} aria-label={ct('关闭上下文', 'Close context')}><X size={15}/></button></div>
         </div>
-        <div className="oa-context-json-tree"><JsonTree data={{ raw_history: rawHistory || [], history_info: historyInfo || [], working: workingState || {} }} /></div>
-        <details className="oa-context-raw"><summary>{ct('原始 JSON', 'Raw JSON')}</summary><pre className="oa-context-raw-json">{contextJson}</pre></details>
+        {contextLoading && <div className="oa-session-load" role="status">{ct('上下文加载中…', 'Loading context…')}</div>}
+        {contextError && <div className="oa-session-load" role="alert">{contextError}</div>}
+        {!contextLoading && !contextError && <>
+          <div className="oa-context-json-tree"><JsonTree data={{ raw_history: rawHistory || [], history_info: historyInfo || [], working: workingState || {} }} /></div>
+          <details className="oa-context-raw"><summary>{ct('原始 JSON', 'Raw JSON')}</summary><pre className="oa-context-raw-json">{contextJson}</pre></details>
+        </>}
       </aside>}
       {worldlineOpen && <WorldlinePanel
         state={worldlineForView}
@@ -6967,11 +7083,25 @@ export default function ChatApp() {
         </div>}
       </div>
       <div className={`oa-workspace ${loopRailOpen ? 'has-loop' : ''} ${btwRailOpen && btwMessages.length > 0 ? 'has-btw' : ''} ${btwMessages.length > 0 && !btwRailOpen ? 'has-launchers' : ''}`}>
-        <section className="oa-thread" ref={threadRef} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) pauseFollow() }} onTouchMove={()=>{ if (!isNearBottom(threadRef.current)) pauseFollow() }}>
-          {messages.length === 0 && <div className="oa-empty">
+        <section className="oa-thread" ref={threadRef} aria-busy={sessionLoading} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) pauseFollow() }} onTouchMove={()=>{ if (!isNearBottom(threadRef.current)) pauseFollow() }}>
+          {sessionLoading && messages.length === 0 && <div className="oa-session-load" role="status" aria-live="polite">
+            <RotateCw size={20} className="oa-session-load-spinner" aria-hidden="true"/>
+            <span>{ct('对话加载中…', 'Loading conversation…')}</span>
+          </div>}
+          {sessionLoadFailed && <div className="oa-session-load" role="alert">
+            <span>{ct('对话加载失败', 'Could not load conversation')}</span>
+            <button type="button" onClick={() => openSession(sid)}><RotateCw size={15}/>{ct('重试', 'Retry')}</button>
+          </div>}
+          {!sessionLoading && !sessionLoadFailed && messages.length === 0 && <div className="oa-empty">
             <h1>今天想让 GenericAgent 做什么？</h1>
             <p>支持 Markdown、代码块复制、图片输入、模型切换、会话重命名与删除。</p>
           </div>}
+          {!sessionLoading && historyPages.page?.has_more && <button type="button" className="oa-history-load"
+            disabled={historyPages.loading} onClick={historyPages.loadOlder}>
+            {historyPages.loading ? <Loader2 size={15} className="oa-spin"/> : <ChevronUp size={15}/>}
+            {historyPages.loading ? ct('加载中…', 'Loading…') : ct('加载更早消息', 'Load earlier messages')}
+          </button>}
+          {historyPages.error && <div className="oa-session-load" role="alert">{historyPages.error}</div>}
           <MessageList
             messages={messages}
             isCurrentRunning={isCurrentRunning}
@@ -7278,7 +7408,7 @@ export default function ChatApp() {
               <button
                 className="oa-send"
                 type="button"
-                disabled={!prompt.trim() && !attachments.length}
+                disabled={sessionLoading || sessionLoadFailed || (!prompt.trim() && !attachments.length)}
                 onClick={() => send()}
                 title={isCurrentRunning ? ct('加入发送队列', 'Add to send queue') : ct('发送', 'Send')}
                 aria-label={isCurrentRunning ? ct('加入发送队列', 'Add to send queue') : ct('发送', 'Send')}
@@ -7293,7 +7423,7 @@ export default function ChatApp() {
             </div>
           </div>
         </div>
-        <ChatStats messages={messages} now={streamClock} running={isCurrentRunning}/>
+        <ChatStats messages={historyStatsMessages(historyPages.page?.stats_messages, messages)} now={streamClock} running={isCurrentRunning}/>
       </footer>
     </main>
 

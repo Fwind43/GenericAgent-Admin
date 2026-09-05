@@ -1378,6 +1378,13 @@ html[data-color-scheme="dark"] .oa-session-title .oa-session-loop-badge{border-c
   margin-bottom:26px;
 }
 .oa-empty p { display:none; }
+.oa-session-load { min-height:180px; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px; padding:24px; color:var(--muted); font-size:14px; letter-spacing:0; }
+.oa-session-load button { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); cursor:pointer; }
+.oa-history-load { display:flex; align-items:center; justify-content:center; gap:6px; max-width:calc(100% - 32px); margin:12px auto; padding:7px 12px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); font:inherit; font-size:13px; letter-spacing:0; cursor:pointer; }
+.oa-history-load:disabled { opacity:.6; cursor:wait; }
+.oa-session-load-spinner, .oa-spin { flex:none; animation:oa-session-load-spin 1s linear infinite; }
+@keyframes oa-session-load-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .oa-session-load-spinner { animation:none; } }
 .oa-message {
   width:min(100% - 48px, 768px);
   display:flex;
