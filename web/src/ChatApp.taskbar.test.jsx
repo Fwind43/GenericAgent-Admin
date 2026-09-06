@@ -24,7 +24,9 @@ afterEach(() => {
 
 test('real ChatApp keeps background attention across selection and clears only the read result', async () => {
   localStorage.clear()
+  localStorage.setItem('ga-admin-lang', 'en')
   sessionStorage.clear()
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
   Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
   const bridge = vi.fn()
   vi.stubGlobal('__gaTaskbarState', bridge)
@@ -98,4 +100,29 @@ test('real ChatApp keeps background attention across selection and clears only t
   expect(paths).toContain('/api/chat/session/background')
   expect(backgroundButton.querySelector('.oa-session-unread-label')).toBeNull()
   expect(bridge).toHaveBeenLastCalledWith('idle')
+
+  sessions = sessions.map(item => item.id === 'background'
+    ? { ...item, taskbar_state: 'waiting', running: false }
+    : item)
+  act(() => { window.dispatchEvent(new Event('online')) })
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('waiting'))
+  expect(backgroundButton.querySelector('.oa-session-waiting-label')?.textContent).toBe('Waiting')
+  expect(backgroundButton.querySelector('.oa-session-running-label')).toBeNull()
+  const alphaButton = screen.getByText('Taskbar Alpha').closest('.oa-session')
+  fireEvent.click(alphaButton)
+  await waitFor(() => expect(alphaButton.closest('.oa-session-row').classList.contains('active')).toBe(true))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Search sessions' }), { target: { value: 'Alpha' } })
+  expect(document.querySelector('.oa-sidebar').textContent).not.toContain('Taskbar Background')
+  fireEvent.click(screen.getByRole('button', { name: 'Waiting for reply (1)' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: 'Taskbar Background' }))
+  await waitFor(() => expect(document.querySelector('.oa-title b')?.textContent).toBe('Taskbar Background'))
+  expect(bridge).toHaveBeenLastCalledWith('waiting')
+  expect(screen.getByRole('button', { name: 'Waiting for reply (1)' })).toBeTruthy()
+
+  sessions = sessions.map(item => item.id === 'background'
+    ? { ...item, taskbar_state: 'running', running: true }
+    : item)
+  act(() => { window.dispatchEvent(new Event('online')) })
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('running'))
+  expect(screen.queryByRole('button', { name: 'Waiting for reply (1)' })).toBeNull()
 }, 10000)

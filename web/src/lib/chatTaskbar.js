@@ -41,12 +41,22 @@ export function chatTaskbarState({ sid, messages = [], loading = false, running 
   return String(last.content || '').trim() || last.structured_content?.length || last.files?.length ? 'completed' : 'idle'
 }
 
+export function waitingChatSessions({ sessions = [], sid = '', liveState = 'idle', liveRunning = false }) {
+  const waiting = sessions.filter(session => session.id === sid && liveRunning
+    ? liveState === 'waiting'
+    : session.taskbar_state === 'waiting')
+  if (sid && liveRunning && liveState === 'waiting' && !sessions.some(session => session.id === sid)) {
+    waiting.push({ id: sid })
+  }
+  return waiting
+}
+
 // Summaries are scoped to the active instance. Viewing one session must never
 // clear another session's attention state.
 export function aggregateChatTaskbarState({ sessions = [], unread = new Set(), sid = '', liveState = 'idle', liveRunning = false }) {
+  if (waitingChatSessions({ sessions, sid, liveState, liveRunning }).length) return 'waiting'
   const states = sessions.map(session => {
     if (session.id === sid && liveRunning) return liveState
-    if (session.taskbar_state === 'waiting') return 'waiting'
     if (session.running) return 'running'
     if (!unread.has(session.id)) return 'idle'
     return session.taskbar_state === 'failed' ? 'failed' : 'completed'

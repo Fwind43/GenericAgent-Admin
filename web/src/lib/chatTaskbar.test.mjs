@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { setImmediate } from 'node:timers'
-import { aggregateChatTaskbarState, shouldRefreshChatTaskbar, chatTaskbarState, hasPendingTaskbarQuestion, publishTaskbarState } from './chatTaskbar.js'
+import { aggregateChatTaskbarState, shouldRefreshChatTaskbar, chatTaskbarState, hasPendingTaskbarQuestion, publishTaskbarState, waitingChatSessions } from './chatTaskbar.js'
 
 test('all-session priority survives switching and reading only one result', () => {
   const sessions = [
@@ -21,6 +21,20 @@ test('all-session priority survives switching and reading only one result', () =
   assert.equal(aggregate([], { sessions: [], sid: 'new', liveRunning: true, liveState: 'waiting' }), 'waiting')
   assert.equal(aggregate([], { sessions: sessions.filter(s => !s.running) }), 'idle')
   assert.equal(aggregate(['done1'], { sessions: [] }), 'idle')
+})
+
+test('waiting navigation matches the badge, independent of unread and project filters', () => {
+  const sessions = [
+    { id: 'archived', taskbar_state: 'waiting', project_mode: 'Folded project' },
+    { id: 'live', taskbar_state: 'waiting' },
+    { id: 'done', taskbar_state: 'completed' },
+  ]
+  const options = { sessions, sid: 'live', liveRunning: true, liveState: 'running' }
+  assert.deepEqual(waitingChatSessions(options).map(session => session.id), ['archived'])
+  assert.equal(aggregateChatTaskbarState(options), 'waiting')
+  assert.deepEqual(waitingChatSessions({ sessions, sid: 'archived' }).map(session => session.id), ['archived', 'live'])
+  assert.deepEqual(waitingChatSessions({ sessions: [], sid: 'new', liveRunning: true, liveState: 'waiting' }), [{ id: 'new' }])
+  assert.deepEqual(waitingChatSessions({ sessions: [sessions[2]] }), [])
 })
 
 test('native minimized windows keep polling; ordinary hidden tabs do not', () => {
