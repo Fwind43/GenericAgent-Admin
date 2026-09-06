@@ -1908,13 +1908,12 @@ html[data-color-scheme="dark"] .oa-code-action-btn:hover{background:rgba(255,255
 .oa-turn-stack::before{content:"";position:absolute;left:8px;top:28px;bottom:6px;width:2px;background:linear-gradient(180deg,var(--n-d9f0e8),var(--n-ececec));border-radius:99px}
 .oa-turn-stack-head{position:relative;display:flex;align-items:center;gap:8px;color: var(--muted);font-size:13px;padding:1px 2px 4px;margin-left:-22px;width:calc(100% + 22px);background:none;border:none;cursor:pointer;text-align:left;font:inherit;border-radius:8px;transition:color .15s ease}.oa-turn-stack-head:hover{color:var(--text)}.oa-turn-stack-head b{color: var(--text);font-weight:650}.oa-turn-stack-head em{margin-left:auto;color:var(--i-08785f);background:var(--n-eef8f4);border:1px solid var(--n-dcefe8);border-radius:999px;padding:2px 8px;font-size:12px;font-style:normal;font-weight:650}.oa-turn-stack-head .oa-stack-chevron{margin-left:6px;color:var(--faint);flex:none}.oa-turn-stack.collapsed .oa-stack-chevron{transform:rotate(90deg)}.oa-turn-stack.collapsed::before{display:none}
 .oa-turn-node{position:relative;min-width:0}
-/* Keep a live turn's text geometry when it becomes a previous step. */
-.oa-turn-streamed .oa-turn-current-head{width:100%;min-height:34px;justify-content:flex-start;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;transform:none;text-align:left;font:inherit;cursor:pointer}
-.oa-turn-streamed .oa-turn-current-head .oa-turn-chevron{flex:none;color:var(--faint)}
-.oa-turn-streamed.collapsed .oa-turn-chevron{transform:rotate(-90deg)}
 .oa-turn-stack > section[hidden],.oa-turn-body[hidden]{display:none}
 .oa-turn-node::before{content:"";position:absolute;left:-19px;top:17px;width:9px;height:9px;border-radius:50%;background:var(--surface-strong);border:2px solid #b7dccc;box-shadow:0 0 0 3px #fff}
-.oa-turn-card{position:relative;border:1px solid var(--n-e8e8e8);border-radius:13px;background:var(--surface-strong);overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.025)}
+.oa-turn-card{position:relative;border:1px solid var(--n-e8e8e8);border-radius:13px;background:var(--surface-strong);overflow:visible;box-shadow:0 1px 2px rgba(0,0,0,.025)}
+.oa-turn-card > .oa-turn-toggle{border-radius:12px}
+.oa-turn-card.open > .oa-turn-toggle{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.oa-turn-card > .oa-turn-body{overflow:hidden;border-radius:0 0 12px 12px}
 .oa-turn-toggle{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:10px;border:0;background:var(--surface-strong);color: var(--text);padding:10px 12px;cursor:pointer;text-align:left;font:inherit;min-width:0}
 .oa-turn-toggle:hover{background:var(--surface-muted)}.oa-turn-toggle b{min-width:0;font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color: var(--text)}.oa-turn-toggle em{margin-left:auto;color: var(--muted);font-size:12px;font-style:normal;white-space:nowrap}.oa-turn-toggle svg{flex:0 0 auto;color: var(--muted)}.oa-turn-toggle .oa-turn-chevron{transform:rotate(90deg)}.oa-turn-card.open .oa-turn-toggle{border-bottom:1px solid var(--n-eeeeee);background:var(--surface-muted)}.oa-turn-card.open .oa-turn-toggle .oa-turn-chevron{transform:none}
 .oa-turn-index{flex:0 0 auto;color:var(--muted);font-size:10.5px;font-weight:560;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.015em;white-space:nowrap}.oa-turn-card .oa-md{padding:12px 14px;color: var(--text);font-size:14px;line-height:1.68}.oa-turn-card .oa-code-card{margin:10px 0}.oa-turn-empty{margin:0;padding:12px 14px;color: var(--muted);font-size:13px;text-align:left}
@@ -17228,11 +17227,13 @@ html[data-color-scheme="dark"] .logs-page {
 /* A boxed step gives prose 14px of inner space. Tool summaries already own
    4px, so a 10px inset aligns their visible content and preserves the 4px
    handoff to the following prose without changing the unboxed latest step. */
-.oa-turn-card > .ga-execution-log {
+.oa-turn-card > .ga-execution-log,
+.oa-turn-card > .oa-turn-body > .ga-execution-log {
   margin-inline: 10px;
 }
 
-.oa-turn-card > .ga-execution-log + .oa-md {
+.oa-turn-card > .ga-execution-log + .oa-md,
+.oa-turn-card > .oa-turn-body > .ga-execution-log + .oa-md {
   padding-top: 0;
 }
 

@@ -3097,19 +3097,18 @@ const AssistantBody = memo(function AssistantBody({ text = '', onAskReply, ultra
 
 const AssistantTurn = memo(function AssistantTurn({ turn, current, stackOpen, pending, usage, onAskReply, ultraplan_state, isLatestMessage }) {
   // A streamed turn keeps its body and local tool state when the next turn starts.
-  const [streamed] = useState(current)
-  const [expanded, setExpanded] = useState(current)
+  const [expanded, setExpanded] = useState(false)
   const open = current || expanded
   const [visited, setVisited] = useState(current)
   const toggle = () => {
     setVisited(true)
     setExpanded(value => !value)
   }
-  return <section className={current || streamed ? `oa-turn-current oa-turn-streamed ${open ? 'open' : 'collapsed'}` : `oa-turn-node oa-turn-card ${open ? 'open' : 'collapsed'}`} hidden={!current && !stackOpen} data-turn={turn.turn}>
+  return <section className={current ? 'oa-turn-current' : `oa-turn-node oa-turn-card ${open ? 'open' : 'collapsed'}`} hidden={!current && !stackOpen} data-turn={turn.turn}>
     {current
       ? <div className="oa-turn-current-head"><span className="oa-turn-index oa-turn-index-current">{ct('步骤', 'Step')} {turn.turn}</span><b>{turn.title || ct('正在执行', 'Running')}</b><UsageRow u={usage} className="oa-usage-inline" /><em>{pending ? ct('实时输出中', 'Live output') : ct('最新一轮', 'Latest turn')}</em></div>
-      : <button className={streamed ? 'oa-turn-current-head' : 'oa-turn-toggle'} type="button" onClick={toggle} aria-expanded={open} title={turn.title || ct('执行步骤', 'Execution step')}>
-        <span className={`oa-turn-index${streamed ? ' oa-turn-index-current' : ''}`}>{ct('步骤', 'Step')} {turn.turn}</span><b>{turn.title || ct('执行步骤', 'Execution step')}</b><UsageRow u={usage} className="oa-usage-inline" /><ChevronDown size={15} className="oa-turn-chevron"/>
+      : <button className="oa-turn-toggle" type="button" onClick={toggle} aria-expanded={open} title={turn.title || ct('执行步骤', 'Execution step')}>
+        <span className="oa-turn-index">{ct('步骤', 'Step')} {turn.turn}</span><b>{turn.title || ct('执行步骤', 'Execution step')}</b><UsageRow u={usage} className="oa-usage-inline" /><ChevronDown size={15} className="oa-turn-chevron"/>
       </button>}
     <div className="oa-turn-body" hidden={!open}>
       {(current || visited) && (turn.body || ultraplan_state
@@ -3120,8 +3119,9 @@ const AssistantTurn = memo(function AssistantTurn({ turn, current, stackOpen, pe
 })
 
 const AssistantContent = memo(function AssistantContent({ content, structuredContent, pending, onAskReply, isLatestMessage = false, turnUsages, ultraplan_state, runStartedAtMS = 0, clockNow = 0, modelID = '' }) {
-  // Historical messages start folded; a live message keeps the user's choice at completion.
-  const [stackOpen, setStackOpen] = useState(pending)
+  // Follow the run lifecycle until the user explicitly toggles execution history.
+  const [stackOpenOverride, setStackOpenOverride] = useState(null)
+  const stackOpen = stackOpenOverride ?? Boolean(pending)
   const liveUltraPlanState = useMemo(() => normalizeUltraPlanState(ultraplan_state), [ultraplan_state])
   const stats = useMemo(() => textRenderStats(content), [content])
   
@@ -3174,7 +3174,7 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
     : undefined
   return <div className={`oa-content ${parsed.runs.length ? 'oa-agent-output' : ''}`}>
     {parsed.runs.length > 0 && <div className={`oa-turn-stack ${stackOpen ? 'open' : 'collapsed'}`}>
-      <button className="oa-turn-stack-head" type="button" onClick={() => setStackOpen(v => !v)} aria-expanded={stackOpen} title={stackOpen ? ct('折叠执行过程', 'Collapse execution') : ct('展开执行过程', 'Expand execution')}>
+      <button className="oa-turn-stack-head" type="button" onClick={() => setStackOpenOverride(!stackOpen)} aria-expanded={stackOpen} title={stackOpen ? ct('折叠执行过程', 'Collapse execution') : ct('展开执行过程', 'Expand execution')}>
         <span className="oa-run-dot"/>
         <span>{ct('执行过程', 'Execution')}</span>
         <b>{parsed.runs.length}</b>

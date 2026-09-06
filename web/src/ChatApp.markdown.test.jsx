@@ -361,6 +361,107 @@ describe('assistant markdown rendering', () => {
   })
 })
 
+describe('execution step folding', () => {
+  const firstTurn = 'LLM Running (Turn 1)\n<summary>inspect stream</summary>\nStable **paragraph**.\n\n```js\nconst answer = 42\n```'
+  const secondTurn = `${firstTurn}\n\nLLM Running (Turn 2)\n<summary>finish work</summary>\nSecond body.`
+  const pending = { id: 'pending-steps', role: 'assistant', content: firstTurn, files: [], created_at: 1 }
+  const frame = (messages, running) => <MessageList messages={messages} isCurrentRunning={running} onAskReply={vi.fn()} />
+
+  test('folds and frames a previous streamed step without remounting its body', () => {
+    const view = render(frame([pending], true))
+    const first = view.container.querySelector('[data-turn="1"]')
+    const body = first.querySelector('.oa-turn-body')
+    const paragraph = first.querySelector('.oa-md p')
+    const code = first.querySelector('.oa-md pre')
+    expect(body.hidden).toBe(false)
+    expect(paragraph).not.toBeNull()
+    expect(code).not.toBeNull()
+
+    view.rerender(frame([{ ...pending, content: secondTurn }], true))
+    expect(view.container.querySelector('[data-turn="1"]')).toBe(first)
+    expect(first.classList.contains('oa-turn-card')).toBe(true)
+    expect(first.classList.contains('oa-turn-current')).toBe(false)
+    expect(first.hidden).toBe(false)
+    expect(body.hidden).toBe(true)
+    expect(first.querySelector('.oa-turn-toggle').getAttribute('aria-expanded')).toBe('false')
+    expect(first.querySelector('.oa-md p')).toBe(paragraph)
+    expect(first.querySelector('.oa-md pre')).toBe(code)
+
+    fireEvent.click(first.querySelector('.oa-turn-toggle'))
+    expect(body.hidden).toBe(false)
+    expect(first.querySelector('.oa-turn-toggle').getAttribute('aria-expanded')).toBe('true')
+    const second = view.container.querySelector('[data-turn="2"]')
+    const secondBody = second.querySelector('.oa-turn-body')
+    const secondParagraph = second.querySelector('.oa-md p')
+    view.rerender(frame([{ ...pending, content: `${secondTurn}\n\nLLM Running (Turn 3)\n<summary>report</summary>\nThird body.` }], true))
+    expect(body.hidden).toBe(false)
+    expect(second.classList.contains('oa-turn-card')).toBe(true)
+    expect(secondBody.hidden).toBe(true)
+    expect(second.querySelector('.oa-md p')).toBe(secondParagraph)
+    fireEvent.click(first.querySelector('.oa-turn-toggle'))
+    expect(body.hidden).toBe(true)
+    fireEvent.click(first.querySelector('.oa-turn-toggle'))
+    expect(first.querySelector('.oa-md p')).toBe(paragraph)
+    expect(first.querySelector('.oa-md pre')).toBe(code)
+  })
+
+  test('auto-folds execution at completion while retaining nodes through terminal and history updates', () => {
+    const view = render(frame([pending], true))
+    const row = view.container.querySelector('.oa-message')
+    const first = view.container.querySelector('[data-turn="1"]')
+    const paragraph = first.querySelector('.oa-md p')
+    const code = first.querySelector('.oa-md pre')
+    const content = `${secondTurn}\n\n\x60\x60\x60\n[Info] Final response to user.\n\x60\x60\x60\nfinal answer`
+    let messages = [{ ...pending, content }]
+    view.rerender(frame(messages, true))
+    const stack = view.container.querySelector('.oa-turn-stack-head')
+    const latest = view.container.querySelector('[data-turn="2"] .oa-md p')
+    const answer = view.container.querySelector('.oa-final-answer .oa-md p')
+    expect(stack.getAttribute('aria-expanded')).toBe('true')
+    expect(answer).not.toBeNull()
+    const finalMessage = { ...messages[0], id: 'server-steps', structured_content: [{ type: 'text', text: 'final answer' }] }
+    const assertFoldedAndMounted = () => {
+      view.rerender(frame(messages, false))
+      expect(view.container.querySelector('.oa-message')).toBe(row)
+      expect(view.container.querySelector('.oa-turn-stack-head')).toBe(stack)
+      expect(stack.getAttribute('aria-expanded')).toBe('false')
+      expect(first.hidden).toBe(true)
+      expect(first.querySelector('.oa-md p')).toBe(paragraph)
+      expect(first.querySelector('.oa-md pre')).toBe(code)
+      expect(view.container.querySelector('[data-turn="2"] .oa-md p')).toBe(latest)
+      expect(view.container.querySelector('.oa-final-answer .oa-md p')).toBe(answer)
+    }
+    messages = mergeStreamTerminalMessage(messages, pending.id, finalMessage)
+    assertFoldedAndMounted()
+    messages = mergeStreamTerminalMessage(messages, pending.id, finalMessage)
+    assertFoldedAndMounted()
+    for (const paged of [false, true]) {
+      const latestPage = { messages: [finalMessage] }
+      if (paged) latestPage.message_index = [{ id: finalMessage.id }]
+      messages = reconcileHistoryPage(latestPage, { messages }).messages
+      assertFoldedAndMounted()
+    }
+    fireEvent.click(stack)
+    expect(first.hidden).toBe(false)
+    expect(first.querySelector('.oa-turn-body').hidden).toBe(true)
+    fireEvent.click(first.querySelector('.oa-turn-toggle'))
+    expect(first.querySelector('.oa-turn-body').hidden).toBe(false)
+    expect(first.querySelector('.oa-md p')).toBe(paragraph)
+    expect(first.querySelector('.oa-md pre')).toBe(code)
+  })
+
+  test.each([false, true])('preserves an explicit execution toggle at completion: %s', manualOpen => {
+    const message = { ...pending, content: secondTurn }
+    const view = render(frame([message], true))
+    const stack = view.container.querySelector('.oa-turn-stack-head')
+    fireEvent.click(stack)
+    if (manualOpen) fireEvent.click(stack)
+    expect(stack.getAttribute('aria-expanded')).toBe(String(manualOpen))
+    view.rerender(frame([message], false))
+    expect(stack.getAttribute('aria-expanded')).toBe(String(manualOpen))
+  })
+})
+
 describe('completion render identity', () => {
   test('keeps plain markdown mounted when pending ends and structured text arrives', () => {
     const content = '# Result\n\nFinished paragraph.\n\n```js\nconst answer = 42\n```'
