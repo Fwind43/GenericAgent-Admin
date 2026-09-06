@@ -1541,6 +1541,44 @@ const normalizeToolArgumentValue = value => (
   typeof value === 'string' ? parseNestedToolArgumentJson(value) : value
 )
 
+const ToolScriptPreview = ({ value }) => {
+  const [expanded, setExpanded] = useState(false)
+  const [canExpand, setCanExpand] = useState(() => value.split(/\r\n?|\n/).length > 4)
+  const codeRef = useRef(null)
+  const codeId = useId()
+
+  useLayoutEffect(() => {
+    const code = codeRef.current
+    if (!code) return
+    const measure = () => {
+      if (!code.getClientRects().length) return
+      const lineHeight = Number.parseFloat(getComputedStyle(code).lineHeight)
+      if (lineHeight > 0) setCanExpand(code.scrollHeight > lineHeight * 4 + 1)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(code)
+    return () => observer.disconnect()
+  }, [value])
+
+  const toggleLabel = expanded
+    ? ct('\u6536\u8d77\u811a\u672c', 'Collapse script')
+    : ct('\u5c55\u5f00\u5b8c\u6574\u811a\u672c', 'Show full script')
+  return (
+    <div className={`ga-tool-script${expanded ? ' is-expanded' : ''}`}>
+      <pre className="ga-tool-arg-code" ref={codeRef} id={codeId}>{value}</pre>
+      {canExpand && (
+        <button type="button" className="ga-tool-script-toggle" aria-expanded={expanded}
+          aria-controls={codeId} title={toggleLabel} onClick={() => setExpanded(current => !current)}>
+          {expanded ? <ChevronUp size={12} aria-hidden="true" /> : <ChevronDown size={12} aria-hidden="true" />}
+          <span>{toggleLabel}</span>
+        </button>
+      )}
+    </div>
+  )
+}
+
 const ToolArgumentValue = ({ value, name = '', depth = 0 }) => {
   const normalized = normalizeToolArgumentValue(value)
   if (Array.isArray(normalized)) {
@@ -1565,6 +1603,7 @@ const ToolArgumentValue = ({ value, name = '', depth = 0 }) => {
     )
   }
   if (typeof normalized === 'string') {
+    if (/^script$/i.test(name)) return <ToolScriptPreview value={normalized} />
     const codeLike = normalized.includes('\n') || /^(script|code|content|patch|old_content|new_content)$/i.test(name)
     return codeLike
       ? <pre className="ga-tool-arg-code">{normalized}</pre>

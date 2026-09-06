@@ -1,6 +1,6 @@
 import React from 'react'
 import { afterEach, describe, expect, test } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { ChatMessage, parseToolReceiptArgs, parseToolResultDetails } from './ChatApp.jsx'
 
 afterEach(() => cleanup())
@@ -88,8 +88,48 @@ describe('tool receipt argument parsing', () => {
     )
     const args = container.querySelector('.ga-tool-pair-call')
     expect(args?.querySelector('.ga-tool-arg dt')?.textContent).toBe('script')
-    expect(args.querySelector('.ga-tool-arg dd')?.textContent).toBe(reportScript)
+    const code = args.querySelector('.ga-tool-arg-code')
+    const preview = args.querySelector('.ga-tool-script')
+    const toggle = args.querySelector('.ga-tool-script-toggle')
+    expect(code?.textContent).toBe(reportScript)
     expect(args.querySelector('.ga-fold-pre')).toBeNull()
+    expect(preview.classList.contains('is-expanded')).toBe(false)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(toggle.getAttribute('aria-controls')).toBe(code.id)
+
+    fireEvent.click(toggle)
+    expect(preview.classList.contains('is-expanded')).toBe(true)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(code.textContent).toBe(reportScript)
+
+    fireEvent.click(toggle)
+    expect(preview.classList.contains('is-expanded')).toBe(false)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(code.textContent).toBe(reportScript)
+  })
+
+  test.each([
+    ['one line', 'print("ok")', false],
+    ['four lines', ['a', 'b', 'c', 'd'].join('\n'), false],
+    ['five lines', ['a', 'b', 'c', 'd', 'e'].join('\n'), true],
+    ['Windows newlines', ['a', 'b', 'c', 'd', 'e'].join('\r\n'), true],
+  ])('only offers expansion for long scripts: %s', (_label, script, canExpand) => {
+    const content = [
+      '\u{1F6E0}\uFE0F Tool: `code_run`',
+      '```text',
+      JSON.stringify({ script, content: reportScript }),
+      '```',
+    ].join('\n')
+    const { container } = render(
+      <ChatMessage message={{ id: 'preview-boundary', role: 'assistant', content, files: [], created_at: 0 }} pending={false} />,
+    )
+    expect(container.querySelectorAll('.ga-tool-script')).toHaveLength(1)
+    expect(container.querySelector('.ga-tool-script .ga-tool-arg-code')?.textContent).toBe(script)
+    expect(Boolean(container.querySelector('.ga-tool-script-toggle'))).toBe(canExpand)
+    expect(container.querySelector('.ga-tool-script.is-expanded')).toBeNull()
+    const contentRow = [...container.querySelectorAll('.ga-tool-arg')].find(row => row.querySelector('dt')?.textContent === 'content')
+    expect(contentRow.querySelector('.ga-tool-arg-code').textContent).toBe(reportScript)
+    expect(contentRow.querySelector('.ga-tool-script')).toBeNull()
   })
 
   test('falls back for malformed or non-object JSON', () => {
