@@ -108,6 +108,7 @@ type hostWindow struct {
 	hwnd    uintptr
 	browser *edge.Chromium
 	minSize win32Point
+	taskbar taskbarOverlay
 
 	// handlers is only ever touched from the window's own thread: bindings
 	// are registered before the first navigation and called from the message
@@ -226,6 +227,7 @@ func newHostWindow(spec desktopWindowSpec) (*hostWindow, error) {
 	}
 	win.hwnd = hwnd
 	rememberHostWindow(hwnd, win)
+	taskbarWindows.set(hwnd, taskbarIdle)
 
 	_, _, _ = procShowWindow.Call(hwnd, swShow)
 	_, _, _ = procUpdateWindow.Call(hwnd)
@@ -250,6 +252,7 @@ func newHostWindow(spec desktopWindowSpec) (*hostWindow, error) {
 // reach a window proc that would post WM_QUIT to a thread with no loop left
 // to read it.
 func (w *hostWindow) discard() {
+	w.closeTaskbar()
 	forgetHostWindow(w.hwnd)
 	_, _, _ = procDestroyWindow.Call(w.hwnd)
 	w.hwnd = 0
@@ -379,7 +382,17 @@ func hostWndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		return result
 	}
 
+	if taskbarButtonCreated != 0 && msg == uintptr(taskbarButtonCreated) {
+		win.taskbar.releaseCOM()
+		win.taskbar.ready = true
+		win.applyTaskbar()
+		return 0
+	}
+
 	switch msg {
+	case wmTaskbarRefresh:
+		win.applyTaskbar()
+		return 0
 	case wmApp:
 		win.runQueued()
 		return 0
@@ -423,6 +436,7 @@ func hostWndProc(hwnd, msg, wparam, lparam uintptr) uintptr {
 		_, _, _ = procDestroyWindow.Call(hwnd)
 		return 0
 	case wmDestroy:
+		win.closeTaskbar()
 		forgetHostWindow(hwnd)
 		// Only this thread's loop ends; every other window has its own.
 		_, _, _ = procPostQuitMessage.Call(0)

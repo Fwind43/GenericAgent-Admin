@@ -2940,6 +2940,16 @@ html[data-color-scheme="dark"] .oa-session-dialog-title .oa-session-autorun-badg
   background:rgba(59,130,246,.16);
   color:#93c5fd;
 }
+.oa-session-title .oa-session-unread-label,
+.oa-session-dialog-copy .oa-session-unread-label{
+  flex:0 0 auto;
+  color:#08775e;
+  font-size:11px;
+  font-style:normal;
+  font-weight:650;
+  white-space:nowrap;
+}
+html[data-color-scheme="dark"] .oa-session-unread-label{color:#6ee7b7}
 .oa-session small{
   display:block !important;
   flex:0 0 auto;

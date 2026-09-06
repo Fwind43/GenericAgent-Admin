@@ -273,6 +273,9 @@ type chatRun struct {
 	SID                string
 	QueueID            string
 	Events             [][]byte
+	TaskbarText        strings.Builder
+	TaskbarDirty       bool
+	TaskbarWaiting     bool
 	Done               bool
 	Canceled           bool
 	CancelReady        bool
@@ -1384,6 +1387,13 @@ func (s *Server) publishChatLine(sid string, line []byte) {
 	}
 	b := append([]byte(nil), line...)
 	r.Events = append(r.Events, b)
+	var ev struct {
+		Delta string `json:"delta"`
+	}
+	if json.Unmarshal(line, &ev) == nil && ev.Delta != "" {
+		r.TaskbarText.WriteString(ev.Delta)
+		r.TaskbarDirty = true
+	}
 	for ch := range r.Subscribers {
 		select {
 		case ch <- b:

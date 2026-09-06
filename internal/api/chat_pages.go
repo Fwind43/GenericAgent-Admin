@@ -121,7 +121,7 @@ func chatSessionView(cs chatSession, r *http.Request) (interface{}, int, error) 
 	result := map[string]interface{}{
 		"id": cs.ID, "title": cs.Title, "updated_at": cs.UpdatedAt, "settings": cs.Settings,
 		"workspace": cs.Workspace, "project_mode": cs.ProjectMode, "queued_messages": cs.QueuedMessages,
-		"plan": cs.Plan, "worldline_head": cs.WorldlineHead,
+		"plan": cs.Plan, "worldline_head": cs.WorldlineHead, "result": latestChatSessionResult(cs),
 		"messages": page, "total_messages": len(cs.Messages), "has_more": start > 0, "before": before,
 		"message_index": index, "stats_messages": stats, "context_count": len(cs.RawHistory),
 	}

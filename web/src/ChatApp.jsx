@@ -16,6 +16,8 @@ import { Bot, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleHe
 import { api, apiStream } from './lib/api'
 import { createChatSessionCache } from './lib/chatSessionCache.js'
 import { useChatHistoryPages } from './lib/useChatHistoryPages.js'
+import { useChatReadState } from './lib/useChatReadState.js'
+import { initializeChatReadBaseline } from './lib/chatReadState.js'
 import { historyStatsMessages } from './lib/chatHistoryPages.js'
 import { SETTINGS_TEXT } from './lib/i18n'
 import { KeychainPage } from './pages/KeychainPage'
@@ -30,6 +32,7 @@ import { formatDuration, fuzzyMatch, goalBudgetPercent, goalTurnPercent } from '
 import { JSON_TREE_CHILD_LIMIT, JSON_TREE_STRING_LIMIT, LIST_ITEM_LIMIT, LONG_TEXT_PREVIEW_CHARS, MARKDOWN_BLOCK_LIMIT, MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, parseAssistantContent, previewLongText, splitMarkdownParts, textRenderStats } from './lib/chatTextSafety'
 import { parseStructuredContent } from './lib/structuredContent'
 import { segmentAgentProtocolBlocks } from './lib/agentProtocol'
+import { aggregateChatTaskbarState, chatTaskbarState, publishTaskbarState, shouldRefreshChatTaskbar } from './lib/chatTaskbar.js'
 import { parseBlocks, parseInline, resolveMarkdownImageUrl, resolveMarkdownLink } from './lib/markdown.js'
 import { getAskUserPayload } from './lib/askUserPayload'
 import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ultraPlanTasks'
@@ -233,6 +236,7 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   hasDraft = false,
   autorunEnabled = false,
   ageText = '',
+  unread = false,
   actionsRef,
 }) {
   const sidebarLoop = loopSidebarView(session.loop)
@@ -242,7 +246,7 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
       <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>actionsRef.current.setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') actionsRef.current.saveRename(session.id); if(event.key==='Escape') actionsRef.current.cancelRename() }}/>
       <button onClick={()=>actionsRef.current.saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>actionsRef.current.cancelRename()} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
     </div> : <button className="oa-session" onClick={()=>actionsRef.current.openSession(session.id)} title={title}>
-      <span className="oa-session-title" title={title}>{session.running && <i className="oa-session-running-dot" aria-hidden="true"/>}{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b><SessionAutorunBadge enabled={autorunEnabled} sessionId={session.id} targetSessionId={active ? session.id : ''}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
+      <span className="oa-session-title" title={title}>{session.running && <i className="oa-session-running-dot" aria-hidden="true"/>}{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={autorunEnabled} sessionId={session.id} targetSessionId={active ? session.id : ''}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
       <small title={fmtTime(session.updated_at)}>{session.running ? <em className="oa-session-running-label">{ct('运行中', 'Running')}</em> : ageText}</small>
     </button>}
     {!editing && <button className={`oa-session-more ${menuOpen ? 'is-open' : ''}`} onClick={(event)=>actionsRef.current.toggleMenu(session.id, event)} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
@@ -4374,6 +4378,23 @@ export default function ChatApp() {
   const [busy, setBusy] = useState(false)
   const [streamingSid, setStreamingSid] = useState('')
   const [err, setErr] = useState('')
+  const [taskbarStoppedRun, setTaskbarStoppedRun] = useState('')
+  const taskbarRunKey = JSON.stringify([chatInstanceID, sid, messages.findLast(message => message.role === 'user')?.id || ''])
+  const taskbarState = chatTaskbarState({
+    sid, messages, loading: sessionLoading,
+    running: (busy && streamingSid === sid) || sessions.some(session => session.id === sid && session.running),
+    error: err,
+    stopped: taskbarStoppedRun === taskbarRunKey,
+  })
+
+  useEffect(() => {
+    const clear = () => publishTaskbarState('idle')
+    window.addEventListener('pagehide', clear)
+    return () => {
+      window.removeEventListener('pagehide', clear)
+      clear()
+    }
+  }, [])
   const [collapsed, setCollapsed] = useState(() => isNarrowChatViewport())
   const [notice, setNotice] = useState('')
   const [llms, setLlms] = useState([])
@@ -4443,8 +4464,14 @@ export default function ChatApp() {
   const openedChatInstanceRef = useRef('')
   const chatApi = useCallback(async (url, options) => {
     const epoch = chatRequestEpochRef.current
-    const result = await api(addChatInstanceToURL(url, chatInstanceRef.current), options)
+    const instance = chatInstanceRef.current
+    const result = await api(addChatInstanceToURL(url, instance), options)
     if (epoch !== chatRequestEpochRef.current) throw new DOMException('Chat instance changed', 'AbortError')
+    if (url === '/api/chat/sessions') {
+      let storage
+      try { storage = window.localStorage } catch { /* Use an in-memory baseline if storage is blocked. */ }
+      initializeChatReadBaseline(instance, result.sessions, storage, window)
+    }
     return result
   }, [])
   const sessionCacheRef = useRef(null)
@@ -4519,6 +4546,15 @@ export default function ChatApp() {
     },
     onConflict: () => openSession(activeSidRef.current, false),
   })
+  const chatReadState = useChatReadState({
+    instance: chatInstanceID, sid, snapshot: historyPages.page, messages, sessions,
+    running: busy && streamingSid === sid, loading: sessionLoading, threadRef,
+  })
+  const aggregateTaskbarState = aggregateChatTaskbarState({
+    sessions, unread: new Set(sessions.filter(chatReadState.unread).map(session => session.id)),
+    sid, liveState: taskbarState, liveRunning: busy && streamingSid === sid,
+  })
+  useEffect(() => { publishTaskbarState(aggregateTaskbarState) }, [aggregateTaskbarState])
   const [contextLoading, setContextLoading] = useState(false)
   const [contextError, setContextError] = useState('')
   const [contextRefresh, setContextRefresh] = useState(0)
@@ -5116,6 +5152,7 @@ export default function ChatApp() {
     try {
       streamAbortRef.current?.abort?.()
       await chatApi(`/api/chat/cancel/${id}`, { method:'POST', body:'{}' })
+      if (isActiveSession(id)) setTaskbarStoppedRun(taskbarRunKey)
       setMessages(xs => xs.map(m => (m.role === 'assistant' && !m.content) ? { ...m, content:ct('已中止。', 'Stopped.'), error:true } : m))
       setSessions(xs => xs.map(s => s.id === id ? { ...s, running:false } : s))
       setNotice(ct('已中止当前执行', 'Current run stopped'))
@@ -6034,6 +6071,7 @@ export default function ChatApp() {
     streamAbortRef.current?.abort?.()
     streamAbortRef.current = ctrl
     const targetSessionID = item.sessionId || sid
+    setTaskbarStoppedRun('')
     setBusy(true); setStreamingSid(targetSessionID || 'new'); setErr(''); setNotice('')
     let id = targetSessionID
     let commandPatch = null
@@ -6463,7 +6501,7 @@ export default function ChatApp() {
     let stopped = false
     let inFlight = false
     const refreshList = async () => {
-      if (stopped || inFlight || document.hidden) return
+      if (stopped || inFlight || !shouldRefreshChatTaskbar()) return
       inFlight = true
       try {
         const d = await chatApi('/api/chat/sessions')
@@ -6863,6 +6901,7 @@ export default function ChatApp() {
     hasDraft={draftSessionIds.has(session.id)}
     autorunEnabled={autorunEnabled}
     ageText={sessionAgeText(session.updated_at)}
+    unread={chatReadState.unread(session)}
     actionsRef={sidebarSessionActionsRef}
   />
 
@@ -7458,7 +7497,7 @@ export default function ChatApp() {
                 <span className={`oa-session-check ${selected ? 'is-checked' : ''}`}>{selected && <Check size={12}/>}</span>
                 <span className="oa-session-dialog-copy">
                   <span className="oa-session-dialog-title">{s.running && <i className="oa-session-running-dot" aria-hidden="true"/>}<b>{shortTitle(s)}</b><SessionAutorunBadge enabled={autorunEnabled} sessionId={s.id} targetSessionId={sid}/>{s.hub_enabled && <em className="oa-session-hub-badge">Hub</em>}{draftSessionIds.has(s.id) && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}{s.id === sid && <em>当前</em>}<em className={`is-title-source is-${s.title_source || 'legacy'}`}>{sourceLabel}</em></span>
-                  <small><Clock3 size={12}/>{fmtTime(s.updated_at) || ct('刚刚', 'Just now')} · {s.count || 0} 条{s.running && <span>运行中</span>}</small>
+                  <small><Clock3 size={12}/>{fmtTime(s.updated_at) || ct('刚刚', 'Just now')} · {s.count || 0} 条{s.running ? <span>运行中</span> : chatReadState.unread(s) && <span className="oa-session-unread-label">{ct('未读', 'Unread')}</span>}</small>
                 </span>
               </button>
               <button className={`oa-session-dialog-hub-action ${s.hub_enabled ? 'is-leave' : ''}`} type="button" onClick={()=>setSessionHubEnabled(s)} disabled={batchDeleting || Boolean(hubUpdatingSessionId)} aria-label={s.hub_enabled ? ct(`退出 Hub：${shortTitle(s)}`, `Leave Hub: ${shortTitle(s)}`) : ct(`入驻 Hub：${shortTitle(s)}`, `Join Hub: ${shortTitle(s)}`)}>

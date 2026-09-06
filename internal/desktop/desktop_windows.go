@@ -50,6 +50,10 @@ func runDesktopWindow(spec desktopWindowSpec, ready func(desktopWindow)) (err er
 	}
 
 	setWindowIcon(win.hwnd, appicon.ICO)
+	if bindErr := win.bindTaskbar(); bindErr != nil {
+		log.Printf("desktop window %q cannot report taskbar state: %v", spec.Name, bindErr)
+	}
+	refreshTaskbarWindows()
 
 	// The page owns the palette and reports it once it has loaded; until then
 	// the caption uses whatever the last session ended on. Binding has to

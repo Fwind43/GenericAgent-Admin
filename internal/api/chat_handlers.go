@@ -27,11 +27,13 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(summaries, func(i, j int) bool { return summaries[i].UpdatedAt > summaries[j].UpdatedAt })
 	items := make([]map[string]interface{}, 0, len(summaries))
 	for _, summary := range summaries {
+		running, taskbarState := s.chatSessionTaskbarSnapshot(summary)
 		items = append(items, map[string]interface{}{
 			"id": summary.ID, "title": summary.Title, "title_source": summary.TitleSource,
-			"updated_at": summary.UpdatedAt, "count": summary.Count, "running": s.chatRunActive(summary.ID),
+			"updated_at": summary.UpdatedAt, "count": summary.Count, "running": running, "taskbar_state": taskbarState,
 			"workspace": summary.Workspace, "project_mode": summary.ProjectMode,
 			"hub_enabled": summary.HubEnabled, "pinned": summary.Pinned, "loop": summary.Loop,
+			"result": summary.Result,
 		})
 	}
 	projects, pinnedProjects := chatProjectNamesFor(cfg)
