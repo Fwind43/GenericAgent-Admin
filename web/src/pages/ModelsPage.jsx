@@ -119,6 +119,13 @@ function OptionalBoolSelect({ value, onChange, t, trueLabel, falseLabel }) {
 function ModelParams({ config, protocol, onChange, t }) {
   const text = t.models
   const fields = modelProtocolFields(protocol)
+  const extra = config.extra || {}
+  const updateExtra = (key, value) => {
+    const next = { ...extra }
+    if (value === undefined || value === '') delete next[key]
+    else next[key] = value
+    onChange({ extra: next })
+  }
   const hasProtocolFields = fields.userAgent || fields.apiMode || fields.serviceTier
     || fields.thinkingType || fields.reasoningFamily || fields.fakeClaudeCode
 
@@ -134,6 +141,16 @@ function ModelParams({ config, protocol, onChange, t }) {
           <label className="model-field model-field--wide">
             <span className="model-field-label">{text.displayName}</span>
             <Input value={config.name || ''} onChange={event => onChange({ name: event.target.value })} placeholder={text.displayNamePlaceholder} />
+          </label>
+          {['temperature', 'max_tokens', 'max_retry_after'].map(key => (
+            <label className="model-field" key={key}>
+              <span className="model-field-label">{key}</span>
+              <Input type="number" min={key === 'max_tokens' ? 1 : 0} step={key === 'max_tokens' ? 1 : 'any'} value={extra[key] ?? ''} onChange={event => updateExtra(key, optionalNumber(event.target.value))} placeholder={text.inherit} />
+            </label>
+          ))}
+          <label className="model-field">
+            <span className="model-field-label">omit_thinking</span>
+            <OptionalBoolSelect value={extra.omit_thinking} onChange={value => updateExtra('omit_thinking', value)} t={t} />
           </label>
           <label className="model-field">
             <span className="model-field-label">{text.stream}</span>
@@ -183,6 +200,18 @@ function ModelParams({ config, protocol, onChange, t }) {
               <label className="model-field">
                 <span className="model-field-label">{text.thinkingType}</span>
                 <Select allowClear value={config.thinking_type || undefined} onChange={thinking_type => onChange({ thinking_type })} placeholder={text.inherit} options={THINKING_TYPE_OPTIONS} />
+              </label>
+            )}
+            {fields.thinkingType && (
+              <label className="model-field">
+                <span className="model-field-label">thinking_budget_tokens</span>
+                <Input type="number" min={1} step={1} disabled={config.thinking_type !== 'enabled'} value={extra.thinking_budget_tokens ?? ''} onChange={event => updateExtra('thinking_budget_tokens', optionalNumber(event.target.value))} placeholder={text.inherit} />
+              </label>
+            )}
+            {protocol === 'native_claude' && (
+              <label className="model-field">
+                <span className="model-field-label">api_key_header</span>
+                <Select allowClear value={extra.api_key_header || undefined} onChange={value => updateExtra('api_key_header', value)} placeholder={text.inherit} options={['auto', 'x-api-key', 'bearer'].map(value => ({ value, label: value }))} />
               </label>
             )}
             {fields.reasoningFamily && (

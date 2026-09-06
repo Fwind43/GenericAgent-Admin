@@ -758,6 +758,8 @@ for var, value in vars(mod).items():
         p.update(failover_values)
     for src,dst in [('models','models'),('stream','stream'),('max_retries','max_retries'),('read_timeout','read_timeout'),('connect_timeout','connect_timeout'),('user_agent','user_agent'),('api_mode','api_mode'),('service_tier','service_tier'),('thinking_type','thinking_type'),('reasoning_effort','reasoning_effort'),('fake_cc_system_prompt','fake_cc_system_prompt')]:
         if src in d: p[dst]=d.pop(src)
+    if 'timeout' in d:
+        p['connect_timeout']=d.pop('timeout')
     instance_id=model_instances.get(var)
     if isinstance(instance_id, str) and instance_id:
         p['instance_id']=instance_id
@@ -1155,7 +1157,7 @@ func renderWithFailoverGroups(profiles []Profile, groups []FailoverGroup, allowM
 			m["read_timeout"] = *config.ReadTimeout
 		}
 		if config.ConnectTimeout != nil {
-			m["connect_timeout"] = *config.ConnectTimeout
+			m["timeout"] = *config.ConnectTimeout
 		}
 		if config.UserAgent != "" {
 			m["user_agent"] = config.UserAgent

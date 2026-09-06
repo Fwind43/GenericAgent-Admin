@@ -516,6 +516,39 @@ func TestExportImportPreservesProviderDisplayName(t *testing.T) {
 	}
 }
 
+func TestOfficialParametersRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	var input Draft
+	if err := json.Unmarshal([]byte(`{"profiles":[{"var_name":"native_claude_config_test","type":"native_claude","apibase":"https://example.test/v1","model_configs":[{"model":"test","connect_timeout":17,"thinking_type":"enabled","reasoning_effort":"max","extra":{"temperature":0,"max_tokens":8192,"thinking_budget_tokens":2048,"api_key_header":"bearer","omit_thinking":false,"max_retry_after":0}}]}]}`), &input); err != nil {
+		t.Fatal(err)
+	}
+	for pass := 0; pass < 2; pass++ {
+		rendered, err := Render(input.Profiles)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(rendered, `"timeout": 17`) || strings.Contains(rendered, `"connect_timeout"`) {
+			t.Fatalf("incorrect official timeout key: %s", rendered)
+		}
+		if _, err := Export(root, input.Profiles, true); err != nil {
+			t.Fatal(err)
+		}
+		input, err = ImportMyKeyWithPython(root, "", true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		config := input.Profiles[0].ModelConfigs[0]
+		if config.ConnectTimeout == nil || *config.ConnectTimeout != 17 || config.ReasoningEffort != "max" {
+			t.Fatalf("lost official parameters: %+v", config)
+		}
+		for key, want := range map[string]interface{}{"temperature": float64(0), "max_tokens": float64(8192), "thinking_budget_tokens": float64(2048), "api_key_header": "bearer", "omit_thinking": false, "max_retry_after": float64(0)} {
+			if config.Extra[key] != want {
+				t.Fatalf("pass %d: %s = %#v, want %#v", pass, key, config.Extra[key], want)
+			}
+		}
+	}
+}
+
 func TestExportImportPreservesPerModelAdvancedConfig(t *testing.T) {
 	root := t.TempDir()
 	data := []byte(`{"profiles":[{"var_name":"native_oai_config_acme","type":"native_oai","name":"Acme","apibase":"https://api.acme.example/v1","apikey":"sk-real-secret","model_configs":[{"model":"acme-chat","reasoning_effort":"low","service_tier":"default","read_timeout":120},{"model":"acme-reasoning","reasoning_effort":"high","service_tier":"priority","read_timeout":600}]}]}`)

@@ -14,7 +14,7 @@ export const THINKING_TYPE_OPTIONS = ['adaptive', 'enabled', 'disabled'].map(val
 
 const REASONING_EFFORT_OPTIONS = {
   oai: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].map(value => ({ value, label: value })),
-  claude: ['low', 'medium', 'high', 'xhigh'].map(value => ({ value, label: value })),
+  claude: ['low', 'medium', 'high', 'xhigh', 'max'].map(value => ({ value, label: value })),
 }
 
 export const modelProtocolFields = protocol => (

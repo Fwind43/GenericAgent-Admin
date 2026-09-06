@@ -114,8 +114,8 @@ test('protocol-specific selects expose only supported values', () => {
   assert.deepEqual(optionValues(THINKING_TYPE_OPTIONS), ['adaptive', 'enabled', 'disabled'])
   assert.deepEqual(optionValues(reasoningEffortOptions('native_oai')), ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
   assert.deepEqual(optionValues(reasoningEffortOptions('oai')), ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
-  assert.deepEqual(optionValues(reasoningEffortOptions('native_claude')), ['low', 'medium', 'high', 'xhigh'])
-  assert.deepEqual(optionValues(reasoningEffortOptions('claude')), ['low', 'medium', 'high', 'xhigh'])
+  assert.deepEqual(optionValues(reasoningEffortOptions('native_claude')), ['low', 'medium', 'high', 'xhigh', 'max'])
+  assert.deepEqual(optionValues(reasoningEffortOptions('claude')), ['low', 'medium', 'high', 'xhigh', 'max'])
 })
 
 const orderingProfiles = () => ([
