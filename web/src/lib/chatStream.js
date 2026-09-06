@@ -88,7 +88,10 @@ export const mergeStreamTerminalMessage = (messages, pendingId, finalMessage, me
   // Keep its position and metadata, then remove only this run's redundant placeholders.
   const streamed = pendingIndex >= 0 ? list[pendingIndex] : list[targetIndex]
   const base = existingIndex >= 0 ? { ...streamed, ...list[existingIndex] } : streamed
-  const merged = merge(base, finalMessage)
+  const merged = { ...merge(base, finalMessage) }
+  // The server ID can change at completion; keep the mounted row's React key.
+  const mounted = list[targetIndex]
+  if (mounted.render_key || mounted.id !== merged.id) merged.render_key = mounted.render_key || mounted.id
   return list.flatMap((message, index) => {
     if (index === targetIndex) return [merged]
     if (message.id === pendingId || (finalId && message.id === finalId)) return []

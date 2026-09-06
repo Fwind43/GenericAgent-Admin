@@ -1,7 +1,9 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { ChatMessage } from './ChatApp.jsx'
+import { ChatMessage, MessageList } from './ChatApp.jsx'
+import { mergeStreamTerminalMessage } from './lib/chatStream.js'
+import { reconcileHistoryPage } from './lib/chatHistoryPages.js'
 
 afterEach(() => cleanup())
 
@@ -356,6 +358,51 @@ describe('assistant markdown rendering', () => {
     expect(md.querySelector('h2').textContent).toBe('Next')
     expect(md.querySelector('hr')).toBeTruthy()
     expect(md.querySelector('p').textContent).toBe('body text')
+  })
+})
+
+describe('completion render identity', () => {
+  test('keeps plain markdown mounted when pending ends and structured text arrives', () => {
+    const content = '# Result\n\nFinished paragraph.\n\n```js\nconst answer = 42\n```'
+    const message = { id: 'stable-id', role: 'assistant', content, files: [], created_at: 1 }
+    const view = render(<ChatMessage message={message} pending />)
+    const paragraph = view.container.querySelector('.oa-md p')
+    const code = view.container.querySelector('.oa-md pre')
+    expect(paragraph).not.toBeNull()
+    expect(code).not.toBeNull()
+    view.rerender(<ChatMessage message={{ ...message, structured_content: [{ type: 'text', text: content }] }} pending={false} />)
+    expect(view.container.querySelector('.oa-md p')).toBe(paragraph)
+    expect(view.container.querySelector('.oa-md pre')).toBe(code)
+  })
+
+  test('keeps the actual message row and markdown through terminal replay and history refresh', () => {
+    const content = 'Finished paragraph.\n\n```js\nconst answer = 42\n```'
+    const pending = { id: 'pending-a', role: 'assistant', content, files: [], created_at: 1 }
+    const finalMessage = { ...pending, id: 'server-a', structured_content: [{ type: 'text', text: content }] }
+    const frame = (messages, running) => <MessageList messages={messages} isCurrentRunning={running} onAskReply={vi.fn()} />
+    const view = render(frame([pending], true))
+    const row = view.container.querySelector('.oa-message')
+    const paragraph = view.container.querySelector('.oa-md p')
+    const code = view.container.querySelector('.oa-md pre')
+    expect(row).not.toBeNull()
+    expect(paragraph).not.toBeNull()
+    expect(code).not.toBeNull()
+    let messages = mergeStreamTerminalMessage([pending], pending.id, finalMessage)
+    const assertMounted = () => {
+      view.rerender(frame(messages, false))
+      expect(view.container.querySelector('.oa-message')).toBe(row)
+      expect(view.container.querySelector('.oa-md p')).toBe(paragraph)
+      expect(view.container.querySelector('.oa-md pre')).toBe(code)
+    }
+    assertMounted()
+    messages = mergeStreamTerminalMessage(messages, pending.id, finalMessage)
+    assertMounted()
+    for (const paged of [false, true]) {
+      const latest = { messages: [finalMessage] }
+      if (paged) latest.message_index = [{ id: finalMessage.id }]
+      messages = reconcileHistoryPage(latest, { messages }).messages
+      assertMounted()
+    }
   })
 })
 

@@ -2,10 +2,14 @@
 // earlier pages; the latest page always supplies complete, authoritative messages.
 export function reconcileHistoryPage(latest, previous) {
   const index = latest.message_index
-  if (!Array.isArray(index)) return latest
   const oldMessages = previous?.messages || []
   const oldById = new Map(oldMessages.map(message => [message.id, message]))
-  const latestMessages = latest.messages || []
+  // Carry only local render identity across authoritative snapshot replacement.
+  const latestMessages = (latest.messages || []).map(message => {
+    const renderKey = oldById.get(message.id)?.render_key
+    return renderKey && renderKey !== message.render_key ? { ...message, render_key: renderKey } : message
+  })
+  if (!Array.isArray(index)) return { ...latest, messages: latestMessages }
   const first = index.findIndex(item => item.id === latestMessages[0]?.id)
   const oldStart = index.findIndex(item => item.id === oldMessages[0]?.id)
   if (oldStart < 0 || oldStart >= first) return { ...latest, messages: latestMessages }

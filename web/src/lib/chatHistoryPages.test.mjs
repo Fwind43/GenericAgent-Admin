@@ -26,6 +26,19 @@ test('latest complete messages are authoritative and empty history clears cached
   assert.deepEqual(reconcileHistoryPage({ messages: [] }, { messages: [full] }), { messages: [] })
 })
 
+test('snapshot refresh preserves only the mounted render key, not stale message data', () => {
+  const previous = { messages: [{ ...message('a'), render_key: 'pending-a', content: 'streamed', usage: 123 }] }
+  for (const paged of [false, true]) {
+    const latest = { messages: [{ ...message('a'), content: 'authoritative' }, message('b')] }
+    if (paged) latest.message_index = index(['a', 'b'])
+    const merged = reconcileHistoryPage(latest, previous)
+    assert.deepEqual(merged.messages[0], { ...latest.messages[0], render_key: 'pending-a' })
+    assert.equal(merged.messages[1], latest.messages[1])
+    assert.equal(latest.messages[0].render_key, undefined)
+    assert.deepEqual(reconcileHistoryPage(latest, merged), merged)
+  }
+})
+
 test('page cache enforces LRU entry and byte budgets with instance isolation', () => {
   const cache = createHistoryPageCache({ maxEntries: 2, maxBytes: 200 })
   cache.put('one:a', { value: 1 }); cache.put('two:a', { value: 2 })

@@ -131,11 +131,23 @@ test('terminal replay keeps the final history position and removes only matching
   assert.deepEqual(mergeStreamTerminalMessage(result, pending.id, finalMessage), result)
 })
 
+test('terminal retains the mounted identity across repeated final events', () => {
+  const pending = { id: 'pending-a', role: 'assistant', content: 'Answer' }
+  const finalMessage = { id: 'server-a', role: 'assistant', content: 'Answer' }
+  const merged = mergeStreamTerminalMessage([pending], pending.id, finalMessage)
+  assert.equal(merged[0].id, 'server-a')
+  assert.equal(merged[0].render_key, 'pending-a')
+  assert.deepEqual(mergeStreamTerminalMessage(merged, pending.id, finalMessage), merged)
+  const duplicate = { ...pending, render_key: 'stale-key' }
+  const replay = mergeStreamTerminalMessage([finalMessage, duplicate], duplicate.id, finalMessage)
+  assert.equal(replay[0].render_key || replay[0].id, 'server-a')
+})
+
 test('normal terminal replaces the pending message and preserves streamed metadata', () => {
   const pending = { id:'pending', role:'assistant', content:'Partial', model_id:'model-a', usages:[{ output_tokens:2 }] }
   const finalMessage = { id:'final', role:'assistant', content:'Finished' }
   const result = mergeStreamTerminalMessage([pending], pending.id, finalMessage)
-  assert.deepEqual(result, [{ ...finalMessage, model_id:'model-a', usages:pending.usages }])
+  assert.deepEqual(result, [{ ...finalMessage, model_id:'model-a', usages:pending.usages, render_key:'pending' }])
 })
 
 test('terminal handles a stable server ID and removes already duplicated final IDs', () => {

@@ -3758,7 +3758,7 @@ export function WorldlinePanel({ state, loading, switchingId, disabled, onClose,
   )
 }
 
-const MessageList = memo(function MessageList({
+export const MessageList = memo(function MessageList({
   messages, isCurrentRunning, onAskReply, onEditResend, onRetryBTW, clockNow,
   worldline = null, onSwitchVersion = null,
 }) {
@@ -3779,7 +3779,7 @@ const MessageList = memo(function MessageList({
         }
         nodes.push(
           <ChatMessage
-            key={m.id}
+            key={m.render_key || m.id}
             message={m}
             pending={!m.kind && isCurrentRunning && m.id === lastMessageId}
             onAskReply={onAskReply}
