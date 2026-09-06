@@ -6895,7 +6895,10 @@ export default function ChatApp() {
   }
 
   sidebarSessionActionsRef.current = {
-    openSession,
+    openSession: sessionId => {
+      chatReadState.markSessionRead(sessionId)
+      openSession(sessionId)
+    },
     saveRename,
     setDraftTitle,
     cancelRename: () => setEditing(''),

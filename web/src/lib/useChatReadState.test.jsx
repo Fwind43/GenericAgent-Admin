@@ -105,6 +105,45 @@ test('switching session cancels old dwell and new revisions become unread', () =
   expect(h.result.current.currentUnread).toBe(false)
 })
 
+test('explicit selection clears only the selected revision before history loads', () => {
+  focused = false; covered = true; bottom = 700
+  props = { ...props, sid: 'other', loading: true, snapshot: null, messages: [],
+    sessions: [...props.sessions, { id: 'other', result: answer }] }
+  const h = setup()
+  act(() => { h.result.current.markSessionRead('s') })
+  expect(h.result.current.unread(props.sessions[0])).toBe(false)
+  expect(h.result.current.unread(props.sessions[1])).toBe(true)
+  expect(localStorage.getItem(chatReadKey('i', 's', answer))).toBe('1')
+  h.unmount()
+  const restored = setup()
+  expect(restored.result.current.unread(props.sessions[0])).toBe(false)
+  const next = { id: 's', result: { ...answer, revision: 'v2' } }
+  restored.rerender({ ...props, sessions: [next] })
+  expect(restored.result.current.unread(next)).toBe(true)
+  restored.rerender({ ...props, instance: 'other' })
+  expect(restored.result.current.unread(props.sessions[0])).toBe(true)
+})
+
+test('explicit selection remains immediate and repeatable with blocked storage', () => {
+  focused = false
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+  const h = setup()
+  act(() => { h.result.current.markSessionRead('s') })
+  expect(h.result.current.currentUnread).toBe(false)
+  act(() => { h.result.current.markSessionRead('s') })
+  expect(h.result.current.currentUnread).toBe(false)
+  expect(localStorage.length).toBe(0)
+})
+
+test('explicit selection ignores unknown, running and incomplete results', () => {
+  props = { ...props, sessions: [{ id: 'running', running: true, result: answer }, { id: 'empty' }] }
+  const h = setup()
+  act(() => {
+    for (const id of ['unknown', 'running', 'empty']) h.result.current.markSessionRead(id)
+  })
+  expect(localStorage.length).toBe(0)
+})
+
 test('cross-tab storage and same-window events immediately synchronize lists', () => {
   focused = false
   const h = setup()

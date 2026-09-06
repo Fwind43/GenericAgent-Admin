@@ -2,7 +2,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import ChatApp from './ChatApp.jsx'
-import { markChatResultRead } from './lib/chatReadState.js'
+import { chatReadKey } from './lib/chatReadState.js'
 
 const session = (id, title, extra = {}) => ({
   id, title, running: false, taskbar_state: 'idle',
@@ -43,12 +43,15 @@ test('real ChatApp keeps background attention across selection and clears only t
     session('background', 'Taskbar Background', { taskbar_state: 'waiting' }),
   ]
   const paths = []
+  let releaseHistory
+  const backgroundHistory = new Promise(resolve => { releaseHistory = resolve })
   vi.stubGlobal('fetch', vi.fn(async (input) => {
     const url = new URL(typeof input === 'string' ? input : input.url, window.location.origin)
     paths.push(url.pathname)
     let data = {}
     if (url.pathname === '/api/instances') data = { instances: [] }
     else if (url.pathname === '/api/chat/sessions') data = { sessions, projects: [], pinned_projects: [] }
+    else if (url.pathname === '/api/chat/session/background') return backgroundHistory
     else if (url.pathname.startsWith('/api/chat/session/')) {
       const id = url.pathname.split('/').pop()
       data = { ...sessions.find(item => item.id === id), messages: [], queue: [] }
@@ -79,7 +82,20 @@ test('real ChatApp keeps background attention across selection and clears only t
   const baselineKey = Object.keys(localStorage).find(key => key.startsWith('ga.chat.read.baseline.v1:'))
   expect(baselineKey).toBeTruthy()
   const instance = JSON.parse(baselineKey.slice('ga.chat.read.baseline.v1:'.length))
-  act(() => { markChatResultRead(instance, 'background', result, localStorage, window) })
-  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
-  expect(paths).not.toContain('/api/chat/session/background')
+  const backgroundButton = screen.getByText('Taskbar Background').closest('button')
+  expect(backgroundButton.querySelector('.oa-session-unread-label')).toBeTruthy()
+  fireEvent.click(backgroundButton)
+  // The selection must clear attention before the pending history request resolves.
+  expect(backgroundButton.querySelector('.oa-session-unread-label')).toBeNull()
+  expect(localStorage.getItem(chatReadKey(instance, 'background', result))).toBe('1')
+  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await act(async () => {
+    const data = { ...sessions.find(item => item.id === 'background'), messages: [], queue: [] }
+    releaseHistory(new Response(JSON.stringify({ ok: true, ...data, data }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }))
+  })
+  expect(paths).toContain('/api/chat/session/background')
+  expect(backgroundButton.querySelector('.oa-session-unread-label')).toBeNull()
+  expect(bridge).toHaveBeenLastCalledWith('idle')
 }, 10000)

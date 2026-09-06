@@ -15,6 +15,13 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
     }
   }, [])
   const unread = session => !readKeys.has(chatReadKey(instance, session?.id, session?.result)) && isChatResultUnread(session, instance, storage)
+  const markSessionRead = sessionId => {
+    const session = sessions.find(item => item.id === sessionId)
+    if (!unread(session)) return
+    const selectedKey = chatReadKey(instance, session.id, session.result)
+    markChatResultRead(instance, session.id, session.result, storage, window)
+    setReadKeys(previous => previous.has(selectedKey) ? previous : new Set(previous).add(selectedKey))
+  }
   const result = snapshot?.id === sid ? snapshot.result : null
   const summary = sessions.find(session => session.id === sid)
   const message = messages.find(item => item.id === result?.id)
@@ -43,5 +50,5 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
       document.removeEventListener('visibilitychange', reset)
     }
   }, [eligible, currentUnread, key, instance, sid, result, storage, threadRef])
-  return { unread, currentUnread }
+  return { unread, currentUnread, markSessionRead }
 }
