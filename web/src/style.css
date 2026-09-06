@@ -5586,43 +5586,6 @@ html[data-color-scheme="dark"] .oa-tools-act:hover:not(:disabled) { background: 
   font-weight:600;
   line-height:16px;
 }
-.oa-chat .oa-topbar.has-waiting .oa-title {
-  position:static;
-  transform:none;
-  flex:1 1 0;
-  min-width:0;
-  max-width:100%;
-  text-align:left;
-}
-.oa-waiting-trigger {
-  display:inline-flex;
-  flex:0 0 auto;
-  align-items:center;
-  gap:6px;
-  min-height:36px;
-  padding:0 9px;
-  border:1px solid color-mix(in srgb, var(--warning) 35%, var(--oa-line));
-  border-radius:7px;
-  background:color-mix(in srgb, var(--warning) 9%, var(--oa-panel));
-  color:var(--oa-text);
-  font-size:12px;
-  white-space:nowrap;
-  cursor:pointer;
-}
-.oa-waiting-trigger > svg { flex:none; color:var(--warning); }
-.oa-waiting-trigger > strong { font-variant-numeric:tabular-nums; }
-.oa-waiting-trigger:hover,
-.oa-waiting-trigger[aria-expanded="true"] { background:color-mix(in srgb, var(--warning) 16%, var(--oa-panel)); }
-.oa-waiting-trigger:focus-visible { outline:2px solid var(--oa-focus-ring, var(--primary)); outline-offset:2px; }
-.oa-waiting-menu { width:min(320px, calc(100vw - 24px)); }
-.oa-waiting-menu .ant-dropdown-menu { max-height:min(400px, 65dvh); overflow-y:auto; }
-.oa-waiting-menu-copy { display:flex; min-width:0; flex-direction:column; gap:2px; padding:3px 0; }
-.oa-waiting-menu-copy b { font-weight:500; overflow-wrap:anywhere; white-space:normal; }
-.oa-waiting-menu-copy small { color:var(--oa-muted); overflow-wrap:anywhere; white-space:normal; }
-@media (max-width:600px) {
-  .oa-waiting-trigger { gap:4px; padding:0 7px; }
-  .oa-waiting-menu { left:12px !important; right:12px !important; width:auto; }
-}
 .oa-topbar-tools {
   margin-left:auto;
   flex:0 0 auto;

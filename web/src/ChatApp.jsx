@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import ThemePicker from './ThemePicker'
-import ChatWaitingMenu from './ChatWaitingMenu.jsx'
 import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamTerminalMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldRefreshChatSnapshot } from './lib/chatStream.js'
 import { cacheHitPercent, cacheReadTokens, measuredOutputRate } from './lib/chatUsage.js'
 import { autorunInitialReplyAt, isAutorunTargetRunning, shouldTriggerAutorun } from './lib/chatAutorun.js'
@@ -7070,17 +7069,12 @@ export default function ChatApp() {
     <div className={`oa-sidebar-backdrop ${collapsed ? '' : 'is-visible'}`} aria-hidden={collapsed} onClick={()=>setCollapsed(true)} />
 
     <main className="oa-main">
-      <header className={`oa-topbar ${waitingSessions.length ? 'has-waiting' : ''}`}>
+      <header className="oa-topbar">
         {collapsed && <div className="oa-collapsed-actions">
           <button className="oa-icon-btn oa-sidebar-toggle" onClick={()=>setCollapsed(false)} title={ct('展开侧栏', 'Expand sidebar')} aria-label={ct('展开侧栏', 'Expand sidebar')}><Menu size={18}/></button>
           <button className="oa-icon-btn oa-collapsed-new" onClick={newSession} title={ct('新对话', 'New chat')} aria-label={ct('新对话', 'New chat')}><MessageSquarePlus size={18}/></button>
         </div>}
         <div className="oa-title"><b>{current ? shortTitle(current) : ct('新对话', 'New chat')}</b>{current?.project_mode && <span className="oa-project-badge" title={`Project Mode: ${current.project_mode}`}><FolderOpen size={12} aria-hidden="true"/><span>{current.project_mode}</span></span>}{current?.workspace && <span className="oa-workspace-badge" title={current.workspace}>Workspace: {current.workspace}</span>}</div>
-        {waitingSessions.length > 0 && <ChatWaitingMenu
-          sessions={waitingSessions}
-          sid={sid}
-          onOpen={sessionId => sidebarSessionActionsRef.current.openSession(sessionId)}
-        />}
         <div className="oa-topbar-tools" role="toolbar" aria-label={ct('聊天工具', 'Chat tools')}>
           <div className="oa-topbar-view-tools" role="group" aria-label={ct('对话视图', 'Conversation views')}>
             <button className={`oa-context-btn ${contextOpen ? 'is-open' : ''}`} type="button" onClick={()=>setContextOpen(v=>!v)} disabled={!sid} title={ct('查看发给模型的 raw_history', 'View raw_history sent to the model')}>

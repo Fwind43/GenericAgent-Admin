@@ -16,6 +16,16 @@ const ruleBodies = (selector) => {
   return matches.map(match => match[1])
 }
 
+test('chat topbar has no waiting-reply navigation or reserved layout', () => {
+  const header = chatSource.match(/<header className="oa-topbar">([\s\S]*?)<\/header>/)?.[1]
+  assert.ok(header, 'the topbar layout must not depend on waiting sessions')
+  assert.doesNotMatch(chatSource, /ChatWaitingMenu/)
+  assert.doesNotMatch(header, /waitingSessions|waitingSessionIds|oa-waiting-/)
+  assert.doesNotMatch(css, /\.oa-waiting-|\.oa-topbar\.has-waiting/)
+  assert.match(header, /oa-topbar-tools/)
+  assert.match(chatSource, /waiting=\{waitingSessionIds\.has\(session\.id\)\}/)
+})
+
 test('all color themes share one product font stack', () => {
   const fontDeclarations = [...css.matchAll(/--font\s*:\s*([^;]+);/g)]
   assert.equal(fontDeclarations.length, 1, 'the product font must have a single source of truth')
