@@ -25,6 +25,7 @@ import { addChatInstanceToURL, chatInstanceOptions, initialChatInstanceID, persi
 import { clearChatLaunchIntent, readChatLaunchIntent } from './lib/chatLaunchIntent'
 import { chooseChatSessionID, loadSelectedChatSessionID, persistSelectedChatSessionID } from './lib/chatSessionSelection'
 import { forgetSessionScroll, rememberSessionScroll, sessionScrollRestore } from './lib/chatSessionScroll'
+import { createThreadFollowScheduler } from './lib/chatFollowScheduler.js'
 import { loopSidebarView, updateSessionLoop } from './lib/chatLoopSidebar.js'
 import { normalizeLoopRecords } from './lib/chatLoopRecords.js'
 import { confirmDanger, showAppAlert } from './lib/danger'
@@ -3089,11 +3090,37 @@ function UltraPlanMessageDrawer({ content = '', state, pending = false, onAskRep
   )
 }
 
+const AssistantBody = memo(function AssistantBody({ text = '', onAskReply, ultraplan_state, openAskUser = false }) {
+  return renderAssistantBody(text, onAskReply, ultraplan_state, openAskUser)
+})
+
+const AssistantTurn = memo(function AssistantTurn({ turn, current, stackOpen, pending, usage, onAskReply, ultraplan_state, isLatestMessage }) {
+  // A streamed turn keeps its body and local tool state when the next turn starts.
+  const [streamed] = useState(current)
+  const [expanded, setExpanded] = useState(current)
+  const open = current || expanded
+  const [visited, setVisited] = useState(current)
+  const toggle = () => {
+    setVisited(true)
+    setExpanded(value => !value)
+  }
+  return <section className={current || streamed ? `oa-turn-current oa-turn-streamed ${open ? 'open' : 'collapsed'}` : `oa-turn-node oa-turn-card ${open ? 'open' : 'collapsed'}`} hidden={!current && !stackOpen} data-turn={turn.turn}>
+    {current
+      ? <div className="oa-turn-current-head"><span className="oa-turn-index oa-turn-index-current">{ct('步骤', 'Step')} {turn.turn}</span><b>{turn.title || ct('正在执行', 'Running')}</b><UsageRow u={usage} className="oa-usage-inline" /><em>{pending ? ct('实时输出中', 'Live output') : ct('最新一轮', 'Latest turn')}</em></div>
+      : <button className={streamed ? 'oa-turn-current-head' : 'oa-turn-toggle'} type="button" onClick={toggle} aria-expanded={open} title={turn.title || ct('执行步骤', 'Execution step')}>
+        <span className={`oa-turn-index${streamed ? ' oa-turn-index-current' : ''}`}>{ct('步骤', 'Step')} {turn.turn}</span><b>{turn.title || ct('执行步骤', 'Execution step')}</b><UsageRow u={usage} className="oa-usage-inline" /><ChevronDown size={15} className="oa-turn-chevron"/>
+      </button>}
+    <div className="oa-turn-body" hidden={!open}>
+      {(current || visited) && (turn.body || ultraplan_state
+        ? <AssistantBody text={turn.body || ''} onAskReply={onAskReply} ultraplan_state={ultraplan_state} openAskUser={isLatestMessage} />
+        : <p className="oa-turn-empty">{current ? ct('正在等待该轮输出…', 'Waiting for this turn’s output…') : ct('该轮暂无详细输出', 'No detailed output for this turn')}</p>)}
+    </div>
+  </section>
+})
+
 const AssistantContent = memo(function AssistantContent({ content, structuredContent, pending, onAskReply, isLatestMessage = false, turnUsages, ultraplan_state, runStartedAtMS = 0, clockNow = 0, modelID = '' }) {
-  const [openTurns, setOpenTurns] = useState({})
+  // Historical messages start folded; a live message keeps the user's choice at completion.
   const [stackOpen, setStackOpen] = useState(pending)
-  // 生成中自动展开过程；完成后自动折叠，只留最终回复。手动切换在 pending 不变时保留
-  useEffect(() => { setStackOpen(pending) }, [pending])
   const liveUltraPlanState = useMemo(() => normalizeUltraPlanState(ultraplan_state), [ultraplan_state])
   const stats = useMemo(() => textRenderStats(content), [content])
   
@@ -3128,16 +3155,13 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
     </div>
   }
   if (content && stats.tooLarge && !hasTurnSplit) return <div className="oa-content"><LongTextPreview text={content} stats={stats} /></div>
-  const boxedRuns = parsed.runs.slice(0, -1)
-  const lastRun = parsed.runs[parsed.runs.length - 1]
+  const lastRunIndex = parsed.runs.length - 1
   // A persisted UltraPlan state belongs to the final user-visible branch. When a
   // response has turn markers but no explicit final marker, that branch is the
   // latest run rather than parsed.body.
   const ultraPlanStateForLastRun = !parsed.body && hasLiveUltraPlan
     ? (liveUltraPlanState || ultraplan_state)
     : undefined
-  const isTurnOpen = (r, i) => openTurns[`${r.turn}-${i}`] === true
-  const toggleTurn = (r, i) => setOpenTurns(xs => ({ ...xs, [`${r.turn}-${i}`]: !isTurnOpen(r, i) }))
   return <div className={`oa-content ${parsed.runs.length ? 'oa-agent-output' : ''}`}>
     {parsed.runs.length > 0 && <div className={`oa-turn-stack ${stackOpen ? 'open' : 'collapsed'}`}>
       <button className="oa-turn-stack-head" type="button" onClick={() => setStackOpen(v => !v)} aria-expanded={stackOpen} title={stackOpen ? ct('折叠执行过程', 'Collapse execution') : ct('展开执行过程', 'Expand execution')}>
@@ -3147,27 +3171,17 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
         <em>{pending ? ct('正在生成', 'Generating') : ct('已完成', 'Completed')}</em>
         <ChevronDown className="oa-stack-chevron" size={15}/>
       </button>
-      {stackOpen && boxedRuns.map((r, i) => {
-        const open = isTurnOpen(r, i)
-        const tu = turnUsages && turnUsages[i]
-        return <div className="oa-turn-node" key={`${r.turn}-${i}`}>
-          <section className={`oa-turn-card ${open ? 'open' : 'collapsed'}`}>
-            <button className="oa-turn-toggle" type="button" onClick={() => toggleTurn(r, i)} aria-expanded={open} title={r.title || ct('执行步骤', 'Execution step')}>
-              <span className="oa-turn-index">{ct('步骤', 'Step')} {r.turn}</span>
-              <b>{r.title || ct('执行步骤', 'Execution step')}</b>
-              <UsageRow u={tu} className="oa-usage-inline" />
-              <ChevronDown size={15} className="oa-turn-chevron"/>
-            </button>
-            {open && (r.body ? renderAssistantBody(r.body, onAskReply) : <p className="oa-turn-empty">{ct('该轮暂无详细输出', 'No detailed output for this turn')}</p>)}
-          </section>
-        </div>
-      })}
-      {lastRun && <section className="oa-turn-current" key={`last-${lastRun.turn}`}>
-        <div className="oa-turn-current-head"><span className="oa-turn-index oa-turn-index-current">{ct('步骤', 'Step')} {lastRun.turn}</span><b>{lastRun.title || ct('正在执行', 'Running')}</b><UsageRow u={turnUsages && turnUsages[boxedRuns.length]} className="oa-usage-inline" /><em>{pending ? ct('实时输出中', 'Live output') : ct('最新一轮', 'Latest turn')}</em></div>
-        {lastRun.body || ultraPlanStateForLastRun
-          ? renderAssistantBody(lastRun.body || '', onAskReply, ultraPlanStateForLastRun, isLatestMessage)
-          : <p className="oa-turn-empty">{ct('正在等待该轮输出…', 'Waiting for this turn’s output…')}</p>}
-      </section>}
+      {parsed.runs.map((run, index) => <AssistantTurn
+        key={`${run.turn}-${index}`}
+        turn={run}
+        current={index === lastRunIndex}
+        stackOpen={stackOpen}
+        pending={pending}
+        usage={turnUsages && turnUsages[index]}
+        onAskReply={onAskReply}
+        ultraplan_state={index === lastRunIndex ? ultraPlanStateForLastRun : undefined}
+        isLatestMessage={index === lastRunIndex && isLatestMessage}
+      />)}
     </div>}
     {(parsed.summary || parsed.body || !parsed.runs.length) && <div className={parsed.runs.length ? 'oa-final-answer' : ''}>
       {parsed.runs.length > 0 && <div className="oa-final-label">返回给用户</div>}
@@ -4522,6 +4536,18 @@ export default function ChatApp() {
   const previousScrollTopRef = useRef(0)
   const previousScrollHeightRef = useRef(0)
   const followSettleUntilRef = useRef(0)
+  const [followScheduler] = useState(() => createThreadFollowScheduler({
+    getThread: () => threadRef.current,
+    isFollowing: () => autoFollowRef.current,
+    onScroll: (thread, behavior) => {
+      previousScrollTopRef.current = thread.scrollTop
+      previousScrollHeightRef.current = thread.scrollHeight
+      followSettleUntilRef.current = Date.now() + (behavior === 'smooth' ? SMOOTH_SETTLE_MS : FOLLOW_SETTLE_MS)
+    },
+    schedule: callback => window.requestAnimationFrame(callback),
+    cancel: handle => window.cancelAnimationFrame(handle),
+  }))
+  useLayoutEffect(() => () => followScheduler.cancel(), [followScheduler, sid])
   const sessionScrollSnapshotsRef = useRef(new Map())
   const pendingSessionScrollRestoreRef = useRef(null)
   const pendingRenderedSessionRef = useRef('')
@@ -6658,18 +6684,10 @@ export default function ChatApp() {
     previousScrollHeightRef.current = thread.scrollHeight
     followSettleUntilRef.current = Date.now() + settleMs
   }
-  const scrollToThreadEnd = (behavior = 'auto') => {
-    const thread = threadRef.current
-    if (!thread) return
-    // The thread keeps a strip of padding under the last message for the
-    // floating composer. Scrolling an end marker into view stops at the marker
-    // and leaves that strip below the fold, which parks the newest output
-    // behind the composer and keeps the thread permanently short of its own
-    // bottom; scrolling the container itself lands on both.
-    thread.scrollTo({ top: thread.scrollHeight, behavior })
-    markProgrammaticScroll(thread, behavior === 'smooth' ? SMOOTH_SETTLE_MS : FOLLOW_SETTLE_MS)
-  }
+  // Commit and ResizeObserver requests share a frame and read the latest height.
+  const scrollToThreadEnd = (behavior = 'auto') => followScheduler.request(behavior)
   const setFollowState = (enabled) => {
+    if (!enabled) followScheduler.cancel()
     autoFollowRef.current = enabled
     setAutoFollow(enabled)
     setShowFollow(!enabled && threadCanScroll(threadRef.current))
