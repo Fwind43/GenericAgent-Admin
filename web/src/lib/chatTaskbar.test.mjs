@@ -3,27 +3,28 @@ import test from 'node:test'
 import { setImmediate } from 'node:timers'
 import { aggregateChatTaskbarState, shouldRefreshChatTaskbar, chatTaskbarState, hasPendingTaskbarQuestion, publishTaskbarState, waitingChatSessions } from './chatTaskbar.js'
 
-test('all-session priority survives switching and reading only one result', () => {
+test('taskbar shows only unread results regardless of workflow status', () => {
   const sessions = [
     { id: 'running', running: true, taskbar_state: 'running' },
     { id: 'done1', taskbar_state: 'completed' },
     { id: 'done2', taskbar_state: 'completed' },
     { id: 'error', taskbar_state: 'failed' },
+    { id: 'question', taskbar_state: 'waiting' },
   ]
-  const aggregate = (unread, extra = {}) => aggregateChatTaskbarState({ sessions, unread: new Set(unread), ...extra })
-  assert.equal(aggregate([]), 'running')
-  assert.equal(aggregate(['done1'], { sid: 'running', liveRunning: true, liveState: 'running' }), 'completed')
-  assert.equal(aggregate(['done2'], { sid: 'done1' }), 'completed')
-  assert.equal(aggregate(['error', 'done1']), 'failed')
-  assert.equal(aggregate(['done1']), 'completed')
-  assert.equal(aggregate(['error'], { sessions: [...sessions, { id: 'question', taskbar_state: 'waiting' }] }), 'waiting')
-  assert.equal(aggregate([], { sessions: [{ id: 'question', taskbar_state: 'waiting' }], sid: 'question', liveRunning: true, liveState: 'running' }), 'running')
-  assert.equal(aggregate([], { sessions: [], sid: 'new', liveRunning: true, liveState: 'waiting' }), 'waiting')
-  assert.equal(aggregate([], { sessions: sessions.filter(s => !s.running) }), 'idle')
+  const aggregate = (ids, extra = {}) => aggregateChatTaskbarState({ sessions, unread: new Set(ids), ...extra })
+  for (const session of sessions) {
+    assert.equal(aggregate([session.id]), 'unread', session.taskbar_state)
+  }
+  assert.equal(aggregate(['done1', 'done2']), 'unread')
+  assert.equal(aggregate(['done2']), 'unread')
+  assert.equal(aggregate([]), 'idle')
   assert.equal(aggregate(['done1'], { sessions: [] }), 'idle')
+  assert.equal(aggregate([], { sid: 'new', liveRunning: true, liveState: 'waiting' }), 'idle')
+  assert.equal(aggregate([], { sid: 'new', liveRunning: true, liveState: 'running' }), 'idle')
+  assert.equal(aggregateChatTaskbarState({}), 'idle')
 })
 
-test('waiting navigation matches the badge, independent of unread and project filters', () => {
+test('waiting navigation stays independent of unread taskbar and project filters', () => {
   const sessions = [
     { id: 'archived', taskbar_state: 'waiting', project_mode: 'Folded project' },
     { id: 'live', taskbar_state: 'waiting' },
@@ -31,7 +32,7 @@ test('waiting navigation matches the badge, independent of unread and project fi
   ]
   const options = { sessions, sid: 'live', liveRunning: true, liveState: 'running' }
   assert.deepEqual(waitingChatSessions(options).map(session => session.id), ['archived'])
-  assert.equal(aggregateChatTaskbarState(options), 'waiting')
+  assert.equal(aggregateChatTaskbarState(options), 'idle')
   assert.deepEqual(waitingChatSessions({ sessions, sid: 'archived' }).map(session => session.id), ['archived', 'live'])
   assert.deepEqual(waitingChatSessions({ sessions: [], sid: 'new', liveRunning: true, liveState: 'waiting' }), [{ id: 'new' }])
   assert.deepEqual(waitingChatSessions({ sessions: [sessions[2]] }), [])

@@ -151,19 +151,12 @@ func (w *hostWindow) bindTaskbar() error {
 	})
 }
 
-// Rasterize at 4x coverage so the small overlay has crisp, distinct symbols
-// in addition to color. This does not replace the application's main icon.
+// Rasterize the unread dot at 4x coverage. This does not replace the app icon.
 func taskbarIconPNG(state taskbarState) ([]byte, error) {
-	palette := map[taskbarState]color.NRGBA{
-		taskbarRunning:   {R: 37, G: 99, B: 235, A: 255},
-		taskbarWaiting:   {R: 234, G: 179, B: 8, A: 255},
-		taskbarCompleted: {R: 22, G: 163, B: 74, A: 255},
-		taskbarFailed:    {R: 220, G: 38, B: 38, A: 255},
-	}
-	fill, ok := palette[state]
-	if !ok {
+	if state != taskbarUnread {
 		return nil, fmt.Errorf("no icon for %q", state)
 	}
+	fill := color.NRGBA{R: 220, G: 38, B: 38, A: 255}
 	// Keep the overlay canvas fixed; shrink the artwork to a 20px circle
 	// anchored one pixel from the bottom-right so it covers less of the app icon.
 	const artworkScale = 2.0 / 3.0
@@ -181,7 +174,7 @@ func taskbarIconPNG(state taskbarState) ([]byte, error) {
 						continue
 					}
 					c := fill
-					if math.Hypot(px-16, py-16) > 13.5 || taskbarSymbol(state, px, py) {
+					if math.Hypot(px-16, py-16) > 13.5 {
 						c = color.NRGBA{255, 255, 255, 255}
 					}
 					r += int(c.R)
@@ -198,23 +191,4 @@ func taskbarIconPNG(state taskbarState) ([]byte, error) {
 	var out bytes.Buffer
 	err := png.Encode(&out, img)
 	return out.Bytes(), err
-}
-
-func taskbarSymbol(state taskbarState, x, y float64) bool {
-	line := func(x1, y1, x2, y2 float64) bool {
-		dx, dy := x2-x1, y2-y1
-		t := math.Max(0, math.Min(1, ((x-x1)*dx+(y-y1)*dy)/(dx*dx+dy*dy)))
-		return math.Hypot(x-x1-t*dx, y-y1-t*dy) <= 1.6
-	}
-	switch state {
-	case taskbarRunning:
-		return x >= 12 && x <= 23 && math.Abs(y-16) <= (23-x)*0.7
-	case taskbarWaiting:
-		return line(16, 8, 16, 17) || math.Hypot(x-16, y-23) <= 1.8
-	case taskbarCompleted:
-		return line(8, 16, 13, 21) || line(13, 21, 24, 10)
-	case taskbarFailed:
-		return line(10, 10, 22, 22) || line(22, 10, 10, 22)
-	}
-	return false
 }

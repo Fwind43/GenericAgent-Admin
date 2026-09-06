@@ -22,24 +22,18 @@ func TestTaskbarRegistryAggregatesAndRemovesWindows(t *testing.T) {
 		}
 	}
 	check(taskbarIdle)
-	states := []taskbarState{taskbarIdle, taskbarCompleted, taskbarRunning, taskbarFailed, taskbarWaiting}
+	states := []taskbarState{taskbarIdle, taskbarUnread, taskbarUnread, taskbarIdle}
 	for i, state := range states {
 		if !registry.set(uintptr(i+1), state) {
 			t.Fatalf("first set %q did not change registry", state)
 		}
-		got, _ := registry.snapshot()
-		if got != state {
-			t.Fatalf("aggregate = %q, want %q", got, state)
-		}
 	}
-	check(taskbarWaiting, 1, 2, 3, 4, 5)
-	registry.remove(5)
-	check(taskbarFailed, 1, 2, 3, 4)
+	check(taskbarUnread, 1, 2, 3, 4)
 	registry.remove(4)
-	check(taskbarRunning, 1, 2, 3)
-	registry.remove(3)
-	check(taskbarCompleted, 1, 2)
+	check(taskbarUnread, 1, 2, 3)
 	registry.set(2, taskbarIdle)
+	check(taskbarUnread, 1, 2, 3)
+	registry.remove(3)
 	check(taskbarIdle, 1, 2)
 	registry.remove(1)
 	registry.remove(2)
@@ -49,13 +43,15 @@ func TestTaskbarRegistryAggregatesAndRemovesWindows(t *testing.T) {
 
 func TestTaskbarRegistryRejectsInvalidAndDeduplicates(t *testing.T) {
 	var registry taskbarRegistry
-	registry.set(1, taskbarRunning)
+	registry.set(1, taskbarUnread)
 	beforeState, beforeHandles := registry.snapshot()
-	if registry.set(1, taskbarRunning) {
+	if registry.set(1, taskbarUnread) {
 		t.Fatal("duplicate set must not request redraw")
 	}
-	if registry.set(2, taskbarState("unknown")) {
-		t.Fatal("invalid state accepted")
+	for _, state := range []taskbarState{"unknown", "waiting", "running", "completed", "failed"} {
+		if registry.set(2, state) {
+			t.Fatalf("invalid state %q accepted", state)
+		}
 	}
 	afterState, afterHandles := registry.snapshot()
 	if beforeState != afterState || !reflect.DeepEqual(beforeHandles, afterHandles) {

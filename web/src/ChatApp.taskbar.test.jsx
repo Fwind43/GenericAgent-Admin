@@ -65,10 +65,11 @@ test('real ChatApp keeps background attention across selection and clears only t
   }))
 
   render(<ChatApp />)
-  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('waiting'))
+  expect(await screen.findByRole('button', { name: 'Waiting for reply (1)' })).toBeTruthy()
+  expect(bridge).toHaveBeenLastCalledWith('idle')
   fireEvent.click(await screen.findByText('Taskbar Beta'))
   await waitFor(() => expect(paths).toContain('/api/chat/session/beta'))
-  expect(bridge).toHaveBeenLastCalledWith('waiting')
+  expect(bridge).toHaveBeenLastCalledWith('idle')
   expect(paths).not.toContain('/api/chat/session/background')
 
   const result = { id: 'background-answer', revision: 'revision-2' }
@@ -76,10 +77,10 @@ test('real ChatApp keeps background attention across selection and clears only t
     ? { ...item, taskbar_state: 'completed', result }
     : item)
   act(() => { window.dispatchEvent(new Event('online')) })
-  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('completed'))
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('unread'))
   fireEvent.click(screen.getByText('Taskbar Alpha'))
   await waitFor(() => expect(paths).toContain('/api/chat/session/alpha'))
-  expect(bridge).toHaveBeenLastCalledWith('completed')
+  expect(bridge).toHaveBeenLastCalledWith('unread')
 
   const baselineKey = Object.keys(localStorage).find(key => key.startsWith('ga.chat.read.baseline.v1:'))
   expect(baselineKey).toBeTruthy()
@@ -105,8 +106,8 @@ test('real ChatApp keeps background attention across selection and clears only t
     ? { ...item, taskbar_state: 'waiting', running: false }
     : item)
   act(() => { window.dispatchEvent(new Event('online')) })
-  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('waiting'))
-  expect(backgroundButton.querySelector('.oa-session-waiting-label')?.textContent).toBe('Waiting')
+  await waitFor(() => expect(backgroundButton.querySelector('.oa-session-waiting-label')?.textContent).toBe('Waiting'))
+  expect(bridge).toHaveBeenLastCalledWith('idle')
   expect(backgroundButton.querySelector('.oa-session-running-label')).toBeNull()
   const alphaButton = screen.getByText('Taskbar Alpha').closest('.oa-session')
   fireEvent.click(alphaButton)
@@ -116,13 +117,13 @@ test('real ChatApp keeps background attention across selection and clears only t
   fireEvent.click(screen.getByRole('button', { name: 'Waiting for reply (1)' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Taskbar Background' }))
   await waitFor(() => expect(document.querySelector('.oa-title b')?.textContent).toBe('Taskbar Background'))
-  expect(bridge).toHaveBeenLastCalledWith('waiting')
+  expect(bridge).toHaveBeenLastCalledWith('idle')
   expect(screen.getByRole('button', { name: 'Waiting for reply (1)' })).toBeTruthy()
 
   sessions = sessions.map(item => item.id === 'background'
     ? { ...item, taskbar_state: 'running', running: true }
     : item)
   act(() => { window.dispatchEvent(new Event('online')) })
-  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('running'))
-  expect(screen.queryByRole('button', { name: 'Waiting for reply (1)' })).toBeNull()
+  await waitFor(() => expect(screen.queryByRole('button', { name: 'Waiting for reply (1)' })).toBeNull())
+  expect(bridge).toHaveBeenLastCalledWith('idle')
 }, 10000)

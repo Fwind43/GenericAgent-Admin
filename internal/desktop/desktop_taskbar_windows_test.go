@@ -11,18 +11,14 @@ import (
 	"unsafe"
 )
 
-func TestTaskbarIconsAreDistinctValidNativeResources(t *testing.T) {
-	seen := make(map[string]bool)
-	for _, state := range []taskbarState{taskbarRunning, taskbarWaiting, taskbarCompleted, taskbarFailed} {
+func TestTaskbarUnreadDotIsValidNativeResource(t *testing.T) {
+	for _, state := range []taskbarState{taskbarUnread} {
 		t.Run(string(state), func(t *testing.T) {
 			data, err := taskbarIconPNG(state)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if seen[string(data)] {
-				t.Fatal("states share the same icon")
-			}
-			seen[string(data)] = true
+
 			img, err := png.Decode(bytes.NewReader(data))
 			if err != nil {
 				t.Fatal(err)
@@ -34,6 +30,14 @@ func TestTaskbarIconsAreDistinctValidNativeResources(t *testing.T) {
 			_, _, _, center := img.At(21, 21).RGBA()
 			if corner != 0 || center != 65535 {
 				t.Fatal("invalid transparency")
+			}
+			for y := 17; y <= 24; y++ {
+				for x := 17; x <= 24; x++ {
+					r, g, b, a := img.At(x, y).RGBA()
+					if r != 220*257 || g != 38*257 || b != 38*257 || a != 65535 {
+						t.Fatalf("unread dot contains a symbol or incorrect fill at (%d, %d)", x, y)
+					}
+				}
 			}
 			var visible image.Rectangle
 			for y := 0; y < 32; y++ {
@@ -65,7 +69,7 @@ func TestTaskbarIconsAreDistinctValidNativeResources(t *testing.T) {
 
 func TestTaskbarOverlayWaitsForShellReadiness(t *testing.T) {
 	var overlay taskbarOverlay
-	if err := overlay.apply(0, taskbarRunning); err != nil {
+	if err := overlay.apply(0, taskbarUnread); err != nil {
 		t.Fatal(err)
 	}
 	if overlay.object != nil || overlay.applied != "" || len(overlay.icons) != 0 {

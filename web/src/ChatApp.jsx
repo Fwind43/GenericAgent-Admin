@@ -4593,7 +4593,6 @@ export default function ChatApp() {
   const waitingSessionIds = new Set(waitingSessions.map(session => session.id))
   const aggregateTaskbarState = aggregateChatTaskbarState({
     sessions, unread: new Set(sessions.filter(chatReadState.unread).map(session => session.id)),
-    sid, liveState: taskbarState, liveRunning: busy && streamingSid === sid,
   })
   useEffect(() => { publishTaskbarState(aggregateTaskbarState) }, [aggregateTaskbarState])
   const [contextLoading, setContextLoading] = useState(false)

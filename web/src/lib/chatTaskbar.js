@@ -51,21 +51,9 @@ export function waitingChatSessions({ sessions = [], sid = '', liveState = 'idle
   return waiting
 }
 
-// Summaries are scoped to the active instance. Viewing one session must never
-// clear another session's attention state.
-export function aggregateChatTaskbarState({ sessions = [], unread = new Set(), sid = '', liveState = 'idle', liveRunning = false }) {
-  if (waitingChatSessions({ sessions, sid, liveState, liveRunning }).length) return 'waiting'
-  const states = sessions.map(session => {
-    if (session.id === sid && liveRunning) return liveState
-    if (session.running) return 'running'
-    if (!unread.has(session.id)) return 'idle'
-    return session.taskbar_state === 'failed' ? 'failed' : 'completed'
-  })
-  if (liveRunning && !sessions.some(session => session.id === sid)) states.push(liveState)
-  for (const state of ['waiting', 'failed', 'completed', 'running']) {
-    if (states.includes(state)) return state
-  }
-  return 'idle'
+// Use the same unread set as the sidebar; workflow status stays inside the chat.
+export function aggregateChatTaskbarState({ sessions = [], unread = new Set() }) {
+  return sessions.some(session => unread.has(session.id)) ? 'unread' : 'idle'
 }
 
 export function shouldRefreshChatTaskbar(doc = globalThis.document, target = globalThis.window) {
