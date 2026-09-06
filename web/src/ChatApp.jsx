@@ -1468,9 +1468,12 @@ const hasUltraPlanDashboardState = (state) => !!(state && (
   || state.complete
 ))
 
+// Match whole strings, allowing a legacy path's trailing slash before a JSON delimiter.
 const preserveWindowsPathsInJson = value => value.replace(
-  /([A-Za-z]:)((?:\\+[^"\\]*)+)/g,
-  (_match, drive, tail) => drive + tail.replace(/\\+/g, run => (run.length % 2 ? `${run}\\` : run)),
+  /"((?:\\[\s\S]|[^"\\])*(?:\\)?)"(?=\s*(?:[:,}\]]|$))/g,
+  (token, content) => /^[A-Za-z]:(?:\\+[^"\\]*)+$/.test(content)
+    ? `"${content.replace(/\\+/g, run => (run.length % 2 ? `${run}\\` : run))}"`
+    : token,
 )
 
 const escapeJsonStringControlCharacters = value => {
