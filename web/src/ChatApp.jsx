@@ -3147,11 +3147,20 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
       : elapsedSeconds < 2
         ? ct('正在连接模型', 'Connecting to model')
         : ct('正在准备回复', 'Preparing response')
-    return <div className="oa-content oa-thinking" role="status" aria-label={waitingLabel}>
+    const waitingTime = elapsedSeconds >= 60
+      ? `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`
+      : `${elapsedSeconds}s`
+    const waitingStage = modelID ? 'generating' : elapsedSeconds < 2 ? 'connecting' : 'preparing'
+    return <div className="oa-content oa-thinking" data-stage={waitingStage} role="status" aria-label={waitingLabel}>
       <span className="oa-thinking-pulse" aria-hidden="true"><i/><i/><i/></span>
-      <span className="oa-thinking-label">{waitingLabel}</span>
-      {elapsedSeconds >= 3 && <span className="oa-thinking-time" aria-hidden="true">{elapsedSeconds}s</span>}
-      {modelID && <span className="oa-thinking-model" title={modelID}>{modelID}</span>}
+      <span className="oa-thinking-copy">
+        <span className="oa-thinking-label">{waitingLabel}</span>
+        {modelID && <span className="oa-thinking-model" title={modelID}>{modelID}</span>}
+      </span>
+      {elapsedSeconds >= 3 && <span className="oa-thinking-time" aria-hidden="true">
+        <Clock3 size={12}/>
+        <span>{waitingTime}</span>
+      </span>}
     </div>
   }
   if (content && stats.tooLarge && !hasTurnSplit) return <div className="oa-content"><LongTextPreview text={content} stats={stats} /></div>

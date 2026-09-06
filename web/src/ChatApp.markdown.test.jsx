@@ -339,6 +339,7 @@ describe('assistant pre-token feedback', () => {
 
     let indicator = view.container.querySelector('.oa-thinking')
     expect(indicator.getAttribute('role')).toBe('status')
+    expect(indicator.getAttribute('data-stage')).toBe('connecting')
     expect(indicator.textContent).toContain('\u6b63\u5728\u8fde\u63a5\u6a21\u578b')
     expect(indicator.querySelector('.oa-thinking-time')).toBeNull()
 
@@ -346,14 +347,22 @@ describe('assistant pre-token feedback', () => {
       <ChatMessage message={baseMessage} pending clockNow={startedAt + 4_000} onAskReply={vi.fn()} />,
     )
     indicator = view.container.querySelector('.oa-thinking')
+    expect(indicator.getAttribute('data-stage')).toBe('preparing')
     expect(indicator.textContent).toContain('\u6b63\u5728\u51c6\u5907\u56de\u590d')
     expect(indicator.querySelector('.oa-thinking-time').textContent).toBe('4s')
     expect(indicator.querySelector('.oa-thinking-model')).toBeNull()
 
     view.rerender(
+      <ChatMessage message={baseMessage} pending clockNow={startedAt + 61_000} onAskReply={vi.fn()} />,
+    )
+    indicator = view.container.querySelector('.oa-thinking')
+    expect(indicator.querySelector('.oa-thinking-time').textContent).toBe('1:01')
+
+    view.rerender(
       <ChatMessage message={{ ...baseMessage, model_id: 'gpt-5.6-sol' }} pending clockNow={startedAt + 8_000} onAskReply={vi.fn()} />,
     )
     indicator = view.container.querySelector('.oa-thinking')
+    expect(indicator.getAttribute('data-stage')).toBe('generating')
     expect(indicator.textContent).toContain('\u6a21\u578b\u5df2\u63a5\u5165\uff0c\u6b63\u5728\u751f\u6210')
     expect(indicator.querySelector('.oa-thinking-time').textContent).toBe('8s')
     expect(indicator.querySelector('.oa-thinking-model').textContent).toBe('gpt-5.6-sol')
