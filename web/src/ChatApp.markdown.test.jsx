@@ -16,6 +16,39 @@ const renderAssistant = (content, messagePatch = {}) => render(
 ).container
 
 describe('assistant markdown rendering', () => {
+  test('updates earlier references when a footnote definition arrives during streaming', () => {
+    const frame = content => <ChatMessage message={{ id: 'stream-footnote', role: 'assistant', content, files: [], created_at: 0 }} pending onAskReply={vi.fn()} />
+    const { container, rerender } = render(frame('Stable **paragraph**.\n\nReference[^late].'))
+    const stable = container.querySelector('.oa-md p')
+    expect(container.querySelector('.oa-footnote-ref')).toBeNull()
+
+    rerender(frame('Stable **paragraph**.\n\nReference[^late].\n\n[^late]: Final **definition**.'))
+    expect(container.querySelector('.oa-md p')).toBe(stable)
+    const ref = container.querySelector('.oa-footnote-ref a')
+    const item = container.querySelector('.oa-md-footnote-item')
+    expect(ref.getAttribute('href')).toBe(`#${item.id}`)
+    expect(item.querySelector('strong').textContent).toBe('definition')
+
+    rerender(frame('Stable **paragraph**.\n\nReference[^late].\n\n[^late]: Changed definition.'))
+    expect(container.querySelector('.oa-md-footnote-item').textContent).toContain('Changed definition.')
+  })
+
+  test('updates table rows and nested list structure while preserving completed blocks', () => {
+    const frame = content => <ChatMessage message={{ id: 'stream-structure', role: 'assistant', content, files: [], created_at: 0 }} pending onAskReply={vi.fn()} />
+    const prefix = 'Stable **paragraph**.\n\n| Name | Value |\n| --- | --- |\n| A | 1 |'
+    const { container, rerender } = render(frame(prefix))
+    const stable = container.querySelector('.oa-md p')
+    expect(container.querySelectorAll('.oa-md-table tbody tr')).toHaveLength(1)
+
+    rerender(frame(`${prefix}\n| B | 2 |\n\n- parent\n  - child`))
+    expect(container.querySelectorAll('.oa-md-table tbody tr')).toHaveLength(2)
+    expect(container.querySelector('.oa-list .oa-list').textContent).toContain('child')
+
+    rerender(frame(`${prefix}\n| B | 2 |\n\n- parent\n  - child\n  - next`))
+    expect(container.querySelector('.oa-md p')).toBe(stable)
+    expect(container.querySelectorAll('.oa-list .oa-list > li')).toHaveLength(2)
+  })
+
   test('renders nested emphasis, code spans and links as real elements', () => {
     const container = renderAssistant('A **bold `snippet` and [link](https://a.test)** tail.')
     const strong = container.querySelector('.oa-md strong')

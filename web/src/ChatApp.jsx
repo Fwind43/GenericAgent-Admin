@@ -2662,27 +2662,26 @@ function MarkdownList({ list }) {
   </Tag>
 }
 
+const MarkdownNode = memo(function MarkdownNode({ block }) {
+  if (block.type === 'paragraph') return <p><InlineRichText text={block.text} runs={block.runs} /></p>
+  if (block.type === 'heading') {
+    const Tag = `h${block.depth}`
+    return <Tag><InlineRichText text={block.text} runs={block.runs} /></Tag>
+  }
+  if (block.type === 'hr') return <hr />
+  if (block.type === 'math') return <MathFormula value={block.value} display block />
+  if (block.type === 'table') return <MarkdownTable table={block} />
+  if (block.type === 'list') return <MarkdownList list={block} />
+  if (block.type === 'blockquote') return <blockquote className="oa-md-quote"><MarkdownNodes blocks={block.blocks} /></blockquote>
+  if (block.type === 'footnotes') return <FootnotesSection items={block.items} />
+  return null
+}, (prev, next) => prev.language === next.language && prev.signature === next.signature)
+
 function MarkdownNodes({ blocks = [] }) {
-  return <>
-    {blocks.map((block, i) => {
-      if (block.type === 'paragraph') return <p key={i}><InlineRichText text={block.text} runs={block.runs} /></p>
-      if (block.type === 'heading') {
-        const Tag = `h${block.depth}`
-        return <Tag key={i}><InlineRichText text={block.text} runs={block.runs} /></Tag>
-      }
-      if (block.type === 'hr') return <hr key={i} />
-      if (block.type === 'math') return <MathFormula key={i} value={block.value} display block />
-      if (block.type === 'table') return <MarkdownTable key={i} table={block} />
-      if (block.type === 'list') return <MarkdownList key={i} list={block} />
-      if (block.type === 'blockquote') {
-        return <blockquote key={i} className="oa-md-quote"><MarkdownNodes blocks={block.blocks} /></blockquote>
-      }
-      if (block.type === 'footnotes') {
-        return <FootnotesSection key={i} items={block.items} />
-      }
-      return null
-    })}
-  </>
+  const language = chatLanguage()
+  // Parsing still sees the whole document: late footnotes can change earlier runs.
+  // Compare the complete plain AST, not just source text, to reuse stable blocks.
+  return <>{blocks.map((block, i) => <MarkdownNode key={i} block={block} language={language} signature={JSON.stringify(block)} />)}</>
 }
 
 function FootnotesSection({ items = [] }) {
@@ -4962,6 +4961,7 @@ export default function ChatApp() {
     )) : xs),
     schedule: callback => window.requestAnimationFrame ? window.requestAnimationFrame(callback) : window.setTimeout(callback, 16),
     cancel: handle => window.cancelAnimationFrame ? window.cancelAnimationFrame(handle) : window.clearTimeout(handle),
+    shouldAnimate: () => !document.hidden && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
     // Start in replay mode: backend emits {"type":"sync"} after the backlog,
     // so reattach-after-refresh renders prior output instantly, then animates.
     live: false,
@@ -4970,6 +4970,9 @@ export default function ChatApp() {
   const readStream = async (res, pendingId, clientUserID = '', sessionId = '') => {
     const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = ''
     const batcher = createStreamBatcher(pendingId, sessionId)
+    // A queued rAF can stop firing when the tab is hidden, including after EOF.
+    const onVisibilityChange = () => { if (document.hidden) batcher.flushNow() }
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibilityChange)
     let commandPatch = null
     let eventCount = 0
     let terminal = false
@@ -5006,14 +5009,6 @@ export default function ChatApp() {
           if (!line.trim()) continue
           if (!isActiveSession(sessionId)) return { commandPatch, eventCount, terminal }
           const ev = JSON.parse(line)
-          // Log delta events with full content
-          if (ev.type === 'delta') {
-            console.log('[SSE] delta:', JSON.parse(JSON.stringify(ev)))
-          }
-          // Log any event containing structured_content
-          if ('structured_content' in ev) {
-            console.log('[SSE] *** FOUND structured_content ***:', ev.structured_content)
-          }
           consumeEvent(ev)
         }
       }
@@ -5025,6 +5020,10 @@ export default function ChatApp() {
       batcher.flushNow()
       error.chatStreamOutcome = { commandPatch, eventCount, terminal }
       throw error
+    } finally {
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibilityChange)
+      batcher.flushNow()
+      reader.releaseLock?.()
     }
     return { commandPatch, eventCount, terminal }
   }

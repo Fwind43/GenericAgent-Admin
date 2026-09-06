@@ -187,26 +187,32 @@ test('stream delta batcher flushes pending text before terminal events', () => {
 test('stream delta batcher paces a network burst across animation frames', () => {
   const callbacks = []
   const flushed = []
+  let time = 0
   const batcher = createStreamDeltaBatcher({
     onFlush: chunk => flushed.push(chunk),
+    now: () => time,
     schedule: callback => { callbacks.push(callback); return callbacks.length },
     cancel: () => {},
   })
   const burst = 'x'.repeat(160)
   batcher.push(burst)
+  time = 16
   callbacks.shift()()
-  assert.equal(flushed[0].length, 20)
+  assert.equal(flushed[0].length, 16)
   assert.equal(callbacks.length, 1)
+  time = 32
   callbacks.shift()()
-  assert.equal(flushed.join('').length, 38)
+  assert.equal(flushed.join('').length, 32)
   assert.equal(callbacks.length, 1)
 })
 
 test('stream delta batcher resolves drain only after all paced frames render', async () => {
   const callbacks = []
   const flushed = []
+  let time = 0
   const batcher = createStreamDeltaBatcher({
     onFlush: chunk => flushed.push(chunk),
+    now: () => time,
     schedule: callback => { callbacks.push(callback); return callbacks.length },
     cancel: () => {},
   })
@@ -216,6 +222,7 @@ test('stream delta batcher resolves drain only after all paced frames render', a
   await Promise.resolve()
   assert.equal(drained, false)
   while (callbacks.length) {
+    time += 16
     callbacks.shift()()
     await Promise.resolve()
   }
