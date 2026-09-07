@@ -5295,12 +5295,14 @@ export default function ChatApp() {
     void attachRunningStream(sid, { waitForRun:true })
   }, [sid, streamingSid, loopState?.enabled, loopState?.status])
 
-  const loadChatState = async (id = '', openToken = openSeqRef.current, prefetchedState = null) => {
+  const loadChatState = async (id = '', openToken = openSeqRef.current, prefetchedState = null, isCurrent = () => true) => {
     const result = prefetchedState ? await prefetchedState : null
     if (openToken !== openSeqRef.current || !isActiveSession(id)) return null
+    if (!isCurrent()) return null
     if (result?.error) throw result.error
     const st = result ? result.state : await chatApi(id ? `/api/chat/state/${id}` : '/api/chat/state')
     if (openToken !== openSeqRef.current || !isActiveSession(id)) return null
+    if (!isCurrent()) return null
     const nextLlms = st.llms || []
     const nextNo = st.settings?.llm_no ?? st.llm_no ?? nextLlms[0]?.index ?? 0
     const nextReasoningEffort = normalizeReasoningEffort(st.settings?.reasoning_effort)
@@ -5412,6 +5414,24 @@ export default function ChatApp() {
         setSessionLoading(false)
       }
     }
+  }
+
+  const refreshCompletedRun = async (id, openToken, isCurrent) => {
+    if (!isCurrent()) return
+    const [d, state] = await Promise.all([
+      chatApi(`/api/chat/session/${id}?view=page`),
+      chatApi(`/api/chat/state/${id}`),
+    ])
+    if (!isCurrent()) return
+    // Reconcile in place: reopening clears the thread and clamps its scrollTop.
+    historyPages.apply(d, addChatInstanceToURL(`/api/chat/session/${d.id}?view=page`, chatInstanceRef.current))
+    applyQueueSnapshot(d.queued_messages, d.id)
+    setRawHistory(Array.isArray(d.raw_history) ? d.raw_history : [])
+    setHistoryInfo(Array.isArray(d.history_info) ? d.history_info : [])
+    setWorkingState(d.working || null)
+    setPlanState(d.plan || null)
+    if (contextOpen) setContextRefresh(value => value + 1)
+    await loadChatState(d.id, openToken, { state }, isCurrent)
   }
 
   const refreshActiveSessionSnapshot = async (id) => {
@@ -6144,7 +6164,7 @@ export default function ChatApp() {
     const files = (item.files || []).map(({ name, type, dataURL }) => ({ name, type, dataURL }))
     if (!text && !files.length) return
     const runToken = ++runSeqRef.current
-    ++streamActivitySeqRef.current
+    const streamToken = ++streamActivitySeqRef.current
     const openToken = openSeqRef.current
     const ctrl = new AbortController()
     activeRunRef.current = true
@@ -6220,9 +6240,15 @@ export default function ChatApp() {
       activeRunRef.current = false
       setBusy(false)
       setStreamingSid('')
+      if (streamAbortRef.current === ctrl) streamAbortRef.current = null
+      const isCurrentRun = () => runToken === runSeqRef.current
+        && openToken === openSeqRef.current && streamToken === streamActivitySeqRef.current
+        && isActiveSession(id)
       if (id) {
         const refreshedSessions = await loadSessions(id).catch(()=>[])
-        await openSession(id, false).catch(()=>{})
+        if (!isCurrentRun()) return
+        await refreshCompletedRun(id, openToken, isCurrentRun).catch(()=>{})
+        if (!isCurrentRun()) return
         const refreshedSession = refreshedSessions.find(session => session.id === id)
         if (shouldPollGeneratedTitle(refreshedSession)) {
           void pollGeneratedChatTitle({ sessionId:id, loadSessions, isActive:isActiveSession }).catch(()=>{})

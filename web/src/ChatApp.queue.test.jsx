@@ -127,7 +127,7 @@ describe('session-scoped guided-message queue wiring', () => {
     const releaseBusy = source.indexOf('setBusy(false)', releaseRun)
     const releaseStreaming = source.indexOf("setStreamingSid('')", releaseBusy)
     const reloadSessions = source.indexOf('const refreshedSessions = await loadSessions(id)', terminalFinally)
-    const reloadSession = source.indexOf('await openSession(id, false)', reloadSessions)
+    const reloadSession = source.indexOf('await refreshCompletedRun(id, openToken, isCurrentRun)', reloadSessions)
     expect(terminalFinally).toBeGreaterThan(runStart)
     expect(releaseRun).toBeGreaterThan(terminalFinally)
     expect(releaseBusy).toBeGreaterThan(releaseRun)
