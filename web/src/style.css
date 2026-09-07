@@ -17178,21 +17178,23 @@ html[data-color-scheme="dark"] .logs-page {
   .oa-composer textarea,
   .oa-composer textarea:not(.file-editor) { font-size: 14px !important; }
 
-  .oa-turn-stack { padding-left: 0; }
-  .oa-turn-stack::before,
-  .oa-turn-node::before { display: none; }
-  .oa-turn-stack-head { margin-left: 0; width: 100%; }
-
-  .oa-turn-card {
-    border: 0;
-    border-bottom: 1px solid var(--oa-line, var(--border));
-    border-radius: 0;
-    box-shadow: none;
-  }
-  .oa-turn-card > .oa-turn-toggle { padding-block: 6px; }
-  .oa-turn-card > .oa-turn-toggle,
-  .oa-turn-card > .oa-turn-body { border-radius: 0; }
 }
+
+/* Shared step presentation across phone, tablet and desktop. */
+.oa-turn-stack { padding-left: 0; }
+.oa-turn-stack::before,
+.oa-turn-node::before { display: none; }
+.oa-turn-stack-head { margin-left: 0; width: 100%; }
+
+.oa-turn-card {
+  border: 0;
+  border-bottom: 1px solid var(--oa-line, var(--border));
+  border-radius: 0;
+  box-shadow: none;
+}
+.oa-turn-card > .oa-turn-toggle { padding-block: 6px; }
+.oa-turn-card > .oa-turn-toggle,
+.oa-turn-card > .oa-turn-body { border-radius: 0; }
 
 /* Conversation observability summary below the composer. */
 .oa-chat-stats {

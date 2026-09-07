@@ -16,12 +16,15 @@ const ruleBodies = (selector) => {
   return matches.map(match => match[1])
 }
 
-test('mobile chat uses compact input and bottom-only step borders', () => {
+test('chat shares minimal step styling across all screen sizes', () => {
   const start = css.indexOf('@media (max-width: 920px) {\n  .oa-content');
   const end = css.indexOf('/* Conversation observability', start);
   assert.ok(start >= 0 && end > start);
-  const mobile = css.slice(start, end);
-  assert.match(mobile, /font-size: 14px !important/);
+  const sharedStart = css.indexOf('/* Shared step presentation', start);
+  assert.ok(sharedStart > start && sharedStart < end);
+  assert.match(css.slice(start, sharedStart), /font-size: 14px !important/);
+  const mobile = css.slice(sharedStart, end);
+  assert.doesNotMatch(mobile, /@media/);
   assert.match(mobile, /\.oa-turn-stack \{ padding-left: 0; \}/);
   assert.match(mobile, /\.oa-turn-stack::before,\s*\.oa-turn-node::before \{ display: none; \}/);
   assert.match(mobile, /\.oa-turn-stack-head \{ margin-left: 0; width: 100%; \}/);
