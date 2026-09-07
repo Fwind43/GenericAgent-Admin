@@ -17213,18 +17213,6 @@ html[data-color-scheme="dark"] .logs-page {
   overflow: visible;
 }
 
-.ga-execution-log .ga-fold + .ga-fold::after {
-  content: '';
-  position: absolute;
-  z-index: 0;
-  top: -10px;
-  left: 24px;
-  width: 1px;
-  height: 20px;
-  background: color-mix(in srgb, var(--oa-border, var(--border)) 72%, transparent);
-  pointer-events: none;
-}
-
 .ga-execution-log .ga-fold > summary,
 .oa-tool-receipt > summary,
 .oa-tool-ask-user .oa-tool-head {
@@ -17801,10 +17789,6 @@ html[data-color-scheme="dark"] .logs-page {
   .oa-tool-receipt > summary::before,
   .oa-tool-disclosure {
     grid-row: 1 / 3;
-  }
-
-  .ga-execution-log .ga-fold + .ga-fold::after {
-    left: 19px;
   }
 
   .ga-tool-pair {
