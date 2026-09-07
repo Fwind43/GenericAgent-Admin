@@ -16,6 +16,21 @@ const ruleBodies = (selector) => {
   return matches.map(match => match[1])
 }
 
+test('mobile chat uses compact input and bottom-only step borders', () => {
+  const start = css.indexOf('@media (max-width: 920px) {\n  .oa-content');
+  const end = css.indexOf('/* Conversation observability', start);
+  assert.ok(start >= 0 && end > start);
+  const mobile = css.slice(start, end);
+  assert.match(mobile, /font-size: 14px !important/);
+  const card = mobile.match(/\.oa-turn-card \{([^}]+)\}/)?.[1];
+  assert.ok(card);
+  assert.match(card, /border: 0;/);
+  assert.match(card, /border-bottom: 1px solid var\(--oa-line, var\(--border\)\)/);
+  assert.match(card, /border-radius: 0;/);
+  assert.match(card, /box-shadow: none;/);
+  assert.match(mobile, /\.oa-turn-body \{ border-radius: 0; \}/);
+})
+
 test('chat topbar has no waiting-reply navigation or reserved layout', () => {
   const header = chatSource.match(/<header className="oa-topbar">([\s\S]*?)<\/header>/)?.[1]
   assert.ok(header, 'the topbar layout must not depend on waiting sessions')
