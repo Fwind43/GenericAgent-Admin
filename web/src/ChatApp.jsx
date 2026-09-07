@@ -7079,14 +7079,6 @@ export default function ChatApp() {
           title={ct('新对话', 'New chat')}
           aria-label={ct('新对话', 'New chat')}
         ><MessageSquarePlus size={16}/></button>
-        <button
-          type="button"
-          className="oa-icon-btn"
-          onClick={chatReadState.markAllRead}
-          disabled={!chatReadState.hasUnread}
-          title={ct('一键已读', 'Mark all as read')}
-          aria-label={ct('一键已读', 'Mark all as read')}
-        ><CheckCheck size={16}/></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('折叠', 'Collapse')}><Menu size={16}/></button>
       </div>
       <div className="oa-sidebar-tabs" role="tablist" aria-label={ct('会话视图', 'Session views')}>
@@ -7100,7 +7092,17 @@ export default function ChatApp() {
       {sidebarTab === 'history' ? <>
         <div className="oa-session-manager-head">
           <span className="oa-session-manager-title">{ct('最近对话', 'Recent chats')}</span>
-          <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理', 'Manage')}</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              type="button"
+              className="oa-session-manage-open"
+              onClick={chatReadState.markAllRead}
+              disabled={!chatReadState.hasUnread}
+              title={ct('一键已读', 'Mark all as read')}
+              aria-label={ct('一键已读', 'Mark all as read')}
+            ><CheckCheck size={16}/></button>
+            <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理', 'Manage')}</button>
+          </div>
         </div>
         <div className="oa-session-list">
           {recentSessionGroups.map(group => <section className={`oa-recent-group oa-recent-group-${group.key}`} key={group.key}>
