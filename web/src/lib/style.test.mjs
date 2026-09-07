@@ -29,6 +29,7 @@ test('mobile chat uses compact input and bottom-only step borders', () => {
   assert.match(card, /border-radius: 0;/);
   assert.match(card, /box-shadow: none;/);
   assert.match(mobile, /\.oa-turn-body \{ border-radius: 0; \}/);
+  assert.match(mobile, /\.oa-turn-card > \.oa-turn-toggle \{ padding-block: 6px; \}/);
 })
 
 test('chat topbar has no waiting-reply navigation or reserved layout', () => {

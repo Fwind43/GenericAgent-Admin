@@ -17184,6 +17184,7 @@ html[data-color-scheme="dark"] .logs-page {
     border-radius: 0;
     box-shadow: none;
   }
+  .oa-turn-card > .oa-turn-toggle { padding-block: 6px; }
   .oa-turn-card > .oa-turn-toggle,
   .oa-turn-card > .oa-turn-body { border-radius: 0; }
 }
