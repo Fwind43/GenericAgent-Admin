@@ -121,8 +121,8 @@
   .oa-message-nav-toggle {
     position: fixed;
     right: 0;
-    top: 50%;
-    transform: translateY(-50%);
+    top: calc(50% - 28px);
+    transform: none;
     display: grid;
     justify-items: end;
     align-items: center;
@@ -153,6 +153,7 @@
     background: var(--surface-strong);
     box-shadow: 0 1px 4px rgb(0 0 0 / .05);
   }
+  .oa-message-nav .oa-message-nav-toggle:is(:hover, :active, :focus) { transform: none; }
   .oa-message-nav-toggle > span > svg { width: 10px; height: 16px; }
   .oa-message-nav-toggle:hover,
   .oa-message-nav-toggle[aria-expanded="true"] { color: var(--accent); }
