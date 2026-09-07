@@ -41,6 +41,14 @@ test('chat shares minimal step styling across all screen sizes', () => {
   assert.match(mobile, /\.oa-turn-toggle > \.oa-turn-chevron \{ margin-left: auto; \}/);
 })
 
+test('expanded project headers stick within the sidebar scroll group', () => {
+  const body = ruleBodies('.oa-sidebar .oa-project-group.is-expanded > .oa-project-head').join('');
+  assert.match(body, /position:\s*sticky/);
+  assert.match(body, /top:\s*0/);
+  assert.match(body, /z-index:\s*2/);
+  assert.match(body, /background:\s*var\(--oa-sidebar\)/);
+})
+
 test('execution header keeps quiet status and accessible controls', () => {
   assert.match(chatSource, /data-running=\{pending \? 'true' : 'false'\}/);
   assert.match(chatSource, /className="oa-run-status"/);

@@ -18301,6 +18301,14 @@ html .oa-sidebar .oa-project-group.is-pinned {
   box-shadow:none;
 }
 .oa-sidebar .oa-project-head { padding:2px 0; }
+/* Keep the expanded project identity visible within its own scrolling group. */
+.oa-sidebar .oa-project-group.is-expanded > .oa-project-head {
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:var(--oa-sidebar);
+  box-shadow:0 1px 0 var(--oa-side-line);
+}
 .oa-sidebar .oa-project-toggle { border-radius:0; }
 .oa-sidebar .oa-project-body {
   margin-top:0;
