@@ -18325,3 +18325,9 @@ html .oa-sidebar .oa-project-group.is-pinned {
   }
   .oa-keychain-dialog .keychain-form { padding-top: 18px; }
 }
+
+/* Keep the running halo inside the clip without moving the dot or title. */
+.oa-sidebar .oa-session-title:has(> .oa-session-running-dot) {
+  margin-inline-start: -4px;
+  padding-inline-start: 4px;
+}
