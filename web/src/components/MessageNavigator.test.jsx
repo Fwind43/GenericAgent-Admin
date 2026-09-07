@@ -51,6 +51,15 @@ describe('message nodes', () => {
     expect(track).toMatch(/overflow-y:\s*auto/)
     expect(track).toMatch(/overscroll-behavior:\s*contain/)
   })
+  test('shows a themed scrollbar in the expanded directory', () => {
+    const expanded = navigatorCSS.match(/\.oa-message-nav\[data-expanded="true"\] \.oa-message-nav-track\s*\{([^}]+)\}/)[1]
+    expect(expanded).toMatch(/scrollbar-width:\s*thin/)
+    expect(expanded).toMatch(/scrollbar-color:\s*var\(--muted\) var\(--surface-strong\)/)
+    expect(expanded).toMatch(/scrollbar-gutter:\s*stable/)
+    const webkit = navigatorCSS.match(/\.oa-message-nav\[data-expanded="true"\] \.oa-message-nav-track::-webkit-scrollbar\s*\{([^}]+)\}/)[1]
+    expect(webkit).toMatch(/display:\s*block/)
+    expect(webkit).toMatch(/width:\s*8px/)
+  })
   test('indexes only main user messages, handles attachments and caps long previews', () => {
     const result = messageNavigationNodes([...messages,
       { id: 'file', role: 'user', files: [{ name: 'report.pdf' }] },

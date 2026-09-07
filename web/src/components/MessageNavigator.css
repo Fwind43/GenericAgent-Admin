@@ -33,9 +33,21 @@
 .oa-message-nav-track::-webkit-scrollbar { display: none; }
 .oa-message-nav[data-expanded="true"] .oa-message-nav-track {
   width: min(260px, calc(100vw - 64px));
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) var(--surface-strong);
+  scrollbar-gutter: stable;
   border-color: var(--border);
   background: var(--surface-strong);
   box-shadow: 0 5px 20px rgb(0 0 0 / .10);
+}
+.oa-message-nav[data-expanded="true"] .oa-message-nav-track::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+}
+.oa-message-nav-track::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border: 2px solid var(--surface-strong);
+  border-radius: 8px;
 }
 .oa-message-nav-track > li { margin: 0; padding: 0; list-style: none; }
 .oa-message-nav-node,
