@@ -4109,12 +4109,16 @@ export function ProviderModelCascade({
                 <button type="button" className="oa-cascade-provider-toggle"
                   aria-label={group.label} aria-expanded={expanded} aria-controls={modelsId}
                   disabled={Boolean(normalizedQuery)}
-                  onClick={() => setCollapsedProviders(previous => {
-                    const next = new Set(previous)
-                    if (next.has(group.value)) next.delete(group.value)
-                    else next.add(group.value)
-                    return next
-                  })}>
+                  onClick={event => {
+                    // A multi-click gesture should not immediately undo its first toggle.
+                    if (event.detail > 1) return
+                    setCollapsedProviders(previous => {
+                      const next = new Set(previous)
+                      if (next.has(group.value)) next.delete(group.value)
+                      else next.add(group.value)
+                      return next
+                    })
+                  }}>
                   <ChevronDown size={13} aria-hidden="true" />
                   <span>{group.label}</span>
                   <span>{group.models.length}</span>

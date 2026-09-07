@@ -1422,6 +1422,41 @@ describe('chat model cascade', () => {
     expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
   })
 
+  test('toggles a provider once per multi-click gesture and preserves keyboard toggles', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<React.StrictMode><ProviderModelCascade groups={groups} selectedProvider="alpha" value="a-1" onChange={onChange} /></React.StrictMode>)
+    await user.click(screen.getByRole('button', { expanded: false }))
+    const beta = screen.getByRole('button', { name: 'Beta', exact: true })
+
+    await user.dblClick(beta)
+    expect(beta.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Beta One' })).toBeTruthy()
+    await user.click(beta)
+    expect(beta.getAttribute('aria-expanded')).toBe('false')
+    await user.tripleClick(beta)
+    expect(beta.getAttribute('aria-expanded')).toBe('true')
+    await user.keyboard('{Enter}')
+    expect(beta.getAttribute('aria-expanded')).toBe('false')
+    await user.keyboard(' ')
+    expect(beta.getAttribute('aria-expanded')).toBe('true')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  test('preserves expanded providers when parent model data is refreshed', () => {
+    const onChange = vi.fn()
+    const picker = data => <React.StrictMode><ProviderModelCascade groups={data} selectedProvider="alpha" value="a-1" onChange={onChange} /></React.StrictMode>
+    const { rerender } = render(picker(groups))
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+    const beta = screen.getByRole('button', { name: 'Beta', exact: true })
+    fireEvent.click(beta)
+    rerender(picker(groups.map(group => ({ ...group, models: group.models.map(model => ({ ...model })) }))))
+    expect(screen.getByRole('button', { name: 'Beta', exact: true })).toBe(beta)
+    expect(beta.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Beta One' })).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   test('opens only the selected provider, resets on reopen, and reveals search matches', () => {
     const onChange = vi.fn()
     render(<ProviderModelCascade groups={groups} selectedProvider="alpha" value="a-1" onChange={onChange} />)
