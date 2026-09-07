@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import ThemePicker from './ThemePicker'
+import ThinkingBlock from './ThinkingBlock'
 import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamTerminalMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldRefreshChatSnapshot } from './lib/chatStream.js'
 import { cacheHitPercent, cacheReadTokens, measuredOutputRate } from './lib/chatUsage.js'
 import { autorunInitialReplyAt, isAutorunTargetRunning, shouldTriggerAutorun } from './lib/chatAutorun.js'
@@ -1738,6 +1739,11 @@ const renderAssistantBody = (text = '', onAskReply, ultraplan_state, openAskUser
   if (segments.length === 0) return null
 
   const renderFold = (fold, key) => {
+    if (fold.type === 'thinking') {
+      return <ThinkingBlock key={key} body={fold.body} live={fold.live} label={ct('思考过程', 'Thought process')}>
+        <MarkdownBlock text={fold.body} onAskReply={onAskReply} />
+      </ThinkingBlock>
+    }
     const hasResult = Object.prototype.hasOwnProperty.call(fold, 'result')
     const receipt = toolReceiptSummary(fold)
     const isFileMutation = receipt.tool === 'file_patch' || receipt.tool === 'file_write'

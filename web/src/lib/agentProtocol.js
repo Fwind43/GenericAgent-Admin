@@ -168,12 +168,74 @@ function parseInFlightToolResult(lines, i) {
   }
 }
 
-/**
- * Fold agent protocol blocks (tool calls, tool results, thinking, function_calls/results)
- * Returns array of folds: {type, label, body, open, cls}
- * @param {string} text
- * @returns {Array<{type: string, label: string, body: string, open: boolean, cls: string}>}
- */
+function markdownFenceEnd(lines, start, insideThinking = false) {
+  const fence = /^ {0,3}(`{3,}|~{3,})/.exec(lines[start])
+  if (!fence) return null
+  // Bare five-backtick fences belong to the tool-result protocol, even live.
+  if (!insideThinking && /^`{5,}\s*$/.test(lines[start])) return null
+  const close = new RegExp('^ {0,3}' + fence[1][0] + '{' + fence[1].length + ',}\\s*$')
+  for (let end = start + 1; end < lines.length; end++) {
+    if (close.test(lines[end])) return end + 1
+  }
+  return lines.length
+}
+
+function thinkingTagIndex(line, closing = false) {
+  const tokens = /\\.|`+|<\/?thinking>/gi
+  const tag = closing ? '</thinking>' : '<thinking>'
+  let token
+  while ((token = tokens.exec(line))) {
+    if (token[0][0] === '`') {
+      const ticks = /`+/g
+      ticks.lastIndex = tokens.lastIndex
+      let end
+      while ((end = ticks.exec(line))) {
+        if (end[0].length === token[0].length) {
+          tokens.lastIndex = ticks.lastIndex
+          break
+        }
+      }
+    } else if (token[0].toLowerCase() === tag) return token.index
+  }
+  return -1
+}
+
+// Each caller owns its line array. Keep any same-line suffix for the next pass.
+function parseThinkingBlock(lines, start) {
+  if (/^(?: {4}|\t)/.test(lines[start])) return null
+  const opening = thinkingTagIndex(lines[start])
+  if (opening < 0) return null
+  const prefix = lines[start].slice(0, opening)
+  const body = []
+  for (let end = start; end < lines.length; end++) {
+    const line = end === start ? lines[end].slice(opening + '<thinking>'.length) : lines[end]
+    const fenceEnd = end > start ? markdownFenceEnd(lines, end, true) : null
+    if (fenceEnd !== null) {
+      body.push(...lines.slice(end, fenceEnd))
+      end = fenceEnd - 1
+      continue
+    }
+    const close = thinkingTagIndex(line, true)
+    if (close >= 0) {
+      body.push(line.slice(0, close))
+      const suffix = line.slice(close + '</thinking>'.length)
+      lines[end] = suffix
+      return { prefix, body: body.join('\n').trim(), live: false, nextLine: suffix.trim() ? end : end + 1 }
+    }
+    body.push(line)
+  }
+  // A closing tag may arrive across several stream deltas.
+  const text = body.join('\n')
+  const tagStart = text.lastIndexOf('<')
+  const partialClose = tagStart >= 0 && '</thinking>'.startsWith(text.slice(tagStart).toLowerCase())
+  return { prefix, body: (partialClose ? text.slice(0, tagStart) : text).trim(), live: true, nextLine: lines.length }
+}
+
+const thinkingFold = ({ body, live }) => ({
+  type: 'thinking', label: '思考过程', body, live, open: false, cls: 'fold-thinking',
+})
+
+/** Return a flat fold list for callers that do not need prose interleaving. */
 export function foldAgentProtocolBlocks(text) {
   const lines = String(text || '').split('\n')
   const folds = []
@@ -229,21 +291,13 @@ export function foldAgentProtocolBlocks(text) {
       continue
     }
 
-    // Thinking
-    if (/^<thinking>/i.test(line)) {
-      const closeIdx = lines.findIndex((l, idx) => idx > i && /<\/thinking>/i.test(l))
-      if (closeIdx >= 0) {
-        const body = lines.slice(i + 1, closeIdx).join('\n')
-        folds.push({
-          type: 'thinking',
-          label: '思考过程',
-          body,
-          open: false,
-          cls: 'fold-thinking',
-        })
-        i = closeIdx + 1
-        continue
-      }
+    const fenceEnd = markdownFenceEnd(lines, i)
+    if (fenceEnd !== null) { i = fenceEnd; continue }
+    const thinking = parseThinkingBlock(lines, i)
+    if (thinking) {
+      if (thinking.body) folds.push(thinkingFold(thinking))
+      i = thinking.nextLine
+      continue
     }
 
     // Legacy function_calls
@@ -390,20 +444,21 @@ export function segmentAgentProtocolBlocks(text) {
       continue
     }
 
-    if (/^<thinking>/i.test(line)) {
-      const closeIdx = lines.findIndex((l, idx) => idx > i && /<\/thinking>/i.test(l))
-      if (closeIdx >= 0) {
+    const fenceEnd = markdownFenceEnd(lines, i)
+    if (fenceEnd !== null) {
+      proseBuf.push(...lines.slice(i, fenceEnd))
+      i = fenceEnd
+      continue
+    }
+    const thinking = parseThinkingBlock(lines, i)
+    if (thinking) {
+      if (thinking.prefix.trim()) proseBuf.push(thinking.prefix)
+      if (thinking.body) {
         flushProse()
-        foldGroup().push({
-          type: 'thinking',
-          label: '\u601d\u8003\u8fc7\u7a0b',
-          body: lines.slice(i + 1, closeIdx).join('\n'),
-          open: false,
-          cls: 'fold-thinking',
-        })
-        i = closeIdx + 1
-        continue
+        foldGroup().push(thinkingFold(thinking))
       }
+      i = thinking.nextLine
+      continue
     }
 
     if (/^<function_calls>/i.test(line)) {
@@ -494,12 +549,17 @@ export function stripAgentProtocolBlocks(text) {
     }
 
     const line = lines[i]
-    if (/^<thinking>/i.test(line)) {
-      const closeIdx = lines.findIndex((l, idx) => idx > i && /<\/thinking>/i.test(l))
-      if (closeIdx >= 0) {
-        i = closeIdx + 1
-        continue
-      }
+    const fenceEnd = markdownFenceEnd(lines, i)
+    if (fenceEnd !== null) {
+      kept.push(...lines.slice(i, fenceEnd))
+      i = fenceEnd
+      continue
+    }
+    const thinking = parseThinkingBlock(lines, i)
+    if (thinking) {
+      if (thinking.prefix.trim()) kept.push(thinking.prefix)
+      i = thinking.nextLine
+      continue
     }
 
     if (/^<function_calls>/i.test(line)) {
