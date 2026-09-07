@@ -8,6 +8,7 @@ import 'katex/dist/katex.min.css'
 import './style.css'
 import { RouteFallback, ErrorBoundary } from './components/feedback.jsx'
 import { AppDialogHost } from './components/AppDialogHost.jsx'
+import { GlobalImagePreview } from './components/GlobalImagePreview.jsx'
 import { applyThemeToDocument, getInitialTheme, getTheme, isThemeId } from './themes'
 
 // Chat is the primary interface: it owns "/" (and legacy "/chat").
@@ -57,6 +58,7 @@ function LocalizedRoot() {
     },
   }}>
     <AppDialogHost />
+    <GlobalImagePreview />
     <ErrorBoundary>
       <Suspense fallback={<RouteFallback label={loading} />}>
         <Root />

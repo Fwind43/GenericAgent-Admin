@@ -401,6 +401,9 @@ function MarkdownImage({ node }) {
     <span className="oa-md-image-wrap">
       <img
         className="oa-md-image"
+        tabIndex={0}
+        role="button"
+        aria-label={ct(`查看大图 ${node.alt || ''}`, `Preview image ${node.alt || ''}`)}
         src={src}
         alt={node.alt}
         title={node.title || undefined}
