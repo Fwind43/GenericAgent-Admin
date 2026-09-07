@@ -1,9 +1,21 @@
 import React from 'react'
-import { Save, Sparkles } from 'lucide-react'
+import { FoldVertical, Save, Sparkles } from 'lucide-react'
+import { useAutoCollapseProcess } from '../hooks/useAutoCollapseProcess.js'
 import { SettingFooter, SettingRow, SettingToggle, SettingsPage, SettingsSection } from '../components/settings'
 
 export function ChatSettingsPage({ t, text, titleModel }) {
+  const [autoCollapseProcess, setAutoCollapseProcess] = useAutoCollapseProcess()
   return <SettingsPage>
+    <SettingsSection title={text.chat.processDisplay} icon={<FoldVertical size={17}/>}>
+      <SettingToggle
+        id="settings-auto-collapse-process"
+        checked={autoCollapseProcess}
+        onChange={setAutoCollapseProcess}
+        label={text.chat.autoCollapseProcess}
+        onText={text.chat.on}
+        offText={text.chat.off}
+      />
+    </SettingsSection>
     <SettingsSection title={text.chat.autoTitle} description={text.chat.autoTitleDesc} icon={<Sparkles size={17}/>}>
       <SettingToggle
         id="settings-auto-title"

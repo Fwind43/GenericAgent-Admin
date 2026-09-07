@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import ThemePicker from './ThemePicker'
+import { useAutoCollapseProcess } from './hooks/useAutoCollapseProcess.js'
 import MessageNavigator from './components/MessageNavigator'
 import ThinkingBlock from './ThinkingBlock'
 import SummaryBlock from './SummaryBlock'
@@ -3174,7 +3175,8 @@ const AssistantTurn = memo(function AssistantTurn({ turn, current, stackOpen, pe
 const AssistantContent = memo(function AssistantContent({ content, structuredContent, pending, onAskReply, isLatestMessage = false, turnUsages, ultraplan_state, runStartedAtMS = 0, clockNow = 0, modelID = '' }) {
   // Follow the run lifecycle until the user explicitly toggles execution history.
   const [stackOpenOverride, setStackOpenOverride] = useState(null)
-  const stackOpen = stackOpenOverride ?? Boolean(pending)
+  const [autoCollapseProcess] = useAutoCollapseProcess()
+  const stackOpen = stackOpenOverride ?? (Boolean(pending) || !autoCollapseProcess)
   const liveUltraPlanState = useMemo(() => normalizeUltraPlanState(ultraplan_state), [ultraplan_state])
   const stats = useMemo(() => textRenderStats(content), [content])
   

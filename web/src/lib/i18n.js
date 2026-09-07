@@ -222,6 +222,8 @@ export const SETTINGS_TEXT = {
     chat: {
       autoTitle: '自动标题',
       autoTitleDesc: '控制新会话是否自动生成标题，以及使用哪个模型。',
+      processDisplay: '流程展示',
+      autoCollapseProcess: '输出完成后收缩整个流程',
       toggle: '自动生成会话标题',
       toggleHelp: '关闭后不会为任何会话调用模型生成标题，不产生额外 token 消耗。',
       on: '已开启',
@@ -319,6 +321,8 @@ export const SETTINGS_TEXT = {
     chat: {
       autoTitle: 'Automatic titles',
       autoTitleDesc: 'Control whether new chats generate a title automatically, and which model does it.',
+      processDisplay: 'Process display',
+      autoCollapseProcess: 'Collapse the entire process after output completes',
       toggle: 'Generate chat titles automatically',
       toggleHelp: 'When off, no model call is made for titles, so no extra tokens are spent.',
       on: 'On',
