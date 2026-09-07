@@ -147,7 +147,6 @@ const threadCanScroll = (el) => Boolean(el) && (el.scrollHeight - el.clientHeigh
 // Where a jump parks the message it lands on, and how far its top must have
 // cleared the edge to count as being behind the reader at all.
 const JUMP_TOP_MARGIN = 12
-const SENT_ABOVE_EPSILON = 2
 const parseBTWDisplay = (value) => {
   const raw = String(value || '')
   const match = raw.match(/^\s*(?:>\s*)?(?:🟡\s*)?\/btw(?:[ \t]+([\s\S]*))?\s*$/i)
@@ -4537,7 +4536,6 @@ export default function ChatApp() {
   const [dragging, setDragging] = useState(false)
   const [autoFollow, setAutoFollow] = useState(true)
   const [showFollow, setShowFollow] = useState(false)
-  const [showJumpSent, setShowJumpSent] = useState(false)
   const [cmdDrawer, setCmdDrawer] = useState({ open: false, filter: '', selectedIdx: 0 })
   const [cmdManagerOpen, setCmdManagerOpen] = useState(false)
   const [keychainOpen, setKeychainOpen] = useState(false)
@@ -6824,21 +6822,6 @@ export default function ChatApp() {
   const cardTopOffset = (card) => (
     card.getBoundingClientRect().top - threadRef.current.getBoundingClientRect().top
   )
-  // What a reader sent is where a turn begins, and an answer can run for
-  // screens past it. The nearest one behind the view is the start of what is
-  // on screen; taking it again and again walks the conversation back a turn
-  // at a time.
-  const previousSentCard = () => {
-    const thread = threadRef.current
-    if (!thread) return null
-    let previous = null
-    for (const card of thread.querySelectorAll('.oa-message.user')) {
-      if (cardTopOffset(card) >= -SENT_ABOVE_EPSILON) break
-      previous = card
-    }
-    return previous
-  }
-  const syncJumpSent = () => setShowJumpSent(Boolean(previousSentCard()))
   const jumpToMessageNode = (messageID) => {
     const sessionID = activeSidRef.current
     const thread = threadRef.current
@@ -6854,26 +6837,9 @@ export default function ChatApp() {
       thread.scrollTo({ top: thread.scrollTop + cardTopOffset(card) - JUMP_TOP_MARGIN, behavior: reducedMotion ? 'auto' : 'smooth' })
     })
   }
-  const jumpToPreviousSent = () => {
-    if (!previousSentCard()) return
-    // Reading a turn from its start is incompatible with being carried to the
-    // end of the newest one, so this leaves the reader in charge.
-    if (autoFollowRef.current) setFollowState(false)
-    // Letting go of the end takes a commit, and the follow it cancels still
-    // has one jump to the bottom left in it. Measuring and moving a frame
-    // later means landing on the message rather than being overruled.
-    requestAnimationFrame(() => {
-      const thread = threadRef.current
-      const card = previousSentCard()
-      if (!thread || !card) return
-      thread.scrollTo({ top: thread.scrollTop + cardTopOffset(card) - JUMP_TOP_MARGIN, behavior: 'smooth' })
-      markProgrammaticScroll(thread, SMOOTH_SETTLE_MS)
-    })
-  }
   const updateFollowFromScroll = () => {
     const thread = threadRef.current
     if (!thread) return
-    syncJumpSent()
     const { scrollTop, scrollHeight } = thread
     const action = scrollFollowAction({
       nearBottom: isNearBottom(thread),
@@ -6922,7 +6888,6 @@ export default function ChatApp() {
       // to go back to, so the button follows the thread rather than the flag.
       setShowFollow(!isNearBottom(threadRef.current) && threadCanScroll(threadRef.current))
     }
-    syncJumpSent()
   }, [messages, busy, autoFollow, sid])
 
   const lastThreadMessageId = messages.reduce((id, message) => message.kind === 'btw' ? id : message.id, '')
@@ -7327,9 +7292,8 @@ export default function ChatApp() {
             worldline={worldlineForView}
             onSwitchVersion={switchWorldline}
           />
-          {(showJumpSent || showFollow) && <div className="oa-follow-row">
+          {showFollow && <div className="oa-follow-row">
             {showFollow && <button className={`oa-follow-btn ${isCurrentRunning ? 'is-live' : ''}`} type="button" onClick={resumeFollow} title={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')} aria-label={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')}><ChevronDown size={16}/></button>}
-            {showJumpSent && <button className="oa-follow-btn" type="button" onClick={jumpToPreviousSent} title={ct('跳到上一条发送', 'Previous message you sent')} aria-label={ct('跳到上一条发送', 'Previous message you sent')}><ChevronUp size={16}/></button>}
           </div>}
         </section>
         <MessageNavigator messages={messages} sessionID={sid} threadRef={threadRef}

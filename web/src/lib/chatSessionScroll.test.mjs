@@ -72,16 +72,17 @@ test('ChatApp forgets deleted sessions and clears snapshots when switching insta
   assert.match(source.slice(switchStart, scrollStart), /renderedSessionRef\.current = ''/)
 })
 
-test('previous-message control keeps the rightmost hot area when follow control appears', () => {
+test('chat keeps resume-follow control without the previous-message icon', () => {
   const source = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
-  const rowStart = source.indexOf('{(showJumpSent || showFollow) && <div className="oa-follow-row">')
+  const rowStart = source.indexOf('{showFollow && <div className="oa-follow-row">')
   const rowEnd = source.indexOf('</div>}', rowStart)
   const row = source.slice(rowStart, rowEnd)
-  const followControl = row.indexOf('{showFollow &&')
-  const previousControl = row.indexOf('{showJumpSent &&')
 
   assert.ok(rowStart >= 0)
   assert.ok(rowEnd > rowStart)
-  assert.ok(followControl >= 0)
-  assert.ok(previousControl > followControl)
+  assert.match(row, /onClick=\{resumeFollow\}/)
+  assert.match(row, /<ChevronDown size=\{16\}/)
+  assert.doesNotMatch(row, /ChevronUp/)
+  assert.doesNotMatch(source, /showJumpSent|jumpToPreviousSent|previousSentCard|syncJumpSent/)
+  assert.match(source, /if \(autoFollowRef\.current\) scrollToThreadEnd\('auto'\)/)
 })
