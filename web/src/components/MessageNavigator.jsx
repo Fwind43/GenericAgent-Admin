@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import './MessageNavigator.css'
 
 export function messageNavigationNodes(messages, attachmentLabel, emptyLabel) {
@@ -17,6 +17,8 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
   const signature = JSON.stringify(messages.filter(m => m.kind !== 'btw').map(m => String(m.id)))
   const nodeSignature = JSON.stringify(nodes.map(n => n.id))
   const trackRef = useRef(null)
+  const positionRef = useRef(null)
+  const olderRequestRef = useRef(null)
   const listID = useId()
   const navRef = useRef(null)
   const suppressTouchClick = useRef(false)
@@ -83,6 +85,19 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
     }
   }, [expanded])
 
+  useLayoutEffect(() => {
+    const track = trackRef.current
+    const previous = positionRef.current
+    if (!track) { positionRef.current = null; return }
+    const first = track.querySelector('[data-message-node]')
+    // Preserve the old first node's viewport position when history is prepended.
+    if (previous?.sessionID === sessionID && previous.firstID !== first?.dataset.messageNode) {
+      const anchor = [...track.querySelectorAll('[data-message-node]')].find(item => item.dataset.messageNode === previous.firstID)
+      if (anchor) track.scrollTop = previous.top + anchor.offsetTop - previous.offset
+    }
+    positionRef.current = { sessionID, firstID: first?.dataset.messageNode, offset: first?.offsetTop || 0, top: track.scrollTop, height: track.scrollHeight }
+  }, [nodeSignature, sessionID, loading, hasMore, expanded])
+
   useEffect(() => {
     const track = trackRef.current
     if (!track || expanded || track.contains(document.activeElement)) return
@@ -94,6 +109,20 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
   }, [activeID, layout.height, expanded])
 
   if (loading || !nodes.length) return null
+  const loadOlder = async () => {
+    if (!hasMore || loadingOlder || !onLoadOlder || olderRequestRef.current?.sessionID === sessionID) return
+    const request = { sessionID }
+    olderRequestRef.current = request
+    try { await onLoadOlder() }
+    finally { if (olderRequestRef.current === request) olderRequestRef.current = null }
+  }
+  const scroll = event => {
+    const track = event.currentTarget
+    const previous = positionRef.current
+    const top = Math.max(0, track.scrollTop)
+    if (previous) positionRef.current = { ...previous, top, height: track.scrollHeight }
+    if (expanded && previous?.sessionID === sessionID && top < previous.top && top <= 8 && track.scrollHeight === previous.height) loadOlder()
+  }
   const keyboard = event => {
     const keys = ['ArrowUp', 'ArrowDown', 'Home', 'End']
     if (!keys.includes(event.key)) return
@@ -122,8 +151,10 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
     onFocus={() => setExpanded(true)}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setExpanded(false) }}>
     <ul className="oa-message-nav-track" ref={trackRef} id={listID} aria-label={ct('\u6d88\u606f\u5217\u8868', 'Message list')}
+      onScroll={scroll}
+      onWheel={event => { if (expanded && event.deltaY < 0 && event.currentTarget.scrollTop <= 8) loadOlder() }}
       onKeyDown={event => { suppressTouchClick.current = false; keyboard(event) }}>
-      {hasMore && <li><button type="button" className="oa-message-nav-older" disabled={loadingOlder} onClick={() => select(onLoadOlder)}
+      {hasMore && <li><button type="button" className="oa-message-nav-older" disabled={loadingOlder} onClick={() => select(loadOlder)}
         title={ct('\u52a0\u8f7d\u66f4\u65e9\u7684\u6d88\u606f\u8282\u70b9', 'Load earlier message nodes')} aria-label={ct('\u52a0\u8f7d\u66f4\u65e9\u7684\u6d88\u606f\u8282\u70b9', 'Load earlier message nodes')}>
         <span className="oa-message-nav-label" aria-hidden="true">{ct('\u52a0\u8f7d\u66f4\u65e9\u6d88\u606f', 'Load earlier messages')}</span><span className="oa-message-nav-mark" aria-hidden="true">{'\u22ef'}</span>
       </button></li>}

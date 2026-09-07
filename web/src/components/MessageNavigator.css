@@ -23,6 +23,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  overflow-anchor: none;
   scrollbar-width: none;
   pointer-events: auto;
   border: 1px solid transparent;
