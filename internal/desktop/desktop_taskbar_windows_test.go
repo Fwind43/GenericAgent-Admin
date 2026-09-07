@@ -12,7 +12,7 @@ import (
 )
 
 func TestTaskbarUnreadDotIsValidNativeResource(t *testing.T) {
-	for _, state := range []taskbarState{taskbarUnread} {
+	for _, state := range []taskbarState{taskbarUnread, taskbarRunning} {
 		t.Run(string(state), func(t *testing.T) {
 			data, err := taskbarIconPNG(state)
 			if err != nil {
@@ -31,7 +31,17 @@ func TestTaskbarUnreadDotIsValidNativeResource(t *testing.T) {
 			if corner != 0 || center != 65535 {
 				t.Fatal("invalid transparency")
 			}
-			for y := 17; y <= 24; y++ {
+			if state == taskbarRunning {
+				r, g, b, _ := img.At(21, 21).RGBA()
+				if r != 65535 || g != 65535 || b != 65535 {
+					t.Fatal("running icon must have a white play symbol")
+				}
+				r, g, b, _ = img.At(17, 21).RGBA()
+				if r != 37*257 || g != 99*257 || b != 235*257 {
+					t.Fatal("running icon must have blue fill")
+				}
+			}
+			for y := 17; state == taskbarUnread && y <= 24; y++ {
 				for x := 17; x <= 24; x++ {
 					r, g, b, a := img.At(x, y).RGBA()
 					if r != 220*257 || g != 38*257 || b != 38*257 || a != 65535 {

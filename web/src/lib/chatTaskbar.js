@@ -51,8 +51,13 @@ export function waitingChatSessions({ sessions = [], sid = '', liveState = 'idle
   return waiting
 }
 
-// Use the same unread set as the sidebar; workflow status stays inside the chat.
-export function aggregateChatTaskbarState({ sessions = [], unread = new Set() }) {
+// Active work takes priority over unread results, including other sessions.
+export function aggregateChatTaskbarState({ sessions = [], unread = new Set(), sid = '', liveRunning = false, liveState = 'idle' }) {
+  if (liveRunning && liveState === 'running') return 'running'
+  if (sessions.some(session => {
+    if (session.id === sid && liveRunning) return false
+    return session.running && session.taskbar_state !== 'waiting'
+  })) return 'running'
   return sessions.some(session => unread.has(session.id)) ? 'unread' : 'idle'
 }
 

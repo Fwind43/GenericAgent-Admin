@@ -4642,6 +4642,7 @@ export default function ChatApp() {
   })
   const waitingSessionIds = new Set(waitingSessions.map(session => session.id))
   const aggregateTaskbarState = aggregateChatTaskbarState({
+    sid, liveRunning: busy && streamingSid === sid, liveState: taskbarState,
     sessions, unread: new Set(sessions.filter(chatReadState.unread).map(session => session.id)),
   })
   useEffect(() => { publishTaskbarState(aggregateTaskbarState) }, [aggregateTaskbarState])

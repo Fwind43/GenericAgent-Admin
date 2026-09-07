@@ -41,6 +41,21 @@ func TestTaskbarRegistryAggregatesAndRemovesWindows(t *testing.T) {
 	check(taskbarIdle)
 }
 
+func TestTaskbarRunningPrecedesUnread(t *testing.T) {
+	var registry taskbarRegistry
+	registry.set(1, taskbarUnread)
+	registry.set(2, taskbarRunning)
+	for i := 0; i < 20; i++ {
+		if state, _ := registry.snapshot(); state != taskbarRunning {
+			t.Fatalf("running lost priority: %s", state)
+		}
+	}
+	registry.remove(2)
+	if state, _ := registry.snapshot(); state != taskbarUnread {
+		t.Fatalf("unread not restored: %s", state)
+	}
+}
+
 func TestTaskbarRegistryRejectsInvalidAndDeduplicates(t *testing.T) {
 	var registry taskbarRegistry
 	registry.set(1, taskbarUnread)
@@ -48,7 +63,7 @@ func TestTaskbarRegistryRejectsInvalidAndDeduplicates(t *testing.T) {
 	if registry.set(1, taskbarUnread) {
 		t.Fatal("duplicate set must not request redraw")
 	}
-	for _, state := range []taskbarState{"unknown", "waiting", "running", "completed", "failed"} {
+	for _, state := range []taskbarState{"unknown", "waiting", "completed", "failed"} {
 		if registry.set(2, state) {
 			t.Fatalf("invalid state %q accepted", state)
 		}

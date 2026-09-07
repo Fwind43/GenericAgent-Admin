@@ -151,12 +151,15 @@ func (w *hostWindow) bindTaskbar() error {
 	})
 }
 
-// Rasterize the unread dot at 4x coverage. This does not replace the app icon.
+// Rasterize the overlay at 4x coverage. This does not replace the app icon.
 func taskbarIconPNG(state taskbarState) ([]byte, error) {
-	if state != taskbarUnread {
+	if state != taskbarUnread && state != taskbarRunning {
 		return nil, fmt.Errorf("no icon for %q", state)
 	}
 	fill := color.NRGBA{R: 220, G: 38, B: 38, A: 255}
+	if state == taskbarRunning {
+		fill = color.NRGBA{R: 37, G: 99, B: 235, A: 255}
+	}
 	// Keep the overlay canvas fixed; shrink the artwork to a 20px circle
 	// anchored one pixel from the bottom-right so it covers less of the app icon.
 	const artworkScale = 2.0 / 3.0
@@ -174,7 +177,7 @@ func taskbarIconPNG(state taskbarState) ([]byte, error) {
 						continue
 					}
 					c := fill
-					if math.Hypot(px-16, py-16) > 13.5 {
+					if math.Hypot(px-16, py-16) > 13.5 || (state == taskbarRunning && px >= 12 && px <= 23 && math.Abs(py-16) <= (23-px)*0.65) {
 						c = color.NRGBA{255, 255, 255, 255}
 					}
 					r += int(c.R)

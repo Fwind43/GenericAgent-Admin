@@ -7,15 +7,16 @@ type taskbarState string
 const (
 	taskbarIdle          taskbarState = "idle"
 	taskbarUnread        taskbarState = "unread"
+	taskbarRunning       taskbarState = "running"
 	nativeTaskbarBinding              = "__gaTaskbarState"
 )
 
 func validTaskbarState(state taskbarState) bool {
-	return state == taskbarIdle || state == taskbarUnread
+	return state == taskbarIdle || state == taskbarUnread || state == taskbarRunning
 }
 
 // Windows groups taskbar buttons by AppUserModelID and displays the last
-// overlay set. Keep the unread dot until every live window is read.
+// overlay set. Active work takes priority, then unread results.
 type taskbarRegistry struct {
 	mu     sync.Mutex
 	states map[uintptr]taskbarState
@@ -50,8 +51,8 @@ func (r *taskbarRegistry) snapshot() (taskbarState, []uintptr) {
 	windows := make([]uintptr, 0, len(r.states))
 	for hwnd, candidate := range r.states {
 		windows = append(windows, hwnd)
-		if candidate == taskbarUnread {
-			state = taskbarUnread
+		if candidate == taskbarRunning || (candidate == taskbarUnread && state == taskbarIdle) {
+			state = candidate
 		}
 	}
 	return state, windows
