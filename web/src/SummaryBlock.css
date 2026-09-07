@@ -1,0 +1,50 @@
+.oa-chat .ga-summary-block {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: start;
+  gap: 6px;
+  min-width: 0;
+  margin: 4px 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.oa-chat .oa-turn-card > .oa-turn-body > .ga-summary-block {
+  margin: 6px 14px;
+}
+
+.ga-summary-icon {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.ga-summary-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.oa-chat .ga-summary-body .oa-md {
+  padding: 0;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.oa-chat .ga-summary-body :is(p, ul, ol) { margin-top: 3px; margin-bottom: 3px; }
+.ga-summary-body > .oa-md > :first-child { margin-top: 0; }
+.ga-summary-body > .oa-md > :last-child { margin-bottom: 0; }
+
+.oa-chat .ga-summary-body :is(h1, h2, h3, h4, h5, h6) {
+  margin: 3px 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: inherit;
+}
+
+.oa-chat .ga-summary-body :not(pre) > code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

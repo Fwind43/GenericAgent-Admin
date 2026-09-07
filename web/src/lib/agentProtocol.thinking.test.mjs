@@ -18,6 +18,35 @@ test('thinking keeps same-line content and trailing answer across every parser e
   }
 })
 
+test('summary and thinking retain their source order on the same line', () => {
+  for (const [text, kinds] of [
+    ['<summary>**Status**</summary><thinking>Check</thinking>Answer', ['summary', 'folds', 'prose']],
+    ['<thinking>Check</thinking><summary>**Status**</summary>Answer', ['folds', 'summary', 'prose']],
+  ]) {
+    const segments = segmentAgentProtocolBlocks(text)
+    assert.deepEqual(segments.map(segment => segment.kind), kinds)
+    assert.equal(segments.find(segment => segment.kind === 'summary').body, '**Status**')
+    assert.equal(segments.find(segment => segment.kind === 'summary').live, false)
+    assert.equal(segments.find(segment => segment.kind === 'folds').folds[0].body, 'Check')
+    assert.equal(segments.at(-1).text, 'Answer')
+  }
+})
+
+test('summary streaming hides partial closing tags and preserves code examples', () => {
+  assert.deepEqual(segmentAgentProtocolBlocks('<summary>Status</summ'), [
+    { kind: 'summary', body: 'Status', live: true },
+  ])
+  assert.deepEqual(segmentAgentProtocolBlocks('<summary> </summary>Answer'), [
+    { kind: 'prose', text: 'Answer' },
+  ])
+  for (const text of [
+    '```xml\n<summary>Example</summary>\n```',
+    '`<summary>Example</summary>`',
+  ]) {
+    assert.deepEqual(segmentAgentProtocolBlocks(text), [{ kind: 'prose', text }])
+  }
+})
+
 test('thinking can follow narration on the same line without losing either side', () => {
   const text = '**Inspecting**<thinking>**Checking**</thinking>Answer'
   const segments = segmentAgentProtocolBlocks(text)

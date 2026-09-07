@@ -42,6 +42,42 @@ describe('thinking disclosure in the assistant pipeline', () => {
     expect(fold.open).toBe(false)
   })
 
+  test('preserves nested thinking when a turn enters history and its parents reopen', () => {
+    const first = 'LLM Running (Turn 1) ...\n<thinking>Inspecting styles</thinking>\n<summary>Checking the fold layout</summary>\nBody paragraph'
+    const second = '\n\nLLM Running (Turn 2) ...\n<summary>Second step</summary>\nMore content'
+    const { container, rerender } = render(frame(first, true))
+    const turn = container.querySelector('[data-turn="1"]')
+    const fold = turn.querySelector('.fold-thinking')
+    fireEvent.click(fold.querySelector('summary'))
+    expect(fold.open).toBe(true)
+
+    rerender(frame(first + second, true))
+    expect(container.querySelector('[data-turn="1"]')).toBe(turn)
+    expect(turn.classList.contains('oa-turn-card')).toBe(true)
+    expect(turn.querySelector('.fold-thinking')).toBe(fold)
+    expect(fold.open).toBe(true)
+    expect(turn.querySelector('.ga-summary-body').textContent).toBe('Checking the fold layout')
+
+    const toggle = turn.querySelector('.oa-turn-toggle')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    for (let i = 0; i < 2; i += 1) {
+      fireEvent.click(fold.querySelector('summary'))
+      expect(fold.open).toBe(false)
+      fireEvent.click(fold.querySelector('summary'))
+      expect(fold.open).toBe(true)
+      fireEvent.click(toggle)
+      expect(toggle.getAttribute('aria-expanded')).toBe('false')
+      fireEvent.click(toggle)
+      expect(toggle.getAttribute('aria-expanded')).toBe('true')
+      const stackToggle = container.querySelector('.oa-turn-stack-head')
+      fireEvent.click(stackToggle)
+      fireEvent.click(stackToggle)
+      expect(turn.querySelector('.fold-thinking')).toBe(fold)
+      expect(fold.open).toBe(true)
+    }
+  })
+
   test('empty thinking leaves no disclosure and code examples remain code', () => {
     const { container, rerender } = render(frame('<thinking> </thinking>Answer'))
     expect(container.querySelector('.fold-thinking')).toBeNull()

@@ -80,19 +80,16 @@ const FINAL_OPEN_FENCE_RE = /^\s*```+\s*$/
 const FINAL_INLINE_RE = /^\s*```+\s*\[Info\]\s*Final response to user\.\s*```+\s*$/i
 
 export const cleanAssistantRunBody = (s = '') => String(s || '')
-  .replace(/<summary>[\s\S]*?<\/summary>/gi, '')
   .replace(/\n{3,}/g, '\n\n')
   .trim()
 
-// A summary at the very start is transport metadata even when a lightweight
-// response (for example /btw) has no "LLM Running" marker. Keep later tags so
-// genuine Markdown/HTML examples in the answer are not silently removed.
+// Extract metadata without changing the summary's position in the body.
 const parseAssistantFinalBody = (s = '') => {
   const normalized = String(s || '').replace(/\n{3,}/g, '\n\n')
   const match = normalized.match(/^\s*<summary>([\s\S]*?)<\/summary>\s*/i)
   return {
     summary: match?.[1]?.trim() || '',
-    body: (match ? normalized.slice(match[0].length) : normalized).trim(),
+    body: normalized.trim(),
   }
 }
 

@@ -70,6 +70,10 @@
   overflow-wrap: anywhere;
 }
 
+.oa-chat .ga-thinking-body > .oa-md {
+  padding: 0;
+}
+
 .ga-thinking-body > .oa-md > :first-child { margin-top: 0; }
 .ga-thinking-body > .oa-md > :last-child { margin-bottom: 0; }
 

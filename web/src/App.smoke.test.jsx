@@ -1129,7 +1129,7 @@ describe('chat response identity and time', () => {
       />,
     )
 
-    expect(container.querySelector('.oa-response-summary')?.textContent).toContain('source differences confirmed')
+    expect(container.querySelector('.ga-summary-block')?.textContent).toContain('source differences confirmed')
     expect(screen.getByRole('heading', { level: 2, name: 'Two legacy CPLD TU comparison report' })).toBeTruthy()
     expect(screen.getByRole('heading', { level: 3, name: 'Basic information' })).toBeTruthy()
     const firstDetailHeading = container.querySelector('.oa-md h4')
@@ -1141,8 +1141,9 @@ describe('chat response identity and time', () => {
     expect(container.querySelector('.oa-md code')?.textContent).toBe('update_cpld_firmware()')
     expect(container.querySelector('.oa-md del')?.textContent).toBe('obsolete path')
     expect(container.querySelector('.oa-md img')).toBeNull()
-    expect(container.querySelector('.oa-md')?.textContent).toContain('<img src=x onerror="window.__markdownInjected=true">')
-    expect(container.querySelector('.oa-md')?.textContent).not.toContain('<br>')
+    const markdownText = [...container.querySelectorAll('.oa-md')].map(node => node.textContent).join('\n')
+    expect(markdownText).toContain('<img src=x onerror="window.__markdownInjected=true">')
+    expect(markdownText).not.toContain('<br>')
   })
 
   test('renders mermaid fences as safe diagrams and keeps the source copyable', async () => {

@@ -4,6 +4,7 @@ import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import ThemePicker from './ThemePicker'
 import ThinkingBlock from './ThinkingBlock'
+import SummaryBlock from './SummaryBlock'
 import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamTerminalMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldRefreshChatSnapshot } from './lib/chatStream.js'
 import { cacheHitPercent, cacheReadTokens, measuredOutputRate } from './lib/chatUsage.js'
 import { autorunInitialReplyAt, isAutorunTargetRunning, shouldTriggerAutorun } from './lib/chatAutorun.js'
@@ -1779,6 +1780,10 @@ const renderAssistantBody = (text = '', onAskReply, ultraplan_state, openAskUser
     <>
       {segments.map((segment, segmentIdx) => segment.kind === 'prose'
         ? <MarkdownBlock key={`prose-${segmentIdx}`} text={segment.text} onAskReply={onAskReply} />
+        : segment.kind === 'summary'
+        ? <SummaryBlock key={`summary-${segmentIdx}`} label={ct('摘要', 'Summary')}>
+          <MarkdownBlock text={segment.body} onAskReply={onAskReply} />
+        </SummaryBlock>
         : <div className="ga-execution-log" key={`folds-${segmentIdx}`}>
           {segment.folds.map((fold, foldIdx) => renderFold(fold, `${segmentIdx}-${foldIdx}`))}
         </div>)}
@@ -3242,7 +3247,6 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
     </div>}
     {(parsed.summary || parsed.body || !parsed.runs.length) && <div className={parsed.runs.length ? 'oa-final-answer' : ''}>
       {parsed.runs.length > 0 && <div className="oa-final-label">返回给用户</div>}
-      {parsed.summary && <div className="oa-response-summary" aria-label="响应摘要"><span>摘要</span><b>{parsed.summary}</b></div>}
       {parsed.tools && parsed.tools.length > 0 && <div className="oa-tools-section">
         {parsed.tools.map((call, idx) => <ToolCallBlock key={idx} call={call} onAskReply={onAskReply} />)}
       </div>}

@@ -180,9 +180,9 @@ function markdownFenceEnd(lines, start, insideThinking = false) {
   return lines.length
 }
 
-function thinkingTagIndex(line, closing = false) {
-  const tokens = /\\.|`+|<\/?thinking>/gi
-  const tag = closing ? '</thinking>' : '<thinking>'
+function taggedBlockIndex(line, name, closing = false) {
+  const tokens = /\\.|`+|<\/?(?:thinking|summary)>/gi
+  const tag = closing ? `</${name}>` : `<${name}>`
   let token
   while ((token = tokens.exec(line))) {
     if (token[0][0] === '`') {
@@ -201,24 +201,24 @@ function thinkingTagIndex(line, closing = false) {
 }
 
 // Each caller owns its line array. Keep any same-line suffix for the next pass.
-function parseThinkingBlock(lines, start) {
+function parseTaggedBlock(lines, start, name) {
   if (/^(?: {4}|\t)/.test(lines[start])) return null
-  const opening = thinkingTagIndex(lines[start])
+  const opening = taggedBlockIndex(lines[start], name)
   if (opening < 0) return null
   const prefix = lines[start].slice(0, opening)
   const body = []
   for (let end = start; end < lines.length; end++) {
-    const line = end === start ? lines[end].slice(opening + '<thinking>'.length) : lines[end]
+    const line = end === start ? lines[end].slice(opening + name.length + 2) : lines[end]
     const fenceEnd = end > start ? markdownFenceEnd(lines, end, true) : null
     if (fenceEnd !== null) {
       body.push(...lines.slice(end, fenceEnd))
       end = fenceEnd - 1
       continue
     }
-    const close = thinkingTagIndex(line, true)
+    const close = taggedBlockIndex(line, name, true)
     if (close >= 0) {
       body.push(line.slice(0, close))
-      const suffix = line.slice(close + '</thinking>'.length)
+      const suffix = line.slice(close + name.length + 3)
       lines[end] = suffix
       return { prefix, body: body.join('\n').trim(), live: false, nextLine: suffix.trim() ? end : end + 1 }
     }
@@ -227,9 +227,11 @@ function parseThinkingBlock(lines, start) {
   // A closing tag may arrive across several stream deltas.
   const text = body.join('\n')
   const tagStart = text.lastIndexOf('<')
-  const partialClose = tagStart >= 0 && '</thinking>'.startsWith(text.slice(tagStart).toLowerCase())
+  const partialClose = tagStart >= 0 && `</${name}>`.startsWith(text.slice(tagStart).toLowerCase())
   return { prefix, body: (partialClose ? text.slice(0, tagStart) : text).trim(), live: true, nextLine: lines.length }
 }
+
+const parseThinkingBlock = (lines, start) => parseTaggedBlock(lines, start, 'thinking')
 
 const thinkingFold = ({ body, live }) => ({
   type: 'thinking', label: '思考过程', body, live, open: false, cls: 'fold-thinking',
@@ -372,7 +374,7 @@ export function foldAgentProtocolBlocks(text) {
  * `foldAgentProtocolBlocks` above keeps returning a flat fold list for callers
  * that don't care about position.
  * @param {string} text
- * @returns {Array<{kind:'prose',text:string}|{kind:'folds',folds:object[]}>}
+ * @returns {Array<{kind:'prose',text:string}|{kind:'summary',body:string,live:boolean}|{kind:'folds',folds:object[]}>}
  */
 export function segmentAgentProtocolBlocks(text) {
   const lines = String(text || '').split('\n')
@@ -448,6 +450,21 @@ export function segmentAgentProtocolBlocks(text) {
     if (fenceEnd !== null) {
       proseBuf.push(...lines.slice(i, fenceEnd))
       i = fenceEnd
+      continue
+    }
+    const summaryIndex = taggedBlockIndex(line, 'summary')
+    const thinkingIndex = taggedBlockIndex(line, 'thinking')
+    const summary = summaryIndex >= 0 && (thinkingIndex < 0 || summaryIndex < thinkingIndex)
+      ? parseTaggedBlock(lines, i, 'summary') : null
+    if (summary) {
+      if (summary.prefix.trim()) proseBuf.push(summary.prefix)
+      if (summary.body) {
+        flushProse()
+        segments.push({ kind: 'summary', body: summary.body, live: summary.live })
+        currentFolds = null
+        pendingToolFolds = []
+      }
+      i = summary.nextLine
       continue
     }
     const thinking = parseThinkingBlock(lines, i)
