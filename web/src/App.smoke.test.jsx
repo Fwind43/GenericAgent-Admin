@@ -1422,17 +1422,20 @@ describe('chat model cascade', () => {
     expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
   })
 
-  test('toggles a provider once per multi-click gesture and preserves keyboard toggles', async () => {
+  test('toggles a provider on every click in a continuous sequence and preserves keyboard toggles', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
     render(<React.StrictMode><ProviderModelCascade groups={groups} selectedProvider="alpha" value="a-1" onChange={onChange} /></React.StrictMode>)
     await user.click(screen.getByRole('button', { expanded: false }))
     const beta = screen.getByRole('button', { name: 'Beta', exact: true })
 
+    for (let detail = 1; detail <= 6; detail += 1) {
+      fireEvent.click(beta, { detail })
+      const expanded = detail % 2 === 1
+      expect(beta.getAttribute('aria-expanded')).toBe(String(expanded))
+      expect(document.getElementById(beta.getAttribute('aria-controls')).hidden).toBe(!expanded)
+    }
     await user.dblClick(beta)
-    expect(beta.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Beta One' })).toBeTruthy()
-    await user.click(beta)
     expect(beta.getAttribute('aria-expanded')).toBe('false')
     await user.tripleClick(beta)
     expect(beta.getAttribute('aria-expanded')).toBe('true')
