@@ -28,8 +28,9 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame', fn => setTimeout(fn, 1))
   vi.stubGlobal('cancelAnimationFrame', id => clearTimeout(id))
   vi.stubGlobal('ResizeObserver', class {
-    constructor(fn) { resize = fn }
-    observe() {}
+    constructor(fn) { this.callback = fn }
+    observe(target) { if (target.classList.contains('oa-thread')) resize = this.callback }
+    unobserve() {}
     disconnect() {}
   })
   vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function () { return this.classList.contains('oa-thread') ? 600 : 100 })
@@ -70,6 +71,73 @@ describe('message nodes', () => {
     expect(result[2].label).toBe('report.pdf')
     expect(result[3].label).toBe('Empty message')
     expect(result[4].label).toHaveLength(180)
+    expect(result[4].fullContent).toBe('x'.repeat(500))
+    expect(result[2].fullContent).toBe('report.pdf')
+    expect(result[3].fullContent).toBe('Empty message')
+  })
+  test('keeps full multiline text and attachment fallbacks separate from summaries', () => {
+    const content = `  First line\n\n${'Long message '.repeat(60)}\nFinal line  `
+    const nodes = messageNavigationNodes([
+      { id: 'long', role: 'user', content },
+      { id: 'file', role: 'user', content: '  ', files: [{}] },
+    ], 'Attachment', 'Empty message')
+    expect(nodes[0].fullContent).toBe(content)
+    expect(nodes[0].label).toHaveLength(180)
+    expect(nodes[0].label).not.toContain('\n')
+    expect(nodes[1].fullContent).toBe('Attachment')
+    const tooltip = navigatorCSS.match(/\.oa-message-nav-tooltip\s*\{([^}]+)\}/)[1]
+    expect(tooltip).toMatch(/white-space:\s*pre-wrap/)
+    expect(tooltip).toMatch(/overflow-y:\s*auto/)
+    expect(tooltip).toMatch(/overscroll-behavior:\s*contain/)
+  })
+  test('shows untruncated text and keeps the preview open while reading it', () => {
+    const content = `First line\n${'Long message '.repeat(60)}\nFinal line`
+    const onLoadOlder = vi.fn()
+    render(<Harness items={[{ id: 'long', role: 'user', content }]} hasMore onLoadOlder={onLoadOlder}/>)
+    const button = screen.getByRole('button', { name: /First line/ })
+    fireEvent.pointerEnter(button, { pointerType: 'mouse' }); flush()
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip.textContent).toBe(content)
+    const preview = tooltip.querySelector('.oa-message-nav-tooltip')
+    fireEvent.pointerLeave(screen.getByRole('navigation'), { pointerType: 'mouse', relatedTarget: document.body })
+    fireEvent.pointerEnter(preview, { pointerType: 'mouse' }); flush()
+    fireEvent.pointerDown(preview, { pointerType: 'mouse' })
+    fireEvent.wheel(preview, { deltaY: -100 })
+    expect(screen.getByRole('navigation').dataset.expanded).toBe('true')
+    expect(screen.getByRole('tooltip').textContent).toBe(content)
+    expect(onLoadOlder).not.toHaveBeenCalled()
+    fireEvent.pointerLeave(preview, { pointerType: 'mouse', relatedTarget: document.body }); flush(); flush()
+    expect(screen.getByRole('navigation').dataset.expanded).toBe('false')
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+  test('dismisses the preview on directory scroll, Escape, outside press and session change', () => {
+    const view = render(<Harness/>)
+    const first = screen.getByRole('button', { name: /First question/ })
+    const open = () => { fireEvent.pointerEnter(first, { pointerType: 'mouse' }); flush(); expect(screen.getByRole('tooltip').textContent).toBe('First question') }
+    open()
+    fireEvent.scroll(screen.getByRole('list')); flush(); flush()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(screen.getByRole('navigation').dataset.expanded).toBe('true')
+    open()
+    fireEvent.keyDown(document, { key: 'Escape' }); flush(); flush()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(screen.getByRole('navigation').dataset.expanded).toBe('false')
+    open()
+    fireEvent.pointerDown(document.body, { pointerType: 'mouse' }); flush(); flush()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+    open()
+    view.rerender(<Harness sessionID="s2"/>); flush(); flush()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+  test('shows previews on keyboard focus without navigating', () => {
+    const onNavigate = vi.fn()
+    render(<Harness onNavigate={onNavigate}/>)
+    const first = screen.getByRole('button', { name: /First question/ })
+    act(() => first.focus()); flush()
+    expect(screen.getByRole('tooltip').textContent).toBe('First question')
+    expect(onNavigate).not.toHaveBeenCalled()
+    fireEvent.blur(first, { relatedTarget: document.body }); flush(); flush()
+    expect(screen.queryByRole('tooltip')).toBeNull()
   })
   test('opens the full list on hover and keeps it open while browsing', () => {
     const onNavigate = vi.fn()
@@ -82,7 +150,7 @@ describe('message nodes', () => {
     expect(nav.dataset.expanded).toBe('true')
     expect(screen.getByRole('list').textContent).toContain('First question')
     expect(screen.getByRole('list').textContent).toContain('Second question')
-    expect(screen.queryByRole('tooltip')).toBeNull()
+    expect(screen.getByRole('tooltip').textContent).toBe('First question')
     expect(onNavigate).not.toHaveBeenCalled()
     fireEvent.pointerOut(first, { pointerType: 'mouse', relatedTarget: second })
     fireEvent.pointerOver(second, { pointerType: 'mouse', relatedTarget: first })

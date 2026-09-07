@@ -49,6 +49,17 @@
   border: 2px solid var(--surface-strong);
   border-radius: 8px;
 }
+.oa-message-nav-tooltip {
+  max-height: min(360px, calc(100dvh - 32px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  scrollbar-width: thin;
+}
 .oa-message-nav-track > li { margin: 0; padding: 0; list-style: none; }
 .oa-message-nav-node,
 .oa-message-nav-older {
