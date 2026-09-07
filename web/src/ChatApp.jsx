@@ -1534,6 +1534,25 @@ const parseToolArgumentJsonText = value => {
   }
 }
 
+export function SessionManagerGroup({ label, items, selectedIds, collapsed, disabled, onToggle, onSelect, children }) {
+  const selected = items.filter(item => selectedIds.has(item.id)).length
+  const all = items.length > 0 && selected === items.length
+  return <section className="oa-session-manager-group">
+    <div className="oa-session-manager-group-header">
+      <button type="button" className="oa-session-group-select" role="checkbox"
+        aria-label={ct(`选择分组：${label}`, `Select group: ${label}`)} aria-checked={all ? true : selected ? 'mixed' : false}
+        disabled={disabled || !items.length} onClick={onSelect}>
+        <span className={`oa-session-check ${all ? 'is-checked' : selected ? 'is-partial' : ''}`}>{all && <Check size={12}/>}</span>
+      </button>
+      <button type="button" className="oa-session-group-toggle" aria-expanded={!collapsed} onClick={onToggle}>
+        <span>{label}</span><small>{selected} / {items.length}</small>
+        <ChevronDown size={14} style={{ transform: collapsed ? 'rotate(90deg)' : 'none' }} aria-hidden="true"/>
+      </button>
+    </div>
+    {!collapsed && children}
+  </section>
+}
+
 export const parseToolReceiptArgs = (body = '') => {
   if (body && typeof body === 'object' && !Array.isArray(body)) return body
   const parsed = parseToolArgumentJsonText(body)
@@ -7637,7 +7656,6 @@ export default function ChatApp() {
         </div>
         <div className="oa-session-manager-dialog-list">
           {(() => {
-            console.log('[SessionManager]', { sessionManagerView, recentGroups: managedRecentGroups.length, projectGroups: managedProjectGroups.length });
             
             // 公共会话行渲染函数
             const renderSessionRow = (s) => {
@@ -7658,36 +7676,18 @@ export default function ChatApp() {
               </div>
             }
             
-            // 项目分组
-            if (sessionManagerView === 'project') {
-              return managedProjectGroups.map(group => {
-                return <div key={group.name} className="oa-session-manager-group">
-                  <div className="oa-session-manager-group-header">{group.name}</div>
-                  {group.sessions.map(renderSessionRow)}
-                </div>
-              })
-            }
-            
-            // 时间分组
-            if (sessionManagerView === 'time') {
-              return managedRecentGroups.map(({ key: groupKey, sessions: groupSessions }) => {
-                const groupLabel = recentGroupLabels[groupKey]
-                return <div key={groupKey} className="oa-session-manager-group">
-                  <div className="oa-session-manager-group-header">{groupLabel}</div>
-                  {groupSessions.map(renderSessionRow)}
-                </div>
-              })
-            }
-            
-            // Hub分组（按项目分组Hub会话）
-            if (sessionManagerView === 'hub') {
-              return managedProjectGroups.map(group => {
-                return <div key={group.name} className="oa-session-manager-group">
-                  <div className="oa-session-manager-group-header">{group.name}</div>
-                  {group.sessions.map(renderSessionRow)}
-                </div>
-              })
-            }
+            const groups = sessionManagerView === 'time'
+              ? managedRecentGroups.map(group => ({ key: group.key, label: managedSessionGroupLabels[group.key], sessions: group.sessions }))
+              : managedProjectGroups.map(group => ({ key: group.name, label: group.name, sessions: group.sessions }))
+            return groups.map(group => {
+              const key = `${sessionManagerView}:${group.key}`
+              return <SessionManagerGroup key={key} label={group.label} items={group.sessions}
+                selectedIds={selectedSessionIdSet} collapsed={collapsedSessionGroups.has(key)}
+                disabled={batchDeleting || Boolean(hubUpdatingSessionId)}
+                onToggle={()=>toggleSessionGroup(key)} onSelect={()=>toggleSessionGroupSelection(group.sessions)}>
+                {group.sessions.map(renderSessionRow)}
+              </SessionManagerGroup>
+            })
           })()}
           {!managedSessions.length && <div className="oa-session-manager-dialog-empty">{sessionManagerView === 'hub' ? ct('暂无会话入驻 Hub', 'No sessions have joined Hub') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
