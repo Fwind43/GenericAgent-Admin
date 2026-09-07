@@ -41,6 +41,14 @@ test('chat shares minimal step styling across all screen sizes', () => {
   assert.match(mobile, /\.oa-turn-toggle > \.oa-turn-chevron \{ margin-left: auto; \}/);
 })
 
+test('execution header keeps quiet status and accessible controls', () => {
+  assert.match(chatSource, /data-running=\{pending \? 'true' : 'false'\}/);
+  assert.match(chatSource, /className="oa-run-status"/);
+  assert.match(ruleBodies('.oa-turn-stack-head > .oa-run-status').join(''), /background: none/);
+  assert.match(ruleBodies('.oa-turn-stack-head > .oa-run-dot').join(''), /box-shadow: none/);
+  assert.match(ruleBodies('.oa-turn-stack-head:focus-visible').join(''), /outline: 2px solid/);
+})
+
 test('chat topbar has no waiting-reply navigation or reserved layout', () => {
   const header = chatSource.match(/<header className="oa-topbar">([\s\S]*?)<\/header>/)?.[1]
   assert.ok(header, 'the topbar layout must not depend on waiting sessions')

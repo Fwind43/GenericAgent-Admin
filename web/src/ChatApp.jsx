@@ -3231,11 +3231,11 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
     : undefined
   return <div className={`oa-content ${parsed.runs.length ? 'oa-agent-output' : ''}`}>
     {parsed.runs.length > 0 && <div className={`oa-turn-stack ${stackOpen ? 'open' : 'collapsed'}`}>
-      <button className="oa-turn-stack-head" type="button" onClick={() => setStackOpenOverride(!stackOpen)} aria-expanded={stackOpen} title={stackOpen ? ct('折叠执行过程', 'Collapse execution') : ct('展开执行过程', 'Expand execution')}>
+      <button className="oa-turn-stack-head" data-running={pending ? 'true' : 'false'} type="button" onClick={() => setStackOpenOverride(!stackOpen)} aria-expanded={stackOpen} title={stackOpen ? ct('折叠执行过程', 'Collapse execution') : ct('展开执行过程', 'Expand execution')}>
         <span className="oa-run-dot"/>
-        <span>{ct('执行过程', 'Execution')}</span>
+        <span className="oa-run-label">{ct('执行过程', 'Execution')}</span>
         <b>{parsed.runs.length}</b>
-        <em>{pending ? ct('正在生成', 'Generating') : ct('已完成', 'Completed')}</em>
+        <em className="oa-run-status">{pending ? ct('正在生成', 'Generating') : ct('已完成', 'Completed')}</em>
         <ChevronDown className="oa-stack-chevron" size={15}/>
       </button>
       {parsed.runs.map((run, index) => <AssistantTurn
