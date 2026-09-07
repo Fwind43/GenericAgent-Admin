@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Tooltip } from 'antd'
+import { List, X } from 'lucide-react'
 import './MessageNavigator.css'
 
 export function messageNavigationNodes(messages, attachmentLabel, emptyLabel) {
@@ -26,8 +27,10 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
   const listID = useId()
   const navRef = useRef(null)
   const suppressTouchClick = useRef(false)
+  const touchInput = useRef(false)
   const [activeID, setActiveID] = useState('')
   const [expanded, setExpanded] = useState(false)
+  const [mobile, setMobile] = useState(() => window.matchMedia?.('(max-width: 640px)').matches ?? false)
   const [layout, setLayout] = useState({ right: 12, top: 0, height: 0 })
   const [previewID, setPreviewID] = useState(null)
   const leaveTimer = useRef(null)
@@ -43,6 +46,13 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
   }
   const containsPreview = useCallback(target => target instanceof Element && target.closest('[data-message-nav-owner]')?.dataset.messageNavOwner === listID, [listID])
   useEffect(() => () => clearTimeout(leaveTimer.current), [])
+  useEffect(() => {
+    const media = window.matchMedia?.('(max-width: 640px)')
+    if (!media) return
+    const change = () => { setMobile(media.matches); dismissPreview() }
+    media.addEventListener('change', change)
+    return () => media.removeEventListener('change', change)
+  }, [dismissPreview])
 
   useEffect(() => {
     const thread = threadRef.current
@@ -153,30 +163,42 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
     target?.focus({ preventScroll: true })
     if (target) trackRef.current.scrollTop = Math.max(0, target.offsetTop - trackRef.current.clientHeight / 2)
   }
-  const select = action => {
+  const select = (action, closeAfterSelect = false) => {
     if (suppressTouchClick.current) { suppressTouchClick.current = false; return }
     if (!expanded) { setExpanded(true); return }
     setPreviewID(null)
     action?.()
+    if (closeAfterSelect && (mobile || touchInput.current)) {
+      dismissPreview()
+      if (mobile) navRef.current?.querySelector('.oa-message-nav-toggle')?.focus({ preventScroll: true })
+    }
   }
   return <nav className="oa-message-nav" ref={navRef} data-expanded={expanded}
     aria-label={ct('\u6d88\u606f\u8282\u70b9', 'Message navigation')}
-    style={{ right: layout.right, top: layout.top, height: layout.height }}
-    onPointerEnter={event => { if (event.pointerType !== 'touch') keepOpen() }}
+    style={{ '--nav-right': `${layout.right}px`, top: layout.top, height: layout.height }}
+    onPointerEnter={event => { if (!mobile && event.pointerType !== 'touch') keepOpen() }}
     onPointerLeave={event => {
-      if (event.pointerType !== 'touch' && !containsPreview(event.relatedTarget)) {
+      if (!mobile && event.pointerType !== 'touch' && !containsPreview(event.relatedTarget)) {
         if (previewID) leave()
         else dismissPreview()
       }
     }}
     onPointerDown={event => {
       if (containsPreview(event.target)) return
-      suppressTouchClick.current = event.pointerType === 'touch' && !expanded
+      touchInput.current = event.pointerType === 'touch'
+      suppressTouchClick.current = !mobile && touchInput.current && !expanded
       if (suppressTouchClick.current) { event.preventDefault(); keepOpen() }
     }}
-    onFocus={keepOpen}
+    onFocus={() => { if (!mobile) keepOpen() }}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget) && !containsPreview(event.relatedTarget)) dismissPreview() }}>
-    <ul className="oa-message-nav-track" ref={trackRef} id={listID} aria-label={ct('\u6d88\u606f\u5217\u8868', 'Message list')}
+    {mobile && <button type="button" className="oa-message-nav-toggle"
+      aria-label={ct('\u6d88\u606f\u76ee\u5f55', 'Message directory')}
+      title={ct('\u6d88\u606f\u76ee\u5f55', 'Message directory')}
+      aria-expanded={expanded} aria-controls={listID}
+      onClick={() => { if (expanded) dismissPreview(); else keepOpen() }}>
+      <span aria-hidden="true">{expanded ? <X size={16}/> : <List size={16}/>}</span>
+    </button>}
+    <ul className="oa-message-nav-track" ref={trackRef} id={listID} hidden={mobile && !expanded} aria-label={ct('\u6d88\u606f\u5217\u8868', 'Message list')}
       onScroll={scroll}
       onWheel={event => { if (expanded && event.deltaY < 0 && event.currentTarget.scrollTop <= 8) loadOlder() }}
       onKeyDown={event => { suppressTouchClick.current = false; keyboard(event) }}>
@@ -187,7 +209,7 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
       </button></li>}
       {nodes.map((node, index) => <li key={node.id}><Tooltip placement="left" arrow={false} trigger={[]} destroyOnHidden
         open={expanded && previewID === node.id}
-        styles={{ root: { maxWidth: 'min(480px, calc(100vw - 32px))' } }}
+        classNames={{ root: 'oa-message-nav-popup' }}
         title={<div className="oa-message-nav-tooltip" data-message-nav-owner={listID} tabIndex={0}
           onPointerEnter={keepOpen} onPointerLeave={leave}
           onWheel={event => event.stopPropagation()}
@@ -198,7 +220,7 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
           tabIndex={node.id === (activeID || nodes[0].id) ? 0 : -1}
           onPointerEnter={event => { if (event.pointerType !== 'touch') { keepOpen(); setPreviewID(node.id) } }}
           onFocus={() => { if (!suppressTouchClick.current) setPreviewID(node.id) }}
-          onClick={() => select(() => onNavigate(node.id))}>
+          onClick={() => select(() => onNavigate(node.id), true)}>
           <span className="oa-message-nav-label" aria-hidden="true">{node.label}</span><span className="oa-message-nav-mark" aria-hidden="true"><span /></span>
         </button>
       </Tooltip></li>)}
