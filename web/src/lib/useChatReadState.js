@@ -50,5 +50,16 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
       document.removeEventListener('visibilitychange', reset)
     }
   }, [eligible, currentUnread, key, instance, sid, result, storage, threadRef])
-  return { unread, currentUnread, markSessionRead }
+  const hasUnread = sessions.some(unread)
+  const markAllRead = () => {
+    const unreadSessions = sessions.filter(unread)
+    if (!unreadSessions.length) return
+    const keys = unreadSessions.map(session => chatReadKey(instance, session.id, session.result))
+    for (const session of unreadSessions) {
+      markChatResultRead(instance, session.id, session.result, storage)
+    }
+    setReadKeys(previous => new Set([...previous, ...keys]))
+    window.dispatchEvent(new Event(chatReadEvent))
+  }
+  return { unread, currentUnread, markSessionRead, hasUnread, markAllRead }
 }

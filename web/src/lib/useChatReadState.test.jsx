@@ -144,6 +144,37 @@ test('explicit selection ignores unknown, running and incomplete results', () =>
   expect(localStorage.length).toBe(0)
 })
 
+test('mark all read persists only completed results and remains scoped and idempotent', () => {
+  focused = false
+  props = { ...props, sessions: [...props.sessions, { id: 'background', result: answer }, { id: 'busy', running: true, result: answer }, { id: 'empty' }] }
+  const h = setup()
+  expect(h.result.current.hasUnread).toBe(true)
+  act(() => { h.result.current.markAllRead() })
+  expect(h.result.current.hasUnread).toBe(false)
+  expect(localStorage.getItem(chatReadKey('i', 'background', answer))).toBe('1')
+  expect(localStorage.getItem(chatReadKey('i', 'busy', answer))).toBeNull()
+  const stored = { ...localStorage }
+  act(() => { h.result.current.markAllRead() })
+  expect({ ...localStorage }).toEqual(stored)
+  h.unmount()
+  const restored = setup()
+  expect(restored.result.current.hasUnread).toBe(false)
+  restored.rerender({ ...props, sessions: [{ id: 's', result: { ...answer, revision: 'v2' } }] })
+  expect(restored.result.current.hasUnread).toBe(true)
+  restored.rerender({ ...props, instance: 'other' })
+  expect(restored.result.current.hasUnread).toBe(true)
+})
+
+test('mark all read updates immediately with blocked storage', () => {
+  focused = false
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+  const h = setup()
+  act(() => { h.result.current.markAllRead() })
+  expect(h.result.current.hasUnread).toBe(false)
+  act(() => { h.result.current.markAllRead() })
+  expect(h.result.current.hasUnread).toBe(false)
+})
+
 test('cross-tab storage and same-window events immediately synchronize lists', () => {
   focused = false
   const h = setup()

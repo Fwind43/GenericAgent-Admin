@@ -16,7 +16,7 @@ import { projectNameError, projectNameErrorText } from './lib/projectName.js'
 import { Collapse, Tag } from 'antd'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { Bot, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Loader2, Lock, Maximize, Maximize2, Menu, MessageSquarePlus, MoreHorizontal, Orbit, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Bot, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Loader2, Lock, Maximize, Maximize2, Menu, MessageSquarePlus, MoreHorizontal, Orbit, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { api, apiStream } from './lib/api'
 import { createChatSessionCache } from './lib/chatSessionCache.js'
 import { useChatHistoryPages } from './lib/useChatHistoryPages.js'
@@ -7076,6 +7076,14 @@ export default function ChatApp() {
           title={ct('新对话', 'New chat')}
           aria-label={ct('新对话', 'New chat')}
         ><MessageSquarePlus size={16}/></button>
+        <button
+          type="button"
+          className="oa-icon-btn"
+          onClick={chatReadState.markAllRead}
+          disabled={!chatReadState.hasUnread}
+          title={ct('一键已读', 'Mark all as read')}
+          aria-label={ct('一键已读', 'Mark all as read')}
+        ><CheckCheck size={16}/></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('折叠', 'Collapse')}><Menu size={16}/></button>
       </div>
       <div className="oa-sidebar-tabs" role="tablist" aria-label={ct('会话视图', 'Session views')}>

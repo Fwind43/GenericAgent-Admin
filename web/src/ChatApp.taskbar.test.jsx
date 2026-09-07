@@ -75,6 +75,21 @@ test('real ChatApp keeps background attention across selection and clears only t
   expect(bridge).toHaveBeenLastCalledWith('idle')
   expect(paths).not.toContain('/api/chat/session/background')
 
+  const bulkResult = { id: 'background-answer', revision: 'bulk-revision' }
+  expect(screen.getByRole('button', { name: 'Mark all as read' }).disabled).toBe(true)
+  sessions = sessions.map(item => item.id === 'background'
+    ? { ...item, taskbar_state: 'completed', result: bulkResult }
+    : item)
+  act(() => { window.dispatchEvent(new Event('online')) })
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('unread'))
+  fireEvent.change(screen.getByRole('textbox', { name: 'Search sessions' }), { target: { value: 'Alpha' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }))
+  expect(screen.getByRole('button', { name: 'Mark all as read' }).disabled).toBe(true)
+  expect(bridge).toHaveBeenLastCalledWith('idle')
+  expect(paths).not.toContain('/api/chat/session/background')
+  fireEvent.change(screen.getByRole('textbox', { name: 'Search sessions' }), { target: { value: '' } })
+  expect(screen.getByText('Taskbar Background').closest('button').querySelector('.oa-session-unread-label')).toBeNull()
+
   const result = { id: 'background-answer', revision: 'revision-2' }
   sessions = sessions.map(item => item.id === 'background'
     ? { ...item, taskbar_state: 'completed', result }
