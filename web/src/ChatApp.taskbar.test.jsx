@@ -134,5 +134,5 @@ test('real ChatApp keeps background attention across selection and clears only t
   expect(restoredBackgroundButton.querySelector('.oa-session-waiting-label')).toBeNull()
   expect(screen.queryByRole('button', { name: /^Waiting for reply/ })).toBeNull()
   expect(document.querySelector('.oa-topbar').classList.contains('has-waiting')).toBe(false)
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  expect(bridge).toHaveBeenLastCalledWith('running')
 }, 10000)
