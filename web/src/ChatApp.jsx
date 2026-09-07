@@ -3931,7 +3931,10 @@ export function ProviderModelCascade({
     else setPreviewProvider(groups[0]?.value || '')
   }
   const toggleMenu = () => {
-    if (!open) resetPreview()
+    if (!open) {
+      resetPreview()
+      setCollapsedProviders(new Set(groups.filter(group => group.value !== selectedProvider).map(group => group.value)))
+    }
     setOpen(value => !value)
   }
   const closeMenu = (restoreFocus = false) => {

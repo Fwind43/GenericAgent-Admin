@@ -1422,18 +1422,19 @@ describe('chat model cascade', () => {
     expect(screen.getByRole('heading', { name: 'Beta' })).toBeTruthy()
   })
 
-  test('collapses providers independently, preserves state on reopen, and reveals search matches', () => {
+  test('opens only the selected provider, resets on reopen, and reveals search matches', () => {
     const onChange = vi.fn()
     render(<ProviderModelCascade groups={groups} selectedProvider="alpha" value="a-1" onChange={onChange} />)
     const trigger = screen.getByRole('button', { expanded: false })
     fireEvent.click(trigger)
     const beta = screen.getByRole('button', { name: 'Beta', exact: true })
-    fireEvent.click(beta)
     expect(beta.getAttribute('aria-expanded')).toBe('false')
     expect(document.getElementById(beta.getAttribute('aria-controls')).hidden).toBe(true)
     expect(screen.queryByRole('button', { name: 'Beta One' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Alpha One' })).toBeTruthy()
     expect(onChange).not.toHaveBeenCalled()
+    fireEvent.click(beta)
+    expect(screen.getByRole('button', { name: 'Beta One' })).toBeTruthy()
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(trigger)
     expect(screen.getByRole('button', { name: 'Beta', exact: true }).getAttribute('aria-expanded')).toBe('false')
@@ -1452,6 +1453,7 @@ describe('chat model cascade', () => {
     render(<ProviderModelCascade groups={groups} selectedProvider="alpha" value="a-1" onChange={onChange} />)
 
     fireEvent.click(screen.getByRole('button', { name: '\u6a21\u578b\u4e0e\u63a8\u7406\u5f3a\u5ea6\uff1aAlpha One \u00b7 \u9ed8\u8ba4' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Beta', exact: true }))
     fireEvent.scroll(window)
     expect(screen.getByRole('dialog', { name: '\u670d\u52a1\u5546\u3001\u6a21\u578b\u4e0e\u63a8\u7406\u5f3a\u5ea6' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Beta One' }))
