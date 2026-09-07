@@ -7081,18 +7081,17 @@ export default function ChatApp() {
         ><MessageSquarePlus size={16}/></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('折叠', 'Collapse')}><Menu size={16}/></button>
       </div>
-      <div className="oa-sidebar-tabs" role="tablist" aria-label={ct('会话视图', 'Session views')}>
-        <button type="button" role="tab" aria-selected={sidebarTab === 'history'} className={sidebarTab === 'history' ? 'active' : ''} onClick={()=>setSidebarTab('history')}>
-          <Clock3 size={13}/><span>{ct('历史', 'History')}</span><small>{sessions.length}</small>
-        </button>
-        <button type="button" role="tab" aria-selected={sidebarTab === 'projects'} className={sidebarTab === 'projects' ? 'active' : ''} onClick={()=>setSidebarTab('projects')}>
-          <FolderOpen size={13}/><span>{ct('项目', 'Projects')}</span><small>{projectSessionGroups.length}</small>
-        </button>
-      </div>
-      {sidebarTab === 'history' ? <>
-        <div className="oa-session-manager-head">
-          <span className="oa-session-manager-title">{ct('最近对话', 'Recent chats')}</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div className="oa-session-manager-head" style={{ justifyContent: 'space-between', minHeight: 40 }}>
+        <select
+          aria-label={ct('会话分组方式', 'Session grouping')}
+          value={sidebarTab}
+          onChange={e=>setSidebarTab(e.target.value)}
+          style={{ width: 'auto', minWidth: 0, maxWidth: '60%', minHeight: 40, padding: '0 6px', border: 0, background: 'transparent', color: 'var(--text)', font: 'inherit', fontWeight: 600, cursor: 'pointer' }}
+        >
+          <option value="history">{ct('按时间分组', 'Group by time')}</option>
+          <option value="projects">{ct('按项目分组', 'Group by project')}</option>
+        </select>
+        {sidebarTab === 'history' ? <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button
               type="button"
               className="oa-session-manage-open"
@@ -7102,8 +7101,11 @@ export default function ChatApp() {
               aria-label={ct('一键已读', 'Mark all as read')}
             ><CheckCheck size={16}/></button>
             <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理', 'Manage')}</button>
-          </div>
-        </div>
+          </div> : <button className="oa-session-manage-open" type="button" onClick={openProjectDraft} disabled={projectCreating || projectDraftOpen}>
+            <FolderPlus size={13}/>{ct('新建项目', 'New project')}
+          </button>}
+      </div>
+      {sidebarTab === 'history' ? <>
         <div className="oa-session-list">
           {recentSessionGroups.map(group => <section className={`oa-recent-group oa-recent-group-${group.key}`} key={group.key}>
             <div className="oa-recent-group-head">{group.key === 'pinned' && <Pin size={12}/>}<span>{recentGroupLabels[group.key]}</span><small>{group.sessions.length}</small></div>
@@ -7112,12 +7114,6 @@ export default function ChatApp() {
           {!filteredSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
       </> : <>
-        <div className="oa-session-manager-head">
-          <span className="oa-session-manager-title">{ct('项目', 'Projects')}</span>
-          <button className="oa-session-manage-open" type="button" onClick={openProjectDraft} disabled={projectCreating || projectDraftOpen}>
-            <FolderPlus size={13}/>{ct('新建项目', 'New project')}
-          </button>
-        </div>
         {projectDraftOpen && <form className="oa-project-draft" onSubmit={e=>{ e.preventDefault(); createProject() }}>
           <input
             autoFocus
