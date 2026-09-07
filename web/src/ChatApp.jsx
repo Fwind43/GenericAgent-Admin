@@ -3916,6 +3916,7 @@ export function ProviderModelCascade({
 }) {
   const [open, setOpen] = useState(false)
   const [mobilePicker, setMobilePicker] = useState(isMobileModelPickerViewport)
+  const [collapsedProviders, setCollapsedProviders] = useState(() => new Set())
   const [previewProvider, setPreviewProvider] = useState(selectedProvider || groups[0]?.value || '')
   const [query, setQuery] = useState('')
   const ref = useRef()
@@ -4097,13 +4098,26 @@ export function ProviderModelCascade({
           {query && <button type="button" onClick={() => setQuery('')} aria-label={ct('\u6e05\u9664\u641c\u7d22', 'Clear search')}><X size={13} /></button>}
         </div>
         <div className="oa-cascade-catalog" ref={modelListRef} aria-label={ct('\u6309\u670d\u52a1\u5546\u5206\u7ec4\u7684\u6a21\u578b', 'Models grouped by provider')}>
-          {filteredGroups.length ? filteredGroups.map(group => (
-            <section className="oa-cascade-group" key={group.value} aria-label={group.label}>
+          {filteredGroups.length ? filteredGroups.map(group => {
+            const expanded = Boolean(normalizedQuery) || !collapsedProviders.has(group.value)
+            const modelsId = `${menuId}-group-${encodeURIComponent(group.value)}`
+            return <section className="oa-cascade-group" key={group.value} aria-label={group.label}>
               <h3 className="oa-cascade-provider-heading" aria-label={group.label}>
-                <span>{group.label}</span>
-                <span>{group.models.length}</span>
+                <button type="button" className="oa-cascade-provider-toggle"
+                  aria-label={group.label} aria-expanded={expanded} aria-controls={modelsId}
+                  disabled={Boolean(normalizedQuery)}
+                  onClick={() => setCollapsedProviders(previous => {
+                    const next = new Set(previous)
+                    if (next.has(group.value)) next.delete(group.value)
+                    else next.add(group.value)
+                    return next
+                  })}>
+                  <ChevronDown size={13} aria-hidden="true" />
+                  <span>{group.label}</span>
+                  <span>{group.models.length}</span>
+                </button>
               </h3>
-              <div className="oa-cascade-group-models">
+              <div id={modelsId} className="oa-cascade-group-models" hidden={!expanded}>
                 {group.models.map(model => {
                   const isCurrent = group.value === selectedProvider && String(model.value) === String(value)
                   return <button key={model.value} type="button"
@@ -4117,7 +4131,7 @@ export function ProviderModelCascade({
                 })}
               </div>
             </section>
-          )) : <div className="oa-cascade-empty">{ct('\u6ca1\u6709\u5339\u914d\u7684\u670d\u52a1\u5546\u6216\u6a21\u578b', 'No matching providers or models')}</div>}
+          }) : <div className="oa-cascade-empty">{ct('\u6ca1\u6709\u5339\u914d\u7684\u670d\u52a1\u5546\u6216\u6a21\u578b', 'No matching providers or models')}</div>}
         </div>
         <div className="oa-cascade-reasoning" aria-label={ct('\u63a8\u7406\u5f3a\u5ea6', 'Reasoning effort')}>
           <div className="oa-cascade-heading">{ct('\u63a8\u7406\u5f3a\u5ea6', 'Reasoning effort')}</div>

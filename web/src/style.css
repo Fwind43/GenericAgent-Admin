@@ -7071,12 +7071,14 @@ html[data-color-scheme="dark"] .oa-cascade-reasoning button:hover { background: 
   font-weight: 720;
   line-height: 1.35;
 }
-.oa-cascade-provider-heading > span:first-child {
+.oa-cascade-provider-toggle > span:first-of-type {
+  flex: 1;
+  text-align: left;
   min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
 }
-.oa-cascade-provider-heading > span:last-child {
+.oa-cascade-provider-toggle > span:last-child {
   flex: 0 0 auto;
   min-width: 18px;
   padding: 1px 5px;
@@ -7088,6 +7090,37 @@ html[data-color-scheme="dark"] .oa-cascade-reasoning button:hover { background: 
   line-height: 1.35;
   text-align: center;
 }
+.oa-composer .oa-cascade-provider-toggle {
+  /* Provider headers must not inherit the composer's 42px action-button basis. */
+  flex: 1 1 auto !important;
+  grid-column: auto !important;
+  justify-self: stretch !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.oa-composer .oa-cascade-provider-toggle:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--muted) 9%, transparent);
+}
+.oa-composer .oa-cascade-provider-toggle:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: 2px;
+}
+.oa-composer .oa-cascade-provider-toggle:disabled { opacity: 1; cursor: default; }
+.oa-cascade-provider-toggle > svg { flex: 0 0 auto; transition: transform .14s ease; }
+.oa-cascade-provider-toggle[aria-expanded="false"] > svg { transform: rotate(-90deg); }
+.oa-cascade-group-models[hidden] { display: none; }
 .oa-cascade-group-models {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
