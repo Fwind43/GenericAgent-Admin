@@ -1493,7 +1493,11 @@ const escapeJsonStringControlCharacters = value => {
       continue
     }
     if (escaped) {
-      result += char
+      // Legacy receipts may contain a literal backslash followed by a raw newline.
+      // Preserve both characters rather than leaving an invalid JSON escape.
+      result += char.charCodeAt(0) < 0x20
+        ? '\\' + JSON.stringify(char).slice(1, -1)
+        : char
       escaped = false
       continue
     }

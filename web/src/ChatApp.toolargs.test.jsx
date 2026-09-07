@@ -132,6 +132,16 @@ describe('tool receipt argument parsing', () => {
     expect(contentRow.querySelector('.ga-tool-script')).toBeNull()
   })
 
+  test.each(['\n', '\r\n', '\t'])('repairs a backslash before literal control %j without losing script text', control => {
+    const script = "print('" + '\\' + control + "'.join(lines))";
+    const body = '{"cwd":"C:\\\\Users\\\\demo","inline_eval":false,"script":"' + script + '","timeout":200,"type":"python"}';
+    expect(parseToolReceiptArgs(body)).toEqual({ cwd: 'C:\\Users\\demo', inline_eval: false, script, timeout: 200, type: 'python' });
+    const content = ['\u{1F6E0}\uFE0F Tool: `code_run`', '```text', body, '```'].join('\n');
+    const { container } = render(<ChatMessage message={{ id: 'slash-control', role: 'assistant', content, files: [], created_at: 0 }} pending={false} />);
+    expect(container.querySelectorAll('.ga-tool-arg dt')).toHaveLength(5);
+    expect(container.querySelector('.ga-fold-pre')).toBeNull();
+  })
+
   test('falls back for malformed or non-object JSON', () => {
     expect(parseToolReceiptArgs('{"script":')).toEqual({})
     expect(parseToolReceiptArgs('[1,2]')).toEqual({})
