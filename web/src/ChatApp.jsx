@@ -7672,11 +7672,10 @@ export default function ChatApp() {
             console.log('[SessionManager]', { sessionManagerView, isAllView, recentGroups: managedRecentGroups.length, projectGroups: managedProjectGroups.length });
             
             return isAllView 
-              ? managedRecentGroups.map(({ key: groupKey, sessions: groupSessions }) => {
-                const groupLabel = recentGroupLabels[groupKey]
-                return <div key={groupKey} className="oa-session-manager-group">
-                  <div className="oa-session-manager-group-header">{groupLabel}</div>
-                  {groupSessions.map(s => {
+              ? managedProjectGroups.map(group => {
+                return <div key={group.name} className="oa-session-manager-group">
+                  <div className="oa-session-manager-group-header">{group.name}</div>
+                  {group.sessions.map(s => {
                     const selected = selectedSessionIdSet.has(s.id)
                     const hubUpdating = hubUpdatingSessionId === s.id
                     const sourceLabel = s.title_source === 'generated' ? 'AI' : s.title_source === 'manual' ? '手动' : '旧标题'
@@ -7695,10 +7694,11 @@ export default function ChatApp() {
                   })}
                 </div>
               })
-            : managedProjectGroups.map(group => {
-                return <div key={group.name} className="oa-session-manager-group">
-                  <div className="oa-session-manager-group-header">{group.name}</div>
-                  {group.sessions.map(s => {
+            : managedRecentGroups.map(({ key: groupKey, sessions: groupSessions }) => {
+                const groupLabel = recentGroupLabels[groupKey]
+                return <div key={groupKey} className="oa-session-manager-group">
+                  <div className="oa-session-manager-group-header">{groupLabel}</div>
+                  {groupSessions.map(s => {
                     const selected = selectedSessionIdSet.has(s.id)
                     const hubUpdating = hubUpdatingSessionId === s.id
                     const sourceLabel = s.title_source === 'generated' ? 'AI' : s.title_source === 'manual' ? '手动' : '旧标题'
