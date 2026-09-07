@@ -16286,6 +16286,55 @@ html[data-color-scheme="dark"] .logs-page {
   transform:none !important;
 }
 
+/* Sidebar view switcher: quiet navigation on the left, actions on the right. */
+.oa-session-manager-head {
+  min-height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:0 2px;
+}
+.oa-sidebar-view-tabs {
+  display:flex;
+  align-items:stretch;
+  align-self:stretch;
+  gap:18px;
+}
+.oa-sidebar-view-tabs button {
+  position:relative;
+  min-height:40px;
+  padding:0 2px;
+  border:0;
+  background:transparent;
+  color:var(--muted);
+  font:inherit;
+  font-size:13px;
+  font-weight:620;
+  cursor:pointer;
+  transition:color .16s ease;
+}
+.oa-sidebar-view-tabs button::after {
+  content:"";
+  position:absolute;
+  right:0;
+  bottom:3px;
+  left:0;
+  height:2px;
+  border-radius:999px;
+  background:var(--oa-green);
+  opacity:0;
+  transform:scaleX(.5);
+  transition:opacity .16s ease, transform .16s ease;
+}
+.oa-sidebar-view-tabs button:hover,
+.oa-sidebar-view-tabs button.is-active { color:var(--text); }
+.oa-sidebar-view-tabs button.is-active::after { opacity:1; transform:scaleX(1); }
+.oa-sidebar-view-actions { display:flex; align-items:center; gap:3px; }
+.oa-sidebar-view-actions .oa-session-manage-open { min-height:34px; }
+.oa-sidebar-view-actions .oa-mark-all-read { width:34px; padding:0; }
+.oa-sidebar-view-actions .oa-mark-all-read:disabled { opacity:.34; }
+
 .oa-sidebar-tabs {
   border-color:var(--oa-side-line);
   background:var(--oa-side-hover);

@@ -7081,20 +7081,19 @@ export default function ChatApp() {
         ><MessageSquarePlus size={16}/></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('折叠', 'Collapse')}><Menu size={16}/></button>
       </div>
-      <div className="oa-session-manager-head" style={{ justifyContent: 'space-between', minHeight: 40 }}>
-        <select
-          aria-label={ct('会话分组方式', 'Session grouping')}
-          value={sidebarTab}
-          onChange={e=>setSidebarTab(e.target.value)}
-          style={{ width: 'auto', minWidth: 0, maxWidth: '60%', minHeight: 40, padding: '0 6px', border: 0, background: 'transparent', color: 'var(--text)', font: 'inherit', fontWeight: 600, cursor: 'pointer' }}
-        >
-          <option value="history">{ct('按时间分组', 'Group by time')}</option>
-          <option value="projects">{ct('按项目分组', 'Group by project')}</option>
-        </select>
-        {sidebarTab === 'history' ? <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div className="oa-session-manager-head">
+        <div className="oa-sidebar-view-tabs" role="tablist" aria-label={ct('会话视图', 'Session view')}>
+          <button type="button" role="tab" aria-selected={sidebarTab === 'history'} className={sidebarTab === 'history' ? 'is-active' : ''} onClick={()=>setSidebarTab('history')}>
+            {ct('最近对话', 'Recent')}
+          </button>
+          <button type="button" role="tab" aria-selected={sidebarTab === 'projects'} className={sidebarTab === 'projects' ? 'is-active' : ''} onClick={()=>setSidebarTab('projects')}>
+            {ct('项目', 'Projects')}
+          </button>
+        </div>
+        {sidebarTab === 'history' ? <div className="oa-sidebar-view-actions">
             <button
               type="button"
-              className="oa-session-manage-open"
+              className="oa-session-manage-open oa-mark-all-read"
               onClick={chatReadState.markAllRead}
               disabled={!chatReadState.hasUnread}
               title={ct('一键已读', 'Mark all as read')}
