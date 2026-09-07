@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import katex from 'katex'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import ThemePicker from './ThemePicker'
+import MessageNavigator from './components/MessageNavigator'
 import ThinkingBlock from './ThinkingBlock'
 import SummaryBlock from './SummaryBlock'
 import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamTerminalMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldRefreshChatSnapshot } from './lib/chatStream.js'
@@ -6832,6 +6833,21 @@ export default function ChatApp() {
     return previous
   }
   const syncJumpSent = () => setShowJumpSent(Boolean(previousSentCard()))
+  const jumpToMessageNode = (messageID) => {
+    const sessionID = activeSidRef.current
+    const thread = threadRef.current
+    if (!thread || sessionLoading) return
+    setFollowState(false)
+    requestAnimationFrame(() => {
+      // A session switch can win the frame between releasing follow and jumping.
+      if (activeSidRef.current !== sessionID || threadRef.current !== thread) return
+      const card = [...thread.querySelectorAll('.oa-message.user')].find(el => el.dataset.id === messageID)
+      if (!card) return
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      markProgrammaticScroll(thread, reducedMotion ? FOLLOW_SETTLE_MS : SMOOTH_SETTLE_MS)
+      thread.scrollTo({ top: thread.scrollTop + cardTopOffset(card) - JUMP_TOP_MARGIN, behavior: reducedMotion ? 'auto' : 'smooth' })
+    })
+  }
   const jumpToPreviousSent = () => {
     if (!previousSentCard()) return
     // Reading a turn from its start is incompatible with being carried to the
@@ -7288,6 +7304,9 @@ export default function ChatApp() {
             {showJumpSent && <button className="oa-follow-btn" type="button" onClick={jumpToPreviousSent} title={ct('跳到上一条发送', 'Previous message you sent')} aria-label={ct('跳到上一条发送', 'Previous message you sent')}><ChevronUp size={16}/></button>}
           </div>}
         </section>
+        <MessageNavigator messages={messages} sessionID={sid} threadRef={threadRef}
+          onNavigate={jumpToMessageNode} loading={sessionLoading} ct={ct}
+          hasMore={historyPages.page?.has_more} loadingOlder={historyPages.loading} onLoadOlder={historyPages.loadOlder}/>
         {loopRailOpen && <div className="oa-loop-backdrop" onClick={()=>setLoopRailOpen(false)} aria-hidden="true"/>}
         {loopRailOpen && <aside className="oa-loop-rail" id="oa-loop-rail" aria-label={ct('Loop 控制', 'Loop controls')}>
           <header className="oa-loop-rail-head">
