@@ -14,7 +14,8 @@
   position: relative;
   flex: none;
   width: var(--nav-mark-width);
-  max-height: 100%;
+  /* Keep long directories compact, including in short/mobile viewports. */
+  max-height: min(100%, 320px, 50dvh);
   box-sizing: border-box;
   margin: 0 0 0 auto;
   padding: 6px 0;

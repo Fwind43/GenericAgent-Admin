@@ -3,6 +3,9 @@ import React, { useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import MessageNavigator, { messageNavigationNodes } from './MessageNavigator'
+import { readFileSync } from 'node:fs'
+
+const navigatorCSS = readFileSync('src/components/MessageNavigator.css', 'utf8')
 
 const messages = [
   { id: 'u1', role: 'user', content: 'First question' },
@@ -42,6 +45,12 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.use
 const flush = () => act(() => { vi.runOnlyPendingTimers() })
 
 describe('message nodes', () => {
+  test('caps directory height and contains overflow within the list', () => {
+    const track = navigatorCSS.match(/\.oa-message-nav-track\s*\{([^}]+)\}/)[1]
+    expect(track).toMatch(/max-height:\s*min\(100%, 320px, 50dvh\)/)
+    expect(track).toMatch(/overflow-y:\s*auto/)
+    expect(track).toMatch(/overscroll-behavior:\s*contain/)
+  })
   test('indexes only main user messages, handles attachments and caps long previews', () => {
     const result = messageNavigationNodes([...messages,
       { id: 'file', role: 'user', files: [{ name: 'report.pdf' }] },
