@@ -65,7 +65,8 @@ describe('message nodes', () => {
     const mobile = navigatorCSS.split('@media (max-width: 640px) {')[1].split('@media (prefers-reduced-motion: reduce)')[0]
     expect(mobile).toMatch(/padding-right:\s*0/)
     expect(mobile).toMatch(/\.oa-message-nav\[data-expanded="false"\] \.oa-message-nav-track\s*\{\s*display:\s*none/)
-    expect(mobile).toMatch(/\.oa-message-nav-toggle\s*\{[^}]*width:\s*44px;[^}]*height:\s*44px/)
+    expect(mobile).toMatch(/\.oa-message-nav-toggle\s*\{[^}]*width:\s*44px;[^}]*height:\s*56px/)
+    expect(mobile).toMatch(/\.oa-message-nav-toggle > span\s*\{[^}]*width:\s*14px;[^}]*height:\s*56px/)
     expect(mobile).toMatch(/width:\s*min\(208px, calc\(100vw - 64px\)\)/)
     expect(mobile).toMatch(/max-height:\s*min\(100%, 232px, 40dvh\)/)
     expect(mobile).toMatch(/\.oa-message-nav\[data-expanded="true"\] \.oa-message-nav-older\s*\{[^}]*height:\s*44px; min-height:\s*44px/)
