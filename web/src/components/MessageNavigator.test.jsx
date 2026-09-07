@@ -65,7 +65,8 @@ describe('message nodes', () => {
     const mobile = navigatorCSS.split('@media (max-width: 640px) {')[1].split('@media (prefers-reduced-motion: reduce)')[0]
     expect(mobile).toMatch(/padding-right:\s*0/)
     expect(mobile).toMatch(/\.oa-message-nav-toggle\s*\{[^}]*top:\s*calc\(50% - 28px\);[^}]*transform:\s*none/)
-    expect(mobile).toContain('.oa-message-nav .oa-message-nav-toggle:is(:hover, :active, :focus) { transform: none; }')
+    expect(mobile).toMatch(/\.oa-message-nav \.oa-message-nav-toggle:is\(:hover, :active, :focus\)\s*\{\s*transform: none;\s*background: transparent;\s*box-shadow: none;/)
+    expect(mobile).toMatch(/-webkit-tap-highlight-color:\s*transparent/)
     expect(mobile).toMatch(/\.oa-message-nav\[data-expanded="false"\] \.oa-message-nav-track\s*\{\s*display:\s*none/)
     expect(mobile).toMatch(/\.oa-message-nav-toggle\s*\{[^}]*width:\s*44px;[^}]*height:\s*56px/)
     expect(mobile).toMatch(/\.oa-message-nav-toggle > span\s*\{[^}]*width:\s*14px;[^}]*height:\s*56px/)

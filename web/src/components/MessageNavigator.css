@@ -153,7 +153,14 @@
     background: var(--surface-strong);
     box-shadow: 0 1px 4px rgb(0 0 0 / .05);
   }
-  .oa-message-nav .oa-message-nav-toggle:is(:hover, :active, :focus) { transform: none; }
+  .oa-message-nav .oa-message-nav-toggle {
+    -webkit-tap-highlight-color: transparent;
+  }
+  .oa-message-nav .oa-message-nav-toggle:is(:hover, :active, :focus) {
+    transform: none;
+    background: transparent;
+    box-shadow: none;
+  }
   .oa-message-nav-toggle > span > svg { width: 10px; height: 16px; }
   .oa-message-nav-toggle:hover,
   .oa-message-nav-toggle[aria-expanded="true"] { color: var(--accent); }
