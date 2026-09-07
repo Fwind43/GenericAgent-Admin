@@ -4520,7 +4520,7 @@ export default function ChatApp() {
   const [editing, setEditing] = useState('')
   const [draftTitle, setDraftTitle] = useState('')
   const [sessionManagerOpen, setSessionManagerOpen] = useState(false)
-  const [sessionManagerView, setSessionManagerView] = useState('all')
+  const [sessionManagerView, setSessionManagerView] = useState('project')
   const [collapsedSessionGroups, setCollapsedSessionGroups] = useState(() => new Set())
   const [selectedSessionIds, setSelectedSessionIds] = useState([])
   const [batchDeleting, setBatchDeleting] = useState(false)
@@ -7657,7 +7657,8 @@ export default function ChatApp() {
         </header>
         <div className="oa-session-manager-dialog-tools">
           <div className="oa-session-manager-filter" role="group" aria-label={ct('会话筛选', 'Session filter')}>
-            <button type="button" className={sessionManagerView === 'all' ? 'is-active' : ''} onClick={()=>setSessionManagerView('all')} disabled={batchDeleting}>{ct('全部', 'All')}<small>{sessions.length}</small></button>
+            <button type="button" className={sessionManagerView === 'project' ? 'is-active' : ''} onClick={()=>setSessionManagerView('project')} disabled={batchDeleting}>{ct('项目', 'Project')}<small>{sessions.length}</small></button>
+            <button type="button" className={sessionManagerView === 'time' ? 'is-active' : ''} onClick={()=>setSessionManagerView('time')} disabled={batchDeleting}>{ct('时间', 'Time')}<small>{sessions.length}</small></button>
             <button type="button" className={sessionManagerView === 'hub' ? 'is-active' : ''} onClick={()=>setSessionManagerView('hub')} disabled={batchDeleting}>Hub<small>{managedHubSessions.length}</small></button>
           </div>
           <button className="oa-session-select-all" type="button" role="checkbox" aria-checked={allSessionsSelected ? true : (visibleSelectedSessionCount ? 'mixed' : false)} onClick={toggleAllSessions} disabled={!managedSessions.length || batchDeleting}>
@@ -7668,11 +7669,11 @@ export default function ChatApp() {
         </div>
         <div className="oa-session-manager-dialog-list">
           {(() => {
-            const isAllView = sessionManagerView === 'all';
-            console.log('[SessionManager]', { sessionManagerView, isAllView, recentGroups: managedRecentGroups.length, projectGroups: managedProjectGroups.length });
+            console.log('[SessionManager]', { sessionManagerView, recentGroups: managedRecentGroups.length, projectGroups: managedProjectGroups.length });
             
-            return isAllView 
-              ? managedProjectGroups.map(group => {
+            // 项目分组
+            if (sessionManagerView === 'project') {
+              return managedProjectGroups.map(group => {
                 return <div key={group.name} className="oa-session-manager-group">
                   <div className="oa-session-manager-group-header">{group.name}</div>
                   {group.sessions.map(s => {
@@ -7694,7 +7695,11 @@ export default function ChatApp() {
                   })}
                 </div>
               })
-            : managedRecentGroups.map(({ key: groupKey, sessions: groupSessions }) => {
+            }
+            
+            // 时间分组
+            if (sessionManagerView === 'time') {
+              return managedRecentGroups.map(({ key: groupKey, sessions: groupSessions }) => {
                 const groupLabel = recentGroupLabels[groupKey]
                 return <div key={groupKey} className="oa-session-manager-group">
                   <div className="oa-session-manager-group-header">{groupLabel}</div>
@@ -7717,6 +7722,33 @@ export default function ChatApp() {
                   })}
                 </div>
               })
+            }
+            
+            // Hub分组（按项目分组Hub会话）
+            if (sessionManagerView === 'hub') {
+              return managedProjectGroups.map(group => {
+                return <div key={group.name} className="oa-session-manager-group">
+                  <div className="oa-session-manager-group-header">{group.name}</div>
+                  {group.sessions.map(s => {
+                    const selected = selectedSessionIdSet.has(s.id)
+                    const hubUpdating = hubUpdatingSessionId === s.id
+                    const sourceLabel = s.title_source === 'generated' ? 'AI' : s.title_source === 'manual' ? '手动' : '旧标题'
+                    return <div key={s.id} className={`oa-session-manager-dialog-row ${selected ? 'is-selected' : ''}`}>
+                      <button className="oa-session-manager-dialog-select" type="button" role="checkbox" aria-checked={selected} onClick={()=>toggleSessionSelection(s.id)} disabled={batchDeleting || Boolean(hubUpdatingSessionId)}>
+                        <span className={`oa-session-check ${selected ? 'is-checked' : ''}`}>{selected && <Check size={12}/>}</span>
+                        <span className="oa-session-dialog-copy">
+                          <span className="oa-session-dialog-title">{s.running && <i className="oa-session-running-dot" aria-hidden="true"/>}<b>{shortTitle(s)}</b><SessionAutorunBadge enabled={autorunEnabled} sessionId={s.id} targetSessionId={sid}/>{s.hub_enabled && <em className="oa-session-hub-badge">Hub</em>}{draftSessionIds.has(s.id) && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}{s.id === sid && <em>当前</em>}<em className={`is-title-source is-${s.title_source || 'legacy'}`}>{sourceLabel}</em></span>
+                          <small><Clock3 size={12}/>{fmtTime(s.updated_at) || ct('刚刚', 'Just now')} · {s.count || 0} 条{waitingSessionIds.has(s.id) ? <span className="oa-session-waiting-label"><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</span> : s.running ? <span>运行中</span> : chatReadState.unread(s) && <span className="oa-session-unread-label">{ct('未读', 'Unread')}</span>}</small>
+                        </span>
+                      </button>
+                      <button className={`oa-session-dialog-hub-action ${s.hub_enabled ? 'is-leave' : ''}`} type="button" onClick={()=>setSessionHubEnabled(s)} disabled={batchDeleting || Boolean(hubUpdatingSessionId)} aria-label={s.hub_enabled ? ct(`退出 Hub：${shortTitle(s)}`, `Leave Hub: ${shortTitle(s)}`) : ct(`入驻 Hub：${shortTitle(s)}`, `Join Hub: ${shortTitle(s)}`)}>
+                        <Bot size={13}/><span>{hubUpdating ? ct('处理中…', 'Updating…') : s.hub_enabled ? ct('退出 Hub', 'Leave Hub') : ct('入驻 Hub', 'Join Hub')}</span>
+                      </button>
+                    </div>
+                  })}
+                </div>
+              })
+            }
           })()}
           {!managedSessions.length && <div className="oa-session-manager-dialog-empty">{sessionManagerView === 'hub' ? ct('暂无会话入驻 Hub', 'No sessions have joined Hub') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
