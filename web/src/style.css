@@ -17178,6 +17178,11 @@ html[data-color-scheme="dark"] .logs-page {
   .oa-composer textarea,
   .oa-composer textarea:not(.file-editor) { font-size: 14px !important; }
 
+  .oa-turn-stack { padding-left: 0; }
+  .oa-turn-stack::before,
+  .oa-turn-node::before { display: none; }
+  .oa-turn-stack-head { margin-left: 0; width: 100%; }
+
   .oa-turn-card {
     border: 0;
     border-bottom: 1px solid var(--oa-line, var(--border));

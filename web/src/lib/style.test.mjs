@@ -22,6 +22,9 @@ test('mobile chat uses compact input and bottom-only step borders', () => {
   assert.ok(start >= 0 && end > start);
   const mobile = css.slice(start, end);
   assert.match(mobile, /font-size: 14px !important/);
+  assert.match(mobile, /\.oa-turn-stack \{ padding-left: 0; \}/);
+  assert.match(mobile, /\.oa-turn-stack::before,\s*\.oa-turn-node::before \{ display: none; \}/);
+  assert.match(mobile, /\.oa-turn-stack-head \{ margin-left: 0; width: 100%; \}/);
   const card = mobile.match(/\.oa-turn-card \{([^}]+)\}/)?.[1];
   assert.ok(card);
   assert.match(card, /border: 0;/);
