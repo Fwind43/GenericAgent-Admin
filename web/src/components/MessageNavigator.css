@@ -1,28 +1,46 @@
-/* Reserve a gutter only while navigation is present; never cover message actions. */
+/* A fixed marker gutter; expanding the directory must not reflow the thread. */
 .oa-thread:has(~ .oa-message-nav) { padding-right: 44px; }
 .oa-message-nav {
+  --nav-mark-width: 32px;
   position: absolute;
   z-index: 12;
-  width: 32px;
+  width: var(--nav-mark-width);
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   pointer-events: none;
 }
 .oa-message-nav-track {
   position: relative;
-  width: 100%;
+  flex: none;
+  width: var(--nav-mark-width);
   max-height: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0 auto;
+  padding: 6px 0;
+  list-style: none;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
   pointer-events: auto;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: width 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 .oa-message-nav-track::-webkit-scrollbar { display: none; }
+.oa-message-nav[data-expanded="true"] .oa-message-nav-track {
+  width: min(260px, calc(100vw - 64px));
+  border-color: var(--border);
+  background: var(--surface-strong);
+  box-shadow: 0 5px 20px rgb(0 0 0 / .10);
+}
+.oa-message-nav-track > li { margin: 0; padding: 0; list-style: none; }
 .oa-message-nav-node,
 .oa-message-nav-older {
-  width: 32px;
-  height: 24px;
-  min-height: 24px;
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
   padding: 0;
   box-shadow: none;
   border: 0;
@@ -31,10 +49,28 @@
   color: var(--muted);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  gap: 0;
+  text-align: left;
+  font-weight: 400;
   cursor: pointer;
 }
-.oa-message-nav-node > span {
+.oa-message-nav-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 20px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 120ms ease;
+}
+.oa-message-nav[data-expanded="true"] .oa-message-nav-label { opacity: 1; visibility: visible; }
+.oa-message-nav-mark { width: calc(var(--nav-mark-width) - 2px); flex: none; display: flex; justify-content: center; }
+.oa-message-nav-mark > span {
   width: 12px;
   height: 3px;
   border-radius: 2px;
@@ -42,40 +78,24 @@
   opacity: .4;
   transition: width 140ms ease, opacity 140ms ease, background 140ms ease;
 }
-.oa-message-nav-node[aria-current] > span {
-  width: 22px;
-  background: var(--accent);
-  opacity: 1;
-}
-.oa-message-nav-node:hover > span,
-.oa-message-nav-node:focus-visible > span { width: 22px; opacity: 1; }
+.oa-message-nav-node[aria-current] { color: var(--accent); }
+.oa-message-nav-node[aria-current] .oa-message-nav-mark > span { width: 22px; background: var(--accent); opacity: 1; }
+.oa-message-nav-node:hover .oa-message-nav-mark > span,
+.oa-message-nav-node:focus-visible .oa-message-nav-mark > span { width: 22px; opacity: 1; }
+.oa-message-nav[data-expanded="true"] .oa-message-nav-node:hover,
+.oa-message-nav[data-expanded="true"] .oa-message-nav-older:hover { background: var(--surface); color: var(--text); }
 .oa-message-nav-node:focus-visible,
 .oa-message-nav-older:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .oa-message-nav-older:disabled { cursor: wait; opacity: .4; }
-.oa-message-nav-preview {
-  position: absolute;
-  right: calc(100% + 8px);
-  width: min(280px, calc(100vw - 88px));
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-strong);
-  color: var(--text);
-  box-shadow: 0 5px 20px rgb(0 0 0 / .12);
-  font-size: 12px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.oa-message-nav-number { display: block; color: var(--muted); font-size: 10px; margin-bottom: 3px; }
-.oa-message-nav-summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-@media (max-width: 920px) {
-  .oa-message-nav { width: 26px; }
-  .oa-message-nav-node, .oa-message-nav-older { width: 26px; height: 28px; }
-  .oa-message-nav-node > span { width: 8px; }
-  .oa-message-nav-node[aria-current] > span,
-  .oa-message-nav-node:hover > span, .oa-message-nav-node:focus-visible > span { width: 16px; }
+@media (max-width: 640px) {
+  .oa-message-nav { --nav-mark-width: 26px; }
+  .oa-message-nav-mark > span { width: 8px; }
+  .oa-message-nav-node[aria-current] .oa-message-nav-mark > span,
+  .oa-message-nav-node:hover .oa-message-nav-mark > span,
+  .oa-message-nav-node:focus-visible .oa-message-nav-mark > span { width: 16px; }
+  .oa-message-nav[data-expanded="true"] .oa-message-nav-node,
+  .oa-message-nav[data-expanded="true"] .oa-message-nav-older { height: 44px; min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .oa-message-nav-node > span { transition: none; }
+  .oa-message-nav-track, .oa-message-nav-label, .oa-message-nav-mark > span { transition: none; }
 }
