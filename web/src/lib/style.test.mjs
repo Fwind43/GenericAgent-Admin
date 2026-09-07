@@ -36,6 +36,9 @@ test('chat shares minimal step styling across all screen sizes', () => {
   assert.match(card, /box-shadow: none;/);
   assert.match(mobile, /\.oa-turn-body \{ border-radius: 0; \}/);
   assert.match(mobile, /\.oa-turn-card > \.oa-turn-toggle \{ padding-block: 6px; \}/);
+  assert.match(mobile, /\.oa-turn-stack-head,\s*\.oa-turn-card > \.oa-turn-toggle \{ padding-right: 12px; box-sizing: border-box; \}/);
+  assert.match(mobile, /\.oa-turn-toggle > b \{ flex: 1 1 0; \}/);
+  assert.match(mobile, /\.oa-turn-toggle > \.oa-turn-chevron \{ margin-left: auto; \}/);
 })
 
 test('chat topbar has no waiting-reply navigation or reserved layout', () => {
