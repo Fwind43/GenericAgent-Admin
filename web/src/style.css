@@ -18645,7 +18645,7 @@ html[data-color-scheme="dark"] .oa-sidebar {
   background: var(--oa-session-live);
   box-shadow: none;
   flex: 0 0 6px;
-  animation: none;
+  animation: oa-session-breathe 1.8s ease-in-out infinite;
 }
 /* Reserve the menu slot so running status never disappears on selection/hover. */
 .oa-sidebar .oa-session-row.is-running:has(.oa-session-running-label) .oa-session {
@@ -18659,9 +18659,9 @@ html[data-color-scheme="dark"] .oa-sidebar {
   align-items: center;
   gap: 5px;
   margin-left: 0;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--oa-session-live) 9%, transparent);
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--oa-session-live);
   font-size: 11px;
   line-height: 16px;
@@ -18670,6 +18670,11 @@ html[data-color-scheme="dark"] .oa-sidebar {
   white-space: nowrap;
   letter-spacing: 0;
 }
+@keyframes oa-session-breathe {
+  0%, 100% { opacity: .45; transform: scale(.8); }
+  50% { opacity: 1; transform: scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
+  .oa-sidebar .oa-session-running-dot { animation: none; opacity: 1; transform: none; }
   .oa-sidebar .oa-session-row { transition: none; }
 }
