@@ -7066,8 +7066,8 @@ html[data-color-scheme="dark"] .oa-cascade-reasoning button:hover { background: 
   background-clip: padding-box;
 }
 .oa-cascade-group + .oa-cascade-group {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 2px;
+  padding-top: 2px;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 .oa-cascade-provider-heading {
@@ -7076,7 +7076,7 @@ html[data-color-scheme="dark"] .oa-cascade-reasoning button:hover { background: 
   justify-content: space-between;
   gap: 10px;
   margin: 0;
-  padding: 2px 7px 5px;
+  padding: 0 7px;
   color: var(--text);
   font-size: 11.5px;
   font-weight: 720;
