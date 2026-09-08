@@ -262,7 +262,13 @@ function SortableMemberRow({ member, memberIndex, groupIndex, groupLength, candi
   )
 }
 
-function FailoverGroupBody({ group, groupIndex, candidates, candidateMap, sensors, patchGroup, toggleMember, moveMember, removeMember, text }) {
+export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap, sensors, patchGroup, toggleMember, moveMember, removeMember, text }) {
+  const providerGroups = Array.from(candidates.reduce((groups, candidate) => {
+    const key = candidate.providerVarName
+    if (!groups.has(key)) groups.set(key, { key, name: candidate.providerName || text.unnamed, candidates: [] })
+    groups.get(key).candidates.push(candidate)
+    return groups
+  }, new Map()).values())
   const selectedKeys = new Set((group.members || []).map(memberKeyOf))
   const selectedFamilies = new Set((group.members || [])
     .map(member => candidateMap.get(memberKeyOf(member))?.family)
@@ -285,8 +291,15 @@ function FailoverGroupBody({ group, groupIndex, candidates, candidateMap, sensor
           <span>{group.members?.length || 0} / {candidates.length}</span>
         </div>
         <p className="model-subsection-help">{text.failoverCandidatesHelp}</p>
-        <div className="model-failover-candidates">
-          {candidates.length ? candidates.map(candidate => {
+        <div className="model-failover-providers">
+          {providerGroups.length ? providerGroups.map(provider => (
+            <section className="model-failover-provider" key={provider.key} aria-label={provider.name}>
+              <div className="model-subsection-head">
+                <strong><Plug size={14} aria-hidden="true" /> {provider.name}</strong>
+                <span>{provider.candidates.filter(candidate => selectedKeys.has(memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model }))).length} / {provider.candidates.length}</span>
+              </div>
+              <div className="model-failover-candidates">
+          {provider.candidates.map(candidate => {
             const key = memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model })
             const selected = selectedKeys.has(key)
             const locked = selectedFamilies.size > 0 && !selectedFamilies.has(candidate.family)
@@ -303,7 +316,10 @@ function FailoverGroupBody({ group, groupIndex, candidates, candidateMap, sensor
                 <span><strong>{candidate.model || text.missingModelId}</strong><small>{candidate.providerName || text.unnamed} · {candidate.protocol}</small></span>
               </button>
             )
-          }) : <div className="model-hint-block">{text.failoverNoCandidates}</div>}
+          })}
+              </div>
+            </section>
+          )) : <div className="model-hint-block">{text.failoverNoCandidates}</div>}
         </div>
       </div>
 
