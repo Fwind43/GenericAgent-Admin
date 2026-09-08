@@ -146,7 +146,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/api/files/download", s.filesDownload)
 	mux.HandleFunc("/api/files/tail", s.filesTail)
 	mux.HandleFunc("/api/files/search", s.filesSearch)
-	mux.HandleFunc("/api/files/open", s.requireDangerousConfirm(s.filesOpen))
+	mux.HandleFunc("/api/files/open", s.requireDangerousConfirm(s.withChatInstance((*Server).filesOpen)))
 	mux.HandleFunc("/api/files/image", s.filesImage)
 	mux.HandleFunc("/api/schedule/tasks", s.scheduleTasks)
 	mux.HandleFunc("/api/schedule/task", s.requireDangerousConfirm(s.scheduleTask))

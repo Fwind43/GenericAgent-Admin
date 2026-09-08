@@ -5653,6 +5653,17 @@ export default function ChatApp() {
     }
   }
 
+  const openProjectFolder = async (name) => {
+    const instanceID = chatInstanceRef.current
+    if (!await confirmDanger('chat-project-folder-open', ct(`在服务器桌面打开项目文件夹 ${name}？`, `Open project folder ${name} on the server desktop?`))) return
+    if (instanceID !== chatInstanceRef.current) return
+    try {
+      await chatApi('/api/files/open', { dangerous: true, method: 'POST', body: JSON.stringify({ path: `temp/projects/${name}`, mode: 'folder' }) })
+    } catch (e) {
+      if (e.name !== 'AbortError') setErr(e.message || String(e))
+    }
+  }
+
   const openProjectDraft = () => {
     setSidebarTab('projects')
     setProjectDraftName('')
@@ -7140,6 +7151,7 @@ export default function ChatApp() {
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
               <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
+              <button type="button" onClick={()=>openProjectFolder(group.name)} title={ct('在服务器上打开项目文件夹', 'Open project folder on the server')}><FolderOpen size={14}/>{ct('打开项目文件夹', 'Open project folder')}</button>
               </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>

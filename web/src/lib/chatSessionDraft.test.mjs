@@ -177,3 +177,16 @@ test('project drag handles are opt-in from the new-project toolbar', () => {
   assert.match(header, /\{projectSortMode && <ProjectDragHandle/)
   assert.match(header, /onReorder=\{saveProjectOrder\}/)
 })
+
+
+test('project folder action uses selected instance and confirmed folder opening', () => {
+  const source = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const handler = functionBlock(source, '  const openProjectFolder = async', '  const openProjectDraft =')
+  assert.match(handler, /chatApi\('\/api\/files\/open'/)
+  assert.match(handler, /dangerous: true/)
+  assert.ok(handler.includes('path: `temp/projects/${name}`'))
+  assert.match(handler, /mode: 'folder'/)
+  assert.match(source, /onClick=\{\(\)=>openProjectFolder\(group.name\)\}/)
+  const routes = readFileSync(new URL('../../../internal/api/api.go', import.meta.url), 'utf8')
+  assert.ok(routes.includes('s.requireDangerousConfirm(s.withChatInstance((*Server).filesOpen))'))
+})
