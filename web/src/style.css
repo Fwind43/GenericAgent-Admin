@@ -18609,7 +18609,13 @@ html[data-color-scheme="dark"] .oa-sidebar {
   --oa-session-live: #6ee7b7;
 }
 .oa-sidebar .oa-session-row {
-  transition: background-color .15s ease, border-color .15s ease;
+  margin: 1px 0;
+  border: 0;
+  border-radius: 6px;
+  transition: background-color .15s ease;
+}
+.oa-sidebar .oa-session-row .oa-session {
+  border-radius: 6px;
 }
 .oa-sidebar .oa-session-row.is-running {
   background: transparent;
