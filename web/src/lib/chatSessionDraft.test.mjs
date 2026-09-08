@@ -163,3 +163,17 @@ test('main chat wires reactive draft badges into persistence, sending, and delet
   const batchDelete = functionBlock(main, '  const deleteSelectedSessions = async', '  const startRename =')
   assert.match(batchDelete, /clearSessionDrafts\(result\.deletedIds\)/)
 })
+
+
+test('project drag handles are opt-in from the new-project toolbar', () => {
+  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  assert.match(main, /\[projectSortMode, setProjectSortMode\] = useState\(false\)/)
+  const toolbar = functionBlock(main, '<div className="oa-session-manager-head">', "{sidebarTab === 'history' ? <>")
+  assert.match(toolbar, /aria-pressed=\{projectSortMode\}/)
+  assert.match(toolbar, /setProjectSortMode\(current => !current\)/)
+  assert.match(toolbar, /onClick=\{openProjectDraft\}/)
+  assert.match(toolbar, /setProjectSortMode\(false\)/)
+  const header = functionBlock(main, '<div className="oa-project-head">', '<div className="oa-project-body"')
+  assert.match(header, /\{projectSortMode && <ProjectDragHandle/)
+  assert.match(header, /onReorder=\{saveProjectOrder\}/)
+})

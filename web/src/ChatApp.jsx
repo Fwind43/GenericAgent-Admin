@@ -4468,6 +4468,7 @@ export default function ChatApp() {
   }
 
   const [sidebarTab, setSidebarTab] = useState('history')
+  const [projectSortMode, setProjectSortMode] = useState(false)
   const [sidebarSearch, setSidebarSearch] = useState('')
   const [expandedProjectNames, setExpandedProjectNames] = useState(() => new Set())
   const [projectDraftOpen, setProjectDraftOpen] = useState(false)
@@ -7106,7 +7107,7 @@ export default function ChatApp() {
       </div>
       <div className="oa-session-manager-head">
         <div className="oa-sidebar-view-tabs" role="tablist" aria-label={ct('会话视图', 'Session view')}>
-          <button type="button" role="tab" aria-selected={sidebarTab === 'history'} className={sidebarTab === 'history' ? 'is-active' : ''} onClick={()=>setSidebarTab('history')}>
+          <button type="button" role="tab" aria-selected={sidebarTab === 'history'} className={sidebarTab === 'history' ? 'is-active' : ''} onClick={()=>{ setSidebarTab('history'); setProjectSortMode(false) }}>
             {ct('最近对话', 'Recent')}
           </button>
           <button type="button" role="tab" aria-selected={sidebarTab === 'projects'} className={sidebarTab === 'projects' ? 'is-active' : ''} onClick={()=>setSidebarTab('projects')}>
@@ -7123,9 +7124,16 @@ export default function ChatApp() {
               aria-label={ct('一键已读', 'Mark all as read')}
             ><CheckCheck size={16}/></button>
             <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理', 'Manage')}</button>
-          </div> : <button className="oa-session-manage-open" type="button" onClick={openProjectDraft} disabled={projectCreating || projectDraftOpen}>
-            <FolderPlus size={13}/>{ct('新建项目', 'New project')}
-          </button>}
+          </div> : <div className="oa-sidebar-view-actions">
+            <button className="oa-session-manage-open" type="button" aria-pressed={projectSortMode}
+              onClick={()=>setProjectSortMode(current => !current)} disabled={batchDeleting || projectOrderSaving || (!projectSortMode && projectSessionGroups.length < 2)}
+              title={ct('开启后长按项目手柄拖动，顺序自动保存', 'Enable, then hold a project handle to drag. Order saves automatically.')}>
+              {projectSortMode ? ct('完成', 'Done') : ct('排序', 'Sort')}
+            </button>
+            <button className="oa-session-manage-open" type="button" onClick={openProjectDraft} disabled={projectCreating || projectDraftOpen}>
+              <FolderPlus size={13}/>{ct('新建项目', 'New project')}
+            </button>
+          </div>}
       </div>
       {sidebarTab === 'history' ? <>
         <div className="oa-session-list">
@@ -7169,7 +7177,7 @@ export default function ChatApp() {
                 <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
               </button>
               {group.pinned && <span className="oa-project-pinned-badge" title={ct('项目已置顶', 'Project pinned')}><Pin size={11} aria-hidden="true"/>{ct('置顶', 'Pinned')}</span>}
-              <ProjectDragHandle name={group.name} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>
+              {projectSortMode && <ProjectDragHandle name={group.name} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
               <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
