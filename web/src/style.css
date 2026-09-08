@@ -18649,6 +18649,9 @@ html[data-color-scheme="dark"] .oa-sidebar {
   opacity: 1;
 }
 .oa-sidebar .oa-session-running-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-left: 0;
   color: var(--oa-session-live);
   font-size: 10px;
