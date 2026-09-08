@@ -6,7 +6,7 @@ export default function ProjectSessionPage({ items, renderItem, ct }) {
   return <>
     {items.slice(0, limit).map(renderItem)}
     {remaining > 0 && <button type="button" className="oa-project-load-more"
-      onClick={() => setLimit(current => current + 10)}>
+      onClick={() => setLimit(Infinity)}>
       {ct(`加载更多${remaining}个...`, `Load more (${remaining} remaining)...`)}
     </button>}
   </>
