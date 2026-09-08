@@ -8,6 +8,7 @@ import {
   migrateFailoverGroupNames,
   normalizeFailoverGroups,
   orderedProviderProfiles,
+  officialModelSlots,
 } from '../lib/modelsEditor'
 
 // mykey.py provider/model editor state.
@@ -18,6 +19,7 @@ import {
 // page's contents become the file's contents, and "重新读取" is always a way
 // back out.
 export function useModelsConfig({ t, lang, setMsg, setBusy, active, onPersist }) {
+  const [officialSlots, setOfficialSlots] = useState({})
   const [profiles, setProfiles] = useState([])
   const [failoverGroups, setFailoverGroups] = useState([])
   const [persistedProfiles, setPersistedProfiles] = useState([])
@@ -53,6 +55,12 @@ export function useModelsConfig({ t, lang, setMsg, setBusy, active, onPersist })
       const d = await api('/api/models/import-mykey', { method:'POST', headers: instanceHeaders(), body: JSON.stringify({ reveal:false, save:false }) })
       const nextProfiles = withClientIds(orderedProviderProfiles(d.profiles || []))
       const nextGroups = normalizeFailoverGroups(migrateFailoverGroupNames(d.failover_groups || []))
+      let slots = {}
+      try {
+        const state = await api('/api/chat/state', { headers: instanceHeaders() })
+        slots = officialModelSlots(nextProfiles, nextGroups, state.llms || [])
+      } catch { /* Unavailable official list must not become invented indices. */ }
+      setOfficialSlots(slots)
       setProfiles(nextProfiles)
       setPersistedProfiles(nextProfiles)
       setFailoverGroups(nextGroups)
@@ -140,6 +148,7 @@ export function useModelsConfig({ t, lang, setMsg, setBusy, active, onPersist })
       setPreview(safeJson(d))
       setSaveState({ status: 'saved', error: '', savedAt: d.updated_at || new Date().toISOString() })
       setMsg(t.hints.modelsSaved)
+      await importModels({ quiet: true })
       onPersist?.()
       return true
     } catch (e) {
@@ -198,6 +207,7 @@ export function useModelsConfig({ t, lang, setMsg, setBusy, active, onPersist })
   // Opening the editor for another GA instance must not inherit the previous
   // instance's drafts or revealed keys.
   const openFor = (nextInstance = null) => {
+    setOfficialSlots({})
     setInstance(nextInstance)
     setProfiles([])
     setPersistedProfiles([])
@@ -210,7 +220,7 @@ export function useModelsConfig({ t, lang, setMsg, setBusy, active, onPersist })
   }
 
   return {
-    profiles, setProfiles, persistedProfiles, failoverGroups, setFailoverGroups, preview,
+    officialSlots, profiles, setProfiles, persistedProfiles, failoverGroups, setFailoverGroups, preview,
     changes, saveState, importLoading, revealedKeys, keyBusy, instance,
     getProfileKey, importModels, previewModels, discoverModels, revealKey, clearRevealedKey,
     saveAll, discardDraft, addProfiles, removeProfile, patchProfile,

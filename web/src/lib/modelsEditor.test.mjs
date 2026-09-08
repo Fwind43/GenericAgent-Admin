@@ -154,9 +154,9 @@ test('applyModelAndFailoverOrder writes consecutive metadata without moving prov
   const profiles = orderingProfiles()
   const groups = [{ var_name: 'mixin_config_1', members: [] }]
   const rows = orderedModelAndFailoverRows(profiles, groups)
-  assert.deepEqual(rows.map(row => row.type), ['failover', 'model', 'model', 'model'])
+  assert.deepEqual(rows.map(row => row.type), ['model', 'model', 'model', 'failover'])
 
-  const next = applyModelAndFailoverOrder(profiles, groups, [rows[3], rows[0], rows[1], rows[2]])
+  const next = applyModelAndFailoverOrder(profiles, groups, [rows[2], rows[3], rows[0], rows[1]])
 
   assert.deepEqual(next.profiles.map(profile => profile.model_configs.map(config => config.model)), [
     ['a-one', 'a-two'],
@@ -271,4 +271,23 @@ test('failover display names survive normalization independently of routing iden
   assert.equal(row.varName, 'mixin_config_main')
   assert.equal(orderedModelAndFailoverRows([], [{var_name: 'mixin_config_old'}])[0].displayName, '')
   assert.equal(draftChangeSummary([], [], normalized, [{...group, display_name: ''}]).failover, true)
+})
+
+
+test('official slots preserve GA indices rather than editor row positions', async () => {
+  const { officialModelSlots } = await import('./modelsEditor.js')
+  const profiles = [{ var_name: 'native_oai_config_x', model_configs: [
+    { model: 'a', name: 'a', sort_order: 0 },
+    { model: 'a', name: 'a', sort_order: 3 },
+  ] }]
+  const groups = [{ var_name: 'mixin_config_1', sort_order: -1 }]
+  const llms = [
+    { index: 0, provider: 'x', model: 'a', name: 'a' },
+    { index: 3, provider: 'x', model: 'a', name: 'a' },
+    { index: 15, failover_group: '1' },
+  ]
+  assert.deepEqual(officialModelSlots(profiles, groups, llms), { '0:0': 0, '0:1': 3, 'failover:0': 15 })
+  assert.deepEqual(officialModelSlots(profiles, groups, []), { '0:0': null, '0:1': null, 'failover:0': null })
+  const ambiguous = [{ ...profiles[0], model_configs: [{ model: 'a', name: 'a' }] }]
+  assert.equal(officialModelSlots(ambiguous, [], llms)['0:0'], null)
 })

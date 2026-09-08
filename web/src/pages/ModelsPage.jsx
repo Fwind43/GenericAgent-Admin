@@ -387,8 +387,7 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
   )
 }
 
-// One row is one callable slot: its position in this list is the --llm-no the
-// agent is started with, which is the only number the operator ever quotes.
+// Draft position is not a live GA slot. Only official indices are shown.
 function CallRow({ row, index, total, expanded, onToggle, moveRow, onOpenProvider, onRemove, text, t, children }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id })
   const style = {
@@ -411,8 +410,8 @@ function CallRow({ row, index, total, expanded, onToggle, moveRow, onOpenProvide
         <span {...attributes} {...listeners} className="model-drag-handle" aria-label={`${text.reorderRow}: ${label}`} title={text.reorderRow}>
           <GripVertical size={16} aria-hidden="true" />
         </span>
-        <div className="model-call-slot" aria-label={`--llm-no ${index}`}>
-          <strong>{index}</strong>
+        <div className="model-call-slot" aria-label={`--llm-no ${row.officialIndex ?? "?"}`}>
+          <strong>{row.officialIndex ?? "?"}</strong>
           <span>--llm-no</span>
         </div>
         <div className="model-call-copy">
@@ -809,6 +808,7 @@ function AddModelModal({ open, profiles, initialIndex, onClose, onAdd, discoverM
 }
 
 export function Models({
+  officialSlots = {},
   t,
   profiles,
   setProfiles,
@@ -858,7 +858,9 @@ export function Models({
       displayName: profileModelConfigs(profiles[row.profileIndex] || {})[row.configIndex]?.name || '',
       providerName: providerName(profiles[row.profileIndex]),
     }
-  )), [profiles, failoverGroups])
+  )).map(row => ({ ...row, officialIndex: changes.total ? null : officialSlots[row.id] })).sort((a, b) =>
+    changes.total ? 0 : (a.officialIndex ?? Infinity) - (b.officialIndex ?? Infinity)
+  ), [profiles, failoverGroups, officialSlots, changes.total])
 
   const candidates = useMemo(() => orderedModelRows(profiles).map(row => {
     const protocol = String(profiles[row.profileIndex]?.type || DEFAULT_PROTOCOL)

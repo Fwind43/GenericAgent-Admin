@@ -352,6 +352,7 @@ const validModelProfile = {
 }
 
 function ModelsHarness({
+  officialSlots = {},
   initialProfile = validModelProfile,
   discoverModels = vi.fn(async () => ({ models: [] })),
   initialFailoverGroups = [],
@@ -379,6 +380,7 @@ function ModelsHarness({
   return (
     <Models
       t={I18N.zh}
+      officialSlots={officialSlots}
       profiles={profiles}
       setProfiles={setProfiles}
       patchProfile={patchProfile}
@@ -406,16 +408,16 @@ const providerNameInput = () => document.querySelector('.model-field--provider i
 const openAddModel = () => fireEvent.click(screen.getByRole('button', { name: /添加模型$/ }))
 
 describe('Models call list', () => {
-  test('lists every model as a call slot numbered by --llm-no', () => {
+  test('lists every model using official indices, not local positions', () => {
     installBrowserPolyfills()
     render(<ModelsHarness initialProfile={{
       ...validModelProfile,
       models: ['demo-model', 'demo-model-2'],
       model_configs: [{ model: 'demo-model' }, { model: 'demo-model-2' }],
-    }} />)
+    }} officialSlots={{ '0:0': 9, '0:1': 15 }} />)
 
     const slots = [...document.querySelectorAll('.model-call-slot strong')]
-    expect(slots.map(slot => slot.textContent)).toEqual(['0', '1'])
+    expect(slots.map(slot => slot.textContent)).toEqual(['9', '15'])
     expect(document.querySelector('.model-call-row .model-call-title strong').textContent).toBe('demo-model')
   })
 

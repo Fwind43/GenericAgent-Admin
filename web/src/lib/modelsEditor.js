@@ -246,7 +246,7 @@ export const orderedModelAndFailoverRows = (profiles = [], failoverGroups = []) 
     })
   ))
   
-  // Failover group rows - place at the beginning by default (negative order)
+  // Unordered groups follow model rows; never invent a leading call slot.
   const failoverRows = (Array.isArray(failoverGroups) ? failoverGroups : []).map((group, groupIndex) => ({
     type: 'failover',
     id: `failover:${groupIndex}`,
@@ -254,8 +254,8 @@ export const orderedModelAndFailoverRows = (profiles = [], failoverGroups = []) 
     varName: text(group.var_name),
     displayName: text(group.display_name),
     members: group.members || [],
-    order: Number.isInteger(group.sort_order) ? group.sort_order : -(failoverGroups.length - groupIndex),
-    defaultOrder: -(failoverGroups.length - groupIndex),
+    order: Number.isInteger(group.sort_order) ? group.sort_order : defaultOrder + groupIndex,
+    defaultOrder: defaultOrder + groupIndex,
   }))
   
   return [...modelRows, ...failoverRows].sort((left, right) => left.order - right.order)
@@ -367,4 +367,26 @@ export const applyModelAndFailoverOrder = (profiles = [], failoverGroups = [], o
   })
   
   return { profiles: nextProfiles, failoverGroups: nextFailoverGroups }
+}
+// Only uniquely identified official slots may be presented as live llm-no.
+export const officialModelSlots = (profiles, groups, llms = []) => {
+  const rows = orderedModelAndFailoverRows(profiles, groups)
+  const candidates = rows.map(row => llms.filter(llm => {
+    if (!Number.isInteger(llm.index)) return false
+    if (row.type === 'failover') return String(llm.failover_group ?? '') === failoverGroupSuffix(row.varName)
+    if (llm.failover_group !== undefined) return false
+    const profile = profiles[row.profileIndex]
+    const config = profileModelConfigs(profile)[row.configIndex]
+    return llm.model === row.model && llm.provider === (profile.display_name || profile.var_name.replace(/^(native_oai_config|native_claude_config|oai_config|claude_config)_?/, '') || 'Unknown provider')
+      && (!config.name || llm.name === config.name)
+      && (!config.reasoning_effort || llm.reasoning_effort === config.reasoning_effort)
+  }))
+  return Object.fromEntries(rows.map((row, i) => {
+    const matches = candidates[i].length > 1
+      ? candidates[i].filter(item => item.index === rows[i].order && Number.isInteger(profileModelConfigs(profiles[rows[i].profileIndex])[rows[i].configIndex].sort_order))
+      : candidates[i]
+    const slot = matches.length === 1
+      ? matches[0].index : null
+    return [row.id, slot]
+  }))
 }
