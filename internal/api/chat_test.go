@@ -646,6 +646,23 @@ func TestAnnotateChatLLMFailoverGroupsUsesSavedSuffixesAndOnlyTouchesMixins(t *t
 	}
 }
 
+func TestAnnotateChatLLMFailoverGroupsDisplayName(t *testing.T) {
+	for _, tc := range []struct{ displayName, want string }{
+		{"  Primary Route  ", "Primary Route"},
+		{"\u4e3b\u529b\u6545\u969c\u7ec4", "\u4e3b\u529b\u6545\u969c\u7ec4"},
+		{"", "primary"},
+		{" \t ", "primary"},
+	} {
+		t.Run(tc.displayName, func(t *testing.T) {
+			llms := []map[string]interface{}{{"index": 7, "label": "Mixin/a -> b", "provider": "MixinSession"}}
+			annotateChatLLMFailoverGroups(llms, []modelconfig.FailoverGroup{{VarName: "mixin_config_primary", DisplayName: tc.displayName}})
+			if llms[0]["label"] != tc.want || llms[0]["failover_group"] != "primary" || llms[0]["index"] != 7 || llms[0]["provider"] != "MixinSession" {
+				t.Fatalf("unexpected display name or changed identity: %#v", llms)
+			}
+		})
+	}
+}
+
 func TestMarkChatLLMActiveUsesSessionLLMNo(t *testing.T) {
 	llms := []map[string]interface{}{
 		{"index": float64(0), "active": true},

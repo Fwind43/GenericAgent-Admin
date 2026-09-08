@@ -1660,12 +1660,19 @@ func annotateChatLLMFailoverGroups(llms []map[string]interface{}, groups []model
 		if !isChatLLMFailover(item) || groupIndex >= len(groups) {
 			continue
 		}
-		name := strings.TrimSpace(groups[groupIndex].VarName)
+		group := groups[groupIndex]
+		name := strings.TrimSpace(group.VarName)
 		groupIndex++
 		name = strings.TrimPrefix(name, "mixin_config_")
 		if name != "" {
 			item["failover_group"] = name
-			item["label"] = name
+		}
+		label := strings.TrimSpace(group.DisplayName)
+		if label == "" {
+			label = name
+		}
+		if label != "" {
+			item["label"] = label
 		}
 	}
 }
