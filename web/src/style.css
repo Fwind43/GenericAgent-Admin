@@ -18301,6 +18301,21 @@ html .oa-sidebar .oa-project-group.is-pinned {
   box-shadow:none;
 }
 .oa-sidebar .oa-project-head { padding:2px 0; }
+/* Quiet session overflow action without a permanent grey tile. */
+html .oa-sidebar .oa-session-more {
+  background:transparent !important;
+  color:var(--oa-muted);
+  border-radius:6px;
+  transition:background .16s ease,color .16s ease;
+}
+html .oa-sidebar .oa-session-more > svg { width:14px; height:14px; stroke-width:1.75; }
+html .oa-sidebar .oa-session-more:hover,
+html .oa-sidebar .oa-session-more.is-open {
+  background:rgba(16,163,127,.08) !important;
+  color:var(--oa-green);
+}
+html .oa-sidebar .oa-session-row:focus-within .oa-session-more { opacity:1; pointer-events:auto; }
+html .oa-sidebar .oa-session-more:focus-visible { outline:2px solid var(--oa-green); outline-offset:2px; }
 /* Quiet project creation action, shared by light and dark themes. */
 html .oa-sidebar .oa-project-add {
   width:29px;
