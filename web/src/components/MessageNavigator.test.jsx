@@ -63,7 +63,10 @@ describe('message nodes', () => {
   })
   test('hides the mobile directory without a gutter and preserves expanded touch targets', () => {
     const mobile = navigatorCSS.split('@media (max-width: 640px) {')[1].split('@media (prefers-reduced-motion: reduce)')[0]
-    expect(mobile).toMatch(/padding-right:\s*0/)
+    expect(navigatorCSS).not.toMatch(/\.oa-thread\b/)
+    const overlay = navigatorCSS.match(/\.oa-message-nav\s*\{([^}]+)\}/)[1]
+    expect(overlay).toMatch(/position:\s*absolute/)
+    expect(overlay).toMatch(/pointer-events:\s*none/)
     expect(mobile).toMatch(/\.oa-message-nav-toggle\s*\{[^}]*top:\s*calc\(50% - 28px\);[^}]*transform:\s*none/)
     expect(mobile).toMatch(/\.oa-message-nav \.oa-message-nav-toggle:is\(:hover, :active, :focus\)\s*\{\s*transform: none;\s*background: transparent;\s*box-shadow: none;/)
     expect(mobile).toMatch(/-webkit-tap-highlight-color:\s*transparent/)

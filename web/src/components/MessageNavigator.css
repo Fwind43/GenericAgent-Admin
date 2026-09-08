@@ -1,5 +1,4 @@
-/* A fixed marker gutter; expanding the directory must not reflow the thread. */
-.oa-thread:has(~ .oa-message-nav) { padding-right: 44px; }
+/* Floating overlay: never reserve space or reflow the message thread. */
 .oa-message-nav {
   --nav-mark-width: 32px;
   position: absolute;
@@ -116,7 +115,6 @@
 .oa-message-nav-older:disabled { cursor: wait; opacity: .4; }
 .oa-message-nav-toggle { display: none; }
 @media (max-width: 640px) {
-  .oa-thread:has(~ .oa-message-nav) { padding-right: 0; }
   .oa-message-nav { --nav-mark-width: 24px; width: 44px; right: max(env(safe-area-inset-right, 0px), calc(var(--nav-right, 12px) - 8px)); }
   .oa-message-nav-toggle {
     position: fixed;
