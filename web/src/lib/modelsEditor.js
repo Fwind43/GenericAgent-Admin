@@ -252,6 +252,7 @@ export const orderedModelAndFailoverRows = (profiles = [], failoverGroups = []) 
     id: `failover:${groupIndex}`,
     groupIndex,
     varName: text(group.var_name),
+    displayName: text(group.display_name),
     members: group.members || [],
     order: Number.isInteger(group.sort_order) ? group.sort_order : -(failoverGroups.length - groupIndex),
     defaultOrder: -(failoverGroups.length - groupIndex),
@@ -305,6 +306,7 @@ export const migrateFailoverGroupNames = (groups = []) => {
 export const normalizeFailoverGroups = (groups = []) => (Array.isArray(groups) ? groups : []).map(group => {
   const next = {
     var_name: text(group?.var_name),
+    ...(text(group?.display_name) ? { display_name: text(group.display_name) } : {}),
     members: (Array.isArray(group?.members) ? group.members : []).map(member => ({
       provider_var_name: text(member?.provider_var_name),
       model: text(member?.model),

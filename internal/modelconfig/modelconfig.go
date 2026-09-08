@@ -107,11 +107,12 @@ type FailoverMember struct {
 }
 
 type FailoverGroup struct {
-	VarName    string           `json:"var_name"`
-	Members    []FailoverMember `json:"members"`
-	MaxRetries int              `json:"max_retries"`
-	BaseDelay  float64          `json:"base_delay"`
-	SpringBack *int             `json:"spring_back,omitempty"`
+	DisplayName string           `json:"display_name,omitempty"`
+	VarName     string           `json:"var_name"`
+	Members     []FailoverMember `json:"members"`
+	MaxRetries  int              `json:"max_retries"`
+	BaseDelay   float64          `json:"base_delay"`
+	SpringBack  *int             `json:"spring_back,omitempty"`
 }
 
 type Draft struct {
@@ -465,6 +466,7 @@ func validateProfiles(profiles []Profile, allowMaskedSecrets bool) error {
 }
 
 type resolvedFailoverGroup struct {
+	DisplayName  string
 	VarName      string
 	SessionNames []string
 	MaxRetries   int
@@ -610,6 +612,7 @@ func resolveFailoverGroups(profiles []Profile, groups []FailoverGroup) ([]resolv
 		}
 		resolved = append(resolved, resolvedFailoverGroup{
 			VarName:      group.VarName,
+			DisplayName:  strings.TrimSpace(group.DisplayName),
 			SessionNames: sessionNames,
 			MaxRetries:   group.MaxRetries,
 			BaseDelay:    group.BaseDelay,
@@ -929,6 +932,9 @@ for source_var, source_profile in profiles_by_var.items():
     if isinstance(source_name, str) and source_name:
         session_targets[source_name]=target
 
+failover_meta=getattr(mod, '_ga_admin_failover_groups', {})
+if not isinstance(failover_meta, dict):
+    failover_meta={}
 failover_groups=[]
 for mixin_var, mixin_data in mixin_groups_raw:
     refs=mixin_data.get('llm_nos', [])
@@ -949,6 +955,10 @@ for mixin_var, mixin_data in mixin_groups_raw:
     if not isinstance(base_delay, (int, float)) or isinstance(base_delay, bool):
         base_delay=0.5
     group={'var_name':mixin_var, 'members':members, 'max_retries':max_retries, 'base_delay':base_delay}
+    meta=failover_meta.get(mixin_var, {})
+    display_name=meta.get('display_name', '') if isinstance(meta, dict) else ''
+    if isinstance(display_name, str) and display_name.strip():
+        group['display_name']=display_name.strip()
     spring_back=mixin_data.get('spring_back')
     if isinstance(spring_back, int) and not isinstance(spring_back, bool):
         group['spring_back']=spring_back
@@ -1198,6 +1208,17 @@ func renderWithFailoverGroups(profiles []Profile, groups []FailoverGroup, allowM
 		return "", err
 	}
 	b.WriteString(fmt.Sprintf("# Admin-only provider grouping metadata; GenericAgent ignores underscore-prefixed variables.\n_ga_admin_provider_groups = %s\n", providerGroupsDict))
+	failoverMetadata := map[string]interface{}{}
+	for _, group := range resolvedGroups {
+		if group.DisplayName != "" {
+			failoverMetadata[group.VarName] = map[string]interface{}{"display_name": group.DisplayName}
+		}
+	}
+	failoverMetadataDict, err := pyDict(failoverMetadata)
+	if err != nil {
+		return "", err
+	}
+	b.WriteString(fmt.Sprintf("# Admin-only failover display names; routing identities remain unchanged.\n_ga_admin_failover_groups = %s\n", failoverMetadataDict))
 	for _, group := range resolvedGroups {
 		// Map session names to their effective display names for llm_nos routing
 		llmNos := make([]string, len(group.SessionNames))

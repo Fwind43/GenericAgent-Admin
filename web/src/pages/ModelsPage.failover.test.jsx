@@ -35,3 +35,13 @@ it('groups by provider identity and preserves candidate identity and protocol re
   expect(within(a).getByText('1 / 2')).toBeTruthy()
   expect(toggleMember).toHaveBeenCalledTimes(1)
 })
+
+it('edits the failover display name without changing the variable name', () => {
+  const patchGroup = vi.fn()
+  render(<FailoverGroupBody group={{var_name:'mixin_config_main',display_name:'Primary',members:[]}} groupIndex={0}
+    candidates={[]} candidateMap={new Map()} patchGroup={patchGroup}
+    text={{displayName:'Display name',varName:'Variable'}} />)
+  fireEvent.change(screen.getByRole('textbox', {name:'Display name'}), {target:{value:'Backup'}})
+  expect(patchGroup).toHaveBeenCalledWith(0, {display_name:'Backup'})
+  expect(screen.getByDisplayValue('main').value).toBe('main')
+})

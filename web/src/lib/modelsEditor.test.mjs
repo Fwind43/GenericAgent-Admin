@@ -261,3 +261,14 @@ test('allocates stable unique failover group variable names', () => {
   ]), 'mixin_config_3')
 })
 
+
+test('failover display names survive normalization independently of routing identity', () => {
+  const group = { var_name: 'mixin_config_main', display_name: ' 主力模型组 ', members: [], max_retries: 10, base_delay: 0.5 }
+  const normalized = normalizeFailoverGroups([group])
+  assert.equal(normalized[0].display_name, '主力模型组')
+  const row = orderedModelAndFailoverRows([], normalized)[0]
+  assert.equal(row.displayName, '主力模型组')
+  assert.equal(row.varName, 'mixin_config_main')
+  assert.equal(orderedModelAndFailoverRows([], [{var_name: 'mixin_config_old'}])[0].displayName, '')
+  assert.equal(draftChangeSummary([], [], normalized, [{...group, display_name: ''}]).failover, true)
+})

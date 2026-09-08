@@ -1290,3 +1290,39 @@ func TestValidateRejectsSingleAndGappedFailover(t *testing.T) {
 		t.Fatal("Validate() accepted non-consecutive failover_order values")
 	}
 }
+
+func TestFailoverDisplayNameRoundTrip(t *testing.T) {
+	profiles := []Profile{
+		{VarName: "native_oai_config_a", Type: "native_oai", APIBase: "https://a.example/v1", APIKey: "test-a", Model: "a"},
+		{VarName: "native_oai_config_b", Type: "native_oai", APIBase: "https://b.example/v1", APIKey: "test-b", Model: "b"},
+	}
+	for _, name := range []string{"", "主力模型组"} {
+		t.Run(name, func(t *testing.T) {
+			groups := []FailoverGroup{{VarName: "mixin_config_main", DisplayName: name, Members: []FailoverMember{
+				{ProviderVarName: profiles[0].VarName, Model: "a"}, {ProviderVarName: profiles[1].VarName, Model: "b"},
+			}, MaxRetries: 10, BaseDelay: 0.5}}
+			root := t.TempDir()
+			for i := 0; i < 2; i++ {
+				rendered, err := RenderWithFailoverGroups(profiles, groups)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(root, "mykey.py"), []byte(rendered), 0600); err != nil {
+					t.Fatal(err)
+				}
+				draft, err := ImportMyKeyWithPython(root, "", true)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(draft.FailoverGroups) != 1 {
+					t.Fatalf("groups: %#v", draft.FailoverGroups)
+				}
+				got := draft.FailoverGroups[0]
+				if got.DisplayName != name || got.VarName != "mixin_config_main" || len(got.Members) != 2 {
+					t.Fatalf("group: %#v", got)
+				}
+				profiles, groups = draft.Profiles, draft.FailoverGroups
+			}
+		})
+	}
+}

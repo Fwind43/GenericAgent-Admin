@@ -278,6 +278,10 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
   return (
     <div className="model-row-body">
       <label className="model-field">
+        <span className="model-field-label">{text.displayName}</span>
+        <Input value={group.display_name || ''} onChange={event => patchGroup(groupIndex, { display_name: event.target.value })} placeholder={group.var_name} />
+      </label>
+      <label className="model-field">
         <span className="model-field-label">{text.varName}</span>
         <Input
           addonBefore={FAILOVER_VAR_PREFIX}
@@ -414,7 +418,7 @@ function CallRow({ row, index, total, expanded, onToggle, moveRow, onOpenProvide
         <div className="model-call-copy">
           <span className="model-call-title">
             {failover && <Network size={13} aria-hidden="true" />}
-            <strong title={label}>{row.displayName || label || text.missingModelId}</strong>
+            <strong title={row.displayName || label}>{row.displayName || label || text.missingModelId}</strong>
             {failover && <Tag color="purple">{text.failoverGroup}</Tag>}
           </span>
           <span className="model-call-sub">
