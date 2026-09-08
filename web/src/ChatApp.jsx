@@ -44,7 +44,7 @@ import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ult
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
 import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
-import { groupProjectSessions } from './lib/chatProjectSessions.js'
+import { groupProjectSessions, moveProjectOrder, readProjectOrder } from './lib/chatProjectSessions.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
 import { reconcileScalarList, reconcileSessionSummaries } from './lib/chatSessionReconcile.js'
@@ -4452,6 +4452,14 @@ export default function ChatApp() {
   const [sessions, setSessions] = useState([])
   const [projects, setProjects] = useState([])
   const [pinnedProjects, setPinnedProjects] = useState([])
+  const [projectOrderState, setProjectOrderState] = useState(() => ({ instance: initialChatInstanceID, names: readProjectOrder(initialChatInstanceID) }))
+  const projectOrder = useMemo(() => projectOrderState.instance === chatInstanceID ? projectOrderState.names : readProjectOrder(chatInstanceID), [projectOrderState, chatInstanceID])
+  const saveProjectOrder = names => {
+    setProjectOrderState({ instance: chatInstanceID, names })
+    try { window.localStorage.setItem('ga-chat-project-order:' + chatInstanceID, JSON.stringify(names)) }
+    catch { setNotice(ct('排序已生效，但浏览器不允许保存', 'Order applied, but browser storage is unavailable')) }
+  }
+
   const [sidebarTab, setSidebarTab] = useState('history')
   const [sidebarSearch, setSidebarSearch] = useState('')
   const [expandedProjectNames, setExpandedProjectNames] = useState(() => new Set())
@@ -6955,7 +6963,7 @@ export default function ChatApp() {
     if (lastMessage) gsap.from(lastMessage, { y: 14, autoAlpha: 0, duration: 0.32, ease: 'power2.out', clearProps: 'transform,opacity,visibility' })
   }, { scope: chatScope, dependencies: [messages.length] })
 
-  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sessions, pinnedProjects), [projects, sessions, pinnedProjects])
+  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sessions, pinnedProjects, projectOrder), [projects, sessions, pinnedProjects, projectOrder])
   const filteredSessions = useMemo(() => {
     if (!sidebarSearch.trim()) return sessions
     const q = sidebarSearch.trim().toLowerCase()
@@ -6974,7 +6982,7 @@ export default function ChatApp() {
   const managedHubSessions = useMemo(() => hubSessions(sessions), [sessions])
   const managedSessions = sessionManagerView === 'hub' ? managedHubSessions : sessions
   const managedRecentGroups = useMemo(() => groupRecentSessions(managedSessions), [managedSessions])
-  const managedProjectGroups = useMemo(() => groupProjectSessions(projects, managedSessions, pinnedProjects), [projects, managedSessions, pinnedProjects])
+  const managedProjectGroups = useMemo(() => groupProjectSessions(projects, managedSessions, pinnedProjects, projectOrder), [projects, managedSessions, pinnedProjects, projectOrder])
   const toggleSessionGroup = (key) => setCollapsedSessionGroups(current => {
     const next = new Set(current)
     next.has(key) ? next.delete(key) : next.add(key)
@@ -7151,6 +7159,16 @@ export default function ChatApp() {
               })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
                 <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
               </button>
+              {[-1, 1].map(direction => {
+                const peers = projectSessionGroups.filter(item => item.pinned === group.pinned)
+                const index = peers.findIndex(item => item.name === group.name)
+                const label = direction === -1 ? ct(`上移 ${group.name}`, `Move ${group.name} up`) : ct(`下移 ${group.name}`, `Move ${group.name} down`)
+                return <button key={direction} className="oa-project-reorder" type="button" title={label} aria-label={label}
+                  disabled={batchDeleting || (direction === -1 ? index === 0 : index === peers.length - 1)}
+                  onClick={() => saveProjectOrder(moveProjectOrder(projectSessionGroups, group.name, direction))}>
+                  <ChevronRight size={12} style={{ transform: direction === -1 ? 'rotate(-90deg)' : 'rotate(90deg)' }} aria-hidden="true"/>
+                </button>
+              })}
               <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/></button>
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
             </div>

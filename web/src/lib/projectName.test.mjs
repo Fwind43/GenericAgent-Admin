@@ -64,5 +64,5 @@ test('projects can be pinned, and the pin is read back from the sessions payload
   assert.match(source, /onClick=\{\(\)=>toggleProjectPinned\(group\.name, !group\.pinned\)\}/)
   assert.match(source, /aria-pressed=\{group\.pinned\}/)
   assert.match(source, /setPinnedProjects\(previous => reconcileScalarList\(previous, d\.pinned_projects\)\)/)
-  assert.match(source, /groupProjectSessions\(projects, sessions, pinnedProjects\)/)
+  assert.match(source, /groupProjectSessions\(projects, sessions, pinnedProjects, projectOrder\)/)
 })
