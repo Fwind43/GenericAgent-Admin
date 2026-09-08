@@ -247,10 +247,6 @@ func projectRequestFields(cs chatSession, cfg config.AppConfig) map[string]inter
 }
 
 func applyProjectRequestFields(req map[string]interface{}, cs chatSession, cfg config.AppConfig) {
-	// Repair the workspace assigned by the former Admin project implementation.
-	if cs.ProjectID != "" && (cs.Workspace == adminProjectDir(cfg, cs.ProjectID) || cs.Workspace == legacyAdminProjectDir(cfg, cs.ProjectID)) {
-		req["workspace"] = projectModeWorkspace(cfg, cs.ProjectID)
-	}
 	for k, v := range projectRequestFields(cs, cfg) {
 		req[k] = v
 	}

@@ -1,8 +1,11 @@
 package api
 
 import (
+	"encoding/json"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -85,19 +88,42 @@ func TestAdminProjectMemoryResolveAndPreserve(t *testing.T) {
 	}
 }
 
+func TestProjectNewSessionDoesNotBindWorkspace(t *testing.T) {
+	s := newGoalTestServer(t, t.TempDir())
+	cfg := s.CfgStore.Snapshot()
+	if _, _, err := ensureAdminProject(cfg, "existing"); err != nil {
+		t.Fatal(err)
+	}
+	for _, body := range []string{`{"project_provider":"official","project_id":"existing"}`, `{"project_provider":"admin","project_id":"existing"}`, `{"project_mode":"existing"}`} {
+		w := httptest.NewRecorder()
+		s.chatNewSession(w, httptest.NewRequest("POST", "/api/chat/sessions", strings.NewReader(body)))
+		if w.Code != 200 {
+			t.Fatalf("%d: %s", w.Code, w.Body.String())
+		}
+		var cs chatSession
+		if err := json.Unmarshal(w.Body.Bytes(), &cs); err != nil {
+			t.Fatal(err)
+		}
+		if cs.Workspace != "" || cs.ProjectID != "existing" {
+			t.Fatalf("unexpected session: %+v", cs)
+		}
+		loaded, err := loadChatSession(cfg, cs.ID)
+		if err != nil || loaded.Workspace != "" {
+			t.Fatalf("persisted workspace=%q err=%v", loaded.Workspace, err)
+		}
+	}
+}
+
 func TestProjectWorkspaceSwitch(t *testing.T) {
 	s := newGoalTestServer(t, t.TempDir())
 	cfg := s.CfgStore.Snapshot()
 	for _, mode := range []string{"official", "admin"} {
 		cfg.DefaultProjectProvider = mode
-		for _, workspace := range []string{adminProjectDir(cfg, "existing"), projectModeWorkspace(cfg, "existing"), "custom-workspace"} {
+		for _, workspace := range []string{"", legacyAdminProjectDir(cfg, "existing"), adminProjectDir(cfg, "existing"), projectModeWorkspace(cfg, "existing"), "custom-workspace"} {
 			cs := chatSession{ProjectProvider: "admin", ProjectID: "existing", Workspace: workspace}
 			req := map[string]interface{}{"workspace": workspace}
 			applyProjectRequestFields(req, cs, cfg)
 			want := workspace
-			if workspace == adminProjectDir(cfg, "existing") {
-				want = projectModeWorkspace(cfg, "existing")
-			}
 			if req["workspace"] != want {
 				t.Fatalf("mode %s: %v", mode, req)
 			}

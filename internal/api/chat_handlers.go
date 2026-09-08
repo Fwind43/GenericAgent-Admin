@@ -196,14 +196,15 @@ func (s *Server) chatNewSession(w http.ResponseWriter, r *http.Request) {
 	if provider == "" && id == "" && strings.TrimSpace(req.ProjectMode) != "" {
 		provider, id = chatProjectProviderOfficial, strings.TrimSpace(req.ProjectMode)
 	}
-	var projectMode, workspace string
+	var projectMode string
+	const workspace = "" // Project selection does not bind the execution workspace.
 	if id != "" {
-		item, resolvedWorkspace, err := resolveProject(cfg, provider, id)
+		item, _, err := resolveProject(cfg, provider, id)
 		if err != nil {
 			bad(w, http.StatusBadRequest, "project does not exist")
 			return
 		}
-		provider, id, workspace = item.Provider, item.ID, resolvedWorkspace
+		provider, id = item.Provider, item.ID
 		if provider == chatProjectProviderOfficial {
 			projectMode = id
 		}

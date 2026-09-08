@@ -2092,9 +2092,6 @@ func loadChatSession(cfg config.AppConfig, sid string) (chatSession, error) {
 	if cs.RawHistory == nil {
 		cs.RawHistory = []map[string]interface{}{}
 	}
-	if cs.ProjectID != "" && (cs.Workspace == adminProjectDir(cfg, cs.ProjectID) || cs.Workspace == legacyAdminProjectDir(cfg, cs.ProjectID)) {
-		cs.Workspace = projectModeWorkspace(cfg, cs.ProjectID)
-	}
 	cs.Plan = normalizeChatPlan(cs.Plan)
 	cs.Settings = normalizeChatSettings(cs.Settings)
 	return cs, nil
