@@ -345,3 +345,24 @@ func TestEnsureProjectModeRefusesANonDirectoryProjectPath(t *testing.T) {
 		t.Fatal("a project path that is not a directory must be refused")
 	}
 }
+
+func TestProjectOrderPersistsAndPreservesPins(t *testing.T) {
+	s, _, h := newProjectTestServer(t)
+	cfg := s.CfgStore.Snapshot()
+	for _, body := range []string{`{"name":"a","pinned":true}`, `{"order":["b","a"]}`, `{"order":["b","a"]}`, `{"name":"c","pinned":true}`} {
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPatch, "/api/chat/projects/pin", strings.NewReader(body)))
+		if rr.Code != 200 {
+			t.Fatalf("%d %s", rr.Code, rr.Body.String())
+		}
+	}
+	prefs := loadProjectPrefs(cfg)
+	if strings.Join(prefs.Order, ",") != "b,a" || strings.Join(prefs.Pinned, ",") != "a,c" {
+		t.Fatalf("prefs=%+v", prefs)
+	}
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/chat/sessions", nil))
+	if !strings.Contains(rr.Body.String(), `"project_order":["b","a"]`) {
+		t.Fatal(rr.Body.String())
+	}
+}

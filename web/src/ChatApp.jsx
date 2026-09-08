@@ -1,3 +1,4 @@
+import ProjectDragHandle from './components/ProjectDragHandle'
 import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import katex from 'katex'
@@ -44,7 +45,7 @@ import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ult
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
 import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
-import { groupProjectSessions, moveProjectOrder, readProjectOrder } from './lib/chatProjectSessions.js'
+import { groupProjectSessions } from './lib/chatProjectSessions.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
 import { reconcileScalarList, reconcileSessionSummaries } from './lib/chatSessionReconcile.js'
@@ -4452,12 +4453,16 @@ export default function ChatApp() {
   const [sessions, setSessions] = useState([])
   const [projects, setProjects] = useState([])
   const [pinnedProjects, setPinnedProjects] = useState([])
-  const [projectOrderState, setProjectOrderState] = useState(() => ({ instance: initialChatInstanceID, names: readProjectOrder(initialChatInstanceID) }))
-  const projectOrder = useMemo(() => projectOrderState.instance === chatInstanceID ? projectOrderState.names : readProjectOrder(chatInstanceID), [projectOrderState, chatInstanceID])
-  const saveProjectOrder = names => {
-    setProjectOrderState({ instance: chatInstanceID, names })
-    try { window.localStorage.setItem('ga-chat-project-order:' + chatInstanceID, JSON.stringify(names)) }
-    catch { setNotice(ct('排序已生效，但浏览器不允许保存', 'Order applied, but browser storage is unavailable')) }
+  const [projectOrder, setProjectOrder] = useState([])
+  const [projectOrderSaving, setProjectOrderSaving] = useState(false)
+  const saveProjectOrder = async names => {
+    if (projectOrderSaving) return
+    setProjectOrderSaving(true)
+    try {
+      const d = await chatApi('/api/chat/projects/pin', { method:'PATCH', body:JSON.stringify({ order:names }) })
+      setProjectOrder(d.project_order || [])
+    } catch (e) { if (e.name !== 'AbortError') setErr(e.message || String(e)) }
+    finally { setProjectOrderSaving(false) }
   }
 
   const [sidebarTab, setSidebarTab] = useState('history')
@@ -5576,6 +5581,7 @@ export default function ChatApp() {
     setSessions(list)
     setProjects(previous => reconcileScalarList(previous, d.projects))
     setPinnedProjects(previous => reconcileScalarList(previous, d.pinned_projects))
+    setProjectOrder(previous => reconcileScalarList(previous, d.project_order))
     if (open) {
       const restored = loadSelectedChatSessionID(chatInstanceRef.current)
       const next = chooseChatSessionID(list, prefer, restored)
@@ -6685,6 +6691,7 @@ export default function ChatApp() {
           setSessions(next)
           setProjects(current => reconcileScalarList(current, d.projects))
           setPinnedProjects(current => reconcileScalarList(current, d.pinned_projects))
+          setProjectOrder(current => reconcileScalarList(current, d.project_order))
           const activeID = activeSidRef.current
           const before = previous.find(item => item.id === activeID)
           const after = next.find(item => item.id === activeID)
@@ -7149,7 +7156,7 @@ export default function ChatApp() {
           const pinLabel = group.pinned
             ? ct(`取消置顶 ${group.name}`, `Unpin ${group.name}`)
             : ct(`置顶 ${group.name}`, `Pin ${group.name}`)
-          return <section className={`oa-project-group ${expanded ? 'is-expanded' : 'is-collapsed'} ${group.pinned ? 'is-pinned' : ''}`} key={group.name}>
+          return <section data-project-name={group.name} className={`oa-project-group ${expanded ? 'is-expanded' : 'is-collapsed'} ${group.pinned ? 'is-pinned' : ''}`} key={group.name}>
             <div className="oa-project-head">
               <button className="oa-project-toggle" type="button" onClick={()=>setExpandedProjectNames(current => {
                 const next = new Set(current)
@@ -7159,16 +7166,7 @@ export default function ChatApp() {
               })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
                 <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
               </button>
-              {[-1, 1].map(direction => {
-                const peers = projectSessionGroups.filter(item => item.pinned === group.pinned)
-                const index = peers.findIndex(item => item.name === group.name)
-                const label = direction === -1 ? ct(`上移 ${group.name}`, `Move ${group.name} up`) : ct(`下移 ${group.name}`, `Move ${group.name} down`)
-                return <button key={direction} className="oa-project-reorder" type="button" title={label} aria-label={label}
-                  disabled={batchDeleting || (direction === -1 ? index === 0 : index === peers.length - 1)}
-                  onClick={() => saveProjectOrder(moveProjectOrder(projectSessionGroups, group.name, direction))}>
-                  <ChevronRight size={12} style={{ transform: direction === -1 ? 'rotate(-90deg)' : 'rotate(90deg)' }} aria-hidden="true"/>
-                </button>
-              })}
+              <ProjectDragHandle name={group.name} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>
               <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/></button>
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
             </div>

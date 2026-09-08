@@ -21,6 +21,7 @@ func chatProjectPrefsPath(cfg config.AppConfig) string {
 
 type chatProjectPrefs struct {
 	Pinned []string `json:"pinned"`
+	Order  []string `json:"order"`
 }
 
 // loadPinnedProjects never fails the caller: a missing or corrupt preferences
@@ -54,7 +55,9 @@ func normalizePinnedProjects(names []string) []string {
 }
 
 func savePinnedProjects(cfg config.AppConfig, names []string) error {
-	b, err := json.MarshalIndent(chatProjectPrefs{Pinned: normalizePinnedProjects(names)}, "", "  ")
+	prefs := loadProjectPrefs(cfg)
+	prefs.Pinned = normalizePinnedProjects(names)
+	b, err := json.MarshalIndent(prefs, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -129,11 +132,42 @@ func (s *Server) chatCreateProject(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) chatSetProjectPinned(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name   string `json:"name"`
-		Pinned bool   `json:"pinned"`
+		Name   string    `json:"name"`
+		Pinned bool      `json:"pinned"`
+		Order  *[]string `json:"order"`
 	}
 	if err := decode(r, &req); err != nil {
 		bad(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.Order != nil {
+		cfg := s.CfgStore.Snapshot()
+		s.SessionMu.Lock()
+		prefs := loadProjectPrefs(cfg)
+		prefs.Order = []string{}
+		seen := map[string]bool{}
+		for _, raw := range *req.Order {
+			name, valid := validProjectModeName(raw)
+			if !valid {
+				s.SessionMu.Unlock()
+				bad(w, http.StatusBadRequest, errProjectNameInvalid.Error())
+				return
+			}
+			if !seen[name] {
+				prefs.Order = append(prefs.Order, name)
+				seen[name] = true
+			}
+		}
+		b, err := json.MarshalIndent(prefs, "", "  ")
+		if err == nil {
+			err = writeChatFileAtomic(chatProjectPrefsPath(cfg), b, 0644)
+		}
+		s.SessionMu.Unlock()
+		if err != nil {
+			bad(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, map[string]interface{}{"ok": true, "project_order": prefs.Order})
 		return
 	}
 	name, ok := validProjectModeName(req.Name)
@@ -163,4 +197,11 @@ func chatProjectNamesFor(cfg config.AppConfig) (names []string, pinned []string)
 		names = []string{}
 	}
 	return names, loadPinnedProjects(cfg)
+}
+func loadProjectPrefs(cfg config.AppConfig) chatProjectPrefs {
+	prefs := chatProjectPrefs{Pinned: []string{}, Order: []string{}}
+	if b, err := os.ReadFile(chatProjectPrefsPath(cfg)); err == nil {
+		_ = json.Unmarshal(b, &prefs)
+	}
+	return prefs
 }

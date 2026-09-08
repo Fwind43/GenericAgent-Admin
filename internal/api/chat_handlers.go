@@ -37,7 +37,7 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	projects, pinnedProjects := chatProjectNamesFor(cfg)
-	writeJSON(w, map[string]interface{}{"sessions": items, "projects": projects, "pinned_projects": pinnedProjects})
+	writeJSON(w, map[string]interface{}{"sessions": items, "projects": projects, "pinned_projects": pinnedProjects, "project_order": loadProjectPrefs(s.CfgStore.Snapshot()).Order})
 }
 
 func (s *Server) chatHandler(w http.ResponseWriter, r *http.Request) {
