@@ -18301,6 +18301,23 @@ html .oa-sidebar .oa-project-group.is-pinned {
   box-shadow:none;
 }
 .oa-sidebar .oa-project-head { padding:2px 0; }
+/* Quiet project creation action, shared by light and dark themes. */
+html .oa-sidebar .oa-project-add {
+  width:29px;
+  height:29px;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:var(--oa-muted);
+  box-shadow:none;
+  transition:background .16s ease,color .16s ease;
+}
+html .oa-sidebar .oa-project-add > svg { width:13px; height:13px; stroke-width:1.75; }
+html .oa-sidebar .oa-project-add:hover:not(:disabled) {
+  background:rgba(16,163,127,.08);
+  color:var(--oa-green);
+  transform:none;
+}
 /* Keep the expanded project identity visible within its own scrolling group. */
 .oa-sidebar .oa-project-group.is-expanded > .oa-project-head {
   position:sticky;
