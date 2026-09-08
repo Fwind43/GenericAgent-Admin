@@ -18679,10 +18679,11 @@ html[data-color-scheme="dark"] .oa-sidebar {
   background: currentColor;
   transform: scaleY(.35);
   animation: oa-session-wave 2.4s ease-in-out infinite;
+  animation-delay: var(--oa-wave-phase, 0s);
 }
-.oa-sidebar .oa-session-running-wave i:nth-child(2) { animation-delay: -.6s; }
-.oa-sidebar .oa-session-running-wave i:nth-child(3) { animation-delay: -1.2s; }
-.oa-sidebar .oa-session-running-wave i:nth-child(4) { animation-delay: -1.8s; }
+.oa-sidebar .oa-session-running-wave i:nth-child(2) { animation-delay: calc(var(--oa-wave-phase, 0s) - .6s); }
+.oa-sidebar .oa-session-running-wave i:nth-child(3) { animation-delay: calc(var(--oa-wave-phase, 0s) - 1.2s); }
+.oa-sidebar .oa-session-running-wave i:nth-child(4) { animation-delay: calc(var(--oa-wave-phase, 0s) - 1.8s); }
 @keyframes oa-session-wave {
   0%, 100% { transform: scaleY(.35); opacity: .85; }
   40% { transform: scaleY(1); opacity: 1; }
