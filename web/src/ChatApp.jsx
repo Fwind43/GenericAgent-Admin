@@ -1,3 +1,4 @@
+import ProjectActionsMenu from './components/ProjectActionsMenu'
 import ProjectDragHandle from './components/ProjectDragHandle'
 import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -7167,12 +7168,14 @@ export default function ChatApp() {
                 <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
               </button>
               <ProjectDragHandle name={group.name} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>
-              <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/></button>
-              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
+              <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
+              <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
+              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/>{ct('新建对话', 'New chat')}</button>
+              </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>
               {group.sessions.map(renderSidebarSession)}
-              {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，点击 + 快速开始', 'No chats yet. Click + to start.')}</div>}
+              {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，从 … 菜单新建', 'No chats yet. Start one from the … menu.')}</div>}
             </div>
           </section>
         })}
