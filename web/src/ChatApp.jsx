@@ -7168,6 +7168,7 @@ export default function ChatApp() {
               })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
                 <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
               </button>
+              {group.pinned && <span className="oa-project-pinned-badge" title={ct('项目已置顶', 'Project pinned')}><Pin size={11} aria-hidden="true"/>{ct('置顶', 'Pinned')}</span>}
               <ProjectDragHandle name={group.name} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>

@@ -40,6 +40,16 @@ test('project new chat is always available outside the actions menu', () => {
   assert.doesNotMatch(main, /No chats yet\. Start one from the/)
 })
 
+test('pinned projects expose a persistent status outside the menu and collapsed body', () => {
+  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const header = functionBlock(main, '<div className="oa-project-head">', '<ProjectActionsMenu')
+  assert.match(header, /group\.pinned && <span className="oa-project-pinned-badge"/)
+  assert.match(header, /<Pin size=\{11\} aria-hidden="true"/)
+  assert.match(header, /'Pinned'/)
+  const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
+  assert.match(css, /\.oa-sidebar \.oa-project-pinned-badge\s*\{[^}]*display:inline-flex;[^}]*flex:0 0 auto;/)
+})
+
 test('new chat stays out of the session list until its first send', () => {
   const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
 

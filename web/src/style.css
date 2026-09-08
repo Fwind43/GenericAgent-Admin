@@ -18301,6 +18301,21 @@ html .oa-sidebar .oa-project-group.is-pinned {
   box-shadow:none;
 }
 .oa-sidebar .oa-project-head { padding:2px 0; }
+.oa-sidebar .oa-project-pinned-badge {
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+  flex:0 0 auto;
+  padding:2px 5px;
+  border-radius:4px;
+  background:rgba(16,163,127,.1);
+  color:var(--oa-green);
+  font-size:10px;
+  font-weight:600;
+  line-height:16px;
+  white-space:nowrap;
+}
+.oa-sidebar .oa-project-pinned-badge > svg { flex:none; }
 .oa-sidebar .oa-project-reorder { display:flex; align-items:center; justify-content:center; flex:0 0 22px; width:22px; height:29px; padding:0; border:0; border-radius:6px; background:transparent; color:var(--oa-muted); cursor:pointer; }
 .oa-sidebar .oa-project-reorder:hover:not(:disabled) { background:rgba(16,163,127,.08); color:var(--oa-green); }
 .oa-sidebar .oa-project-reorder:disabled { opacity:.25; cursor:default; }
