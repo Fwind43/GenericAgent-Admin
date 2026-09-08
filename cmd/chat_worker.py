@@ -1535,13 +1535,11 @@ def _install_worldline_hook():
 
 
 def _ensure_worldline_store(agent, ga_root, workspace):
-    # Worldline is optional on older GA checkouts. Do not suppress missing
-    # transitive dependencies or store errors: those are real failures.
+    # Worldline (including its UI dependencies such as rich) is optional.
+    # Only guard the import; store/workspace failures must remain visible.
     try:
         from frontends.worldline import RewindStore
-    except ModuleNotFoundError as exc:
-        if exc.name not in ('frontends', 'frontends.worldline'):
-            raise
+    except ModuleNotFoundError:
         return None
     cwd = os.path.realpath(str(workspace or ga_root))
     store = getattr(agent, '_admin_worldline_store', None)
