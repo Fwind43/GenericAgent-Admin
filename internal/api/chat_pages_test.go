@@ -29,6 +29,23 @@ func requirePage(t *testing.T, cs chatSession, query string) map[string]interfac
 	return value.(map[string]interface{})
 }
 
+func TestChatPagesPreserveConductor(t *testing.T) {
+	for _, role := range []string{conductorRoleParent, conductorRoleWorker} {
+		t.Run(role, func(t *testing.T) {
+			cs := pageFixture(103)
+			cs.Conductor = &chatConductorState{Role: role}
+			page := requirePage(t, cs, "")
+			if !reflect.DeepEqual(page["conductor"], cs.Conductor) {
+				t.Fatal("initial page lost conductor metadata")
+			}
+			older := requirePage(t, cs, "&before="+url.QueryEscape(page["before"].(string)))
+			if _, ok := older["conductor"]; ok {
+				t.Fatal("older page repeats conductor metadata")
+			}
+		})
+	}
+}
+
 func TestChatPagesCompleteAndLightweight(t *testing.T) {
 	cs := pageFixture(103)
 	original, _ := json.Marshal(cs)
