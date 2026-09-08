@@ -263,6 +263,7 @@ function SortableMemberRow({ member, memberIndex, groupIndex, groupLength, candi
 }
 
 export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap, sensors, patchGroup, toggleMember, moveMember, removeMember, text }) {
+  const [expandedProviders, setExpandedProviders] = useState({})
   const providerGroups = Array.from(candidates.reduce((groups, candidate) => {
     const key = candidate.providerVarName
     if (!groups.has(key)) groups.set(key, { key, name: candidate.providerName || text.unnamed, candidates: [] })
@@ -294,11 +295,11 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
         <div className="model-failover-providers">
           {providerGroups.length ? providerGroups.map(provider => (
             <section className="model-failover-provider" key={provider.key} aria-label={provider.name}>
-              <div className="model-subsection-head">
-                <strong><Plug size={14} aria-hidden="true" /> {provider.name}</strong>
+              <button type="button" className="model-subsection-head model-failover-provider-toggle" aria-expanded={!!expandedProviders[provider.key]} onClick={() => setExpandedProviders(current => ({ ...current, [provider.key]: !current[provider.key] }))}>
+                <strong><span aria-hidden="true">{expandedProviders[provider.key] ? '▾' : '▸'}</span><Plug size={14} aria-hidden="true" /> {provider.name}</strong>
                 <span>{provider.candidates.filter(candidate => selectedKeys.has(memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model }))).length} / {provider.candidates.length}</span>
-              </div>
-              <div className="model-failover-candidates">
+              </button>
+              {expandedProviders[provider.key] && <div className="model-failover-candidates">
           {provider.candidates.map(candidate => {
             const key = memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model })
             const selected = selectedKeys.has(key)
@@ -317,7 +318,7 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
               </button>
             )
           })}
-              </div>
+              </div>}
             </section>
           )) : <div className="model-hint-block">{text.failoverNoCandidates}</div>}
         </div>

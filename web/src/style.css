@@ -18699,3 +18699,7 @@ html[data-color-scheme="dark"] .oa-sidebar {
   .oa-sidebar .oa-session-running-wave i:nth-child(2n) { transform: scaleY(.8); }
   .oa-sidebar .oa-session-row { transition: none; }
 }
+
+.models-page .model-failover-provider-toggle { width: 100%; border: 0; background: transparent; color: inherit; padding: 6px 0; cursor: pointer; text-align: left; font: inherit; }
+.models-page .model-failover-provider-toggle:hover { color: var(--model-focus); }
+.models-page .model-failover-provider-toggle:focus-visible { outline: 2px solid var(--model-focus); outline-offset: 2px; }
