@@ -82,6 +82,7 @@ func main() {
 	}
 	srv := api.New(cfgStore, svc, models, static)
 	srv.StartAutomaticChatTitleBackfill()
+	srv.StartChatAutorun()
 	auth, err := adminauth.New(cwd, cfgStore)
 	if err != nil {
 		log.Fatalf("initialize admin authentication: %v", err)

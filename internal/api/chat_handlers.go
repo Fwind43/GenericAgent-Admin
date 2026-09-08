@@ -32,7 +32,7 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 			"id": summary.ID, "title": summary.Title, "title_source": summary.TitleSource,
 			"updated_at": summary.UpdatedAt, "count": summary.Count, "running": running, "taskbar_state": taskbarState,
 			"workspace": summary.Workspace, "project_mode": summary.ProjectMode,
-			"hub_enabled": summary.HubEnabled, "pinned": summary.Pinned, "loop": summary.Loop,
+			"hub_enabled": summary.HubEnabled, "pinned": summary.Pinned, "loop": summary.Loop, "autorun": summary.Autorun,
 			"result": summary.Result,
 		})
 	}
@@ -137,6 +137,11 @@ func (s *Server) chatHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(parts) == 3 && parts[2] == "switch" && r.Method == http.MethodPost {
 			s.chatWorldlineSwitch(w, r, parts[1])
+			return
+		}
+	case "autorun":
+		if len(parts) == 2 && r.Method == http.MethodPatch {
+			s.chatAutorunSet(w, r, parts[1])
 			return
 		}
 	case "loop":
@@ -965,7 +970,7 @@ func (s *Server) chatState(w http.ResponseWriter, r *http.Request, sid string) {
 		backend["diagnosis"] = payload
 	}
 	running, pendingAssistantID, runStartedAtMS := s.chatRunState(sid)
-	writeJSON(w, map[string]interface{}{"settings": cs.Settings, "extra_sys_prompts": cs.ExtraSysPrompts, "extra_sys_prompt_preset_id": cs.ExtraSysPromptPresetID, "llm_no": cs.Settings.LLMNo, "llms": llms, "backend": backend, "running": running, "pending_assistant_id": pendingAssistantID, "run_started_at_ms": runStartedAtMS, "workspace": cs.Workspace, "project_mode": cs.ProjectMode, "loop": cs.Loop})
+	writeJSON(w, map[string]interface{}{"settings": cs.Settings, "extra_sys_prompts": cs.ExtraSysPrompts, "extra_sys_prompt_preset_id": cs.ExtraSysPromptPresetID, "llm_no": cs.Settings.LLMNo, "llms": llms, "backend": backend, "running": running, "pending_assistant_id": pendingAssistantID, "run_started_at_ms": runStartedAtMS, "workspace": cs.Workspace, "project_mode": cs.ProjectMode, "loop": cs.Loop, "autorun": cs.Autorun})
 }
 
 func (s *Server) maybeHandleWorkspaceCommand(w http.ResponseWriter, r *http.Request, sid string, cs *chatSession, prompt string) bool {

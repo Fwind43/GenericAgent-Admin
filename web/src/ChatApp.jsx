@@ -12,7 +12,6 @@ import ThinkingBlock from './ThinkingBlock'
 import SummaryBlock from './SummaryBlock'
 import { createStreamDeltaBatcher, decideStreamFollow, isBTWCommand, isLoopFollowActive, mergeFinalStreamMessage, mergeStreamTerminalMessage, mergeStreamUserMessage, nextStreamClientUserID, pickResumePlaceholderId, sameStreamRun, scrollFollowAction, shouldRefreshChatSnapshot } from './lib/chatStream.js'
 import { cacheHitPercent, cacheReadTokens, measuredOutputRate } from './lib/chatUsage.js'
-import { autorunInitialReplyAt, isAutorunTargetRunning, shouldTriggerAutorun } from './lib/chatAutorun.js'
 import { computeLineDiff, computeWriteRows } from './lib/lineDiff.js'
 import { modelDiagnosisAdvice, modelDiagnosisTitle } from './lib/modelDiagnosis.js'
 import { projectNameError, projectNameErrorText } from './lib/projectName.js'
@@ -241,7 +240,6 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   menuOpen = false,
   draftTitle = '',
   hasDraft = false,
-  autorunEnabled = false,
   ageText = '',
   unread = false,
   waiting = false,
@@ -254,7 +252,7 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
       <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>actionsRef.current.setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') actionsRef.current.saveRename(session.id); if(event.key==='Escape') actionsRef.current.cancelRename() }}/>
       <button onClick={()=>actionsRef.current.saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>actionsRef.current.cancelRename()} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
     </div> : <button className="oa-session" onClick={()=>actionsRef.current.openSession(session.id)} title={title}>
-      <span className="oa-session-title" title={title}>{session.running && !waiting && <i className="oa-session-running-dot" aria-hidden="true"/>}{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={autorunEnabled} sessionId={session.id} targetSessionId={active ? session.id : ''}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
+      <span className="oa-session-title" title={title}>{session.running && !waiting && <i className="oa-session-running-dot" aria-hidden="true"/>}{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
       <small title={fmtTime(session.updated_at)}>{session.running && !waiting ? <em className="oa-session-running-label">{ct('运行中', 'Running')}</em> : ageText}</small>
     </button>}
     {!editing && <button className={`oa-session-more ${menuOpen ? 'is-open' : ''}`} onClick={(event)=>actionsRef.current.toggleMenu(session.id, event)} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
@@ -4568,10 +4566,8 @@ export default function ChatApp() {
   const [queueEditingId, setQueueEditingId] = useState('')
   const [queueDraft, setQueueDraft] = useState('')
   const [guidingQueueId, setGuidingQueueId] = useState('')
-  const [autorunEnabled, setAutorunEnabled] = useState(false)
-  const autorunEnabledRef = useRef(false)
-  const autorunLastReplyAtRef = useRef(Date.now())
-  const autorunRunSendRef = useRef(null)
+  const autorunEnabled = Boolean(sessions.find(entry => entry.id === sid)?.autorun?.enabled)
+  const autorunSavingRef = useRef(false)
   const [dragging, setDragging] = useState(false)
   const [autoFollow, setAutoFollow] = useState(true)
   const [showFollow, setShowFollow] = useState(false)
@@ -4811,15 +4807,21 @@ export default function ChatApp() {
     el.style.overflowY = el.scrollHeight > COMPOSER_MAX_H ? 'auto' : 'hidden'
   }, [prompt])
 
-  const toggleAutorun = useCallback(() => {
-    const next = !autorunEnabledRef.current
-    autorunEnabledRef.current = next
-    if (next) autorunLastReplyAtRef.current = autorunInitialReplyAt(Date.now())
-    setAutorunEnabled(next)
-    setNotice(next
-      ? ct('\u5df2\u5141\u8bb8\u81ea\u4e3b\u884c\u52a8\uff1a\u7ea6 1 \u5206\u949f\u540e\u542f\u52a8\uff0c\u4e4b\u540e\u6bcf\u6b21\u56de\u590d 30 \u5206\u949f\u540e\u518d\u542f\u52a8', 'Auto-action enabled: starts in about 1 minute, then 30 minutes after each reply')
-      : ct('\u5df2\u7981\u6b62\u81ea\u4e3b\u884c\u52a8', 'Auto-action disabled'))
-  }, [])
+  const toggleAutorun = useCallback(async () => {
+    if (!sid || autorunSavingRef.current) return
+    const sessionID = sid
+    autorunSavingRef.current = true
+    try {
+      const data = await api(`/api/chat/autorun/${sessionID}`, {
+        method: 'PATCH', body: JSON.stringify({ enabled: !autorunEnabled, language: chatLocale().startsWith('en') ? 'en' : 'zh' }),
+      })
+      setSessions(items => items.map(item => item.id === sessionID ? { ...item, autorun: data.autorun } : item))
+      setNotice(data.autorun.enabled
+        ? ct('本会话已开启后台自主行动：约 1 分钟后启动，之后每次回复 30 分钟后再启动', 'Background auto-action enabled for this session: starts in about 1 minute, then 30 minutes after each reply')
+        : ct('本会话已关闭自主行动', 'Auto-action disabled for this session'))
+    } catch (error) { setErr(error?.message || String(error)) }
+    finally { autorunSavingRef.current = false }
+  }, [sid, autorunEnabled])
 
   const current = useMemo(() => sessions.find(s => s.id === sid), [sessions, sid])
   const isUltraPlanPrompt = /^\s*\/ultraplan(?:\s|$)/.test(prompt)
@@ -6298,7 +6300,6 @@ export default function ChatApp() {
         return [...xs.slice(0, cutIdx), optimistic, pending]
       })
       commandPatch = await followChatStream(res, pending.id, clientUserID, id, ctrl.signal)
-      autorunLastReplyAtRef.current = Date.now()
     } catch (e) {
       if (runToken === runSeqRef.current && openToken === openSeqRef.current && e?.name !== 'AbortError' && isActiveSession(id)) setErr(e.message || String(e))
       if (item.propagateError) throw e
@@ -6361,47 +6362,6 @@ export default function ChatApp() {
     }
   }
 
-  autorunRunSendRef.current = runSend
-
-  useEffect(() => {
-    if (!autorunEnabled) return undefined
-    const timer = window.setInterval(() => {
-      const sessionID = activeSidRef.current || sid
-      const session = sessions.find(entry => entry.id === sessionID)
-      const blocked = !sessionID
-        || !session
-        || Boolean(prompt.trim())
-        || attachments.length > 0
-        || busy
-        || activeRunRef.current
-        || isAutorunTargetRunning(sessions, sessionID)
-        || Boolean(loopState?.enabled || loopState?.status === 'running')
-        || queuedRef.current.length > 0
-        || Boolean(guidingQueueRef.current)
-      const nowMs = Date.now()
-      if (!shouldTriggerAutorun({
-        enabled: autorunEnabledRef.current,
-        nowMs,
-        lastReplyAtMs: autorunLastReplyAtRef.current,
-        blocked,
-      })) return
-
-      // Claim the slot before sending so timer ticks cannot enqueue duplicates.
-      autorunLastReplyAtRef.current = nowMs
-      const text = ct(
-        '[AUTO]\u{1F916} \u7528\u6237\u5df2\u7ecf\u79bb\u5f00\u8d85\u8fc730\u5206\u949f\uff0c\u4f5c\u4e3a\u81ea\u4e3b\u667a\u80fd\u4f53\uff0c\u8bf7\u9605\u8bfb\u81ea\u52a8\u5316sop\uff0c\u6267\u884c\u81ea\u52a8\u4efb\u52a1\u3002',
-        '[AUTO]\u{1F916} User has been idle for over 30 minutes. As an autonomous agent, read the automation SOP and execute automatic tasks.',
-      )
-      Promise.resolve(autorunRunSendRef.current?.({
-        text,
-        files: [],
-        llmNo,
-        reasoningEffort,
-        sessionId: sessionID,
-      })).catch(error => setErr(error?.message || String(error)))
-    }, 1000)
-    return () => window.clearInterval(timer)
-  }, [autorunEnabled, attachments, busy, llmNo, loopState, prompt, reasoningEffort, sessions, sid])
 
   const selectWorldlineRestoreNode = useCallback((nodeID, mode, target) => {
     const command = worldlineRestoreCommand(nodeID, mode, target)
@@ -7075,7 +7035,6 @@ export default function ChatApp() {
     menuOpen={menuOpen === session.id}
     draftTitle={editing === session.id ? draftTitle : ''}
     hasDraft={draftSessionIds.has(session.id)}
-    autorunEnabled={autorunEnabled}
     ageText={sessionAgeText(session.updated_at)}
     unread={chatReadState.unread(session)}
     waiting={waitingSessionIds.has(session.id)}
@@ -7695,7 +7654,7 @@ export default function ChatApp() {
                 <button className="oa-session-manager-dialog-select" type="button" role="checkbox" aria-checked={selected} onClick={()=>toggleSessionSelection(s.id)} disabled={batchDeleting || Boolean(hubUpdatingSessionId)}>
                   <span className={`oa-session-check ${selected ? 'is-checked' : ''}`}>{selected && <Check size={12}/>}</span>
                   <span className="oa-session-dialog-copy">
-                    <span className="oa-session-dialog-title">{s.running && <i className="oa-session-running-dot" aria-hidden="true"/>}<b>{shortTitle(s)}</b><SessionAutorunBadge enabled={autorunEnabled} sessionId={s.id} targetSessionId={sid}/>{s.hub_enabled && <em className="oa-session-hub-badge">Hub</em>}{draftSessionIds.has(s.id) && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}{s.id === sid && <em>当前</em>}<em className={`is-title-source is-${s.title_source || 'legacy'}`}>{sourceLabel}</em></span>
+                    <span className="oa-session-dialog-title">{s.running && <i className="oa-session-running-dot" aria-hidden="true"/>}<b>{shortTitle(s)}</b><SessionAutorunBadge enabled={Boolean(s.autorun?.enabled)} sessionId={s.id} targetSessionId={s.id}/>{s.hub_enabled && <em className="oa-session-hub-badge">Hub</em>}{draftSessionIds.has(s.id) && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}{s.id === sid && <em>当前</em>}<em className={`is-title-source is-${s.title_source || 'legacy'}`}>{sourceLabel}</em></span>
                     <small><Clock3 size={12}/>{fmtTime(s.updated_at) || ct('刚刚', 'Just now')} · {s.count || 0} 条{waitingSessionIds.has(s.id) ? <span className="oa-session-waiting-label"><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</span> : s.running ? <span>运行中</span> : chatReadState.unread(s) && <span className="oa-session-unread-label">{ct('未读', 'Unread')}</span>}</small>
                   </span>
                 </button>

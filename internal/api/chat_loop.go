@@ -294,6 +294,7 @@ func (s *Server) publishChatLoopState(sid string, state chatLoopState) {
 }
 
 func (s *Server) afterChatRunTerminal(sid string, success bool) {
+	s.resetChatAutorunAfterReply(sid)
 	if !success {
 		return
 	}

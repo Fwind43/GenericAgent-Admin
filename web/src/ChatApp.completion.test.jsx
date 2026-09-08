@@ -11,7 +11,7 @@ const between = (start, end) => {
   return source.slice(a, b)
 }
 const functions = [
-  between('  const runSend = async', '  autorunRunSendRef.current'),
+  between('  const runSend = async', '  const selectWorldlineRestoreNode'),
   between('  const refreshCompletedRun = async', '  const refreshActiveSessionSnapshot'),
   between('  const loadChatState = async', '  const openSession = async'),
 ].join('\n')

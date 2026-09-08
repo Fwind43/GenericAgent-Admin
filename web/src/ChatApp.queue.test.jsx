@@ -172,7 +172,7 @@ describe('session-scoped guided-message queue wiring', () => {
     const attachStart = source.indexOf('const attachRunningStream = async')
     const attachEnd = source.indexOf('\n  useEffect(() =>', attachStart)
     const runSendStart = source.indexOf('const runSend = async')
-    const runSendEnd = source.indexOf('\n  autorunRunSendRef.current = runSend', runSendStart)
+    const runSendEnd = source.indexOf('\n  const selectWorldlineRestoreNode', runSendStart)
     expect(source.slice(attachStart, attachEnd)).toContain('++streamActivitySeqRef.current')
     expect(source.slice(runSendStart, runSendEnd)).toContain('++streamActivitySeqRef.current')
   })

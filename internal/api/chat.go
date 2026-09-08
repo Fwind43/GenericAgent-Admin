@@ -199,6 +199,7 @@ type chatSession struct {
 	Pinned                 bool                     `json:"pinned,omitempty"`
 	ExtraSysPrompts        []string                 `json:"extra_sys_prompts,omitempty"`
 	ExtraSysPromptPresetID string                   `json:"extra_sys_prompt_preset_id,omitempty"`
+	Autorun                chatAutorunState         `json:"autorun"`
 	Loop                   chatLoopState            `json:"loop"`
 	QueuedMessages         []chatQueuedMessage      `json:"queued_messages,omitempty"`
 }
@@ -2153,6 +2154,7 @@ func (s *Server) saveChatSessionExact(cs chatSession) error {
 func preserveLatestChatUserMetadata(candidate *chatSession, latest chatSession) {
 	candidate.Pinned = latest.Pinned
 	candidate.Loop = latest.Loop
+	candidate.Autorun = latest.Autorun
 	candidate.QueuedMessages = latest.QueuedMessages
 	if latest.TitleSource == chatTitleSourceManual ||
 		(latest.TitleSource == chatTitleSourceGenerated && candidate.TitleSource != chatTitleSourceManual) {

@@ -32,6 +32,9 @@ import (
 )
 
 type Server struct {
+	autorunMu           sync.Mutex
+	autorunCancel       context.CancelFunc
+	autorunDone         chan struct{}
 	CfgStore            *config.Store
 	Svc                 *service.Manager
 	InstanceManagers    *instanceManagerRegistry
@@ -1216,6 +1219,7 @@ func (s *Server) ShutdownCleanup() {
 	// Prevent install work from starting or progressing before persistent child
 	// cleanup. Waiting happens last so a stuck installer cannot prevent chat
 	// workers and managed services from receiving their stop requests.
+	s.StopChatAutorun()
 	s.cancelInstanceInstalls()
 	s.StopChatHubBridge()
 	s.StopChatFeishuBridge()
