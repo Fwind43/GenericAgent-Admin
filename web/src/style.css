@@ -18602,11 +18602,10 @@ html .oa-sidebar .oa-project-add:hover:not(:disabled) {
 
 /* Session states: selection is navigation, green is execution. */
 .oa-sidebar {
-  --oa-session-selected: #526da6;
+  --oa-session-selected: var(--accent);
   --oa-session-live: #087f63;
 }
 html[data-color-scheme="dark"] .oa-sidebar {
-  --oa-session-selected: #a0b8ef;
   --oa-session-live: #6ee7b7;
 }
 .oa-sidebar .oa-session-row {
@@ -18620,8 +18619,8 @@ html[data-color-scheme="dark"] .oa-sidebar {
 }
 .oa-sidebar .oa-session-row.active,
 .oa-sidebar .oa-session-row.active:hover {
-  border-left-color: var(--oa-session-selected);
-  background: color-mix(in srgb, var(--oa-session-selected) 13%, var(--oa-sidebar)) !important;
+  border-left-color: transparent;
+  background: var(--oa-side-active) !important;
 }
 .oa-sidebar .oa-session-row .oa-session:hover {
   background: transparent !important;
