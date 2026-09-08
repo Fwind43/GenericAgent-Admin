@@ -6,7 +6,7 @@ export default function ProjectDragHandle({ name, groups, disabled, onReorder, l
   const [active, setActive] = useState(false)
   const clear = () => {
     const d = drag.current
-    if (d) { clearTimeout(d.timer); cancelAnimationFrame(d.frame); d.target?.classList.remove('is-drop-target'); d.source?.style.removeProperty('opacity'); d.ghost?.remove() }
+    if (d) { clearTimeout(d.timer); cancelAnimationFrame(d.frame); d.target?.classList.remove('is-drop-target'); d.source?.style.removeProperty('opacity'); d.slots?.forEach(({node}) => { node.style.removeProperty('transform'); node.style.removeProperty('transition') }); d.ghost?.remove() }
     drag.current = null
   }
   useEffect(() => clear, [])
@@ -27,7 +27,7 @@ export default function ProjectDragHandle({ name, groups, disabled, onReorder, l
         const before = new Map(nodes.map(node => [node, node.getBoundingClientRect().top]))
         if (d.ghost && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
           const rect = d.target.getBoundingClientRect()
-          await d.ghost.animate([{ transform:d.ghost.style.transform }, { transform:`translate3d(0, ${rect.top - d.top}px, 0) scale(1)` }], { duration:150, easing:'ease-out', fill:'forwards' }).finished.catch(() => {})
+          await d.ghost.animate([{ transform:d.ghost.style.transform }, { transform:`translate3d(0, ${(d.dropTop ?? rect.top) - d.top}px, 0) scale(1)` }], { duration:150, easing:'ease-out', fill:'forwards' }).finished.catch(() => {})
         }
         clear(); setActive(false)
         await onReorder(names)
@@ -61,7 +61,15 @@ export default function ProjectDragHandle({ name, groups, disabled, onReorder, l
         d.ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'))
         Object.assign(d.ghost.style, { position:'fixed', top:`${rect.top}px`, left:`${rect.left}px`, width:`${rect.width}px`, height:`${rect.height}px`, margin:'0', boxSizing:'border-box', pointerEvents:'none', zIndex:'9999', borderRadius:'8px', background:getComputedStyle(head).backgroundColor, boxShadow:'0 6px 20px rgba(0,0,0,.16)', transform:'translate3d(0, 0, 0) scale(1.015)', willChange:'transform' })
         d.source.closest('.oa-sidebar').appendChild(d.ghost)
-        d.source.style.opacity = '.35'
+        d.source.style.opacity = '.15'
+        d.list = d.source.closest('.oa-session-list')
+        d.scrollTop = d.list?.scrollTop || 0
+        const pin = groups.find(g => g.name === name)?.pinned
+        d.slots = [...d.source.parentElement.querySelectorAll(':scope > [data-project-name]')]
+          .filter(node => groups.find(g => g.name === node.dataset.projectName)?.pinned === pin)
+          .map(node => ({ node, rect:node.getBoundingClientRect() }))
+        d.from = d.slots.findIndex(slot => slot.node === d.source)
+        d.slots.forEach(({node}) => { node.style.transition = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : 'transform 180ms cubic-bezier(.2,.8,.2,1)' })
       }, 280)
       drag.current = d
     }}
@@ -73,11 +81,22 @@ export default function ProjectDragHandle({ name, groups, disabled, onReorder, l
         return
       }
       d.ghost.style.transform = `translate3d(0, ${e.clientY-d.y}px, 0) scale(1.015)`
-      const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-project-name]')
-      d.target?.classList.remove('is-drop-target')
-      const dest = groups.find(g => g.name === target?.dataset.projectName)
-      d.target = dest && dest.pinned === groups.find(g => g.name === name)?.pinned ? target : null
-      d.target?.classList.add('is-drop-target')
+      const scrollDelta = (d.list?.scrollTop || 0) - d.scrollTop
+      const y = e.clientY + scrollDelta
+      let to = d.from
+      d.slots.forEach(({rect}, index) => {
+        if (index > d.from && y > rect.top + rect.height / 2) to = index
+        if (index < d.from && y < rect.top + rect.height / 2 && to === d.from) to = index
+      })
+      const height = d.source.getBoundingClientRect().height
+      d.slots.forEach(({node}, index) => {
+        const shift = to > d.from && index > d.from && index <= to ? -height
+          : to < d.from && index >= to && index < d.from ? height : 0
+        node.style.transform = `translate3d(0, ${shift}px, 0)`
+      })
+      d.target = d.slots[to]?.node
+      d.dropTop = d.slots[to]?.rect.top - scrollDelta
+      if (to > d.from) d.dropTop += d.slots[to].rect.height - height
       const list = e.currentTarget.closest('.oa-session-list')
       if (list) {
         const rect = list.getBoundingClientRect()
