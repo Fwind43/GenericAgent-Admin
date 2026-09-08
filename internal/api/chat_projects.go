@@ -39,11 +39,26 @@ func loadPinnedProjects(cfg config.AppConfig) []string {
 	return normalizePinnedProjects(prefs.Pinned)
 }
 
+// Preference keys accept legacy official names and explicit provider identities.
+func validProjectPreferenceKey(raw string) (string, bool) {
+	for _, provider := range []string{chatProjectProviderAdmin, chatProjectProviderOfficial} {
+		prefix := provider + ":"
+		if len(raw) >= len(prefix) && raw[:len(prefix)] == prefix {
+			id, ok := validProjectModeName(raw[len(prefix):])
+			if !ok {
+				return "", false
+			}
+			return id, true
+		}
+	}
+	return validProjectModeName(raw)
+}
+
 func normalizePinnedProjects(names []string) []string {
 	seen := map[string]bool{}
 	out := make([]string, 0, len(names))
 	for _, raw := range names {
-		name, ok := validProjectModeName(raw)
+		name, ok := validProjectPreferenceKey(raw)
 		if !ok || seen[name] {
 			continue
 		}
@@ -71,7 +86,8 @@ func setProjectPinned(cfg config.AppConfig, name string, pinned bool) ([]string,
 	current := loadPinnedProjects(cfg)
 	next := make([]string, 0, len(current)+1)
 	for _, existing := range current {
-		if existing != name {
+		sameProject := existing == name || projectKey(chatProjectProviderOfficial, existing) == name || existing == projectKey(chatProjectProviderOfficial, name)
+		if !sameProject {
 			next = append(next, existing)
 		}
 	}
@@ -92,7 +108,8 @@ func setProjectPinned(cfg config.AppConfig, name string, pinned bool) ([]string,
 // without a second round trip.
 func (s *Server) chatCreateProject(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name string `json:"name"`
+		Name     string `json:"name"`
+		Provider string `json:"provider"`
 	}
 	if err := decode(r, &req); err != nil {
 		bad(w, http.StatusBadRequest, err.Error())
@@ -104,6 +121,31 @@ func (s *Server) chatCreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := s.CfgStore.Snapshot()
+	// Requests from older clients create official projects by default.
+	if req.Provider == "" {
+		req.Provider = chatProjectProviderOfficial
+	}
+	provider, validProvider := normalizeProjectProvider(req.Provider)
+	if !validProvider {
+		bad(w, http.StatusBadRequest, "invalid project provider")
+		return
+	}
+	if provider == chatProjectProviderAdmin {
+		existed := false
+		for _, item := range discoverAdminProjects(cfg) {
+			if item.ID == name {
+				existed = true
+				break
+			}
+		}
+		item, _, err := ensureAdminProject(cfg, name)
+		if err != nil {
+			bad(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, map[string]interface{}{"ok": true, "created": !existed, "name": item.Name, "id": item.ID, "provider": item.Provider, "workspace": projectModeWorkspace(cfg, name), "projects": discoverProjectNames(cfg.GARoot), "project_items": discoverProjectItems(cfg), "pinned_projects": loadPinnedProjects(cfg)})
+		return
+	}
 	existed := false
 	for _, existing := range discoverProjectNames(cfg.GARoot) {
 		if existing == name {
@@ -121,12 +163,14 @@ func (s *Server) chatCreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]interface{}{
-		"ok":       true,
-		"name":     name,
-		"created":  !existed,
-		"dir":      dir,
-		"memory":   memoryPath,
-		"projects": discoverProjectNames(cfg.GARoot),
+		"ok":            true,
+		"name":          name,
+		"created":       !existed,
+		"dir":           dir,
+		"memory":        memoryPath,
+		"projects":      discoverProjectNames(cfg.GARoot),
+		"project_items": discoverProjectItems(cfg),
+		"workspace":     dir,
 	})
 }
 
@@ -147,7 +191,7 @@ func (s *Server) chatSetProjectPinned(w http.ResponseWriter, r *http.Request) {
 		prefs.Order = []string{}
 		seen := map[string]bool{}
 		for _, raw := range *req.Order {
-			name, valid := validProjectModeName(raw)
+			name, valid := validProjectPreferenceKey(raw)
 			if !valid {
 				s.SessionMu.Unlock()
 				bad(w, http.StatusBadRequest, errProjectNameInvalid.Error())
@@ -170,7 +214,7 @@ func (s *Server) chatSetProjectPinned(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]interface{}{"ok": true, "project_order": prefs.Order})
 		return
 	}
-	name, ok := validProjectModeName(req.Name)
+	name, ok := validProjectPreferenceKey(req.Name)
 	if !ok {
 		bad(w, http.StatusBadRequest, errProjectNameInvalid.Error())
 		return

@@ -7,13 +7,22 @@ export function groupProjectSessions(projects, sessions, pinnedProjects, manualO
   const seen = new Set()
 
   const groups = sourceProjects.reduce((acc, value) => {
-    const name = typeof value === 'string' ? value.trim() : ''
-    if (!name || seen.has(name)) return acc
-    seen.add(name)
+    const structured = value && typeof value === 'object'
+    const name = String(structured ? value.name || '' : typeof value === 'string' ? value : '').trim()
+    const provider = structured ? value.provider : 'official'
+    const id = structured ? String(value.id || '').trim() : name
+    if (!name || !id || !['admin', 'official'].includes(provider)) return acc
+    const key = id
+    if (seen.has(key)) return acc
+    seen.add(key)
     acc.push({
       name,
-      pinned: pinned.has(name),
-      sessions: sourceSessions.filter(session => String(session?.project_mode || '').trim() === name),
+      ...(structured ? { key, provider, id } : {}),
+      pinned: pinned.has(id) || pinned.has(`official:${id}`) || pinned.has(`admin:${id}`),
+      sessions: sourceSessions.filter(session => {
+        const sessionID = String(session?.project_id || session?.project_mode || '').trim()
+        return sessionID === id
+      }),
     })
     return acc
   }, [])
@@ -21,7 +30,10 @@ export function groupProjectSessions(projects, sessions, pinnedProjects, manualO
   // Pinned projects float to the top; everything else keeps the order the server
   // sent, so the list stays stable as sessions come and go.
   const order = new Map((Array.isArray(manualOrder) ? manualOrder : []).map((name, index) => [name, index]))
-  const manualRank = group => order.get(group.name) ?? Number.MAX_SAFE_INTEGER
+  const manualRank = group => order.get(group.key || group.name)
+    ?? order.get(`official:${group.id || group.name}`)
+    ?? order.get(`admin:${group.id || group.name}`)
+    ?? Number.MAX_SAFE_INTEGER
   const rank = (group) => group.pinned ? 0 : 1
   return groups
     .map((group, index) => ({ group, index }))
@@ -30,12 +42,13 @@ export function groupProjectSessions(projects, sessions, pinnedProjects, manualO
 }
 
 export function moveProjectOrder(groups, name, direction) {
-  const peers = groups.filter(group => group.pinned === groups.find(item => item.name === name)?.pinned)
-  const index = peers.findIndex(group => group.name === name)
+  const keyOf = group => group.key || group.name
+  const peers = groups.filter(group => group.pinned === groups.find(item => keyOf(item) === name)?.pinned)
+  const index = peers.findIndex(group => keyOf(group) === name)
   const target = index + direction
-  if (![1, -1].includes(direction) || index < 0 || target < 0 || target >= peers.length) return groups.map(group => group.name)
-  const names = groups.map(group => group.name)
-  const a = names.indexOf(name), b = names.indexOf(peers[target].name)
+  if (![1, -1].includes(direction) || index < 0 || target < 0 || target >= peers.length) return groups.map(keyOf)
+  const names = groups.map(keyOf)
+  const a = names.indexOf(name), b = names.indexOf(keyOf(peers[target]))
   ;[names[a], names[b]] = [names[b], names[a]]
   return names
 }

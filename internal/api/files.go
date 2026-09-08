@@ -214,18 +214,29 @@ func (s *Server) filesOpen(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Path string `json:"path"`
 		Mode string `json:"mode"`
+		ProjectProvider string `json:"project_provider"`
+		ProjectID string `json:"project_id"`
 	}
 	if err := decode(r, &req); err != nil {
 		bad(w, 400, "bad request")
 		return
 	}
 	p := strings.TrimSpace(req.Path)
-	if p == "" {
-		bad(w, 400, "path required")
-		return
-	}
 	var err error
-	p, _, err = ga.SafeResolveAny(s.CfgStore.Snapshot().GARoot, p)
+	cfg := s.CfgStore.Snapshot()
+	if req.ProjectProvider != "" || req.ProjectID != "" {
+		if req.ProjectProvider == "" || req.ProjectID == "" || p != "" || req.Mode != "folder" {
+			bad(w, 400, "project provider and id require folder mode without path")
+			return
+		}
+		_, p, err = resolveProject(cfg, req.ProjectProvider, req.ProjectID)
+	} else {
+		if p == "" {
+			bad(w, 400, "path required")
+			return
+		}
+		p, _, err = ga.SafeResolveAny(cfg.GARoot, p)
+	}
 	if err != nil {
 		bad(w, 400, err.Error())
 		return

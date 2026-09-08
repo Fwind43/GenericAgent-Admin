@@ -200,6 +200,17 @@ export default function App() {
     } catch (e) { setMsg(e.message) } finally { setBusy(false) }
   }
 
+  const saveProjectProvider = async (value) => {
+    const latest = await api('/api/config')
+    const c = await api('/api/config', {
+      dangerous: true, method: 'PUT',
+      body: JSON.stringify({ ...latest, default_project_provider: value }),
+    })
+    setSavedCfg(c)
+    setCfg(current => ({ ...(current || {}), default_project_provider: c.default_project_provider }))
+    return c.default_project_provider || 'official'
+  }
+
   const saveGitHubMirror = async (value) => {
     const c = await api('/api/config', {
       dangerous: true,
@@ -316,7 +327,7 @@ export default function App() {
               autostart={version.autostart}
               onToggleAutostart={version.toggleAutostart}
             />}
-            {tab==='chat' && <ChatSettingsPage t={t} text={text} titleModel={titleModel}/>}
+            {tab==='chat' && <ChatSettingsPage t={t} text={text} titleModel={titleModel} lang={lang} projectProvider={savedCfg?.default_project_provider || 'official'} onSaveProjectProvider={saveProjectProvider} projectSettingsDisabled={!savedCfg}/>}
             {tab==='keychain' && <KeychainPage text={text}/>}
             {tab==='models' && <Models officialSlots={models.officialSlots} t={t} profiles={models.profiles} setProfiles={models.setProfiles} patchProfile={models.patchProfile} addModelProfiles={models.addProfiles} removeModelProfile={models.removeProfile} importModels={models.importModels} previewModels={models.previewModels} failoverGroups={models.failoverGroups} setFailoverGroups={models.setFailoverGroups} discoverModels={models.discoverModels} modelPreview={models.preview} changes={models.changes} saveState={models.saveState} saveAll={models.saveAll} discardDraft={models.discardDraft} importLoading={models.importLoading} riskCatalog={observability?.riskItems || []} riskCatalogError={observabilityError} revealedKeys={models.revealedKeys} revealBusy={models.keyBusy} getProfileKey={models.getProfileKey} onRevealKey={models.revealKey} onClearRevealedKey={models.clearRevealedKey} modelInstance={models.instance} modelInstanceLabel={lang === 'zh' ? '当前实例' : 'Current instance'}/>}
             {tab==='instances' && <InstancesPage lang={lang} onConfigureModels={openModels}/>}

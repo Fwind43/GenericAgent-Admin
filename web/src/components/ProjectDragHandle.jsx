@@ -16,10 +16,10 @@ export default function ProjectDragHandle({ name, groups, disabled, onReorder, l
     if (d) d.finishing = true
     if (!cancel && d?.active && d.target) {
       const target = d.target.dataset.projectName
-      const source = groups.find(g => g.name === name)
-      const dest = groups.find(g => g.name === target)
+      const source = groups.find(g => (g.key || g.name) === name)
+      const dest = groups.find(g => (g.key || g.name) === target)
       if (source && dest && source.pinned === dest.pinned && name !== target) {
-        const names = groups.map(g => g.name)
+        const names = groups.map(g => (g.key || g.name))
         const index = names.indexOf(target)
         names.splice(names.indexOf(name), 1)
         names.splice(index, 0, name)
@@ -64,9 +64,9 @@ export default function ProjectDragHandle({ name, groups, disabled, onReorder, l
         d.source.style.opacity = '.15'
         d.list = d.source.closest('.oa-session-list')
         d.scrollTop = d.list?.scrollTop || 0
-        const pin = groups.find(g => g.name === name)?.pinned
+        const pin = groups.find(g => (g.key || g.name) === name)?.pinned
         d.slots = [...d.source.parentElement.querySelectorAll(':scope > [data-project-name]')]
-          .filter(node => groups.find(g => g.name === node.dataset.projectName)?.pinned === pin)
+          .filter(node => groups.find(g => (g.key || g.name) === node.dataset.projectName)?.pinned === pin)
           .map(node => ({ node, rect:node.getBoundingClientRect() }))
         d.from = d.slots.findIndex(slot => slot.node === d.source)
         d.slots.forEach(({node}) => { node.style.transition = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'none' : 'transform 180ms cubic-bezier(.2,.8,.2,1)' })

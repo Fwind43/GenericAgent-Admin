@@ -2267,7 +2267,11 @@ def handle_btw_request(agent, req):
     _restore_admin_history(agent, history, raw_history)
     from frontends.btw_cmd import handle_frontend_command
     started = time.time()
-    content = handle_frontend_command(agent, prompt)
+    @_admin_project_request
+    def run_side_question(agent, req):
+        return handle_frontend_command(agent, prompt)
+
+    content = run_side_question(agent, {**req, 'op': 'btw'})
     msg = {
         'id': new_id(), 'role': 'assistant', 'content': content,
         'created_at': int(time.time()), 'model_id': _snapshot_model_id(agent),
@@ -2466,6 +2470,163 @@ def handle_title_request(agent, req):
     emit({'type': 'title_done', 'title': title, 'model_id': _snapshot_model_id(agent)})
 
 
+def _admin_project_request(fn):
+    """Scope Admin memory injection to one request, including early returns."""
+    from functools import wraps
+
+    @wraps(fn)
+    def wrapped(agent, *args, **kwargs):
+        req = kwargs.get('req', args[-1] if args else {})
+        provider = str(req.get('project_provider') or '').strip()
+        directory = str(req.get('project_memory_dir') or '').strip()
+        workspace = str(req.get('project_workspace') or '').strip()
+        if workspace and req.get('project_id'):
+            project_workspace = Path(workspace)
+            project_workspace.mkdir(parents=True, exist_ok=True)
+            official_memory = project_workspace / 'project_memory.md'
+            if not official_memory.exists():
+                try:
+                    with official_memory.open('x', encoding='utf-8'):
+                        pass
+                except FileExistsError:
+                    pass
+        if provider != 'admin' or not directory:
+            return fn(agent, *args, **kwargs)
+        from plugins import hooks as plugin_hooks
+        memory = Path(directory).resolve()
+        legacy = str(req.get('project_memory_legacy_dir') or '').strip()
+        if legacy and not (memory / 'project_mem_insight.txt').exists() and Path(legacy).is_dir() and Path(legacy).resolve() != memory:
+            import shutil
+            for source in Path(legacy).rglob('*'):
+                if source.is_symlink():
+                    raise OSError('Symlink in legacy project memory: %s' % source)
+                target = memory / source.relative_to(legacy)
+                if source.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                elif source.is_file():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        with target.open('xb') as dest, source.open('rb') as src:
+                            shutil.copyfileobj(src, dest)
+                    except FileExistsError:
+                        pass  # Existing project-local knowledge takes precedence.
+        memory.mkdir(parents=True, exist_ok=True)
+        policy = (
+            '# Project Memory Management\n'
+            'Before any memory write, read this SOP. Use file tools and small patches; never overwrite existing knowledge.\n'
+            'Only retain action-verified, durable project knowledge. No guesses, transient state, logs, transcripts, secrets or common knowledge.\n'
+            'L1: project_mem_insight.txt is a minimal index, at most 30 lines, preferably below 1000 tokens.\n'
+            'Use frequent scenario -> L2 section/SOP mappings, a low-frequency filename list, and RULES for one-line red lines and recurring pitfalls.\n'
+            'No how-to, explanations or technical details in L1. Self-explanatory filenames need no description; parentheses only hold short scenario triggers.\n'
+            'L2: project_mem.txt holds verified project facts under ## [SECTION]. L3: topic SOP .md and reusable .py files live in this memory directory. No L4.\n'
+            'New L2/L3 scenarios default to low-frequency L1 pointers; remove pointers when deleting topics. Value-only updates need no L1 edit unless navigation changes.\n'
+            'Keep valuable knowledge when compressing or relocating; move detail out of L1 rather than deleting it. Do not mechanically truncate old L1.\n'
+            'Retired l1.md/l2.md/l3/ must not be retained or referenced as sources after knowledge is migrated to canonical files.\n'
+            'Project memory supplements global memory; never change global memory or official project_memory.md as part of migration.\n'
+        )
+        index = '# [Project Memory Insight]\nL0: memory_management_sop.md\nL2: project_mem.txt\nL3:\n[RULES]\n'
+        for filename, heading in [('project_mem_insight.txt', index), ('project_mem.txt', '# [Project Facts]\n'), ('memory_management_sop.md', policy)]:
+            try:
+                with (memory / filename).open('x', encoding='utf-8') as handle:
+                    handle.write(heading)
+            except FileExistsError:
+                pass
+        injected = []
+        touched = []
+        originals = {}
+
+        def restore(messages):
+            clean = []
+            for message in messages:
+                if any(message is old for old in injected):
+                    original = originals.get(id(message))
+                    if original is not None:
+                        clean.append(original)
+                else:
+                    clean.append(message)
+            messages[:] = clean
+
+        def before(ctx):
+            if (ctx.get('client') is not getattr(agent, 'llmclient', None)
+                    and getattr(ctx.get('handler'), 'parent', None) is not agent):
+                return
+            messages = ctx.get('messages')
+            if not isinstance(messages, list):
+                return
+            # Remove only our own message; preserve global and other plugin rules.
+            if not any(messages is previous for previous in touched):
+                touched.append(messages)
+            restore(messages)
+            try:
+                l1 = (memory / 'project_mem_insight.txt').read_text(encoding='utf-8')
+            except (OSError, UnicodeError) as exc:
+                l1 = '[Project L1 unavailable: %s]' % exc
+            text = (
+                '[Admin project memory]\nProject: ' + str(req.get('project_id') or '')
+                + '\nMemory directory: ' + str(memory)
+                + '\nL0: memory_management_sop.md; L1: project_mem_insight.txt; '
+                'L2: project_mem.txt; L3: topic SOP .md/.py files in this directory. No L4. '
+                'Before writing memory, read L0. L1 is a minimal two-tier scenario index plus RULES, '
+                'at most 30 lines, preferably below 1000 tokens. Use only small file patches for L1, '
+                'never overwrite or code execution. No how-to, technical detail, logs or secrets. '
+                'Keep only action-verified durable knowledge. New/deleted L2/L3 topics require matching '
+                'L1 pointers; value changes without navigation changes do not. Read L2/L3 on demand. '
+                'Retired l1.md/l2.md/l3/ must not be retained as sources after migration. '
+                'Project rules supplement, not replace, global rules; preserve official project storage.'
+                + ('\nOfficial memory source (preserve the original; read and distill relevant '
+                   'knowledge into L1-L3 as needed): ' + str(Path(workspace) / 'project_memory.md')
+                   if workspace else '')
+                + '\n[Project L1]\n' + l1
+            )
+            index = next((i for i, m in enumerate(messages) if m.get('role') == 'system'), None)
+            original = messages[index] if index is not None else None
+            base = original.get('content', '') if original is not None else ctx.get('system_prompt', '')
+            message = dict(original) if original is not None else {'role': 'system'}
+            if isinstance(base, list):
+                message['content'] = [*base, {'type': 'text', 'text': text}]
+            else:
+                message['content'] = str(base or '') + '\n\n' + text
+            if index is None:
+                messages.insert(0, message)
+            else:
+                messages[index] = message
+            originals[id(message)] = original
+            injected.append(message)
+
+        plugin_hooks.register('llm_before')(before)
+        backend = None
+        raw_original = None
+        raw_owned = False
+        raw_value = None
+        try:
+            if req.get('op') == 'btw':
+                backend = agent.llmclient.backend
+                raw_original = backend.raw_ask
+                raw_owned = 'raw_ask' in vars(backend)
+                raw_value = vars(backend).get('raw_ask')
+
+                def project_raw_ask(messages, *raw_args, **raw_kwargs):
+                    before({'client': agent.llmclient, 'messages': messages})
+                    yield from raw_original(messages, *raw_args, **raw_kwargs)
+
+                backend.raw_ask = project_raw_ask
+            return fn(agent, *args, **kwargs)
+        finally:
+            if backend is not None and raw_original is not None:
+                if raw_owned:
+                    backend.raw_ask = raw_value
+                elif 'raw_ask' in vars(backend):
+                    delattr(backend, 'raw_ask')
+            plugin_hooks.unregister('llm_before', before)
+            for messages in touched:
+                restore(messages)
+            touched.clear()
+            injected.clear()
+            originals.clear()
+    return wrapped
+
+
+@_admin_project_request
 def handle_request(agent, worker, req):
     req = _normalize_request(req)
     request_started = time.time()

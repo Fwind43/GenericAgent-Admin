@@ -197,6 +197,8 @@ func (s *Server) dispatchChatAutorun(sid string, now int64) bool {
 		"working":                  cs.Working,
 		"workspace":                cs.Workspace,
 		"project_mode":             cs.ProjectMode,
+		"project_provider":         cs.ProjectProvider,
+		"project_id":               cs.ProjectID,
 		"extra_sys_prompts":        cs.ExtraSysPrompts,
 		"llm_no":                   cs.Settings.LLMNo,
 		"reasoning_effort":         cs.Settings.ReasoningEffort,
@@ -204,6 +206,8 @@ func (s *Server) dispatchChatAutorun(sid string, now int64) bool {
 		"_ga_pending_assistant_id": pendingID,
 		"_ga_run_started_at_ms":    runStartedAtMS,
 	}
+
+	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 
 	// Publish the pending assistant identity together with the persisted session.
 	// Reattaching clients use these fields to bind live deltas to the placeholder;

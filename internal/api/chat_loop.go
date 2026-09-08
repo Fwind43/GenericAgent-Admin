@@ -398,11 +398,14 @@ func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 		"working":           cs.Working,
 		"workspace":         cs.Workspace,
 		"project_mode":      cs.ProjectMode,
+		"project_provider":  cs.ProjectProvider,
+		"project_id":        cs.ProjectID,
 		"extra_sys_prompts": cs.ExtraSysPrompts,
 		"llm_no":            state.ControllerLLMNo,
 		"reasoning_effort":  cs.Settings.ReasoningEffort,
 		"ga_root":           s.CfgStore.Snapshot().GARoot,
 	}
+	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 	var decision chatLoopDecision
 	var parseErr error
 	for attempt := 0; attempt < chatLoopControllerAttempts; attempt++ {
@@ -564,6 +567,8 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 		"working":                  cs.Working,
 		"workspace":                cs.Workspace,
 		"project_mode":             cs.ProjectMode,
+		"project_provider":         cs.ProjectProvider,
+		"project_id":               cs.ProjectID,
 		"extra_sys_prompts":        cs.ExtraSysPrompts,
 		"llm_no":                   cs.Settings.LLMNo,
 		"reasoning_effort":         cs.Settings.ReasoningEffort,
@@ -571,6 +576,7 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 		"_ga_pending_assistant_id": pendingMsg.ID,
 		"_ga_run_started_at_ms":    runStartedAtMS,
 	}
+	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 	go s.runChatWorkerOwned(sid, token, cs, cmdReq)
 }
 
@@ -779,6 +785,8 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		"working":                  cs.Working,
 		"workspace":                cs.Workspace,
 		"project_mode":             cs.ProjectMode,
+		"project_provider":         cs.ProjectProvider,
+		"project_id":               cs.ProjectID,
 		"extra_sys_prompts":        cs.ExtraSysPrompts,
 		"llm_no":                   cs.Settings.LLMNo,
 		"reasoning_effort":         cs.Settings.ReasoningEffort,
@@ -786,6 +794,8 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		"_ga_pending_assistant_id": pendingID,
 		"_ga_run_started_at_ms":    runStartedAtMS,
 	}
+
+	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 
 	// Publish the pending assistant identity together with the persisted session.
 	// Reattaching clients use these fields to bind live deltas to the placeholder;

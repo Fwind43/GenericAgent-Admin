@@ -146,7 +146,7 @@ func (s *Server) maybeHandleImmediateChatCommand(w http.ResponseWriter, r *http.
 		case "/help":
 			result["commands"] = immediateCommandCatalog()
 		case "/status":
-			result["session"] = map[string]interface{}{"id": cs.ID, "title": cs.Title, "active": false, "message_count": len(cs.Messages), "updated_at": cs.UpdatedAt, "settings": cs.Settings, "workspace": cs.Workspace, "project_mode": cs.ProjectMode}
+			result["session"] = map[string]interface{}{"id": cs.ID, "title": cs.Title, "active": false, "message_count": len(cs.Messages), "updated_at": cs.UpdatedAt, "settings": cs.Settings, "workspace": cs.Workspace, "project_mode": cs.ProjectMode, "project_provider": cs.ProjectProvider, "project_id": cs.ProjectID}
 			result["services"] = safeServiceSummary(s)
 		case "/verbose":
 			result["records"] = verboseRecords(cs.RawHistory)

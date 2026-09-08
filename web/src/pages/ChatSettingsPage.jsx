@@ -1,11 +1,13 @@
 import React from 'react'
+import ProjectModeSetting from '../components/ProjectModeSetting'
 import { FoldVertical, Save, Sparkles } from 'lucide-react'
 import { useAutoCollapseProcess } from '../hooks/useAutoCollapseProcess.js'
 import { SettingFooter, SettingRow, SettingToggle, SettingsPage, SettingsSection } from '../components/settings'
 
-export function ChatSettingsPage({ t, text, titleModel }) {
+export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, onSaveProjectProvider, projectSettingsDisabled }) {
   const [autoCollapseProcess, setAutoCollapseProcess] = useAutoCollapseProcess()
   return <SettingsPage>
+    <ProjectModeSetting value={projectProvider} onSave={onSaveProjectProvider} lang={lang} disabled={projectSettingsDisabled}/>
     <SettingsSection title={text.chat.processDisplay} icon={<FoldVertical size={17}/>}>
       <SettingToggle
         id="settings-auto-collapse-process"

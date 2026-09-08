@@ -95,6 +95,34 @@ func TestFilesOpenRequiresDangerousConfirm(t *testing.T) {
 	}
 }
 
+func TestFilesOpenRejectsInvalidProjectFields(t *testing.T) {
+	h := newGoalTestServer(t, t.TempDir()).Routes()
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"missing_provider", `{"project_id":"demo","mode":"folder"}`},
+		{"missing_id", `{"project_provider":"admin","mode":"folder"}`},
+		{"mixed_path", `{"project_provider":"admin","project_id":"demo","path":".","mode":"folder"}`},
+		{"file_mode", `{"project_provider":"admin","project_id":"demo","mode":"file"}`},
+		{"unknown_provider", `{"project_provider":"unknown","project_id":"demo","mode":"folder"}`},
+		{"admin_traversal", `{"project_provider":"admin","project_id":"../outside","mode":"folder"}`},
+		{"official_traversal", `{"project_provider":"official","project_id":"../outside","mode":"folder"}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rr := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodPost, "/api/files/open", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-GA-Confirm", "dangerous")
+			h.ServeHTTP(rr, req)
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("status=%d want=400 body=%s", rr.Code, rr.Body.String())
+			}
+		})
+	}
+}
+
 func TestFilesOpenRejectsInvalidMode(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "sample.txt"), []byte("visible"), 0644); err != nil {

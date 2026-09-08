@@ -49,7 +49,7 @@ import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, 
 import { groupProjectSessions } from './lib/chatProjectSessions.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
-import { reconcileScalarList, reconcileSessionSummaries } from './lib/chatSessionReconcile.js'
+import { equalSessionSummaryValue, reconcileScalarList, reconcileSessionSummaries } from './lib/chatSessionReconcile.js'
 import { createPromptPreset, normalizePromptPresets, promptPresetPatch, selectedPromptPresetView } from './lib/promptPresets'
 import { commandResultSummary, reduceCommandResult } from './lib/chatCommands'
 import { buildChatRunPayload, buildEditResendItem } from './lib/worldlineEdit'
@@ -4980,12 +4980,12 @@ export default function ChatApp() {
         setErr(ct(`Loop \u5df2\u5f02\u5e38\u505c\u6b62\uff1a${loopStopReasonText(ev.loop.stop_reason)}`, `Loop stopped with an error: ${loopStopReasonText(ev.loop.stop_reason)}`))
       }
     }
-    if (Object.prototype.hasOwnProperty.call(ev, 'workspace') || Object.prototype.hasOwnProperty.call(ev, 'project_mode')) {
-      setSessions(xs => xs.map(x => x.id === sessionId ? {
-        ...x,
-        ...(Object.prototype.hasOwnProperty.call(ev, 'workspace') ? { workspace: ev.workspace || '' } : {}),
-        ...(Object.prototype.hasOwnProperty.call(ev, 'project_mode') ? { project_mode: ev.project_mode || '' } : {}),
-      } : x))
+    const projectFields = ['workspace', 'project_mode', 'project_provider', 'project_id']
+    if (projectFields.some(field => Object.prototype.hasOwnProperty.call(ev, field))) {
+      const changes = Object.fromEntries(projectFields
+        .filter(field => Object.prototype.hasOwnProperty.call(ev, field))
+        .map(field => [field, ev[field] || '']))
+      setSessions(xs => xs.map(x => x.id === sessionId ? { ...x, ...changes } : x))
     }
     if (ev.type === 'user' && ev.message) {
       setMessages(xs => isActiveSession(sessionId)
@@ -5475,7 +5475,7 @@ export default function ChatApp() {
       setNotice('')
       setMenuOpen('')
       setMenuPos(null)
-      setSessions(xs => xs.map(x => x.id === d.id ? { ...x, title: d.title, workspace: d.workspace || '', project_mode: d.project_mode || '', count: d.messages?.length || x.count, updated_at: d.updated_at || x.updated_at } : x))
+      setSessions(xs => xs.map(x => x.id === d.id ? { ...x, title: d.title, workspace: d.workspace || '', project_mode: d.project_mode || '', project_provider: d.project_provider || '', project_id: d.project_id || '', count: d.messages?.length || x.count, updated_at: d.updated_at || x.updated_at } : x))
       await loadChatState(d.id, openToken, prefetchedState)
       if (openToken === openSeqRef.current && worldlineOpen) loadWorldline(d.id, { force: true }).catch(() => {})
     } catch (e) {
@@ -5584,7 +5584,8 @@ export default function ChatApp() {
     const list = reconcileSessionSummaries(sessionsRef.current, incoming)
     sessionsRef.current = list
     setSessions(list)
-    setProjects(previous => reconcileScalarList(previous, d.projects))
+    const incomingProjects = Array.isArray(d.project_items) ? d.project_items : (d.projects || [])
+    setProjects(previous => equalSessionSummaryValue(previous, incomingProjects) ? previous : incomingProjects)
     setPinnedProjects(previous => reconcileScalarList(previous, d.pinned_projects))
     setProjectOrder(previous => reconcileScalarList(previous, d.project_order))
     if (open) {
@@ -5604,7 +5605,10 @@ export default function ChatApp() {
   const createSession = async (projectMode = '') => {
     cancelSessionLoad()
     historyPages.begin()
-    const selectedProject = typeof projectMode === 'string' ? projectMode.trim() : ''
+    const selectedProject = projectMode && typeof projectMode === 'object'
+      ? { project_provider: projectMode.provider, project_id: projectMode.id }
+      : typeof projectMode === 'string' && projectMode.trim()
+        ? { project_mode: projectMode.trim() } : null
     rememberRenderedSessionScroll()
     pendingSessionScrollRestoreRef.current = null
     pendingRenderedSessionRef.current = ''
@@ -5615,7 +5619,7 @@ export default function ChatApp() {
     activeRunRef.current = false
     streamAbortRef.current?.abort?.()
     streamAbortRef.current = null
-    const d = await chatApi('/api/chat/session/new', { method:'POST', body:JSON.stringify(selectedProject ? { project_mode:selectedProject } : {}) })
+    const d = await chatApi('/api/chat/session/new', { method:'POST', body:JSON.stringify(selectedProject || {}) })
     if (openToken !== openSeqRef.current) return
     forgetSessionScroll(sessionScrollSnapshotsRef.current, d.id)
     pendingSessionScrollRestoreRef.current = null
@@ -5653,12 +5657,13 @@ export default function ChatApp() {
     }
   }
 
-  const openProjectFolder = async (name) => {
+  const openProjectFolder = async (project) => {
+    const name = project.name
     const instanceID = chatInstanceRef.current
     if (!await confirmDanger('chat-project-folder-open', ct(`在服务器桌面打开项目文件夹 ${name}？`, `Open project folder ${name} on the server desktop?`))) return
     if (instanceID !== chatInstanceRef.current) return
     try {
-      await chatApi('/api/files/open', { dangerous: true, method: 'POST', body: JSON.stringify({ path: `temp/projects/${name}`, mode: 'folder' }) })
+      await chatApi('/api/files/open', { dangerous: true, method: 'POST', body: JSON.stringify({ project_provider: project.provider || 'official', project_id: project.id || name, mode: 'folder' }) })
     } catch (e) {
       if (e.name !== 'AbortError') setErr(e.message || String(e))
     }
@@ -5685,19 +5690,23 @@ export default function ChatApp() {
       setErr(projectNameErrorText(problem, ct))
       return
     }
-    if (projects.some(existing => existing === name)) {
-      setErr(ct(`项目 ${name} 已存在。`, `Project ${name} already exists.`))
-      return
-    }
+    if (projectCreating) return
     setProjectCreating(true)
     setErr('')
     try {
-      const d = await chatApi('/api/chat/projects', { method:'POST', body: JSON.stringify({ name }) })
+      const provider = 'official'
+      if (projects.some(existing => (existing?.id || existing) === name)) {
+        setErr(ct(`项目 ${name} 已存在。`, `Project ${name} already exists.`))
+        return
+      }
+      const d = await chatApi('/api/chat/projects', { method:'POST', body: JSON.stringify({ name, provider }) })
       const created = String(d?.name || name)
-      setProjects(Array.isArray(d.projects) ? d.projects : projects.concat(created))
-      setExpandedProjectNames(current => new Set(current).add(created))
+      const project = d?.provider && d?.id ? { provider: d.provider, id: d.id, name: created } : created
+      const projectKey = typeof project === 'object' ? project.id : created
+      setProjects(Array.isArray(d.project_items) ? d.project_items : Array.isArray(d.projects) ? d.projects : projects.concat(project))
+      setExpandedProjectNames(current => new Set(current).add(projectKey))
       closeProjectDraft()
-      await createSession(created)
+      await createSession(project)
       setNotice(d?.created === false
         ? ct(`项目 ${created} 已存在，已在其中新建对话`, `Project ${created} already existed; started a chat in it`)
         : ct(`已创建项目 ${created}，并新建了一个对话`, `Created project ${created} and started a chat in it`))
@@ -6663,7 +6672,8 @@ export default function ChatApp() {
           const next = reconcileSessionSummaries(previous, incoming)
           sessionsRef.current = next
           setSessions(next)
-          setProjects(current => reconcileScalarList(current, d.projects))
+          const incomingProjects = Array.isArray(d.project_items) ? d.project_items : (d.projects || [])
+          setProjects(current => equalSessionSummaryValue(current, incomingProjects) ? current : incomingProjects)
           setPinnedProjects(current => reconcileScalarList(current, d.pinned_projects))
           setProjectOrder(current => reconcileScalarList(current, d.project_order))
           const activeID = activeSidRef.current
@@ -7130,32 +7140,33 @@ export default function ChatApp() {
         </form>}
         <div className="oa-session-list oa-project-list">
         {filteredProjectGroups.map((group, index) => {
-          const expanded = expandedProjectNames.has(group.name)
+          const projectKey = group.key || group.name
+          const expanded = expandedProjectNames.has(projectKey)
           const bodyId = `oa-project-sessions-${index}`
           const toggleLabel = ct(`${expanded ? '收起' : '展开'} ${group.name}`, `${expanded ? 'Collapse' : 'Expand'} ${group.name}`)
           const pinLabel = group.pinned
             ? ct(`取消置顶 ${group.name}`, `Unpin ${group.name}`)
             : ct(`置顶 ${group.name}`, `Pin ${group.name}`)
-          return <section data-project-name={group.name} className={`oa-project-group ${expanded ? 'is-expanded' : 'is-collapsed'} ${group.pinned ? 'is-pinned' : ''}`} key={group.name}>
+          return <section data-project-name={projectKey} className={`oa-project-group ${expanded ? 'is-expanded' : 'is-collapsed'} ${group.pinned ? 'is-pinned' : ''}`} key={projectKey}>
             <div className="oa-project-head">
               <button className="oa-project-toggle" type="button" onClick={()=>setExpandedProjectNames(current => {
                 const next = new Set(current)
-                if (next.has(group.name)) next.delete(group.name)
-                else next.add(group.name)
+                if (next.has(projectKey)) next.delete(projectKey)
+                else next.add(projectKey)
                 return next
               })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
                 <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
               </button>
               {group.pinned && <span className="oa-project-pinned-badge" title={ct('项目已置顶', 'Project pinned')}><Pin size={11} aria-hidden="true"/>{ct('置顶', 'Pinned')}</span>}
-              {projectSortMode && <ProjectDragHandle name={group.name} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
-              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
+              {projectSortMode && <ProjectDragHandle name={projectKey} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
+              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.provider ? group : group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
-              <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
-              <button type="button" onClick={()=>openProjectFolder(group.name)} title={ct('在服务器上打开项目文件夹', 'Open project folder on the server')}><FolderOpen size={14}/>{ct('打开项目文件夹', 'Open project folder')}</button>
+              <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(projectKey, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
+              <button type="button" onClick={()=>openProjectFolder(group)} title={ct('在服务器上打开项目文件夹', 'Open project folder on the server')}><FolderOpen size={14}/>{ct('打开项目文件夹', 'Open project folder')}</button>
               </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>
-              <ProjectSessionPage key={`${group.name}:${sidebarSearch}`} items={group.sessions} renderItem={renderSidebarSession} ct={ct}/>
+              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessions} renderItem={renderSidebarSession} ct={ct}/>
               {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
             </div>
           </section>
@@ -7204,7 +7215,7 @@ export default function ChatApp() {
           <button className="oa-icon-btn oa-sidebar-toggle" onClick={()=>setCollapsed(false)} title={ct('展开侧栏', 'Expand sidebar')} aria-label={ct('展开侧栏', 'Expand sidebar')}><PanelLeftOpen size={18} aria-hidden="true"/></button>
           <button className="oa-icon-btn oa-collapsed-new" onClick={newSession} title={ct('新对话', 'New chat')} aria-label={ct('新对话', 'New chat')}><MessageSquarePlus size={18}/></button>
         </div>}
-        <div className="oa-title"><b>{current ? shortTitle(current) : ct('新对话', 'New chat')}</b>{current?.project_mode && <span className="oa-project-badge" title={`Project Mode: ${current.project_mode}`}><FolderOpen size={12} aria-hidden="true"/><span>{current.project_mode}</span></span>}{current?.workspace && <span className="oa-workspace-badge" title={current.workspace}>Workspace: {current.workspace}</span>}</div>
+        <div className="oa-title"><b>{current ? shortTitle(current) : ct('新对话', 'New chat')}</b>{(current?.project_id || current?.project_mode) && <span className="oa-project-badge" title={current.project_id || current.project_mode}><FolderOpen size={12} aria-hidden="true"/><span>{current.project_id || current.project_mode}</span></span>}{current?.workspace && <span className="oa-workspace-badge" title={current.workspace}>Workspace: {current.workspace}</span>}</div>
         <div className="oa-topbar-tools" role="toolbar" aria-label={ct('聊天工具', 'Chat tools')}>
           <div className="oa-topbar-view-tools" role="group" aria-label={ct('对话视图', 'Conversation views')}>
             <button className={`oa-context-btn ${contextOpen ? 'is-open' : ''}`} type="button" onClick={()=>setContextOpen(v=>!v)} disabled={!sid} title={ct('查看发给模型的 raw_history', 'View raw_history sent to the model')}>
@@ -7678,7 +7689,7 @@ export default function ChatApp() {
             
             const groups = sessionManagerView === 'time'
               ? managedRecentGroups.map(group => ({ key: group.key, label: managedSessionGroupLabels[group.key], sessions: group.sessions }))
-              : managedProjectGroups.map(group => ({ key: group.name, label: group.name, sessions: group.sessions }))
+              : managedProjectGroups.map(group => ({ key: group.key || group.name, label: group.name, sessions: group.sessions }))
             return groups.map(group => {
               const key = `${sessionManagerView}:${group.key}`
               return <SessionManagerGroup key={key} label={group.label} items={group.sessions}

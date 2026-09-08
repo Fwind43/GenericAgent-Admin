@@ -41,19 +41,21 @@ func latestChatSessionResult(cs chatSession) *chatSessionResult {
 }
 
 type chatSessionSummary struct {
-	TaskbarState string             `json:"taskbar_state"`
-	Result       *chatSessionResult `json:"result,omitempty"`
-	ID           string             `json:"id"`
-	Title        string             `json:"title"`
-	TitleSource  string             `json:"title_source,omitempty"`
-	UpdatedAt    int64              `json:"updated_at"`
-	Count        int                `json:"count"`
-	Workspace    string             `json:"workspace,omitempty"`
-	ProjectMode  string             `json:"project_mode,omitempty"`
-	HubEnabled   bool               `json:"hub_enabled,omitempty"`
-	Pinned       bool               `json:"pinned,omitempty"`
-	Autorun      chatAutorunState   `json:"autorun"`
-	Loop         chatLoopState      `json:"loop"`
+	TaskbarState    string             `json:"taskbar_state"`
+	Result          *chatSessionResult `json:"result,omitempty"`
+	ID              string             `json:"id"`
+	Title           string             `json:"title"`
+	TitleSource     string             `json:"title_source,omitempty"`
+	UpdatedAt       int64              `json:"updated_at"`
+	Count           int                `json:"count"`
+	Workspace       string             `json:"workspace,omitempty"`
+	ProjectMode     string             `json:"project_mode,omitempty"`
+	ProjectProvider string             `json:"project_provider,omitempty"`
+	ProjectID       string             `json:"project_id,omitempty"`
+	HubEnabled      bool               `json:"hub_enabled,omitempty"`
+	Pinned          bool               `json:"pinned,omitempty"`
+	Autorun         chatAutorunState   `json:"autorun"`
+	Loop            chatLoopState      `json:"loop"`
 }
 
 type chatSessionListIndexEntry struct {
@@ -73,19 +75,21 @@ func chatSessionListIndexPath(cfg config.AppConfig) string {
 
 func summaryFromChatSession(cs chatSession) chatSessionSummary {
 	return chatSessionSummary{
-		TaskbarState: chatSessionTaskbarState(cs),
-		Result:       latestChatSessionResult(cs),
-		ID:           cs.ID,
-		Title:        cs.Title,
-		TitleSource:  cs.TitleSource,
-		UpdatedAt:    cs.UpdatedAt,
-		Count:        len(cs.Messages),
-		Workspace:    cs.Workspace,
-		ProjectMode:  cs.ProjectMode,
-		HubEnabled:   cs.HubEnabled,
-		Pinned:       cs.Pinned,
-		Loop:         cs.Loop,
-		Autorun:      cs.Autorun,
+		TaskbarState:    chatSessionTaskbarState(cs),
+		Result:          latestChatSessionResult(cs),
+		ID:              cs.ID,
+		Title:           cs.Title,
+		TitleSource:     cs.TitleSource,
+		UpdatedAt:       cs.UpdatedAt,
+		Count:           len(cs.Messages),
+		Workspace:       cs.Workspace,
+		ProjectMode:     cs.ProjectMode,
+		ProjectProvider: cs.ProjectProvider,
+		ProjectID:       cs.ProjectID,
+		HubEnabled:      cs.HubEnabled,
+		Pinned:          cs.Pinned,
+		Loop:            cs.Loop,
+		Autorun:         cs.Autorun,
 	}
 }
 

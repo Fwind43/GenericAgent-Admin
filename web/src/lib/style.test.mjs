@@ -505,7 +505,7 @@ test('project badge stays compact, semantic, and readable under title pressure',
   const label = ruleBodies('.oa-title .oa-project-badge > span').join('\n')
   const collapsed = ruleBodies('.oa-chat.is-collapsed .oa-title .oa-project-badge').join('\n')
 
-  assert.match(chatSource, /className="oa-project-badge"[^>]*><FolderOpen size=\{12\} aria-hidden="true"\/><span>\{current\.project_mode\}<\/span>/)
+  assert.match(chatSource, /className="oa-project-badge"[^>]*><FolderOpen size=\{12\} aria-hidden="true"\/><span>\{current\.project_id \|\| current\.project_mode\}<\/span>/)
   assert.doesNotMatch(chatSource, /className="oa-project-badge"[^>]*>Project:/)
   assert.match(badge, /flex\s*:\s*0\s+0\s+auto/i)
   assert.match(badge, /max-width\s*:\s*min\(240px,calc\(100vw\s*-\s*360px\)\)/i)

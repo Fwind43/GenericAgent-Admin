@@ -195,6 +195,8 @@ type chatSession struct {
 	WorldlineHead          string                   `json:"worldline_head,omitempty"`
 	Workspace              string                   `json:"workspace,omitempty"`
 	ProjectMode            string                   `json:"project_mode,omitempty"`
+	ProjectProvider        string                   `json:"project_provider,omitempty"`
+	ProjectID              string                   `json:"project_id,omitempty"`
 	HubEnabled             bool                     `json:"hub_enabled,omitempty"`
 	Pinned                 bool                     `json:"pinned,omitempty"`
 	ExtraSysPrompts        []string                 `json:"extra_sys_prompts,omitempty"`
@@ -2089,6 +2091,9 @@ func loadChatSession(cfg config.AppConfig, sid string) (chatSession, error) {
 	}
 	if cs.RawHistory == nil {
 		cs.RawHistory = []map[string]interface{}{}
+	}
+	if cs.ProjectID != "" && (cs.Workspace == adminProjectDir(cfg, cs.ProjectID) || cs.Workspace == legacyAdminProjectDir(cfg, cs.ProjectID)) {
+		cs.Workspace = projectModeWorkspace(cfg, cs.ProjectID)
 	}
 	cs.Plan = normalizeChatPlan(cs.Plan)
 	cs.Settings = normalizeChatSettings(cs.Settings)

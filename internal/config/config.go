@@ -108,6 +108,9 @@ type AppConfig struct {
 	// It tracks the model last picked in Admin Chat so a new conversation keeps
 	// using it instead of silently falling back to the first configured model.
 	ChatDefaultLLMNo int `json:"chat_default_llm_no,omitempty"`
+	// DefaultProjectProvider selects the runtime memory mode for every project request.
+	// Empty preserves the official mode for existing configurations and clients.
+	DefaultProjectProvider string `json:"default_project_provider,omitempty"`
 	// PythonFallbackRoots lists other GA roots (or interpreter paths) that may
 	// lend an interpreter when this config's own root has no usable one. A fresh
 	// instance is a bare GA checkout with no .venv, so the only interpreter that
@@ -206,6 +209,9 @@ func Validate(cfg AppConfig) error {
 	}
 	if theme := strings.TrimSpace(cfg.UITheme); theme != "" && !ValidUITheme(theme) {
 		return fmt.Errorf("ui_theme must be one of light, warm, dark")
+	}
+	if p := cfg.DefaultProjectProvider; p != "" && p != "admin" && p != "official" {
+		return fmt.Errorf("default_project_provider must be admin or official")
 	}
 	if cfg.ChatDefaultLLMNo < 0 {
 		return fmt.Errorf("chat_default_llm_no must be positive")
