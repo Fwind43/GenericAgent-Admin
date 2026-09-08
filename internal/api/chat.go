@@ -2539,7 +2539,7 @@ func (s *Server) scheduleChatTitleGeneration(sid string, cs chatSession) {
 		}
 		latest.Title = title
 		latest.TitleSource = chatTitleSourceGenerated
-		if err := saveChatSessionLocked(s.CfgStore.Snapshot(), latest); err != nil {
+		if err := saveChatSessionPreserveUpdatedAtLocked(s.CfgStore.Snapshot(), latest); err != nil {
 			fmt.Fprintf(os.Stderr, "chat title persistence failed for %s: %v\n", sid, err)
 		}
 	}()
@@ -2602,7 +2602,7 @@ func (s *Server) generateLegacyChatTitle(sid string) (chatSession, error) {
 	}
 	latest.Title = title
 	latest.TitleSource = chatTitleSourceGenerated
-	if err := saveChatSessionLocked(s.CfgStore.Snapshot(), latest); err != nil {
+	if err := saveChatSessionPreserveUpdatedAtLocked(s.CfgStore.Snapshot(), latest); err != nil {
 		return chatSession{}, err
 	}
 	return latest, nil

@@ -899,6 +899,9 @@ func (s *Server) chatSaveSettings(w http.ResponseWriter, r *http.Request, sid st
 		bad(w, 400, err.Error())
 		return
 	}
+	// Serialize the entire read-modify-write with title generation.
+	s.SessionMu.Lock()
+	defer s.SessionMu.Unlock()
 	cs, err := loadChatSession(s.CfgStore.Snapshot(), safeChatID(sid))
 	if err != nil {
 		bad(w, 500, err.Error())
@@ -928,7 +931,7 @@ func (s *Server) chatSaveSettings(w http.ResponseWriter, r *http.Request, sid st
 			cs.ExtraSysPrompts = []string{preset.Content}
 		}
 	}
-	if err := saveChatSession(s.CfgStore.Snapshot(), cs); err != nil {
+	if err := saveChatSessionPreserveUpdatedAtLocked(s.CfgStore.Snapshot(), cs); err != nil {
 		bad(w, 500, err.Error())
 		return
 	}
