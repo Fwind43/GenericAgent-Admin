@@ -15,7 +15,8 @@
   flex: none;
   width: var(--nav-mark-width);
   /* Keep long directories compact, including in short/mobile viewports. */
-  max-height: min(100%, 320px, 50dvh);
+  /* Five 30px rows + 12px padding + 2px border. */
+  max-height: min(100%, 164px, 50dvh);
   box-sizing: border-box;
   margin: 0 0 0 auto;
   padding: 6px 0;
@@ -179,7 +180,8 @@
   .oa-message-nav-node:focus-visible .oa-message-nav-mark > span { width: 12px; }
   .oa-message-nav[data-expanded="true"] .oa-message-nav-track {
     width: min(208px, calc(100vw - 64px));
-    max-height: min(100%, 232px, 40dvh);
+    /* Five 44px touch rows + 8px padding + 2px border. */
+    max-height: min(100%, 230px, 40dvh);
     box-shadow: 0 3px 12px rgb(0 0 0 / .08);
   }
   .oa-message-nav-label { padding-left: 10px; font-size: 12px; line-height: 18px; }

@@ -48,7 +48,7 @@ const flush = () => act(() => { vi.runOnlyPendingTimers() })
 describe('message nodes', () => {
   test('caps directory height and contains overflow within the list', () => {
     const track = navigatorCSS.match(/\.oa-message-nav-track\s*\{([^}]+)\}/)[1]
-    expect(track).toMatch(/max-height:\s*min\(100%, 320px, 50dvh\)/)
+    expect(track).toMatch(/max-height:\s*min\(100%, 164px, 50dvh\)/)
     expect(track).toMatch(/overflow-y:\s*auto/)
     expect(track).toMatch(/overscroll-behavior:\s*contain/)
   })
@@ -74,7 +74,7 @@ describe('message nodes', () => {
     expect(mobile).toMatch(/\.oa-message-nav-toggle\s*\{[^}]*width:\s*44px;[^}]*height:\s*56px/)
     expect(mobile).toMatch(/\.oa-message-nav-toggle > span\s*\{[^}]*width:\s*14px;[^}]*height:\s*56px/)
     expect(mobile).toMatch(/width:\s*min\(208px, calc\(100vw - 64px\)\)/)
-    expect(mobile).toMatch(/max-height:\s*min\(100%, 232px, 40dvh\)/)
+    expect(mobile).toMatch(/max-height:\s*min\(100%, 230px, 40dvh\)/)
     expect(mobile).toMatch(/\.oa-message-nav\[data-expanded="true"\] \.oa-message-nav-older\s*\{[^}]*height:\s*44px; min-height:\s*44px/)
     expect(mobile).toMatch(/\.oa-message-nav-popup\s*\{[^}]*max-width:\s*min\(280px, calc\(100vw - 24px\)\)/)
     expect(mobile).toMatch(/\.oa-message-nav-tooltip\s*\{[^}]*max-height:\s*min\(200px, 30dvh\)/)
