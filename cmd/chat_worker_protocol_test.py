@@ -21,6 +21,10 @@ chat_worker = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(chat_worker)
 
 
+REAL_ENSURE_WORLDLINE = chat_worker._ensure_worldline_store
+REAL_COMMIT_WORLDLINE = chat_worker._commit_worldline
+
+
 class FakeWorker:
     def is_alive(self):
         return True
@@ -398,6 +402,30 @@ class ChatWorkerProtocolTest(unittest.TestCase):
         self.assertEqual(model_ids, ["claude-first", "claude-fallback"])
         self.assertNotIn("raw_ask", first.__dict__)
         self.assertNotIn("raw_ask", second.__dict__)
+
+    def test_old_ga_without_worldline_can_complete_chat_and_activate_rpc(self):
+        agent = FakeAgent()
+        self.ensure_worldline.side_effect = REAL_ENSURE_WORLDLINE
+        self.commit_worldline.side_effect = REAL_COMMIT_WORLDLINE
+        with mock.patch.dict(sys.modules, {"frontends.worldline": None}):
+            chat_worker.handle_request(agent, FakeWorker(), self.request("ordinary prompt"))
+            self.assertTrue(any(e.get("type") == "done" for e in self.events))
+            self.assertFalse(hasattr(agent, "_admin_worldline_store"))
+            req = self.request()
+            req.update(action="state", activate=True, sid="legacy-chat")
+            chat_worker.handle_worldline_request(agent, req)
+            self.assertEqual(self.events[-1]["type"], "worldline")
+            self.assertEqual(self.events[-1]["tree"]["nodes"], [])
+
+    def test_worldline_transitive_import_failure_is_not_suppressed(self):
+        original = __import__
+        def importing(name, *args, **kwargs):
+            if name == "frontends.worldline":
+                raise ModuleNotFoundError("missing dependency", name="missing_dependency")
+            return original(name, *args, **kwargs)
+        with mock.patch("builtins.__import__", side_effect=importing):
+            with self.assertRaises(ModuleNotFoundError):
+                REAL_ENSURE_WORLDLINE(FakeAgent(), ".", "")
 
     def test_ordinary_request_activates_worldline_before_agent_turn(self):
         class ActivationAwareAgent(FakeAgent):

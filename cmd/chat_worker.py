@@ -1535,7 +1535,14 @@ def _install_worldline_hook():
 
 
 def _ensure_worldline_store(agent, ga_root, workspace):
-    from frontends.worldline import RewindStore
+    # Worldline is optional on older GA checkouts. Do not suppress missing
+    # transitive dependencies or store errors: those are real failures.
+    try:
+        from frontends.worldline import RewindStore
+    except ModuleNotFoundError as exc:
+        if exc.name not in ('frontends', 'frontends.worldline'):
+            raise
+        return None
     cwd = os.path.realpath(str(workspace or ga_root))
     store = getattr(agent, '_admin_worldline_store', None)
     if store is not None:
@@ -2159,7 +2166,7 @@ def handle_worldline_request(agent, req):
             elif (role == 'assistant' and message_id and latest_user is not None and
                   message.get('error') is not True):
                 completed_pair = (latest_user, message)
-        if not store.nodes and completed_pair is not None:
+        if store is not None and not store.nodes and completed_pair is not None:
             _restore_admin_history(agent, history, req.get('raw_history'))
             _restore_ga_state(agent, req.get('history_info'), req.get('working'))
             user_message, assistant_message = completed_pair
