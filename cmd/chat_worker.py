@@ -2626,6 +2626,87 @@ def _admin_project_request(fn):
     return wrapped
 
 
+def _install_conductor_tools(agent, config):
+    """Request-scoped Admin tools; never edit GA core or official plugins."""
+    if not isinstance(config, dict) or config.get('role') != 'parent':
+        return lambda: None
+    import agentmain
+    from agent_loop import StepOutcome
+    import uuid
+    broker = Path(str(config.get('broker_dir') or ''))
+    if not broker.is_absolute() or not broker.is_dir():
+        raise ValueError('Invalid Conductor broker directory')
+    handler_type = agentmain.GenericAgentHandler
+    original_schema = agentmain.TOOLS_SCHEMA
+    originals = {}
+    receipts = {}
+
+    def read_reply(path, timeout):
+        deadline = time.monotonic() + timeout
+        while not getattr(agent, 'stop_sig', False):
+            try:
+                data = path.read_bytes()
+                if len(data) > 1024 * 1024:
+                    return {'ok': False, 'error': 'Conductor reply exceeds size limit'}
+                value = json.loads(data)
+                return value if isinstance(value, dict) else {'ok': False, 'error': 'Invalid Conductor reply'}
+            except FileNotFoundError:
+                pass
+            except (OSError, ValueError) as exc:
+                return {'ok': False, 'error': str(exc)}
+            if time.monotonic() >= deadline:
+                return {'ok': False, 'pending': True, 'error': 'Conductor wait timed out; outcome unknown'}
+            time.sleep(0.1)
+        return {'ok': False, 'error': 'Parent cancelled'}
+
+    def dispatch(handler, args, response):
+        if handler.parent is not agent:
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+        objective = args.get('objective')
+        if not isinstance(objective, str) or not objective.strip():
+            return StepOutcome({'ok': False, 'error': 'objective is required'})
+        request_id = uuid.uuid4().hex
+        emit({'type': 'conductor_dispatch', 'request_id': request_id,
+              'broker_dir': str(broker), 'objective': objective.strip()})
+        reply = read_reply(broker / (request_id + '.response.json'), 30)
+        dispatch_id = reply.get('dispatch_id')
+        if reply.get('ok') and isinstance(dispatch_id, str) and re.fullmatch(r'[A-Za-z0-9_-]+', dispatch_id):
+            receipts[dispatch_id] = reply
+        return StepOutcome(reply)
+
+    def collect(handler, args, response):
+        if handler.parent is not agent:
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+        dispatch_id = args.get('dispatch_id')
+        if not isinstance(dispatch_id, str) or dispatch_id not in receipts:
+            return StepOutcome({'ok': False, 'error': 'Unknown dispatch for this request'})
+        emit({'type': 'conductor_collect', 'dispatch_id': dispatch_id})
+        reply = read_reply(broker / (dispatch_id + '.outcome.json'), 30)
+        return StepOutcome({'untrusted_worker_result': reply,
+                            'instruction': 'Review this evidence before final delivery; pending is not success.'})
+
+    specs = [('conductor_dispatch', dispatch, 'Delegate an independent objective asynchronously. Collect its outcome before final delivery.', 'objective'),
+             ('conductor_collect', collect, 'Collect a dispatched worker outcome. Waits at most 30 seconds; pending is not success.', 'dispatch_id')]
+    schema = list(original_schema)
+    for name, method, description, parameter in specs:
+        attr = 'do_' + name
+        originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
+        setattr(handler_type, attr, method)
+        schema.append({'type': 'function', 'function': {'name': name, 'description': description,
+                       'parameters': {'type': 'object', 'properties': {parameter: {'type': 'string'}},
+                                      'required': [parameter], 'additionalProperties': False}}})
+    agentmain.TOOLS_SCHEMA = schema
+
+    def restore():
+        agentmain.TOOLS_SCHEMA = original_schema
+        for attr, (existed, value) in originals.items():
+            if existed:
+                setattr(handler_type, attr, value)
+            elif attr in handler_type.__dict__:
+                delattr(handler_type, attr)
+    return restore
+
+
 @_admin_project_request
 def handle_request(agent, worker, req):
     req = _normalize_request(req)
@@ -2765,7 +2846,9 @@ def handle_request(agent, worker, req):
 
     restore_image_injection = _install_image_injection(agent, req.get('images'))
     restore_model_hooks = _install_outbound_model_hooks(agent)
+    restore_conductor_tools = lambda: None
     try:
+        restore_conductor_tools = _install_conductor_tools(agent, req.get('conductor'))
         if _up_context:
             _up_thread = threading.Thread(
                 target=_observe_ultraplan_daemon,
@@ -2869,6 +2952,7 @@ def handle_request(agent, worker, req):
         if isinstance(turn_hooks, dict):
             turn_hooks.pop(turn_hook_key, None)
         _clear_tool_timer_emitter(emit)
+        restore_conductor_tools()
         restore_image_injection()
         restore_model_hooks()
 

@@ -1,3 +1,4 @@
+import './conductor.css'
 import ProjectSessionPage from './components/ProjectSessionPage'
 import ProjectActionsMenu from './components/ProjectActionsMenu'
 import ProjectDragHandle from './components/ProjectDragHandle'
@@ -55,6 +56,18 @@ import { commandResultSummary, reduceCommandResult } from './lib/chatCommands'
 import { buildChatRunPayload, buildEditResendItem } from './lib/worldlineEdit'
 import { buildWorldlineEdges, buildWorldlineRows, worldlineMaxLevel, messageVersionInfo, worldlineNodeTitle, worldlineNodeKindLabel } from './lib/worldlineTree'
 import { pollGeneratedChatTitle, shouldPollGeneratedTitle } from './lib/chatTitlePolling'
+import {
+  canStopConductorWorker,
+  conductorChildren,
+  conductorParentID,
+  conductorPollActions,
+  conductorSessionTree,
+  conductorStatusCounts,
+  isConductorParent,
+  isConductorWorker,
+  shouldPollConductorSessions,
+  workerStatus,
+} from './lib/chatConductor.js'
 
 gsap.registerPlugin(useGSAP)
 
@@ -243,20 +256,50 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   ageText = '',
   unread = false,
   waiting = false,
+  nested = false,
   actionsRef,
 }) {
   const sidebarLoop = loopSidebarView(session.loop)
   const title = shortTitle(session)
-  return <div className={`oa-session-row ${active?'active':''} ${session.running?'is-running':''} ${session.pinned?'is-pinned':''}`}>
+  const conductorKind = isConductorParent(session) ? 'parent' : (isConductorWorker(session) ? 'worker' : '')
+  const conductorState = workerStatus(session)
+  return <div className={`oa-session-row ${active?'active':''} ${session.running?'is-running':''} ${session.pinned?'is-pinned':''} ${nested?'is-conductor-worker':''}`}>
     {editing ? <div className="oa-rename">
       <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>actionsRef.current.setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') actionsRef.current.saveRename(session.id); if(event.key==='Escape') actionsRef.current.cancelRename() }}/>
       <button onClick={()=>actionsRef.current.saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>actionsRef.current.cancelRename()} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
     </div> : <button className="oa-session" onClick={()=>actionsRef.current.openSession(session.id)} title={title}>
-      <span className="oa-session-title" title={title}>{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
+      <span className="oa-session-title" title={title}>{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{conductorKind && <em className={`oa-conductor-role is-${conductorKind}`}>{conductorKind === 'parent' ? 'Conductor' : ct('子任务', 'Worker')}</em>}{conductorKind === 'worker' && conductorState && <em className={`oa-conductor-status is-${conductorState}`}>{conductorState}</em>}{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
       <small title={fmtTime(session.updated_at)}>{session.running && !waiting ? <em className="oa-session-running-label" role="img" aria-label={ct('运行中', 'Running')} title={ct('运行中', 'Running')}><span className="oa-session-running-wave" style={{ '--oa-wave-phase': `${-(Array.from(String(session.id)).reduce((hash, char)=> (hash * 31 + char.charCodeAt(0)) % 2400, 0) / 1000)}s` }} aria-hidden="true"><i/><i/><i/><i/></span></em> : ageText}</small>
     </button>}
     {!editing && <button className={`oa-session-more ${menuOpen ? 'is-open' : ''}`} onClick={(event)=>actionsRef.current.toggleMenu(session.id, event)} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
   </div>
+})
+
+const ConductorWorkspace = memo(function ConductorWorkspace({ detail, onOpen, onStop, stoppingID = '' }) {
+  const children = conductorChildren(detail)
+  const counts = conductorStatusCounts(children)
+  return <section className="oa-conductor-workspace" aria-label={ct('Conductor 子任务', 'Conductor workers')}>
+    <header className="oa-conductor-workspace-head">
+      <div><span className="oa-conductor-kicker">CONDUCTOR</span><h2>{ct('任务工作区', 'Task workspace')}</h2></div>
+      <div className="oa-conductor-counts" aria-label={ct('子任务统计', 'Worker totals')}>
+        <span>{counts.total} {ct('项', 'total')}</span>
+        {counts.running > 0 && <span className="is-running">{counts.running} {ct('运行中', 'running')}</span>}
+        {counts.failed > 0 && <span className="is-failed">{counts.failed} {ct('失败', 'failed')}</span>}
+      </div>
+    </header>
+    {children.length ? <div className="oa-conductor-worker-list">{children.map((worker, index) => {
+      const id = String(worker?.id || worker?.session_id || '')
+      const status = workerStatus(worker)
+      const title = worker?.title || worker?.name || `${ct('子任务', 'Worker')} ${index + 1}`
+      return <article className={`oa-conductor-worker is-${status || 'unknown'}`} key={id || index}>
+        <button type="button" className="oa-conductor-worker-main" onClick={()=>id && onOpen(id)} disabled={!id}>
+          <span className={`oa-conductor-status-dot is-${status || 'unknown'}`} aria-hidden="true"/>
+          <span><b>{title}</b><small>{status || ct('未知', 'unknown')}</small></span>
+        </button>
+        {canStopConductorWorker(worker) && <button type="button" className="oa-conductor-stop" onClick={()=>onStop(id)} disabled={!id || stoppingID === id}>{stoppingID === id ? ct('停止中…', 'Stopping…') : ct('停止', 'Stop')}</button>}
+      </article>
+    })}</div> : <p className="oa-conductor-empty">{ct('向 Conductor 描述目标后，子任务会在这里出现。', 'Describe the objective to Conductor; workers will appear here.')}</p>}
+  </section>
 })
 
 const BUILTIN_SLASH_COMMANDS = [
@@ -4507,6 +4550,8 @@ export default function ChatApp() {
   const [btwRailOpen, setBtwRailOpen] = useState(true)
   const [prompt, setPrompt] = useState('')
   const [loopState, setLoopState] = useState(null)
+  const [activeSessionDetail, setActiveSessionDetail] = useState(null)
+  const [conductorStoppingID, setConductorStoppingID] = useState('')
   const [loopConfigOpen, setLoopConfigOpen] = useState(false)
   const [loopObjective, setLoopObjective] = useState('')
   const [loopUpdating, setLoopUpdating] = useState(false)
@@ -5450,6 +5495,7 @@ export default function ChatApp() {
       )
       const d = await loadSessionDetail(id, { signal: controller.signal })
       if (openToken !== openSeqRef.current || activeSidRef.current !== id) return
+      setActiveSessionDetail(d)
       const scrollRestore = sessionScrollRestore(sessionScrollSnapshotsRef.current, d.id)
       pendingSessionScrollRestoreRef.current = scrollRestore ? { sessionID: d.id, ...scrollRestore } : null
       pendingRenderedSessionRef.current = d.id
@@ -5461,6 +5507,7 @@ export default function ChatApp() {
       scrollModeRef.current = 'auto'
       setSid(d.id)
       historyPages.apply(d, addChatInstanceToURL(`/api/chat/session/${d.id}?view=page`, chatInstanceRef.current))
+      setActiveSessionDetail(d)
       applyQueueSnapshot(d.queued_messages, d.id)
       setQueueEditingId('')
       setQueueDraft('')
@@ -5602,7 +5649,7 @@ export default function ChatApp() {
     return list
   }
 
-  const createSession = async (projectMode = '') => {
+  const createSession = async (projectMode = '', sessionOptions = {}) => {
     cancelSessionLoad()
     historyPages.begin()
     const selectedProject = projectMode && typeof projectMode === 'object'
@@ -5619,7 +5666,8 @@ export default function ChatApp() {
     activeRunRef.current = false
     streamAbortRef.current?.abort?.()
     streamAbortRef.current = null
-    const d = await chatApi('/api/chat/session/new', { method:'POST', body:JSON.stringify(selectedProject || {}) })
+    const sessionPayload = { ...(selectedProject || {}), ...sessionOptions }
+    const d = await chatApi('/api/chat/session/new', { method:'POST', body:JSON.stringify(sessionPayload) })
     if (openToken !== openSeqRef.current) return
     forgetSessionScroll(sessionScrollSnapshotsRef.current, d.id)
     pendingSessionScrollRestoreRef.current = null
@@ -5627,7 +5675,8 @@ export default function ChatApp() {
     activeSidRef.current = d.id
     scrollModeRef.current = 'auto'
     clearSessionDrafts(d.id)
-    setSid(d.id); setMessages([]); applyQueueSnapshot([]); setQueueEditingId(''); setQueueDraft(''); guidingQueueRef.current = ''; setGuidingQueueId(''); setRawHistory([]); setHistoryInfo([]); setWorkingState(null); setPlanState(null); setLoopState(null); setLoopObjective(''); setLoopConfigOpen(false); setContextOpen(false); setSessionPrompt('', d.id); setErr(''); setNotice(ct('已创建新对话', 'New chat created')); setBusy(false); setStreamingSid(''); setAutoFollow(false); setShowFollow(false); setLlmNo(d.settings?.llm_no ?? llmNo)
+    setActiveSessionDetail(d)
+    setSid(d.id); setMessages([]); applyQueueSnapshot([]); setQueueEditingId(''); setQueueDraft(''); guidingQueueRef.current = ''; setGuidingQueueId(''); setRawHistory([]); setHistoryInfo([]); setWorkingState(null); setPlanState(null); setLoopState(null); setLoopObjective(''); setLoopConfigOpen(false); setContextOpen(false); setSessionPrompt('', d.id); setErr(''); setNotice(sessionOptions.mode === 'conductor' ? ct('已创建 Conductor', 'Conductor created') : ct('已创建新对话', 'New chat created')); setBusy(false); setStreamingSid(''); setAutoFollow(false); setShowFollow(false); setLlmNo(d.settings?.llm_no ?? llmNo)
     await loadChatState(d.id, openToken)
     if (selectedProject) await loadSessions(d.id)
     return d.id
@@ -5639,6 +5688,26 @@ export default function ChatApp() {
 
   const newProjectSession = async (projectMode) => {
     await createSession(projectMode)
+  }
+
+  const newConductorSession = async () => {
+    await createSession('', { mode:'conductor' })
+  }
+
+  const stopConductorWorker = async (workerID) => {
+    if (!workerID || conductorStoppingID) return
+    setConductorStoppingID(workerID)
+    setErr('')
+    try {
+      await chatApi(`/api/chat/cancel/${encodeURIComponent(workerID)}`, { method:'POST' })
+      setNotice(ct('已请求停止子任务', 'Worker stop requested'))
+      await loadSessions(activeSidRef.current || '')
+      if (activeSidRef.current) await refreshActiveSessionSnapshot(activeSidRef.current)
+    } catch (e) {
+      setErr(e?.message || String(e))
+    } finally {
+      setConductorStoppingID('')
+    }
   }
 
   // Pinned first, so the projects someone actually works in stop sinking under
@@ -6662,7 +6731,7 @@ export default function ChatApp() {
     let stopped = false
     let inFlight = false
     const refreshList = async () => {
-      if (stopped || inFlight || !shouldRefreshChatTaskbar()) return
+      if (stopped || inFlight || (!shouldRefreshChatTaskbar() && !shouldPollConductorSessions(sessionsRef.current))) return
       inFlight = true
       try {
         const d = await chatApi('/api/chat/sessions')
@@ -6679,8 +6748,15 @@ export default function ChatApp() {
           const activeID = activeSidRef.current
           const before = previous.find(item => item.id === activeID)
           const after = next.find(item => item.id === activeID)
-          if (after?.running && !streamAbortRef.current && !activeRunRef.current) {
+          const conductorPoll = conductorPollActions(after, {
+            streamAttached: Boolean(streamAbortRef.current),
+            runAttached: Boolean(activeRunRef.current),
+          })
+          if (conductorPoll.attachRunningStream) {
             void attachRunningStream(activeID, { waitForRun:true })
+          }
+          if (conductorPoll.refreshMetadata) {
+            setActiveSessionDetail(current => current && String(current.id) === String(after.id) ? { ...current, ...after } : current)
           } else if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {
             void refreshActiveSessionSnapshot(activeID).catch(() => {})
           }
@@ -6961,6 +7037,9 @@ export default function ChatApp() {
     return sessions.filter(s => (s.title || '').toLowerCase().includes(q))
   }, [sessions, sidebarSearch])
   const recentSessionGroups = useMemo(() => groupRecentSessions(filteredSessions), [filteredSessions])
+  const conductorSidebarTrees = useMemo(() => conductorSessionTree(filteredSessions), [filteredSessions])
+  const conductorSidebarTreeByID = useMemo(() => new Map(conductorSidebarTrees.map(node => [String(node.session?.id || ''), node])), [conductorSidebarTrees])
+  const conductorNestedWorkerIDs = useMemo(() => new Set(conductorSidebarTrees.flatMap(node => node.workers.map(worker => String(worker?.id || '')))), [conductorSidebarTrees])
   const recentGroupLabels = {
     pinned: ct('\u7f6e\u9876', 'Pinned'),
     today: ct('\u4eca\u5929', 'Today'),
@@ -7048,7 +7127,7 @@ export default function ChatApp() {
     },
   }
 
-  const renderSidebarSession = (session) => <SidebarSessionRow
+  const renderSidebarSession = (session, options = {}) => <SidebarSessionRow
     key={session.id}
     session={session}
     active={session.id === sid}
@@ -7059,6 +7138,7 @@ export default function ChatApp() {
     ageText={sessionAgeText(session.updated_at)}
     unread={chatReadState.unread(session)}
     waiting={waitingSessionIds.has(session.id)}
+    nested={Boolean(options.nested)}
     actionsRef={sidebarSessionActionsRef}
   />
 
@@ -7083,6 +7163,13 @@ export default function ChatApp() {
           title={ct('新对话', 'New chat')}
           aria-label={ct('新对话', 'New chat')}
         ><MessageSquarePlus size={16}/></button>
+        <button
+          className="oa-icon-btn oa-new-conductor"
+          onClick={newConductorSession}
+          disabled={batchDeleting}
+          title={ct('新建 Conductor', 'New Conductor')}
+          aria-label={ct('新建 Conductor', 'New Conductor')}
+        ><span className="oa-conductor-new-mark" aria-hidden="true">C</span></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('收起侧栏', 'Collapse sidebar')} aria-label={ct('收起侧栏', 'Collapse sidebar')}><PanelLeftClose size={18} aria-hidden="true"/></button>
       </div>
       <div className="oa-session-manager-head">
@@ -7119,7 +7206,10 @@ export default function ChatApp() {
         <div className="oa-session-list">
           {recentSessionGroups.map(group => <section className={`oa-recent-group oa-recent-group-${group.key}`} key={group.key}>
             <div className="oa-recent-group-head">{group.key === 'pinned' && <Pin size={12}/>}<span>{recentGroupLabels[group.key]}</span><small>{group.sessions.length}</small></div>
-            <div className="oa-recent-group-body">{group.sessions.map(renderSidebarSession)}</div>
+            <div className="oa-recent-group-body">{group.sessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).flatMap(session => {
+              const node = conductorSidebarTreeByID.get(String(session.id || ''))
+              return [renderSidebarSession(session), ...(node?.workers || []).map(worker => renderSidebarSession(worker, { nested:true }))]
+            })}</div>
           </section>)}
           {!filteredSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
@@ -7298,6 +7388,8 @@ export default function ChatApp() {
       </div>
       <div className={`oa-workspace ${loopRailOpen ? 'has-loop' : ''} ${btwRailOpen && btwMessages.length > 0 ? 'has-btw' : ''} ${btwMessages.length > 0 && !btwRailOpen ? 'has-launchers' : ''}`}>
         <section className="oa-thread" ref={threadRef} aria-busy={sessionLoading} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) pauseFollow() }} onTouchMove={()=>{ if (!isNearBottom(threadRef.current)) pauseFollow() }}>
+          {isConductorWorker(activeSessionDetail) && conductorParentID(activeSessionDetail) && <button type="button" className="oa-conductor-back" onClick={()=>openSession(conductorParentID(activeSessionDetail))}>← {ct('返回 Conductor', 'Back to Conductor')}</button>}
+          {isConductorParent(activeSessionDetail) && <ConductorWorkspace detail={activeSessionDetail} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID}/>}
           {sessionLoading && messages.length === 0 && <div className="oa-session-load" role="status" aria-live="polite">
             <RotateCw size={20} className="oa-session-load-spinner" aria-hidden="true"/>
             <span>{ct('对话加载中…', 'Loading conversation…')}</span>

@@ -184,6 +184,8 @@ type chatLoopState struct {
 type chatSession struct {
 	ID                     string                   `json:"id"`
 	Title                  string                   `json:"title"`
+	Conductor              *chatConductorState      `json:"conductor,omitempty"`
+	ConductorChildren      []chatConductorChild     `json:"conductor_children,omitempty"`
 	TitleSource            string                   `json:"title_source,omitempty"`
 	UpdatedAt              int64                    `json:"updated_at"`
 	Messages               []chatMessage            `json:"messages"`
@@ -467,10 +469,16 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 	startedAtMS, _ := cmdReq["_ga_run_started_at_ms"].(int64)
 	delete(cmdReq, "_ga_run_started_at_ms")
 	saveTerminal := func(session chatSession) error {
+		var err error
 		if worldlineResend {
-			return s.saveChatSessionExact(session)
+			err = s.saveChatSessionExact(session)
+		} else {
+			err = s.saveChatSessionMerged(session)
 		}
-		return s.saveChatSessionMerged(session)
+		if err == nil {
+			s.syncConductorTerminal(session)
+		}
+		return err
 	}
 	startedAt := time.UnixMilli(startedAtMS)
 	if startedAtMS <= 0 {
@@ -551,6 +559,14 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 				readErr = err
 				break
 			}
+			continue
+		}
+		if ev["type"] == "conductor_dispatch" {
+			s.handleConductorDispatchEvent(sid, ev)
+			continue
+		}
+		if ev["type"] == "conductor_collect" {
+			s.handleConductorCollectEvent(sid, ev)
 			continue
 		}
 		if ev["type"] == "model" {
@@ -2165,6 +2181,8 @@ func preserveLatestChatUserMetadata(candidate *chatSession, latest chatSession) 
 	candidate.Loop = latest.Loop
 	candidate.Autorun = latest.Autorun
 	candidate.QueuedMessages = latest.QueuedMessages
+	candidate.Conductor = latest.Conductor
+	candidate.ConductorChildren = latest.ConductorChildren
 	if latest.TitleSource == chatTitleSourceManual ||
 		(latest.TitleSource == chatTitleSourceGenerated && candidate.TitleSource != chatTitleSourceManual) {
 		candidate.Title = latest.Title

@@ -153,6 +153,11 @@ func (s *Server) chatHandler(w http.ResponseWriter, r *http.Request) {
 			s.chatLoopStop(w, r, parts[1])
 			return
 		}
+	case "conductor":
+		if len(parts) == 3 && parts[2] == "children" && r.Method == http.MethodGet {
+			s.chatConductorChildren(w, r, parts[1])
+			return
+		}
 	case "stream":
 		if len(parts) == 2 && r.Method == http.MethodGet {
 			s.chatStream(w, r, parts[1])
@@ -179,6 +184,7 @@ func (s *Server) chatHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) chatNewSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
+		Mode            string `json:"mode"`
 		ProjectMode     string `json:"project_mode"`
 		ProjectProvider string `json:"project_provider"`
 		ProjectID       string `json:"project_id"`
@@ -188,6 +194,11 @@ func (s *Server) chatNewSession(w http.ResponseWriter, r *http.Request) {
 			bad(w, http.StatusBadRequest, err.Error())
 			return
 		}
+	}
+	mode := strings.TrimSpace(req.Mode)
+	if mode != "" && mode != "conductor" {
+		bad(w, http.StatusBadRequest, "unsupported chat mode")
+		return
 	}
 	cfg := s.CfgStore.Snapshot()
 	provider := strings.TrimSpace(req.ProjectProvider)
@@ -210,7 +221,10 @@ func (s *Server) chatNewSession(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	cs := chatSession{ID: newChatID(), Title: "新会话", UpdatedAt: time.Now().Unix(), Messages: []chatMessage{}, Settings: s.defaultChatSettings(), RawHistory: []map[string]interface{}{}, Workspace: workspace, ProjectMode: projectMode, ProjectProvider: provider, ProjectID: id}
-	if id != "" {
+	if strings.TrimSpace(req.Mode) == "conductor" {
+		cs.Conductor = &chatConductorState{Role: conductorRoleParent}
+	}
+	if id != "" || cs.Conductor != nil {
 		if err := saveChatSession(cfg, cs); err != nil {
 			bad(w, http.StatusInternalServerError, err.Error())
 			return
@@ -1192,6 +1206,12 @@ func (s *Server) chatPostMode(w http.ResponseWriter, r *http.Request, sid string
 		bad(w, 500, err.Error())
 		return
 	}
+	if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker &&
+		(conductorTerminal(cs.Conductor.Status) || s.chatRunCanceled(cs.Conductor.ParentSessionID)) {
+		s.endChatRunOwned(sid, token)
+		bad(w, http.StatusConflict, "Conductor dispatch is no longer runnable")
+		return
+	}
 	if cs.ID == "" {
 		cs.ID = sid
 		cs.Title = "新会话"
@@ -1204,6 +1224,12 @@ func (s *Server) chatPostMode(w http.ResponseWriter, r *http.Request, sid string
 		return
 	}
 	if s.maybeHandleProjectCommand(w, r, sid, &cs, req.Prompt) {
+		return
+	}
+	conductorReq := map[string]interface{}{"extra_sys_prompts": cs.ExtraSysPrompts}
+	if err := s.prepareConductorWorkerRequest(cs, conductorReq); err != nil {
+		s.endChatRunOwned(sid, token)
+		bad(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	var inheritedFiles []map[string]interface{}
@@ -1300,6 +1326,9 @@ func (s *Server) chatPostMode(w http.ResponseWriter, r *http.Request, sid string
 		"_ga_pending_assistant_id": pendingMsg.ID,
 		"_ga_run_started_at_ms":    runStartedAtMS,
 	}
+	for key, value := range conductorReq {
+		cmdReq[key] = value
+	}
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 	go s.runChatWorkerOwned(sid, token, cs, cmdReq)
 	if startOnly {
@@ -1359,6 +1388,7 @@ func (s *Server) cancelChatRun(sid string) (bool, error) {
 
 func (s *Server) chatCancel(w http.ResponseWriter, r *http.Request, sid string) {
 	running, err := s.cancelChatRun(sid)
+	s.cancelConductorSession(sid)
 	if err != nil {
 		bad(w, http.StatusInternalServerError, fmt.Sprintf("chat canceled but failed to persist partial output: %v", err))
 		return
