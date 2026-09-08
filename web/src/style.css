@@ -18531,3 +18531,34 @@ html .oa-sidebar .oa-project-add:hover:not(:disabled) {
   margin-inline-start: -4px;
   padding-inline-start: 4px;
 }
+
+/* Compact sidebar instance switcher; keep native selection and focus behavior. */
+.oa-sidebar-instance {
+  width:fit-content;
+  max-width:100%;
+  grid-template-columns:max-content minmax(0,112px);
+  column-gap:7px;
+}
+.oa-sidebar-instance select {
+  height:28px;
+  min-height:0;
+  padding:0 24px 0 8px;
+  border-radius:6px;
+  border-color:color-mix(in srgb, var(--oa-muted) 16%, transparent);
+  background-color:transparent;
+  font-size:12px;
+  font-weight:410;
+  text-overflow:ellipsis;
+  cursor:pointer;
+}
+.oa-sidebar-instance::after {
+  right:13px;
+  width:5px;
+  height:5px;
+}
+@media (max-width:680px) {
+  .oa-sidebar-instance select {
+    height:32px;
+    font-size:14px;
+  }
+}
