@@ -18562,3 +18562,25 @@ html .oa-sidebar .oa-project-add:hover:not(:disabled) {
     font-size:14px;
   }
 }
+
+.oa-project-load-more {
+  display:block;
+  width:calc(100% - 16px);
+  margin:4px 8px 8px;
+  padding:7px 10px;
+  border:0;
+  border-radius:6px;
+  background:transparent;
+  color:var(--oa-muted);
+  font-size:12px;
+  cursor:pointer;
+  text-align:center;
+}
+.oa-project-load-more:hover {
+  background:color-mix(in srgb, var(--oa-muted) 10%, transparent);
+  color:var(--oa-text);
+}
+.oa-project-load-more:focus-visible {
+  outline:2px solid var(--oa-muted);
+  outline-offset:1px;
+}
