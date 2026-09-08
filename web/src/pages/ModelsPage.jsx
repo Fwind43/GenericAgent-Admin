@@ -10,7 +10,7 @@ import {
   GripVertical,
   Layers,
   Network,
-  Plug,
+  Building2,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -296,7 +296,7 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
           {providerGroups.length ? providerGroups.map(provider => (
             <section className="model-failover-provider" key={provider.key} aria-label={provider.name}>
               <button type="button" className="model-subsection-head model-failover-provider-toggle" aria-expanded={!!expandedProviders[provider.key]} onClick={() => setExpandedProviders(current => ({ ...current, [provider.key]: !current[provider.key] }))}>
-                <strong><span aria-hidden="true">{expandedProviders[provider.key] ? '▾' : '▸'}</span><Plug size={14} aria-hidden="true" /> {provider.name}</strong>
+                <strong><span aria-hidden="true">{expandedProviders[provider.key] ? '▾' : '▸'}</span><Building2 size={14} aria-hidden="true" /> {provider.name}</strong>
                 <span>{provider.candidates.filter(candidate => selectedKeys.has(memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model }))).length} / {provider.candidates.length}</span>
               </button>
               {expandedProviders[provider.key] && <div className="model-failover-candidates">
@@ -426,7 +426,7 @@ function CallRow({ row, index, total, expanded, onToggle, moveRow, onOpenProvide
         </div>
         {!failover && (
           <button type="button" className="model-call-provider" onClick={onOpenProvider} title={text.openProvider}>
-            <Plug size={12} aria-hidden="true" />
+            <Building2 size={12} aria-hidden="true" />
             <span>{row.providerName || text.unnamed}</span>
           </button>
         )}
