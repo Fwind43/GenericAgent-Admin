@@ -145,7 +145,9 @@ test('real ChatApp keeps background attention across selection and clears only t
     ? { ...item, taskbar_state: 'running', running: true }
     : item)
   act(() => { window.dispatchEvent(new Event('online')) })
-  await waitFor(() => expect(restoredBackgroundButton.querySelector('.oa-session-running-label')?.textContent).toBe('Running'))
+  await waitFor(() => expect(restoredBackgroundButton.querySelector('.oa-session-running-label')?.getAttribute('aria-label')).toBe('Running'))
+  expect(restoredBackgroundButton.querySelector('.oa-session-running-label')?.getAttribute('title')).toBe('Running')
+  expect(restoredBackgroundButton.querySelector('.oa-session-running-glimmer')).not.toBeNull()
   expect(restoredBackgroundButton.querySelector('.oa-session-waiting-label')).toBeNull()
   expect(screen.queryByRole('button', { name: /^Waiting for reply/ })).toBeNull()
   expect(document.querySelector('.oa-topbar').classList.contains('has-waiting')).toBe(false)

@@ -18639,14 +18639,6 @@ html[data-color-scheme="dark"] .oa-sidebar {
   outline: 2px solid var(--oa-session-selected);
   outline-offset: -2px;
 }
-.oa-sidebar .oa-session-running-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--oa-session-live);
-  box-shadow: none;
-  flex: 0 0 6px;
-  animation: oa-session-breathe 1.8s ease-in-out infinite;
-}
 /* Reserve the menu slot so running status never disappears on selection/hover. */
 .oa-sidebar .oa-session-row.is-running:has(.oa-session-running-label) .oa-session {
   padding-right: 36px !important;
@@ -18654,27 +18646,42 @@ html[data-color-scheme="dark"] .oa-sidebar {
 .oa-sidebar .oa-session-row.is-running:has(.oa-session-running-label) .oa-session small {
   opacity: 1;
 }
+/* A small activity trace, not a determinate progress bar. */
 .oa-sidebar .oa-session-running-label {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin-left: 0;
+  width: 28px;
+  height: 16px;
+  margin: 0;
   padding: 0;
-  border-radius: 0;
   background: transparent;
-  color: var(--oa-session-live);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 500;
-  font-style: normal;
-  white-space: nowrap;
-  letter-spacing: 0;
+  border-radius: 0;
+  color: var(--accent);
+  vertical-align: middle;
 }
-@keyframes oa-session-breathe {
-  0%, 100% { opacity: .45; transform: scale(.8); }
-  50% { opacity: 1; transform: scale(1); }
+.oa-sidebar .oa-session-running-glimmer {
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.oa-sidebar .oa-session-running-glimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 12px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  animation: oa-session-glimmer 2.2s ease-in-out infinite alternate;
+}
+@keyframes oa-session-glimmer {
+  from { transform: translateX(-4px); opacity: .55; }
+  to { transform: translateX(20px); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .oa-sidebar .oa-session-running-dot { animation: none; opacity: 1; transform: none; }
+  .oa-sidebar .oa-session-running-glimmer::after { animation: none; transform: translateX(8px); }
   .oa-sidebar .oa-session-row { transition: none; }
 }
