@@ -27,6 +27,19 @@ function functionBlock(source, start, end) {
   return source.slice(from, to)
 }
 
+test('project new chat is always available outside the actions menu', () => {
+  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const header = functionBlock(main, '<div className="oa-project-head">', '<div className="oa-project-body"')
+  const menuStart = header.indexOf('<ProjectActionsMenu')
+  assert.ok(menuStart > 0)
+  const outsideMenu = header.slice(0, menuStart)
+  assert.match(outsideMenu, /className="oa-project-add"/)
+  assert.match(outsideMenu, /onClick=\{\(\)=>newProjectSession\(group.name\)\}/)
+  assert.match(outsideMenu, /disabled=\{batchDeleting\}/)
+  assert.doesNotMatch(header.slice(menuStart), /oa-project-add/)
+  assert.doesNotMatch(main, /No chats yet\. Start one from the/)
+})
+
 test('new chat stays out of the session list until its first send', () => {
   const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
 

@@ -7169,14 +7169,14 @@ export default function ChatApp() {
                 <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
               </button>
               <ProjectDragHandle name={group.name} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>
+              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
               <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(group.name, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
-              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/>{ct('新建对话', 'New chat')}</button>
               </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>
               <ProjectSessionPage key={`${group.name}:${sidebarSearch}`} items={group.sessions} renderItem={renderSidebarSession} ct={ct}/>
-              {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，从 … 菜单新建', 'No chats yet. Start one from the … menu.')}</div>}
+              {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
             </div>
           </section>
         })}
