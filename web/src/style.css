@@ -18643,7 +18643,8 @@ html[data-color-scheme="dark"] .oa-sidebar {
   width: 6px;
   height: 6px;
   background: var(--oa-session-live);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--oa-session-live) 12%, transparent);
+  box-shadow: none;
+  flex: 0 0 6px;
   animation: none;
 }
 /* Reserve the menu slot so running status never disappears on selection/hover. */
@@ -18656,12 +18657,18 @@ html[data-color-scheme="dark"] .oa-sidebar {
 .oa-sidebar .oa-session-running-label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   margin-left: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--oa-session-live) 9%, transparent);
   color: var(--oa-session-live);
-  font-size: 10px;
-  font-weight: 550;
-  letter-spacing: .02em;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  font-style: normal;
+  white-space: nowrap;
+  letter-spacing: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .oa-sidebar .oa-session-row { transition: none; }
