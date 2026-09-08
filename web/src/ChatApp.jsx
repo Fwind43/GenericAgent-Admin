@@ -1,3 +1,4 @@
+import ProjectSessionPage from './components/ProjectSessionPage'
 import ProjectActionsMenu from './components/ProjectActionsMenu'
 import ProjectDragHandle from './components/ProjectDragHandle'
 import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -7174,7 +7175,7 @@ export default function ChatApp() {
               </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>
-              {group.sessions.map(renderSidebarSession)}
+              <ProjectSessionPage key={`${group.name}:${sidebarSearch}`} items={group.sessions} renderItem={renderSidebarSession} ct={ct}/>
               {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，从 … 菜单新建', 'No chats yet. Start one from the … menu.')}</div>}
             </div>
           </section>
