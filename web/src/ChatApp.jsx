@@ -24,7 +24,6 @@ import { api, apiStream } from './lib/api'
 import { createChatSessionCache } from './lib/chatSessionCache.js'
 import { useChatHistoryPages } from './lib/useChatHistoryPages.js'
 import { useChatReadState } from './lib/useChatReadState.js'
-import { initializeChatReadBaseline } from './lib/chatReadState.js'
 import { historyStatsMessages } from './lib/chatHistoryPages.js'
 import { SETTINGS_TEXT } from './lib/i18n'
 import { KeychainPage } from './pages/KeychainPage'
@@ -4688,11 +4687,6 @@ export default function ChatApp() {
     const instance = chatInstanceRef.current
     const result = await api(addChatInstanceToURL(url, instance), options)
     if (epoch !== chatRequestEpochRef.current) throw new DOMException('Chat instance changed', 'AbortError')
-    if (url === '/api/chat/sessions') {
-      let storage
-      try { storage = window.localStorage } catch { /* Use an in-memory baseline if storage is blocked. */ }
-      initializeChatReadBaseline(instance, result.sessions, storage, window)
-    }
     return result
   }, [])
   const sessionCacheRef = useRef(null)
@@ -4780,7 +4774,7 @@ export default function ChatApp() {
     onConflict: () => openSession(activeSidRef.current, false),
   })
   const chatReadState = useChatReadState({
-    instance: chatInstanceID, sid, snapshot: historyPages.page, messages, sessions,
+    instance: chatInstanceID, sid, snapshot: historyPages.page, messages, sessions, api: chatApi, onError: setErr,
     running: busy && streamingSid === sid, loading: sessionLoading, threadRef,
   })
   const waitingSessions = waitingChatSessions({

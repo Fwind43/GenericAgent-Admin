@@ -1,6 +1,93 @@
 package api
 
-import "testing"
+import (
+	"bytes"
+	"encoding/json"
+	"genericagent-admin-go/internal/config"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestChatReadPersistenceAndRevision(t *testing.T) {
+	s := newGoalTestServer(t, t.TempDir())
+	updateTestConfig(t, s.CfgStore, func(cfg *config.AppConfig) { cfg.ChatDataDir = filepath.Join(t.TempDir(), "data") })
+	cfg := s.CfgStore.Snapshot()
+	cs := chatSession{ID: "read-test", Messages: []chatMessage{{ID: "answer", Role: "assistant", Content: "historical"}}}
+	save := func() {
+		t.Helper()
+		if err := saveChatSessionLocked(cfg, cs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	unread := func(server *Server) bool {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		server.chatSessions(rec, httptest.NewRequest("GET", "/api/chat/sessions", nil))
+		if rec.Code != 200 {
+			t.Fatal(rec.Body.String())
+		}
+		var payload struct {
+			Sessions []struct {
+				Unread bool `json:"unread"`
+			} `json:"sessions"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if len(payload.Sessions) != 1 {
+			t.Fatal(payload)
+		}
+		return payload.Sessions[0].Unread
+	}
+	mark := func(result chatSessionResult) {
+		t.Helper()
+		b, _ := json.Marshal(map[string]interface{}{"receipts": []chatReadReceipt{{SID: cs.ID, Result: result}}})
+		rec := httptest.NewRecorder()
+		s.chatHandler(rec, httptest.NewRequest(http.MethodPost, "/api/chat/read", bytes.NewReader(b)))
+		if rec.Code != 200 {
+			t.Fatalf("mark: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+	save()
+	if unread(s) {
+		t.Fatal("historical baseline must be shared")
+	}
+	cs.Messages[0].Content = "new result"
+	save()
+	result := *latestChatSessionResult(cs)
+	cold := New(s.CfgStore, nil, s.Models, nil)
+	if !unread(s) || !unread(cold) {
+		t.Fatal("both clients must see new result unread")
+	}
+	mark(result)
+	if unread(cold) {
+		t.Fatal("other client did not observe read")
+	}
+	before, _ := os.ReadFile(chatReadPath(cfg))
+	info, _ := os.Stat(chatReadPath(cfg))
+	mark(result)
+	after, _ := os.ReadFile(chatReadPath(cfg))
+	infoAfter, _ := os.Stat(chatReadPath(cfg))
+	if !bytes.Equal(before, after) || !info.ModTime().Equal(infoAfter.ModTime()) {
+		t.Fatal("repeat receipt changed persisted state")
+	}
+	if unread(New(s.CfgStore, nil, s.Models, nil)) {
+		t.Fatal("restart lost read receipt")
+	}
+	cs.Messages[0].Content = "newer result"
+	save()
+	mark(result)
+	if !unread(cold) {
+		t.Fatal("stale receipt marked newer result read")
+	}
+	updateTestConfig(t, s.CfgStore, func(cfg *config.AppConfig) { cfg.ChatDataDir = filepath.Join(t.TempDir(), "other-instance") })
+	if state, err := loadChatReadState(s.CfgStore.Snapshot()); err != nil || state != nil {
+		t.Fatal("instance receipt leaked", state, err)
+	}
+}
 
 func TestChatResultVersion(t *testing.T) {
 	cs := pageFixture(2)

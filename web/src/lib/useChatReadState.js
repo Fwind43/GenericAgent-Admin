@@ -1,40 +1,45 @@
-import { useEffect, useState } from 'react'
-import { chatReadEvent, chatReadKey, createReadDwell, isChatResultUnread, isChatResultVisible, markChatResultRead } from './chatReadState.js'
+import { useEffect, useRef, useState } from 'react'
+import { chatReadKey, createReadDwell, isChatResultVisible } from './chatReadState.js'
 
-export function useChatReadState({ instance, sid, snapshot, messages, sessions, running, loading, threadRef }) {
+export function useChatReadState({ instance, sid, snapshot, messages, sessions, running, loading, threadRef, api, onError }) {
   const [readKeys, setReadKeys] = useState(() => new Set())
-  const [, refresh] = useState(0)
-  const storage = (() => { try { return window.localStorage } catch { return null } })()
-  useEffect(() => {
-    const sync = () => refresh(value => value + 1)
-    window.addEventListener('storage', sync)
-    window.addEventListener(chatReadEvent, sync)
-    return () => {
-      window.removeEventListener('storage', sync)
-      window.removeEventListener(chatReadEvent, sync)
+  const pending = useRef(new Set())
+  const unread = session => !!session?.result?.revision && !session.running && session.unread === true &&
+    !readKeys.has(chatReadKey(instance, session.id, session.result))
+  const mark = async candidates => {
+    const selected = candidates.filter(session => unread(session) && !pending.current.has(chatReadKey(instance, session.id, session.result)))
+    if (!selected.length) return
+    const keys = selected.map(session => chatReadKey(instance, session.id, session.result))
+    keys.forEach(key => pending.current.add(key))
+    try {
+      const response = await api('/api/chat/read', { method: 'POST', body: JSON.stringify({ receipts: selected.map(session => ({ sid: session.id, result: session.result })) }) })
+      const accepted = new Set(keys)
+      setReadKeys(previous => {
+        const next = new Set(previous)
+        for (const receipt of response.receipts || []) {
+          const key = chatReadKey(instance, receipt.sid, receipt.result)
+          if (accepted.has(key)) next.add(key)
+        }
+        return next
+      })
+    } catch (error) {
+      if (error?.name !== 'AbortError') onError?.(error.message)
+    } finally {
+      keys.forEach(key => pending.current.delete(key))
     }
-  }, [])
-  const unread = session => !readKeys.has(chatReadKey(instance, session?.id, session?.result)) && isChatResultUnread(session, instance, storage)
-  const markSessionRead = sessionId => {
-    const session = sessions.find(item => item.id === sessionId)
-    if (!unread(session)) return
-    const selectedKey = chatReadKey(instance, session.id, session.result)
-    markChatResultRead(instance, session.id, session.result, storage, window)
-    setReadKeys(previous => previous.has(selectedKey) ? previous : new Set(previous).add(selectedKey))
   }
-  const result = snapshot?.id === sid ? snapshot.result : null
+  const markRef = useRef(mark)
+  useEffect(() => { markRef.current = mark })
   const summary = sessions.find(session => session.id === sid)
+  const result = snapshot?.id === sid ? snapshot.result : null
   const message = messages.find(item => item.id === result?.id)
   const eligible = !loading && !running && !summary?.running && result?.revision && message?.content_revision === result.revision &&
-    (!summary || (summary.result?.id === result.id && summary.result?.revision === result.revision))
+    summary?.result?.id === result.id && summary?.result?.revision === result.revision
   const key = chatReadKey(instance, sid, result)
-  const currentUnread = unread({ id: sid, result, running })
+  const currentUnread = unread(summary)
   useEffect(() => {
     if (!eligible || !currentUnread) return undefined
-    const tick = createReadDwell(() => {
-      setReadKeys(previous => new Set([...previous, key]))
-      markChatResultRead(instance, sid, result, storage, window)
-    })
+    const tick = createReadDwell(() => { void markRef.current([summary]) })
     const check = () => tick(isChatResultVisible(threadRef.current, result), performance.now())
     const reset = () => tick(false, performance.now())
     const timer = window.setInterval(check, 100)
@@ -49,17 +54,10 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
       window.removeEventListener('blur', reset)
       document.removeEventListener('visibilitychange', reset)
     }
-  }, [eligible, currentUnread, key, instance, sid, result, storage, threadRef])
-  const hasUnread = sessions.some(unread)
-  const markAllRead = () => {
-    const unreadSessions = sessions.filter(unread)
-    if (!unreadSessions.length) return
-    const keys = unreadSessions.map(session => chatReadKey(instance, session.id, session.result))
-    for (const session of unreadSessions) {
-      markChatResultRead(instance, session.id, session.result, storage)
-    }
-    setReadKeys(previous => new Set([...previous, ...keys]))
-    window.dispatchEvent(new Event(chatReadEvent))
+  }, [eligible, currentUnread, key, result, summary, threadRef])
+  return {
+    unread, currentUnread, hasUnread: sessions.some(unread),
+    markSessionRead: sessionID => mark(sessions.filter(session => session.id === sessionID)),
+    markAllRead: () => mark(sessions),
   }
-  return { unread, currentUnread, markSessionRead, hasUnread, markAllRead }
 }

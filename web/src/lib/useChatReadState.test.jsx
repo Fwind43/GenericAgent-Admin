@@ -1,7 +1,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { useChatReadState } from './useChatReadState.js'
-import { chatReadKey, initializeChatReadBaseline, markChatResultRead } from './chatReadState.js'
+
 
 const answer = { id: 'a', revision: 'v1' }
 let focused, covered, bottom, props
@@ -21,7 +21,7 @@ beforeEach(() => {
   thread.getBoundingClientRect = () => ({ top: 0, bottom: 400, left: 0, right: 500 })
   vi.stubGlobal('document', document)
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => covered ? thread : node })
-  props = { instance: 'i', sid: 's', snapshot: { id: 's', result: answer }, messages: [{ id: 'a', content_revision: 'v1' }], sessions: [{ id: 's', result: answer }], running: false, loading: false, threadRef: { current: thread } }
+  props = { instance: 'i', sid: 's', snapshot: { id: 's', result: answer }, messages: [{ id: 'a', content_revision: 'v1' }], sessions: [{ id: 's', result: answer, unread: true }], api: vi.fn(async (_, options) => JSON.parse(options.body)), onError: vi.fn(), running: false, loading: false, threadRef: { current: thread } }
 })
 afterEach(() => {
   cleanup(); document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers()
@@ -29,160 +29,58 @@ afterEach(() => {
 const advance = ms => act(() => { vi.advanceTimersByTime(ms) })
 const setup = () => renderHook(p => useChatReadState(p), { initialProps: props })
 
-test('history baseline clears existing labels, but later completions stay unread across remount', () => {
+test('server confirmation clears selected result without local storage', async () => {
   focused = false
   const h = setup()
-  act(() => { initializeChatReadBaseline('i', props.sessions, localStorage, window) })
-  expect(h.result.current.currentUnread).toBe(false)
-  expect(h.result.current.unread(props.sessions[0])).toBe(false)
-  const result = { ...answer, revision: 'v2' }
-  props = { ...props, snapshot: { id: 's', result }, messages: [{ id: 'a', content_revision: 'v2' }], sessions: [{ id: 's', result }] }
-  h.rerender(props)
   expect(h.result.current.currentUnread).toBe(true)
-  const persisted = Object.entries(localStorage)
-  act(() => { initializeChatReadBaseline('i', props.sessions, localStorage, window) })
-  expect(Object.entries(localStorage)).toEqual(persisted)
-  expect(h.result.current.unread(props.sessions[0])).toBe(true)
-  h.unmount()
-  expect(setup().result.current.currentUnread).toBe(true)
+  await act(async () => { await h.result.current.markSessionRead('s') })
+  expect(h.result.current.currentUnread).toBe(false)
+  expect(props.api).toHaveBeenCalledWith('/api/chat/read', expect.objectContaining({ method: 'POST' }))
+  expect(localStorage.length).toBe(0)
+  h.rerender({ ...props, sessions: [{ id: 's', result: { ...answer, revision: 'v2' }, unread: true }] })
+  expect(h.result.current.currentUnread).toBe(true)
 })
 
-test('foreground dwell clears the list and current completion state and survives remount', () => {
-  const h = setup()
-  expect(h.result.current.currentUnread).toBe(true)
-  advance(999)
-  expect(h.result.current.unread(props.sessions[0])).toBe(true)
-  advance(101)
-  expect(h.result.current.currentUnread).toBe(false)
-  expect(h.result.current.unread(props.sessions[0])).toBe(false)
-  expect(localStorage.getItem(chatReadKey('i', 's', answer))).toBe('1')
-  h.unmount()
-  expect(setup().result.current.currentUnread).toBe(false)
-})
-
-test('background, covering layers and reply end outside viewport do not mark read', () => {
+test('another browser receives server read state and instance remains isolated', () => {
   focused = false
   const h = setup()
-  advance(2000)
-  focused = true; covered = true
-  advance(2000)
-  covered = false; bottom = 700
-  advance(2000)
-  expect(h.result.current.currentUnread).toBe(true)
-  bottom = 300
-  advance(600)
-  act(() => { window.dispatchEvent(new Event('blur')) })
-  advance(600)
-  expect(h.result.current.currentUnread).toBe(true)
-  advance(600)
-  expect(h.result.current.currentUnread).toBe(false)
-})
-
-test.each([
-  { loading: true }, { running: true },
-  { snapshot: { id: 'other', result: answer } },
-  { messages: [{ id: 'a', content_revision: 'old' }] },
-  { sessions: [{ id: 's', result: answer, running: true }] },
-  { sessions: [{ id: 's', result: { ...answer, revision: 'new' } }] },
-])('stale, loading or running snapshots cannot mark read: %j', patch => {
-  props = { ...props, ...patch }
-  setup(); advance(2000)
-  expect(localStorage.length).toBe(0)
-})
-
-test('switching session cancels old dwell and new revisions become unread', () => {
-  const h = setup()
-  advance(600)
-  h.rerender({ ...props, sid: 'other' })
-  advance(1500)
-  expect(localStorage.length).toBe(0)
-  h.rerender(props); advance(1100)
-  expect(h.result.current.currentUnread).toBe(false)
-  const result = { ...answer, revision: 'v2' }
-  h.rerender({ ...props, snapshot: { id: 's', result }, messages: [{ id: 'a', content_revision: 'v2' }], sessions: [{ id: 's', result }] })
-  expect(h.result.current.currentUnread).toBe(true)
-  advance(1100)
-  expect(h.result.current.currentUnread).toBe(false)
-})
-
-test('explicit selection clears only the selected revision before history loads', () => {
-  focused = false; covered = true; bottom = 700
-  props = { ...props, sid: 'other', loading: true, snapshot: null, messages: [],
-    sessions: [...props.sessions, { id: 'other', result: answer }] }
-  const h = setup()
-  act(() => { h.result.current.markSessionRead('s') })
-  expect(h.result.current.unread(props.sessions[0])).toBe(false)
-  expect(h.result.current.unread(props.sessions[1])).toBe(true)
-  expect(localStorage.getItem(chatReadKey('i', 's', answer))).toBe('1')
-  h.unmount()
-  const restored = setup()
-  expect(restored.result.current.unread(props.sessions[0])).toBe(false)
-  const next = { id: 's', result: { ...answer, revision: 'v2' } }
-  restored.rerender({ ...props, sessions: [next] })
-  expect(restored.result.current.unread(next)).toBe(true)
-  restored.rerender({ ...props, instance: 'other' })
-  expect(restored.result.current.unread(props.sessions[0])).toBe(true)
-})
-
-test('explicit selection remains immediate and repeatable with blocked storage', () => {
-  focused = false
-  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
-  const h = setup()
-  act(() => { h.result.current.markSessionRead('s') })
-  expect(h.result.current.currentUnread).toBe(false)
-  act(() => { h.result.current.markSessionRead('s') })
-  expect(h.result.current.currentUnread).toBe(false)
-  expect(localStorage.length).toBe(0)
-})
-
-test('explicit selection ignores unknown, running and incomplete results', () => {
-  props = { ...props, sessions: [{ id: 'running', running: true, result: answer }, { id: 'empty' }] }
-  const h = setup()
-  act(() => {
-    for (const id of ['unknown', 'running', 'empty']) h.result.current.markSessionRead(id)
-  })
-  expect(localStorage.length).toBe(0)
-})
-
-test('mark all read persists only completed results and remains scoped and idempotent', () => {
-  focused = false
-  props = { ...props, sessions: [...props.sessions, { id: 'background', result: answer }, { id: 'busy', running: true, result: answer }, { id: 'empty' }] }
-  const h = setup()
-  expect(h.result.current.hasUnread).toBe(true)
-  act(() => { h.result.current.markAllRead() })
+  h.rerender({ ...props, sessions: [{ ...props.sessions[0], unread: false }] })
   expect(h.result.current.hasUnread).toBe(false)
-  expect(localStorage.getItem(chatReadKey('i', 'background', answer))).toBe('1')
-  expect(localStorage.getItem(chatReadKey('i', 'busy', answer))).toBeNull()
-  const stored = { ...localStorage }
-  act(() => { h.result.current.markAllRead() })
-  expect({ ...localStorage }).toEqual(stored)
-  h.unmount()
-  const restored = setup()
-  expect(restored.result.current.hasUnread).toBe(false)
-  restored.rerender({ ...props, sessions: [{ id: 's', result: { ...answer, revision: 'v2' } }] })
-  expect(restored.result.current.hasUnread).toBe(true)
-  restored.rerender({ ...props, instance: 'other' })
-  expect(restored.result.current.hasUnread).toBe(true)
-})
-
-test('mark all read updates immediately with blocked storage', () => {
-  focused = false
-  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked') })
-  const h = setup()
-  act(() => { h.result.current.markAllRead() })
-  expect(h.result.current.hasUnread).toBe(false)
-  act(() => { h.result.current.markAllRead() })
-  expect(h.result.current.hasUnread).toBe(false)
-})
-
-test('cross-tab storage and same-window events immediately synchronize lists', () => {
-  focused = false
-  const h = setup()
-  localStorage.setItem(chatReadKey('i', 's', answer), '1')
-  act(() => { window.dispatchEvent(new StorageEvent('storage', { key: chatReadKey('i', 's', answer) })) })
-  expect(h.result.current.currentUnread).toBe(false)
   h.rerender({ ...props, instance: 'other' })
-  expect(h.result.current.currentUnread).toBe(true)
-  act(() => { markChatResultRead('other', 's', answer, localStorage, window) })
+  expect(h.result.current.hasUnread).toBe(true)
+})
+
+test('failed request keeps unread and supports retry', async () => {
+  focused = false
+  props.api.mockRejectedValueOnce(new Error('offline'))
+  const h = setup()
+  await act(async () => { await h.result.current.markAllRead() })
+  expect(h.result.current.hasUnread).toBe(true)
+  expect(props.onError).toHaveBeenCalledWith('offline')
+  await act(async () => { await h.result.current.markAllRead() })
+  expect(h.result.current.hasUnread).toBe(false)
+})
+
+test('mark all skips running results and waits for confirmation', async () => {
+  focused = false
+  props.sessions.push({ id: 'busy', result: answer, unread: true, running: true })
+  let resolve
+  props.api.mockImplementation(() => new Promise(r => { resolve = r }))
+  const h = setup()
+  act(() => { void h.result.current.markAllRead() })
+  expect(h.result.current.hasUnread).toBe(true)
+  expect(JSON.parse(props.api.mock.calls[0][1].body).receipts).toHaveLength(1)
+  await act(async () => { resolve({ receipts: [{ sid: 's', result: answer }] }) })
+  expect(h.result.current.hasUnread).toBe(false)
+})
+
+test('visible final result marks read after dwell, never while covered', async () => {
+  covered = true
+  const h = setup()
+  advance(1500)
+  expect(props.api).not.toHaveBeenCalled()
+  covered = false
+  await act(async () => { vi.advanceTimersByTime(1200) })
+  expect(props.api).toHaveBeenCalledTimes(1)
   expect(h.result.current.currentUnread).toBe(false)
 })

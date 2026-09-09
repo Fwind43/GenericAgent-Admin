@@ -24,6 +24,11 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 		bad(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	readState, err := s.chatReadSnapshot(cfg, summaries)
+	if err != nil {
+		bad(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	sort.Slice(summaries, func(i, j int) bool { return summaries[i].UpdatedAt > summaries[j].UpdatedAt })
 	items := make([]map[string]interface{}, 0, len(summaries))
 	for _, summary := range summaries {
@@ -34,6 +39,7 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 			"workspace": summary.Workspace, "project_mode": summary.ProjectMode, "project_provider": summary.ProjectProvider, "project_id": summary.ProjectID,
 			"hub_enabled": summary.HubEnabled, "pinned": summary.Pinned, "loop": summary.Loop, "autorun": summary.Autorun,
 			"result": summary.Result, "conductor": summary.Conductor,
+			"unread": !running && summary.Result != nil && readState[summary.ID] != *summary.Result,
 		})
 	}
 	projects, pinnedProjects := chatProjectNamesFor(cfg)
@@ -65,6 +71,9 @@ func (s *Server) chatHandler(w http.ResponseWriter, r *http.Request) {
 			s.chatDeleteSession(w, r, parts[1])
 			return
 		}
+	case "read":
+		s.chatMarkRead(w, r)
+		return
 	case "settings":
 		if len(parts) == 2 && r.Method == http.MethodPost {
 			s.chatSaveSettings(w, r, parts[1])
