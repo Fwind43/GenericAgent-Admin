@@ -174,8 +174,7 @@
 }
 @media (max-width: 680px) { .oa-conductor-events { --event-rail-width: min(300px, 88vw); z-index: 15; box-shadow: -8px 0 24px #0001; } }
 
-.oa-message.conductor-dispatch { align-self: stretch; width: 100%; }
-.oa-conductor-dispatch-card { border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 10px; padding: 12px 14px; background: var(--surface); color: var(--fg); }
+.oa-conductor-dispatch-card { color: inherit; }
 .oa-conductor-dispatch-card header { display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: 12px; font-weight: 700; }
 .oa-conductor-dispatch-card header span { color: var(--muted); font-weight: 400; }
 .oa-conductor-dispatch-objective { margin-top: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }

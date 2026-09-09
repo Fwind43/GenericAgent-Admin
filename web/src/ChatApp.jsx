@@ -3723,7 +3723,7 @@ export const ChatMessage = memo(function ChatMessage({
   )
 
   return (
-    <article className={`oa-message ${delegated ? 'conductor-dispatch' : m.role} ${pending ? 'pending' : ''} ${editing ? 'oa-message-editing' : ''} ${isBTW ? 'oa-message-btw' : ''}`} data-id={m.id}>
+    <article className={`oa-message ${delegated ? 'user conductor-dispatch' : m.role} ${pending ? 'pending' : ''} ${editing ? 'oa-message-editing' : ''} ${isBTW ? 'oa-message-btw' : ''}`} data-id={m.id}>
       <div className="oa-msg-body">
         {m.role === 'assistant'
           ? (<>
