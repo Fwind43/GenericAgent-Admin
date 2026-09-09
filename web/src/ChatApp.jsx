@@ -249,10 +249,7 @@ export const SessionAutorunBadge = memo(function SessionAutorunBadge({ enabled =
 function ConductorSessionTree({ session, workers, renderSession }) {
   const [expanded, setExpanded] = useState(true)
   return <div className="oa-conductor-tree">
-    <div className="oa-conductor-tree-head">
-      <button type="button" className="oa-conductor-tree-toggle" aria-label={expanded ? ct('收起子任务', 'Collapse subtasks') : ct('展开子任务', 'Expand subtasks')} aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '\u25be' : '\u25b8'}</button>
-      {renderSession(session)}
-    </div>
+    {renderSession(session, { treeExpanded: expanded, onToggleTree: () => setExpanded(value => !value) })}
     {expanded && <div className="oa-conductor-tree-children">{workers.map(worker => renderSession(worker, { nested:true }))}</div>}
   </div>
 }
@@ -268,17 +265,20 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   unread = false,
   waiting = false,
   nested = false,
+  treeExpanded,
+  onToggleTree,
   actionsRef,
 }) {
   const sidebarLoop = loopSidebarView(session.loop)
   const title = shortTitle(session)
   const conductorKind = isConductorParent(session) ? 'parent' : (isConductorWorker(session) ? 'worker' : '')
   return <div className={`oa-session-row ${active?'active':''} ${session.running?'is-running':''} ${session.pinned?'is-pinned':''} ${nested?'is-conductor-worker':''}`}>
+    {!editing && onToggleTree && <button type="button" className="oa-session-conductor-badge oa-conductor-badge-toggle" aria-expanded={treeExpanded} title={treeExpanded ? ct('收起子任务', 'Collapse subtasks') : ct('展开子任务', 'Expand subtasks')} onClick={onToggleTree}>{ct('指挥家', 'Conductor')}</button>}
     {editing ? <div className="oa-rename">
       <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>actionsRef.current.setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') actionsRef.current.saveRename(session.id); if(event.key==='Escape') actionsRef.current.cancelRename() }}/>
       <button onClick={()=>actionsRef.current.saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>actionsRef.current.cancelRename()} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
     </div> : <button className="oa-session" onClick={()=>actionsRef.current.openSession(session.id)} title={title}>
-      <span className="oa-session-title" title={title}>{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}{conductorKind === 'parent' && <span className="oa-session-conductor-badge" title={ct('指挥家会话', 'Conductor session')} aria-label={ct('指挥家会话', 'Conductor session')} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '2px 5px', border: '1px solid currentColor', borderRadius: 5, fontSize: 10, fontWeight: 700, lineHeight: 1.3 }}>{ct('指挥家', 'Conductor')}</span>}<b>{title}</b>{conductorKind === 'worker' && <em className="oa-conductor-role is-worker">{ct('子任务', 'Worker')}</em>}{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
+      <span className="oa-session-title" title={title}>{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}{conductorKind === 'parent' && !onToggleTree && <span className="oa-session-conductor-badge" title={ct('指挥家会话', 'Conductor session')} aria-label={ct('指挥家会话', 'Conductor session')} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', padding: '2px 5px', border: '1px solid currentColor', borderRadius: 5, fontSize: 10, fontWeight: 700, lineHeight: 1.3 }}>{ct('指挥家', 'Conductor')}</span>}<b>{title}</b>{conductorKind === 'worker' && <em className="oa-conductor-role is-worker">{ct('子任务', 'Worker')}</em>}{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
       <small title={fmtTime(session.updated_at)}>{session.running && !waiting ? <em className="oa-session-running-label" role="img" aria-label={ct('运行中', 'Running')} title={ct('运行中', 'Running')}><span className="oa-session-running-wave" style={{ '--oa-wave-phase': `${-(Array.from(String(session.id)).reduce((hash, char)=> (hash * 31 + char.charCodeAt(0)) % 2400, 0) / 1000)}s` }} aria-hidden="true"><i/><i/><i/><i/></span></em> : ageText}</small>
     </button>}
     {!editing && <button className={`oa-session-more ${menuOpen ? 'is-open' : ''}`} onClick={(event)=>actionsRef.current.toggleMenu(session.id, event)} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
@@ -7176,6 +7176,8 @@ export default function ChatApp() {
     ageText={sessionAgeText(session.updated_at)}
     unread={chatReadState.unread(session)}
     waiting={waitingSessionIds.has(session.id)}
+    treeExpanded={options.treeExpanded}
+    onToggleTree={options.onToggleTree}
     nested={Boolean(options.nested)}
     actionsRef={sidebarSessionActionsRef}
   />
