@@ -468,13 +468,14 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 	delete(cmdReq, "_ga_pending_assistant_id")
 	startedAtMS, _ := cmdReq["_ga_run_started_at_ms"].(int64)
 	delete(cmdReq, "_ga_run_started_at_ms")
-	saveTerminal := func(session chatSession) error {
-		var err error
+	saveProgress := func(session chatSession) error {
 		if worldlineResend {
-			err = s.saveChatSessionExact(session)
-		} else {
-			err = s.saveChatSessionMerged(session)
+			return s.saveChatSessionExact(session)
 		}
+		return s.saveChatSessionMerged(session)
+	}
+	saveTerminal := func(session chatSession) error {
+		err := saveProgress(session)
 		if err == nil {
 			s.syncConductorTerminal(session)
 		}
@@ -624,7 +625,7 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 		}
 		isTerminalEvent := ev["type"] == "done" || ev["type"] == "error"
 		if structuredChanged && !isTerminalEvent && (token == nil || s.ownsChatRun(sid, token)) {
-			_ = saveTerminal(cs)
+			_ = saveProgress(cs)
 		}
 		if msg, ok := ev["message"].(map[string]interface{}); ok && (ev["type"] == "done" || ev["type"] == "error") {
 			b, _ := json.Marshal(msg)
