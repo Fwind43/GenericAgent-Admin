@@ -4,6 +4,13 @@ This file records manually curated release changes for GenericAgent Admin Go.
 
 ## Unreleased
 
+### v0.3.6 iteration (not released)
+- **Conductor delivery review:** Separate execution completion from pending/verified/needs-work review; persist parent review basis, dispatch-owned tool evidence references, and unverified boundaries. Worker completion prose is not verification evidence.
+- **Usage:** Expose parent, finalized-child, and recorded-total input/output tokens, with explicit missing-snapshot and incomplete-running-usage notices. Normalize cache protocols per call and preserve dispatch snapshot isolation.
+- **Bounded dispatch:** Share a cumulative 48-dispatch limit between enforcement and API metadata; count worker reuse and all terminal outcomes. Regression covers accepting dispatch 48 and rejecting dispatch 49 without mutating the parent.
+- **Documentation:** Explain Conductor versus automatic continuation modes and the limits of parent review and usage accounting.
+- **Validation boundary:** Backend handler/persistence tests and fixture-based UI tests are not a live browser-to-worker end-to-end acceptance. No production deployment or release is implied.
+
 ### Bug Fixes
 - **Chat:** Fixed cache hit rate calculation to use correct formulas for different API types
   - **Claude API (Modern)**: `cache_read / (output + cache_read)` — portion of generated content from cache

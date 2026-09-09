@@ -149,6 +149,14 @@ Pick Loop when you want to watch and interrupt, and everything to stay in one th
 
 Loop spends one extra full-context controller call per round, so keep the round limit tight. It stops itself at the round limit, when the controller asks for the same next step twice in a row, or when you press stop.
 
+### Conductor: delegated work and delivery review
+
+Use Conductor when a parent task should delegate bounded work to child sessions and collect their results. Unlike Loop's round controller, Conductor coordinates parent/worker sessions; execution completion is not delivery verification.
+
+- Successful execution starts as **Pending review**. **Verified (parent review)** requires a review basis and references to persisted tool evidence belonging to that dispatch. **Needs work** records an unsuccessful review. Worker prose alone cannot satisfy the evidence requirement; parent review is not an independent guarantee of correctness. Inspect the basis, tool records, and unverified boundaries.
+- The parent workspace shows input/output tokens for the parent, finalized child snapshots, and their recorded total. Missing snapshots are not zero usage. Running usage is incomplete; child totals include only saved terminal snapshots, not live consumption or a billing estimate.
+- Each parent session accepts at most **48 cumulative dispatches**, including reused workers and completed, failed, or cancelled dispatches. Dispatch 49 is rejected before session mutation. This is a dispatch-count limit, not a token, cost, or wall-clock budget. Existing concurrency (3 running) and nonterminal (12) limits still apply.
+
 ### For Administrators
 
 - **Goal Mode:** Persistent goals (JSON), BBS team board, sync UI
@@ -415,6 +423,14 @@ go run .
 想边看边随时介入、并且产物都留在同一条会话里，用 Loop；任务长、不需要盯着，用 Goal 模式；一个多阶段计划 Agent 自己就能扛下来，用 UltraPlan。
 
 Loop 每轮会额外花一次全量上下文的控制模型调用，轮次上限别设太大。它会在达到轮次上限、控制模型连续两次给出同一个下一步、或你手动停止时自行结束。
+
+### Conductor：任务分派与交付核验
+
+需要父任务拆分工作、交给子会话执行并收集结果时使用 Conductor。它负责父子任务协作，不等同于 Loop 的逐轮控制；执行结束不代表成果已核验。
+
+- 执行成功后默认**待核验**。**已核验（父任务审阅）**必须提供依据并引用本次派发已持久化的工具证据；**需返工**表示审阅未通过。worker 自述完成不能替代工具证据，父任务审阅也不是独立的正确性保证，请结合依据、工具记录和未验证边界判断。
+- 父任务面板分列父任务、已封存子任务及已记录合计的输入/输出 Token。缺失快照不等于零消耗；运行中用量不完整，子任务仅计入已保存的终态快照，不是实时账单。
+- 每个父会话累计最多接受 **48 次派发**，复用 worker 及已完成、失败、取消的派发均计数。第 49 次在修改会话前拒绝。这是派发次数上限，不是 Token、费用或运行时长预算；原有最多 3 个运行中、12 个未终结任务限制仍有效。
 
 ### 面向管理员
 
