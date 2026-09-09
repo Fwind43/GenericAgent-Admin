@@ -90,3 +90,16 @@ func TestConductorCompletionInboxReplay(t *testing.T) {
 		t.Fatal("duplicate completion changed persisted inbox")
 	}
 }
+
+func TestConductorFinalResultExcludesExecutionTranscript(t *testing.T) {
+	got := conductorFinalResult(chatMessage{Content: "tool log and stale answer", StructuredContent: []map[string]interface{}{
+		{"type": "thinking", "text": "private reasoning"},
+		{"type": "text", "text": "final answer"},
+	}})
+	if got != "final answer" {
+		t.Fatalf("unexpected result: %q", got)
+	}
+	if conductorFinalResult(chatMessage{Content: "legacy answer"}) != "legacy answer" {
+		t.Fatal("legacy fallback")
+	}
+}

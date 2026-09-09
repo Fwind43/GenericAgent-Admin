@@ -800,6 +800,10 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		"_ga_run_started_at_ms":    runStartedAtMS,
 	}
 
+	if internalCompletion {
+		cmdReq["input_kind"] = "conductor_completion"
+	}
+
 	for key, value := range conductorReq {
 		cmdReq[key] = value
 	}

@@ -369,6 +369,19 @@ func (w *conductorResponseWriter) Write(p []byte) (int, error) {
 // syncConductorTerminal is called only after the ordinary chat terminal state
 // was successfully persisted. Therefore success is derived from the current
 // terminal message, not from old prose or process exit heuristics.
+func conductorFinalResult(last chatMessage) string {
+    if len(last.StructuredContent) == 0 {
+        return boundedConductorText(last.Content, conductorMaxResult)
+    }
+    var parts []string
+    for _, block := range last.StructuredContent {
+        if block["type"] == "text" {
+            if text, ok := block["text"].(string); ok { parts = append(parts, text) }
+        }
+    }
+    return boundedConductorText(strings.Join(parts, "\n"), conductorMaxResult)
+}
+
 func (s *Server) syncConductorTerminal(cs chatSession) {
     if cs.Conductor == nil || cs.Conductor.Role != conductorRoleWorker || conductorTerminal(cs.Conductor.Status) {
         return
@@ -379,7 +392,7 @@ func (s *Server) syncConductorTerminal(cs chatSession) {
     if len(cs.Messages) > 0 {
         last := cs.Messages[len(cs.Messages)-1]
         if last.Role == "assistant" {
-            result = boundedConductorText(last.Content, conductorMaxResult)
+            result = conductorFinalResult(last)
             if s.chatRunCanceled(cs.ID) {
                 status, reason = conductorCancelled, "cancelled"
             } else if !last.Error && result != "" {
