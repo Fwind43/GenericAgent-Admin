@@ -246,6 +246,17 @@ export const SessionAutorunBadge = memo(function SessionAutorunBadge({ enabled =
   return <em className="oa-session-autorun-badge" title={label} aria-label={label}>Autorun</em>
 })
 
+function ConductorSessionTree({ session, workers, renderSession }) {
+  const [expanded, setExpanded] = useState(true)
+  return <div className="oa-conductor-tree">
+    <div className="oa-conductor-tree-head">
+      <button type="button" className="oa-conductor-tree-toggle" aria-label={expanded ? ct('收起子任务', 'Collapse subtasks') : ct('展开子任务', 'Expand subtasks')} aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '\u25be' : '\u25b8'}</button>
+      {renderSession(session)}
+    </div>
+    {expanded && <div className="oa-conductor-tree-children">{workers.map(worker => renderSession(worker, { nested:true }))}</div>}
+  </div>
+}
+
 const SidebarSessionRow = memo(function SidebarSessionRow({
   session,
   active = false,
@@ -7236,10 +7247,7 @@ export default function ChatApp() {
             <div className="oa-recent-group-body">{group.sessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
               const node = conductorSidebarTreeByID.get(String(session.id || ''))
               if (!node?.workers?.length) return renderSidebarSession(session)
-              return <div className="oa-conductor-tree" key={session.id}>
-                {renderSidebarSession(session)}
-                <div className="oa-conductor-tree-children">{node.workers.map(worker => renderSidebarSession(worker, { nested:true }))}</div>
-              </div>
+              return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession}/>
             })}</div>
           </section>)}
           {!filteredSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
