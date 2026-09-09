@@ -288,8 +288,8 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   </div>
 })
 
-const ConductorWorkspace = memo(function ConductorWorkspace({ detail, onOpen, onStop, onClose, stoppingID = '' }) {
-  const workers = conductorWorkers(detail)
+const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, onOpen, onStop, onClose, stoppingID = '' }) {
+  const workers = conductorWorkers(detail, sessions)
   const counts = conductorStatusCounts(workers)
   return <aside id="oa-conductor-workers" className="oa-conductor-events oa-conductor-agents" aria-label="Subagents">
     <div className="oa-conductor-events-body">
@@ -7478,7 +7478,7 @@ export default function ChatApp() {
             {showFollow && <button className={`oa-follow-btn ${isCurrentRunning ? 'is-live' : ''}`} type="button" onClick={resumeFollow} title={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')} aria-label={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')}><ChevronDown size={16}/></button>}
           </div>}
         </section>
-        {isConductorParent(activeSessionDetail) && conductorWorkersOpen && <ConductorWorkspace detail={activeSessionDetail} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID} onClose={()=>setConductorWorkersOpen(false)}/>}
+        {isConductorParent(activeSessionDetail) && conductorWorkersOpen && <ConductorWorkspace detail={activeSessionDetail} sessions={sessions} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID} onClose={()=>setConductorWorkersOpen(false)}/>}
         {isConductorParent(activeSessionDetail) && conductorEventsOpen && <ConductorEvents conductorDetail={activeSessionDetail} onClose={()=>setConductorEventsOpen(false)}/> }
         <MessageNavigator messages={messages} sessionID={sid} threadRef={threadRef}
           onNavigate={jumpToMessageNode} loading={sessionLoading} ct={ct}

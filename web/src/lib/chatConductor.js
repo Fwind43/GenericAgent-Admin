@@ -56,12 +56,17 @@ export const conductorSessionTree = sessions => {
     .map(session => ({ session, workers: byParent.get(String(session?.id || '')) || [] }))
 }
 
-// Dispatch history is append-only; retain the latest task for each worker session.
-export const conductorWorkers = session => {
-  const latest = new Map()
-  conductorChildren(session).forEach(worker => {
-    const id = String(worker?.session_id || worker?.id || '')
-    if (id) latest.set(id, worker)
+// Existing worker sessions are authoritative; dispatch history must not resurrect deleted agents.
+export const conductorWorkers = (session, sessions = []) => {
+  const parentID = String(session?.id || '')
+  if (!parentID) return []
+  const workers = new Map()
+  ;(Array.isArray(sessions) ? sessions : []).forEach(worker => {
+    const id = String(worker?.id || '')
+    if (!id || !isConductorWorker(worker) || conductorParentID(worker) !== parentID) return
+    const metadata = worker.conductor
+    const dispatch = conductorChildren(session).find(task => task.dispatch_id === metadata.dispatch_id && task.session_id === id)
+    workers.set(id, { ...dispatch, ...metadata, session_id: id })
   })
-  return [...latest.values()]
+  return [...workers.values()]
 }
