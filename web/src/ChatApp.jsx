@@ -299,6 +299,26 @@ const ConductorWorkspace = memo(function ConductorWorkspace({ detail, onOpen, on
         {canStopConductorWorker(worker) && <button type="button" className="oa-conductor-stop" onClick={()=>onStop(id)} disabled={!id || stoppingID === id}>{stoppingID === id ? ct('停止中…', 'Stopping…') : ct('停止', 'Stop')}</button>}
       </article>
     })}</div> : <p className="oa-conductor-empty">{ct('向 Conductor 描述目标后，子任务会在这里出现。', 'Describe the objective to Conductor; workers will appear here.')}</p>}
+    {children.length > 0 && <details className="oa-conductor-events" open>
+      <summary>{ct('事件记录', 'Event history')}</summary>
+      <ol style={{ paddingInlineStart: 24, maxHeight: 320, overflowY: 'auto' }}>{children.flatMap((worker, index) => {
+        const id = String(worker.session_id || worker.id || index)
+        const title = worker.objective || worker.title || worker.name || id
+        return [
+          { time: worker.created_at, kind: 'dispatched', label: ct('任务已派发', 'Task dispatched') },
+          { time: worker.started_at, kind: 'started', label: ct('子任务已启动', 'Worker started') },
+          { time: worker.finished_at, kind: 'finished', label: `${ct('子任务结束', 'Worker finished')} · ${workerStatus(worker)}` },
+        ].filter(event => Number(event.time) > 0).map(event => ({ ...event, worker, id, title }))
+      }).sort((a, b) => Number(a.time) - Number(b.time)).map(event => <li key={`${event.id}-${event.kind}`} style={{ marginBlock: 10, overflowWrap: 'anywhere' }}>
+        <time dateTime={new Date(Number(event.time) * 1000).toISOString()}>{new Date(Number(event.time) * 1000).toLocaleString()}</time>
+        {' · '}<strong>{event.label}</strong>
+        <div>{event.title}</div>
+        {event.kind === 'finished' && (event.worker.result || event.worker.error) && <details>
+          <summary>{ct('查看结果 / 错误', 'View result / error')}</summary>
+          <pre style={{ whiteSpace: 'pre-wrap', font: 'inherit' }}>{event.worker.error || event.worker.result}</pre>
+        </details>}
+      </li>)}</ol>
+    </details>}
   </section>
 })
 
