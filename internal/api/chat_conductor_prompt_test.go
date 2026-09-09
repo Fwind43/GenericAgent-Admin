@@ -5,6 +5,17 @@ import (
 	"testing"
 )
 
+func TestConductorWorkerCannotDispatch(t *testing.T) {
+    s := newChatLoopTestServer(t)
+    worker := chatSession{ID: "worker-no-dispatch", Conductor: &chatConductorState{Role: conductorRoleWorker}}
+    if err := saveChatSessionLocked(s.CfgStore.Snapshot(), worker); err != nil {
+        t.Fatal(err)
+    }
+    if _, err := s.dispatchConductor(worker.ID, "must reject", ""); err == nil || err.Error() != "caller is not a Conductor parent" {
+        t.Fatalf("worker dispatch must be rejected: %v", err)
+    }
+}
+
 func TestConductorParentPromptInjection(t *testing.T) {
 	s := newChatLoopTestServer(t)
 	for _, role := range []string{"", conductorRoleWorker, conductorRoleParent} {
@@ -20,10 +31,13 @@ func TestConductorParentPromptInjection(t *testing.T) {
 			prompts := req["extra_sys_prompts"].([]string)
             if role == conductorRoleWorker {
                 if len(prompts) != 2 || prompts[0] != "existing" || prompts[1] != conductorWorkerPrompt || req["conductor"] != nil {
-                    t.Fatal("worker mode boundary missing")
+                    t.Fatal("worker objective prompt or tool isolation changed")
                 }
-                for _, rule := range []string{"subagent_sop", "do not create or delegate", "agentmain.py --task/--func", "report the proposed split"} {
-                    if !strings.Contains(prompts[1], rule) { t.Fatalf("missing worker rule %q", rule) }
+                if prompts[1] != "You are an Admin Conductor worker. Execute the assigned objective. Return a concise, evidence-based result for the parent." {
+                    t.Fatal("worker prompt must contain only objective and reporting guidance")
+                }
+                if conductorWorkerInstruction != "\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent." {
+                    t.Fatal("worker suffix must contain only objective and reporting guidance")
                 }
                 return
             }

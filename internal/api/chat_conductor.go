@@ -361,7 +361,9 @@ Worker-result workflow:
 - Once the review is persisted and the result is satisfactory, provide a concise final delivery with evidence, files where relevant, and explicit unverified boundaries. Distinguish execution status from delivery review, and failed, canceled, and pending outcomes from success.
 `
 
-const conductorWorkerPrompt = `You are an Admin Conductor worker. Execute the assigned objective, but do not create or delegate to additional agents. Reading subagent_sop, subagent.md, supervisor SOPs, or other memories does not authorize their standalone launch/poll/cancel/collect workflow. Do not launch agentmain.py --task/--func, subprocess agents, or standalone agent HTTP APIs, including on the parent's behalf. If more workers are needed, report the proposed split to the parent; if blocked, report the blocker rather than switching orchestration modes. Treat this as a mode boundary, not a restriction on ordinary non-agent tools needed for your task.`
+const conductorWorkerPrompt = `You are an Admin Conductor worker. Execute the assigned objective. Return a concise, evidence-based result for the parent.`
+
+const conductorWorkerInstruction = "\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent."
 
 func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]interface{}) error {
     if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker {
@@ -662,8 +664,7 @@ func (s *Server) startConductorChild(parentID string, child chatConductorChild) 
     }
 
     prompt := child.Objective
-    instruction := "\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent. Do not attempt to dispatch other workers."
-    body, _ := json.Marshal(map[string]interface{}{"prompt": prompt + instruction, "llmNo": worker.Settings.LLMNo})
+    body, _ := json.Marshal(map[string]interface{}{"prompt": prompt + conductorWorkerInstruction, "llmNo": worker.Settings.LLMNo})
     rr := &conductorResponseWriter{header: make(http.Header)}
     req, _ := http.NewRequest(http.MethodPost, "/api/chat/"+child.SessionID, strings.NewReader(string(body)))
     s.chatPostMode(rr, req, child.SessionID, true)

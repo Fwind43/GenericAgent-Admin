@@ -101,6 +101,7 @@ class ConductorToolBoundaryTest(unittest.TestCase):
                 install(object(), config)()
                 self.assertIs(module.TOOLS_SCHEMA, schema)
                 self.assertIs(Handler.do_file_read, original_read)
+                self.assertFalse(hasattr(Handler, 'do_conductor_dispatch'))
             restore = install(object(), {'role': 'parent', 'broker_dir': directory})
             try:
                 self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA}, {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel', 'conductor_review'})
