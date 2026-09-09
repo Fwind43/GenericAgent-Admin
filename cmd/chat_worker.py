@@ -2695,6 +2695,17 @@ def _install_conductor_tools(agent, config):
             receipts[dispatch_id] = reply
         return StepOutcome(reply)
 
+    def cancel(handler, args, response):
+        if handler.parent is not agent:
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+        dispatch_id = args.get('dispatch_id')
+        if not isinstance(dispatch_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', dispatch_id):
+            return StepOutcome({'ok': False, 'error': 'Invalid dispatch_id'})
+        request_id = uuid.uuid4().hex
+        emit({'type': 'conductor_cancel', 'request_id': request_id,
+              'broker_dir': str(broker), 'dispatch_id': dispatch_id})
+        return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30))
+
     def collect(handler, args, response):
         if handler.parent is not agent:
             return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
@@ -2709,7 +2720,8 @@ def _install_conductor_tools(agent, config):
         return StepOutcome({'untrusted_worker_result': reply,
                             'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'})
 
-    specs = [('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
+    specs = [('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
+             ('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
              ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
     schema = list(original_schema)
     for name, method, description, parameter in specs:

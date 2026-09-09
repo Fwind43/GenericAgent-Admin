@@ -144,6 +144,7 @@ const conductorParentPrompt = `You are the Conductor (agent manager). The user t
 Non-negotiable role boundary:
 - Never execute user tasks or probe the environment yourself. ALL execution belongs to workers, including a single simple task. You only analyze, dispatch, review, and communicate. Ordinary execution tools being available is NOT permission to use them.
 - For follow-up work, pass the prior worker session_id to conductor_dispatch to reuse its conversation and context. Omit session_id for a new independent worker. Reuse only completed workers; each dispatch returns a new dispatch_id for collection.
+- Use conductor_cancel(dispatch_id) to stop obsolete or incorrect owned work. Cancellation is not rollback or pause: already performed actions remain. Wait for a successful terminal cancellation receipt before reusing its session_id with corrected instructions. Never cancel unrelated work.
 - Use conductor_dispatch for execution and conductor_collect to inspect worker outcomes. Do not use shell, code, browser, file, or other execution tools to perform the task or investigate the environment. Ask a worker to investigate instead.
 - Rewrite the user's objective only minimally for clarity. Never invent assumptions, tools, prerequisites, or additional scope the user did not request. Preserve explicit constraints.
 - Trust workers to work out implementation details and discover readily available facts. Do not micromanage their steps. Ask the user only for genuinely necessary decisions, in one concise checklist.
@@ -318,7 +319,7 @@ func (s *Server) scheduleConductorChildren(parentID string) {
     }
     active := 0
     for _, child := range parent.ConductorChildren {
-        if child.Status == conductorRunning {
+        if child.Status == conductorRunning || child.Status == "cancelling" {
             active++
         }
     }
@@ -476,6 +477,7 @@ func (s *Server) finishConductorChild(parentID, dispatchID, status, result, reas
         return
     }
     child := parent.ConductorChildren[idx]
+    if child.Status == "cancelling" && status != conductorCancelled { s.SessionMu.Unlock(); return }
     worker, workerErr := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
     workerValid := workerErr == nil && worker.ID != "" && worker.Conductor != nil && worker.Conductor.Role == conductorRoleWorker && worker.Conductor.ParentSessionID == parentID && worker.Conductor.DispatchID == dispatchID
     if !workerValid {
@@ -589,7 +591,7 @@ func (s *Server) cancelConductorSession(sid string) {
     for i := range cs.ConductorChildren {
         child := &cs.ConductorChildren[i]
         if conductorTerminal(child.Status) { continue }
-        if child.Status == conductorRunning {
+        if child.Status == conductorRunning || child.Status == "cancelling" {
             worker, loadErr := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
             if loadErr == nil && worker.ID != "" && worker.Conductor != nil && worker.Conductor.Role == conductorRoleWorker && worker.Conductor.ParentSessionID == sid && worker.Conductor.DispatchID == child.DispatchID {
                 running = append(running, runningChild{sid, child.DispatchID, child.SessionID})
@@ -653,4 +655,56 @@ func (s *Server) handleConductorDispatchEvent(parentID string, ev map[string]int
     data, err := json.Marshal(response)
     if err != nil { return }
     _ = writeChatFileAtomic(filepath.Join(expected, requestID+".response.json"), data, 0600)
+}
+
+// Cancellation is scoped to an owned dispatch, never an arbitrary session ID.
+func (s *Server) cancelConductorDispatch(parentID, dispatchID string) (chatConductorChild, error) {
+    if dispatchID == "" || safeChatID(dispatchID) != dispatchID { return chatConductorChild{}, errors.New("invalid dispatch_id") }
+    s.SessionMu.Lock()
+    parent, err := loadChatSession(s.CfgStore.Snapshot(), parentID)
+    if err != nil || parent.Conductor == nil || parent.Conductor.Role != conductorRoleParent || !s.chatRunActive(parentID) || s.chatRunCanceled(parentID) {
+        s.SessionMu.Unlock(); return chatConductorChild{}, errors.New("active Conductor parent required")
+    }
+    idx := conductorFindChild(parent.ConductorChildren, dispatchID)
+    if idx < 0 { s.SessionMu.Unlock(); return chatConductorChild{}, errors.New("dispatch not owned by parent") }
+    child := parent.ConductorChildren[idx]
+    if conductorTerminal(child.Status) { s.SessionMu.Unlock(); return child, nil }
+    worker, err := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
+    if err != nil || worker.Conductor == nil || worker.Conductor.Role != conductorRoleWorker || worker.Conductor.ParentSessionID != parentID || worker.Conductor.DispatchID != dispatchID {
+        s.SessionMu.Unlock(); return chatConductorChild{}, errors.New("worker relationship mismatch")
+    }
+    // Remove queued work from scheduler eligibility before releasing the lock.
+    originalStatus := worker.Conductor.Status
+    worker.Conductor.Status = "cancelling"
+    if err = saveChatSessionLocked(s.CfgStore.Snapshot(), worker); err != nil { s.SessionMu.Unlock(); return chatConductorChild{}, err }
+    parent.ConductorChildren[idx].Status = "cancelling"
+    err = saveChatSessionLocked(s.CfgStore.Snapshot(), parent)
+    if err != nil { worker.Conductor.Status = originalStatus; _ = saveChatSessionLocked(s.CfgStore.Snapshot(), worker) }
+    s.SessionMu.Unlock()
+    if err != nil { return chatConductorChild{}, err }
+    if _, err = s.cancelChatRun(child.SessionID); err != nil { return chatConductorChild{}, err }
+    s.finishConductorChild(parentID, dispatchID, conductorCancelled, "", "cancelled by Conductor")
+    s.SessionMu.Lock()
+    defer s.SessionMu.Unlock()
+    parent, err = loadChatSession(s.CfgStore.Snapshot(), parentID)
+    if err != nil { return chatConductorChild{}, err }
+    idx = conductorFindChild(parent.ConductorChildren, dispatchID)
+    if idx < 0 || !conductorTerminal(parent.ConductorChildren[idx].Status) { return chatConductorChild{}, errors.New("cancellation not persisted; retry") }
+    return parent.ConductorChildren[idx], nil
+}
+
+func (s *Server) handleConductorCancelEvent(parentID string, ev map[string]interface{}) {
+    requestID, _ := ev["request_id"].(string)
+    brokerDir, _ := ev["broker_dir"].(string)
+    expected := filepath.Clean(chatConductorBrokerDirForSession(chatSessionDir(s.CfgStore.Snapshot()), parentID))
+    if requestID == "" || safeChatID(requestID) != requestID || filepath.Clean(brokerDir) != expected { return }
+    dispatchID, _ := ev["dispatch_id"].(string)
+    child, err := s.cancelConductorDispatch(parentID, dispatchID)
+    response := conductorDispatchResponse{}
+    if err != nil { response.Error = boundedConductorText(err.Error(), 4096) } else {
+        response.OK, response.DispatchID, response.SessionID, response.Status = true, child.DispatchID, child.SessionID, child.Status
+    }
+    if os.MkdirAll(expected, 0700) != nil { return }
+    data, err := json.Marshal(response)
+    if err == nil { _ = writeChatFileAtomic(filepath.Join(expected, requestID+".response.json"), data, 0600) }
 }

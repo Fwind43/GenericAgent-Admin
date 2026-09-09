@@ -1207,7 +1207,7 @@ func (s *Server) chatPostMode(w http.ResponseWriter, r *http.Request, sid string
 		return
 	}
 	if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker &&
-		(conductorTerminal(cs.Conductor.Status) || s.chatRunCanceled(cs.Conductor.ParentSessionID)) {
+		(conductorTerminal(cs.Conductor.Status) || cs.Conductor.Status == "cancelling" || s.chatRunCanceled(cs.Conductor.ParentSessionID)) {
 		s.endChatRunOwned(sid, token)
 		bad(w, http.StatusConflict, "Conductor dispatch is no longer runnable")
 		return
