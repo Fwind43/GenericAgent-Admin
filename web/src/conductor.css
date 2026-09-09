@@ -139,9 +139,19 @@
 .oa-conductor-event-task > summary span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .oa-conductor-event-task[open] > summary span { -webkit-line-clamp: 1; color: var(--muted); }
 .oa-conductor-event pre { margin: 8px 0 0; padding: 10px; border-radius: 6px; background: var(--surface-strong); white-space: pre-wrap; font: inherit; line-height: 1.65; max-height: 280px; overflow: auto; }
-@media (min-width: 681px) { .oa-workspace:has(> .oa-conductor-events) { padding-right: 300px; } }
+@media (min-width: 681px) {
+  .oa-workspace:has(> .oa-conductor-events) { padding-right: 300px; }
+  .oa-main:has(> .oa-workspace > .oa-conductor-events) > .oa-composer-wrap {
+    right: 300px;
+    width: min(var(--oa-chat-measure), calc(100% - 348px)) !important;
+  }
+}
 @media (min-width: 681px) and (max-width: 900px) {
   .oa-conductor-events { --event-rail-width: 260px; }
   .oa-workspace:has(> .oa-conductor-events) { padding-right: 260px; }
+  .oa-main:has(> .oa-workspace > .oa-conductor-events) > .oa-composer-wrap {
+    right: 260px;
+    width: calc(100% - 284px) !important;
+  }
 }
 @media (max-width: 680px) { .oa-conductor-events { --event-rail-width: min(300px, 88vw); z-index: 15; box-shadow: -8px 0 24px #0001; } }
