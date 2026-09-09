@@ -143,6 +143,7 @@ const conductorParentPrompt = `You are the Conductor (agent manager). The user t
 
 Non-negotiable role boundary:
 - Never execute user tasks or probe the environment yourself. ALL execution belongs to workers, including a single simple task. You only analyze, dispatch, review, and communicate. Ordinary execution tools being available is NOT permission to use them.
+- For follow-up work, pass the prior worker session_id to conductor_dispatch to reuse its conversation and context. Omit session_id for a new independent worker. Reuse only completed workers; each dispatch returns a new dispatch_id for collection.
 - Use conductor_dispatch for execution and conductor_collect to inspect worker outcomes. Do not use shell, code, browser, file, or other execution tools to perform the task or investigate the environment. Ask a worker to investigate instead.
 - Rewrite the user's objective only minimally for clarity. Never invent assumptions, tools, prerequisites, or additional scope the user did not request. Preserve explicit constraints.
 - Trust workers to work out implementation details and discover readily available facts. Do not micromanage their steps. Ask the user only for genuinely necessary decisions, in one concise checklist.
@@ -178,7 +179,7 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     return nil
 }
 
-func (s *Server) dispatchConductor(parentID, objective string) (chatConductorChild, error) {
+func (s *Server) dispatchConductor(parentID, objective string, reuseSessionID ...string) (chatConductorChild, error) {
     parentID = safeChatID(parentID)
     objective = boundedConductorText(objective, conductorMaxObjective)
     if objective == "" {
@@ -231,15 +232,49 @@ func (s *Server) dispatchConductor(parentID, objective string) (chatConductorChi
             Objective: objective, Status: conductorQueued, CreatedAt: now,
         },
     }
+    var previous *chatSession
+    if len(reuseSessionID) > 0 && reuseSessionID[0] != "" {
+        target := reuseSessionID[0]
+        if safeChatID(target) != target {
+            s.SessionMu.Unlock()
+            return chatConductorChild{}, errors.New("invalid session_id")
+        }
+        existing, loadErr := loadChatSession(s.CfgStore.Snapshot(), target)
+        if loadErr != nil || existing.ID == "" || existing.Conductor == nil || existing.Conductor.Role != conductorRoleWorker || existing.Conductor.ParentSessionID != parentID {
+            s.SessionMu.Unlock()
+            return chatConductorChild{}, errors.New("session_id is not owned by this Conductor")
+        }
+        idx := conductorFindChild(parent.ConductorChildren, existing.Conductor.DispatchID)
+        if idx < 0 || parent.ConductorChildren[idx].SessionID != target || !conductorTerminal(parent.ConductorChildren[idx].Status) || !conductorTerminal(existing.Conductor.Status) || s.chatRunActive(target) || len(existing.QueuedMessages) > 0 {
+            s.SessionMu.Unlock()
+            return chatConductorChild{}, errors.New("subagent is busy or its previous dispatch is not terminal")
+        }
+        for _, prior := range parent.ConductorChildren {
+            if prior.SessionID == target && !conductorTerminal(prior.Status) {
+                s.SessionMu.Unlock()
+                return chatConductorChild{}, errors.New("subagent already has a pending dispatch")
+            }
+        }
+        previous = &existing
+        state := worker.Conductor
+        worker = existing
+        worker.Conductor = state
+        worker.UpdatedAt = now
+        childID, child.SessionID = target, target
+    }
     parent.ConductorChildren = append(parent.ConductorChildren, child)
 
-    // Persist both relationship ends before acceptance. If the parent write
-    // fails, remove the just-created child so no accepted orphan can remain.
+    // Persist both relationship ends before acceptance; restore reused history
+    // on failure rather than deleting an existing worker.
     if err = saveChatSessionLocked(s.CfgStore.Snapshot(), worker); err == nil {
         err = saveChatSessionLocked(s.CfgStore.Snapshot(), parent)
     }
     if err != nil {
-        _ = os.Remove(chatSessionPath(s.CfgStore.Snapshot(), childID))
+        if previous != nil {
+            _ = saveChatSessionLocked(s.CfgStore.Snapshot(), *previous)
+        } else {
+            _ = os.Remove(chatSessionPath(s.CfgStore.Snapshot(), childID))
+        }
         s.SessionMu.Unlock()
         return chatConductorChild{}, err
     }
@@ -590,7 +625,8 @@ func (s *Server) handleConductorDispatchEvent(parentID string, ev map[string]int
     }
     response := conductorDispatchResponse{}
     objective := boundedConductorText(fmt.Sprint(ev["objective"]), conductorMaxObjective)
-    child, err := s.dispatchConductor(parentID, objective)
+    sessionID, _ := ev["session_id"].(string)
+    child, err := s.dispatchConductor(parentID, objective, sessionID)
     if err != nil {
         response.Error = boundedConductorText(err.Error(), 4096)
     } else {

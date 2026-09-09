@@ -303,7 +303,7 @@ const ConductorWorkspace = memo(function ConductorWorkspace({ detail, onOpen, on
       const id = String(worker?.id || worker?.session_id || '')
       const status = workerStatus(worker)
       const title = worker?.title || worker?.name || `${ct('子任务', 'Worker')} ${index + 1}`
-      return <article className={`oa-conductor-worker is-${status || 'unknown'}`} key={id || index}>
+      return <article className={`oa-conductor-worker is-${status || 'unknown'}`} key={worker.dispatch_id || id || index}>
         <button type="button" className="oa-conductor-worker-main" onClick={()=>id && onOpen(id)} disabled={!id}>
           <span className={`oa-conductor-status-dot is-${status || 'unknown'}`} aria-hidden="true"/>
           <span><b>{title}</b><small>{status || ct('未知', 'unknown')}</small></span>

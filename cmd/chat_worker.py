@@ -2683,9 +2683,12 @@ def _install_conductor_tools(agent, config):
         objective = args.get('objective')
         if not isinstance(objective, str) or not objective.strip():
             return StepOutcome({'ok': False, 'error': 'objective is required'})
+        session_id = args.get('session_id', '')
+        if not isinstance(session_id, str) or (session_id and not re.fullmatch(r'[A-Za-z0-9_-]+', session_id)):
+            return StepOutcome({'ok': False, 'error': 'Invalid session_id'})
         request_id = uuid.uuid4().hex
         emit({'type': 'conductor_dispatch', 'request_id': request_id,
-              'broker_dir': str(broker), 'objective': objective.strip()})
+              'broker_dir': str(broker), 'objective': objective.strip(), 'session_id': session_id})
         reply = read_reply(broker / (request_id + '.response.json'), 30)
         dispatch_id = reply.get('dispatch_id')
         if reply.get('ok') and isinstance(dispatch_id, str) and re.fullmatch(r'[A-Za-z0-9_-]+', dispatch_id):
@@ -2713,8 +2716,11 @@ def _install_conductor_tools(agent, config):
         attr = 'do_' + name
         originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
         setattr(handler_type, attr, method)
+        properties = {parameter: {'type': 'string'}}
+        if name == 'conductor_dispatch':
+            properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
         schema.append({'type': 'function', 'function': {'name': name, 'description': description,
-                       'parameters': {'type': 'object', 'properties': {parameter: {'type': 'string'}},
+                       'parameters': {'type': 'object', 'properties': properties,
                                       'required': [parameter], 'additionalProperties': False}}})
     agentmain.TOOLS_SCHEMA = schema
 
