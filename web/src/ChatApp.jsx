@@ -3628,9 +3628,12 @@ export const WorldlineRestoreDialog = memo(function WorldlineRestoreDialog({ nod
 
 export const ChatMessage = memo(function ChatMessage({
   message: m, pending, onAskReply, isLatestMessage = false, onEditResend, onRetryBTW,
-  editDisabled = false, clockNow = 0,
+  editDisabled = false, clockNow = 0, conductorWorker = false,
 }) {
   const userText = m.role === 'user' ? stripUserAttachmentBlock(m.content) : m.content
+  const workerInstruction = '\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent. Do not attempt to dispatch other workers.'
+  const delegated = conductorWorker && m.role === 'user' && typeof userText === 'string' && userText.endsWith(workerInstruction)
+  const delegatedObjective = delegated ? userText.slice(0, -workerInstruction.length) : ''
   const messageFiles = Array.isArray(m.files) ? m.files : []
   const imageFiles   = messageFiles.filter(isImageFile)
   const nonImageFiles = messageFiles.filter(f => !isImageFile(f))
@@ -3702,7 +3705,7 @@ export const ChatMessage = memo(function ChatMessage({
         onClick={copyContent} title={ct('复制', 'Copy')} aria-label={ct('复制消息', 'Copy message')}>
         {copied ? <Check size={13}/> : <Copy size={13}/>}
       </button>
-      {m.role === 'user' && !pending && onEditResend && (
+      {m.role === 'user' && !delegated && !pending && onEditResend && (
         <button type="button" className="oa-icon-btn oa-message-edit-trigger"
           onClick={startMessageEdit} disabled={editDisabled}
           title={editDisabled ? ct('对话运行中，请等待完成后再编辑', 'Wait for the running conversation to finish before editing') : ct('编辑并重新发送', 'Edit and resend')} aria-label={ct('编辑并重新发送', 'Edit and resend')}>
@@ -3720,7 +3723,7 @@ export const ChatMessage = memo(function ChatMessage({
   )
 
   return (
-    <article className={`oa-message ${m.role} ${pending ? 'pending' : ''} ${editing ? 'oa-message-editing' : ''} ${isBTW ? 'oa-message-btw' : ''}`} data-id={m.id}>
+    <article className={`oa-message ${delegated ? 'conductor-dispatch' : m.role} ${pending ? 'pending' : ''} ${editing ? 'oa-message-editing' : ''} ${isBTW ? 'oa-message-btw' : ''}`} data-id={m.id}>
       <div className="oa-msg-body">
         {m.role === 'assistant'
           ? (<>
@@ -3773,7 +3776,11 @@ export const ChatMessage = memo(function ChatMessage({
                   })}
                 </div>
               )}
-              {editing
+              {delegated ? <section className="oa-conductor-dispatch-card">
+                <header>{ct('指挥家', 'Conductor')}<span>{ct('派发子任务', 'Delegated task')}</span></header>
+                <div className="oa-conductor-dispatch-objective">{delegatedObjective}</div>
+                <details><summary>{ct('内部执行指令', 'Internal worker instruction')}</summary><pre>{workerInstruction.trim()}</pre></details>
+              </section> : editing
                 ? (<div className="oa-message-editor">
                     <textarea ref={editRef} value={editDraft}
                       onChange={e => setEditDraft(e.target.value)}
@@ -3936,6 +3943,7 @@ export const MessageList = memo(function MessageList({
           <ChatMessage
             key={m.render_key || m.id}
             message={m}
+            conductorWorker={conductorDetail?.conductor?.role === 'worker'}
             pending={!m.kind && isCurrentRunning && m.id === lastMessageId}
             onAskReply={onAskReply}
             isLatestMessage={m.role === 'assistant' && m.id === lastMessageId}
@@ -7461,6 +7469,7 @@ export default function ChatApp() {
             onRetryBTW={(message)=>sendBTW(`/btw ${message.side_question}`, activeSidRef.current, message.id)}
             clockNow={streamClock}
             worldline={worldlineForView}
+            conductorDetail={activeSessionDetail}
             onSwitchVersion={switchWorldline}
           />
           {showFollow && <div className="oa-follow-row">
