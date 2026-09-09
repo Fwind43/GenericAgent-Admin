@@ -239,6 +239,7 @@ type chatUpload struct {
 }
 
 type chatQueuedMessage struct {
+	Kind            string       `json:"kind,omitempty"`
 	ID              string       `json:"id"`
 	Text            string       `json:"text"`
 	Files           []chatUpload `json:"files,omitempty"`

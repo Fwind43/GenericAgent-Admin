@@ -768,19 +768,18 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		Files:     convertChatUploadsToMaps(queuedItem.Files),
 		CreatedAt: time.Now().Unix(),
 	}
-	cs.Messages = append(cs.Messages, queuedUserMsg, pendingMsg)
+	// Internal completion evidence wakes the model, but is not a user turn.
+	internalCompletion := queuedItem.Kind == "conductor_completion"
+	workerHistory := append([]chatMessage(nil), cs.Messages...)
+	if !internalCompletion {
+		cs.Messages = append(cs.Messages, queuedUserMsg)
+	}
+	cs.Messages = append(cs.Messages, pendingMsg)
 	if queuedItem.LLMNo > 0 {
 		cs.Settings.LLMNo = queuedItem.LLMNo
 	}
 	if queuedItem.ReasoningEffort != "" {
 		cs.Settings.ReasoningEffort = queuedItem.ReasoningEffort
-	}
-	workerHistory := append([]chatMessage(nil), cs.Messages...)
-	for i := len(workerHistory) - 1; i >= 0; i-- {
-		if workerHistory[i].ID == queuedUserMsg.ID {
-			workerHistory = workerHistory[:i]
-			break
-		}
 	}
 	cmdReq := map[string]interface{}{
 		"prompt":                   queuedItem.Text,
@@ -824,7 +823,9 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 	// Automatic queue consumption bypasses the frontend's optimistic guide path.
 	// Publish the persisted user turn on the run stream so attached clients render
 	// it immediately; replay and the frontend's message-id dedupe make reconnects safe.
-	s.publishChatRun(sid, map[string]interface{}{"type": "user", "message": queuedUserMsg})
+	if !internalCompletion {
+		s.publishChatRun(sid, map[string]interface{}{"type": "user", "message": queuedUserMsg})
+	}
 
 	s.ChatMu.Lock()
 	if current := s.ChatRuns[sid]; current == token {
