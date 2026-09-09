@@ -3882,23 +3882,23 @@ export function WorldlinePanel({ state, loading, switchingId, disabled, onClose,
   )
 }
 
-export const ConductorEvents = memo(function ConductorEvents({ conductorDetail }) {
+export const ConductorEvents = memo(function ConductorEvents({ conductorDetail, onClose }) {
   const events = conductorChildren(conductorDetail).flatMap((worker, index) => [
     { time: worker.created_at, kind: 'dispatched', label: ct('任务已派发', 'Task dispatched') },
     { time: worker.started_at, kind: 'started', label: ct('子任务已启动', 'Worker started') },
     { time: worker.finished_at, kind: 'finished', label: `${ct('子任务结束', 'Worker finished')} · ${workerStatus(worker)}` },
   ].filter(event => Number(event.time) > 0).map(event => ({ ...event, worker, id: `${worker.dispatch_id || worker.session_id || index}-${event.kind}` })))
     .sort((a, b) => Number(a.time) - Number(b.time))
-  return <aside className="oa-conductor-events" aria-label={ct('任务事件', 'Task events')}>
-    <details open>
-      <summary>{ct('任务事件', 'Task events')} <span>{events.length}</span></summary>
+  return <aside id="oa-conductor-events" className="oa-conductor-events" aria-label={ct('任务事件', 'Task events')}>
+    <div>
+      <header className="oa-conductor-events-head"><b>{ct('任务事件', 'Task events')} <span>{events.length}</span></b><button type="button" className="oa-icon-btn" onClick={onClose} aria-label={ct('关闭任务事件', 'Close task events')}><X size={16}/></button></header>
       <div className="oa-conductor-event-scroll">{events.slice().reverse().map(event => <article key={event.id} className="oa-conductor-event">
         <time>{new Date(Number(event.time) * 1000).toLocaleTimeString()}</time>
         <strong>{event.label}</strong>
         <p>{event.worker.title || event.worker.objective || event.worker.session_id}</p>
         {event.kind === 'finished' && (event.worker.result || event.worker.error) && <details><summary>{ct('查看结果 / 错误', 'View result / error')}</summary><pre>{event.worker.error || event.worker.result}</pre></details>}
       </article>)}</div>
-    </details>
+    </div>
   </aside>
 })
 
@@ -4482,6 +4482,7 @@ function CustomSelect({ value, onChange, options, disabled, ariaLabel }) {
 
 export default function ChatApp() {
   // Theme state: sync with localStorage and system preference
+  const [conductorEventsOpen, setConductorEventsOpen] = useState(false)
   const [theme, setTheme] = useState(getInitialTheme)
   useEffect(() => {
     const activeTheme = applyThemeToDocument(theme)
@@ -7343,6 +7344,7 @@ export default function ChatApp() {
               <GitBranch size={16}/>{ct('世界线', 'Timeline')}{(worldlineForView?.nodes?.length || 0) > 0 && <span>{worldlineForView.nodes.length}</span>}
             </button>
           </div>
+          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>setConductorEventsOpen(v=>!v)}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
           <ThemePicker className="oa-topbar-theme" value={theme} onChange={setTheme} lang={chatLanguage()} variant="compact" />
         </div>
         <button
@@ -7377,6 +7379,7 @@ export default function ChatApp() {
           >
             <GitBranch size={17}/><span className="oa-mobile-tools-item-copy">{ct('世界线', 'Timeline')}</span>{(worldlineForView?.nodes?.length || 0) > 0 && <b className="oa-mobile-tools-item-badge">{worldlineForView.nodes.length}</b>}
           </button>
+          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>setConductorEventsOpen(v=>!v)}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
           <ThemePicker
             className="oa-mobile-tools-theme"
             value={theme}
@@ -7450,7 +7453,7 @@ export default function ChatApp() {
             {showFollow && <button className={`oa-follow-btn ${isCurrentRunning ? 'is-live' : ''}`} type="button" onClick={resumeFollow} title={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')} aria-label={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')}><ChevronDown size={16}/></button>}
           </div>}
         </section>
-        {isConductorParent(activeSessionDetail) && <ConductorEvents conductorDetail={activeSessionDetail}/> }
+        {isConductorParent(activeSessionDetail) && conductorEventsOpen && <ConductorEvents conductorDetail={activeSessionDetail} onClose={()=>setConductorEventsOpen(false)}/> }
         <MessageNavigator messages={messages} sessionID={sid} threadRef={threadRef}
           onNavigate={jumpToMessageNode} loading={sessionLoading} ct={ct}
           hasMore={historyPages.page?.has_more} loadingOlder={historyPages.loading} onLoadOlder={historyPages.loadOlder}/>
