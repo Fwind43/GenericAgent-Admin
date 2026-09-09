@@ -34,7 +34,7 @@
 .oa-conductor-tree { min-width: 0; }
 .oa-conductor-tree > .oa-session-row { display: flex; align-items: center; }
 .oa-conductor-tree > .oa-session-row > .oa-session { flex: 1; min-width: 0; width: auto; }
-.oa-conductor-badge-toggle { align-self: center; flex-shrink: 0; margin-left: 8px; cursor: pointer; }
+.oa-chat .oa-conductor-badge-toggle { appearance: none; align-self: center; flex-shrink: 0; display: inline-flex; align-items: center; margin-left: 8px; padding: 2px 5px; border: 1px solid currentColor; border-radius: 5px; background: transparent; color: inherit; font-family: inherit; font-size: 10px; font-weight: 700; line-height: 1.3; box-shadow: none; cursor: pointer; }
 .oa-conductor-badge-toggle:hover { filter: brightness(.9); }
 .oa-conductor-badge-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .oa-conductor-tree-children { margin-left: 12px; }
