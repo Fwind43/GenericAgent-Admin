@@ -2678,15 +2678,18 @@ def _install_conductor_tools(agent, config):
         if handler.parent is not agent:
             return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
         dispatch_id = args.get('dispatch_id')
-        if not isinstance(dispatch_id, str) or dispatch_id not in receipts:
-            return StepOutcome({'ok': False, 'error': 'Unknown dispatch for this request'})
+        if not isinstance(dispatch_id, str) or not dispatch_id or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-' for c in dispatch_id):
+            return StepOutcome({'ok': False, 'error': 'Invalid dispatch id'})
         emit({'type': 'conductor_collect', 'dispatch_id': dispatch_id})
-        reply = read_reply(broker / (dispatch_id + '.outcome.json'), 30)
+        try:
+            reply = json.loads((broker / (dispatch_id + '.outcome.json')).read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            reply = {'status': 'pending', 'dispatch_id': dispatch_id}
         return StepOutcome({'untrusted_worker_result': reply,
-                            'instruction': 'Review this evidence before final delivery; pending is not success.'})
+                            'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'})
 
     specs = [('conductor_dispatch', dispatch, 'Delegate an independent objective asynchronously. Collect its outcome before final delivery.', 'objective'),
-             ('conductor_collect', collect, 'Collect a dispatched worker outcome. Waits at most 30 seconds; pending is not success.', 'dispatch_id')]
+             ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
     schema = list(original_schema)
     for name, method, description, parameter in specs:
         attr = 'do_' + name

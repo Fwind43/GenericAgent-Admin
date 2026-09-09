@@ -707,6 +707,12 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 			return false
 		}
 	}
+	conductorReq := map[string]interface{}{"extra_sys_prompts": cs.ExtraSysPrompts}
+	if err := s.prepareConductorWorkerRequest(cs, conductorReq); err != nil {
+		s.SessionMu.Unlock()
+		s.endChatRunOwned(sid, token)
+		return false
+	}
 	queuedItem := cs.QueuedMessages[queueIndex]
 	s.SessionMu.Unlock()
 
@@ -795,6 +801,9 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		"_ga_run_started_at_ms":    runStartedAtMS,
 	}
 
+	for key, value := range conductorReq {
+		cmdReq[key] = value
+	}
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 
 	// Publish the pending assistant identity together with the persisted session.
