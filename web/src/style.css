@@ -18705,3 +18705,27 @@ html[data-color-scheme="dark"] .oa-sidebar {
 .models-page .model-failover-provider-toggle { width: 100%; border: 0; background: transparent; color: inherit; padding: 6px 0; cursor: pointer; text-align: left; font: inherit; }
 .models-page .model-failover-provider-toggle:hover { color: var(--model-focus); }
 .models-page .model-failover-provider-toggle:focus-visible { outline: 2px solid var(--model-focus); outline-offset: 2px; }
+
+/* Composer elevation: soft ambient depth without changing layout. */
+.oa-chat .oa-composer {
+  --composer-shadow-rgb: 35, 30, 24;
+  box-shadow: 0 2px 6px rgba(var(--composer-shadow-rgb), .05),
+              0 10px 28px -8px rgba(var(--composer-shadow-rgb), .16) !important;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.oa-chat .oa-composer:focus-within {
+  box-shadow: 0 3px 8px rgba(var(--composer-shadow-rgb), .07),
+              0 14px 34px -10px rgba(var(--composer-shadow-rgb), .22) !important;
+}
+html[data-color-scheme="dark"] .oa-chat .oa-composer {
+  --composer-shadow-rgb: 0, 0, 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .18),
+              0 12px 30px -8px rgba(0, 0, 0, .4) !important;
+}
+html[data-color-scheme="dark"] .oa-chat .oa-composer:focus-within {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .22),
+              0 16px 36px -10px rgba(0, 0, 0, .5) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oa-chat .oa-composer { transition: none; }
+}
