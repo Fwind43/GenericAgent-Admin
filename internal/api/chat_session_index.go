@@ -11,7 +11,7 @@ import (
 	"genericagent-admin-go/internal/config"
 )
 
-const chatSessionListIndexVersion = 4
+const chatSessionListIndexVersion = 5
 
 type chatSessionResult struct {
 	ID       string `json:"id"`
@@ -41,21 +41,22 @@ func latestChatSessionResult(cs chatSession) *chatSessionResult {
 }
 
 type chatSessionSummary struct {
-	TaskbarState    string             `json:"taskbar_state"`
-	Result          *chatSessionResult `json:"result,omitempty"`
-	ID              string             `json:"id"`
-	Title           string             `json:"title"`
-	TitleSource     string             `json:"title_source,omitempty"`
-	UpdatedAt       int64              `json:"updated_at"`
-	Count           int                `json:"count"`
-	Workspace       string             `json:"workspace,omitempty"`
-	ProjectMode     string             `json:"project_mode,omitempty"`
-	ProjectProvider string             `json:"project_provider,omitempty"`
-	ProjectID       string             `json:"project_id,omitempty"`
-	HubEnabled      bool               `json:"hub_enabled,omitempty"`
-	Pinned          bool               `json:"pinned,omitempty"`
-	Autorun         chatAutorunState   `json:"autorun"`
-	Loop            chatLoopState      `json:"loop"`
+	Conductor       *chatConductorState `json:"conductor,omitempty"`
+	TaskbarState    string              `json:"taskbar_state"`
+	Result          *chatSessionResult  `json:"result,omitempty"`
+	ID              string              `json:"id"`
+	Title           string              `json:"title"`
+	TitleSource     string              `json:"title_source,omitempty"`
+	UpdatedAt       int64               `json:"updated_at"`
+	Count           int                 `json:"count"`
+	Workspace       string              `json:"workspace,omitempty"`
+	ProjectMode     string              `json:"project_mode,omitempty"`
+	ProjectProvider string              `json:"project_provider,omitempty"`
+	ProjectID       string              `json:"project_id,omitempty"`
+	HubEnabled      bool                `json:"hub_enabled,omitempty"`
+	Pinned          bool                `json:"pinned,omitempty"`
+	Autorun         chatAutorunState    `json:"autorun"`
+	Loop            chatLoopState       `json:"loop"`
 }
 
 type chatSessionListIndexEntry struct {
@@ -75,6 +76,7 @@ func chatSessionListIndexPath(cfg config.AppConfig) string {
 
 func summaryFromChatSession(cs chatSession) chatSessionSummary {
 	return chatSessionSummary{
+		Conductor:       cs.Conductor,
 		TaskbarState:    chatSessionTaskbarState(cs),
 		Result:          latestChatSessionResult(cs),
 		ID:              cs.ID,

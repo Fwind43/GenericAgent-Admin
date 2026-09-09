@@ -33,7 +33,7 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 			"updated_at": summary.UpdatedAt, "count": summary.Count, "running": running, "taskbar_state": taskbarState,
 			"workspace": summary.Workspace, "project_mode": summary.ProjectMode, "project_provider": summary.ProjectProvider, "project_id": summary.ProjectID,
 			"hub_enabled": summary.HubEnabled, "pinned": summary.Pinned, "loop": summary.Loop, "autorun": summary.Autorun,
-			"result": summary.Result,
+			"result": summary.Result, "conductor": summary.Conductor,
 		})
 	}
 	projects, pinnedProjects := chatProjectNamesFor(cfg)

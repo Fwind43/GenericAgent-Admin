@@ -34,7 +34,7 @@ func TestChatSessionSummaryIndexCachesAndInvalidates(t *testing.T) {
 		cfg.ChatDataDir = filepath.Join(root, "chat-data")
 	})
 	cfg := s.CfgStore.Snapshot()
-	first := chatSession{ID: "summary-first", Title: "First", UpdatedAt: 20, Messages: []chatMessage{{ID: "m1"}}}
+	first := chatSession{ID: "summary-first", Title: "First", Conductor: &chatConductorState{Role: "parent"}, UpdatedAt: 20, Messages: []chatMessage{{ID: "m1"}}}
 	second := chatSession{ID: "summary-second", Title: "Second", UpdatedAt: 10, Messages: []chatMessage{{ID: "m2"}, {ID: "m3"}}}
 	for _, cs := range []chatSession{first, second} {
 		if err := saveChatSessionLocked(cfg, cs); err != nil {
@@ -45,6 +45,9 @@ func TestChatSessionSummaryIndexCachesAndInvalidates(t *testing.T) {
 	loaded := make([]string, 0, 3)
 	s.ChatRuntime.sessionListLoadHook = func(sid string) { loaded = append(loaded, sid) }
 	got := requestChatSessionSummaries(t, s)
+	if got[0].Conductor == nil || got[0].Conductor.Role != "parent" {
+		t.Fatal("missing conductor role in list")
+	}
 	if len(got) != 2 || got[0].ID != first.ID || got[0].Count != 1 || got[1].ID != second.ID || got[1].Count != 2 {
 		t.Fatalf("initial summaries = %#v", got)
 	}
@@ -57,7 +60,7 @@ func TestChatSessionSummaryIndexCachesAndInvalidates(t *testing.T) {
 
 	loaded = loaded[:0]
 	got = requestChatSessionSummaries(t, s)
-	if len(got) != 2 || len(loaded) != 0 {
+	if len(got) != 2 || got[0].Conductor == nil || got[0].Conductor.Role != "parent" || len(loaded) != 0 {
 		t.Fatalf("cached summaries = %#v, session loads = %v", got, loaded)
 	}
 
@@ -85,7 +88,7 @@ func TestChatSessionSummaryIndexCachesAndInvalidates(t *testing.T) {
 	coldLoads := 0
 	cold.ChatRuntime.sessionListLoadHook = func(string) { coldLoads++ }
 	got = requestChatSessionSummaries(t, cold)
-	if len(got) != 1 || got[0].Title != first.Title || coldLoads != 0 {
+	if len(got) != 1 || got[0].Conductor == nil || got[0].Conductor.Role != "parent" || got[0].Title != first.Title || coldLoads != 0 {
 		t.Fatalf("cold runtime summaries = %#v, session loads = %d", got, coldLoads)
 	}
 }
