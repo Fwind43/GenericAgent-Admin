@@ -803,7 +803,7 @@ func TestEvaluateChatLoopRetriesUnusableControllerReply(t *testing.T) {
 	if strings.Contains(prompts[0], "previous reply was rejected") {
 		t.Fatalf("first attempt already carried the corrective instruction: %q", prompts[0])
 	}
-	if !strings.Contains(prompts[1], "previous reply contained an empty, placeholder, or malformed next_prompt") {
+	if !strings.Contains(prompts[1], "previous reply contained an empty, placeholder, or malformed next_prompt") || !strings.Contains(prompts[1], "Rejected decision category: placeholder") || !strings.Contains(prompts[1], "Waiting for explicit user authorization") {
 		t.Fatalf("retry attempt lost the corrective instruction: %q", prompts[1])
 	}
 	persisted, err := loadChatSession(s.CfgStore.Snapshot(), sid)
@@ -834,6 +834,63 @@ func TestEvaluateChatLoopRetriesUnusableControllerReply(t *testing.T) {
 	}
 	if bytes.Contains(recordsJSON, []byte(unusableReply)) {
 		t.Fatalf("controller output leaked into observer records: %s", recordsJSON)
+	}
+}
+
+func TestChatLoopFailureCategories(t *testing.T) {
+	for _, tc := range []struct{ reply, category string }{
+		{"", "empty_response"},
+		{"<next_prompt> </next_prompt>", "empty_element"},
+		{"<next_prompt>inspect", "malformed_element"},
+		{"<next_prompt>none</next_prompt>", "no_action_sentinel"},
+		{"<next_prompt>null</next_prompt>", "no_action_sentinel"},
+		{"<next_prompt>...</next_prompt>", "placeholder"},
+		{"<next_prompt>continue</next_prompt>", "placeholder"},
+	} {
+		if got := chatLoopDecisionFailureCategory(tc.reply); got != tc.category {
+			t.Errorf("category(%q) = %q, want %q", tc.reply, got, tc.category)
+		}
+		if tc.reply != "" {
+			if _, err := parseChatLoopDecision(tc.reply); err == nil {
+				t.Errorf("invalid reply accepted: %q", tc.reply)
+			}
+		}
+	}
+}
+
+func TestEvaluateChatLoopWaitsForAuthorization(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	sid := "loop-wait-authorization"
+	blockChatLoopTestWorker(t, s, sid)
+	if err := saveChatSession(s.CfgStore.Snapshot(), chatSession{ID: sid, Loop: chatLoopState{
+		Enabled: true, Status: chatLoopStatusEvaluating, Epoch: 1, Round: 1,
+		ControllerPrompt: "continue only after user authorization",
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	oldRun := runOneShotBTWWorkerFunc
+	t.Cleanup(func() { runOneShotBTWWorkerFunc = oldRun })
+	calls := 0
+	runOneShotBTWWorkerFunc = func(_ config.AppConfig, workerSID string, req map[string]interface{}) (chatMessage, error) {
+		calls++
+		prompt := fmt.Sprint(req["prompt"])
+		if workerSID != sid+"-loop" || req["op"] != "btw" || !strings.Contains(prompt, "non-empty plain-text explanation") || !strings.Contains(prompt, "Waiting is not authorization") {
+			t.Fatalf("controller request contract: sid=%q prompt=%q op=%v", workerSID, prompt, req["op"])
+		}
+		return chatMessage{Content: "Waiting for explicit user authorization; no action can proceed now."}, nil
+	}
+	cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.evaluateChatLoop(sid, 1, cs)
+	s.evaluateChatLoop(sid, 1, cs)
+	persisted, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || persisted.Loop.Enabled || persisted.Loop.StopReason != "controller_no_action" || len(persisted.Messages) != 0 {
+		t.Fatalf("waiting loop pushed work: calls=%d session=%#v", calls, persisted)
 	}
 }
 

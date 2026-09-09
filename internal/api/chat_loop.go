@@ -110,7 +110,8 @@ Loop objective (quoted): %q
 Completed automatic rounds: %d.
 
 Review the full conversation. If the objective is not yet complete and the worker needs another push, output the next reminder or corrective instruction inside exactly one <next_prompt>...</next_prompt> element.
-If no further worker action is needed, do not output a <next_prompt> element.
+If no further worker action is needed, return a non-empty plain-text explanation without any next_prompt element. If progress requires user authorization or input, explain that the loop must wait for the user; do not ask the worker to keep waiting, poll, or repeat an authorization request. Waiting is not authorization, and stopping the loop does not mean the objective is complete.
+Never return an empty response or put none, null, n/a, continue, or ellipses inside a decision element.
 
 Keep any next prompt concise and actionable. Do not use placeholder text, markdown fences, or more than one decision element.`, objective, round)
 }
@@ -118,7 +119,26 @@ Keep any next prompt concise and actionable. Do not use placeholder text, markdo
 func chatLoopControllerRetryPrompt(objective string, round int) string {
 	return chatLoopControllerPrompt(objective, round) + `
 
-Your previous reply contained an empty, placeholder, or malformed next_prompt element. Return one complete non-empty <next_prompt>...</next_prompt> element if another worker action is needed; otherwise return no next_prompt element.`
+Your previous reply contained an empty, placeholder, or malformed next_prompt element. Correct the decision, do not repeat the rejected placeholder. If an authorized action can proceed now, return one complete element containing that concrete action. If waiting for user authorization/input or no further action is needed, return a non-empty plain-text explanation with no next_prompt element. For example: Waiting for explicit user authorization; no action can proceed now.`
+}
+
+// Categories are fixed labels, never controller text or hidden reasoning.
+func chatLoopDecisionFailureCategory(content string) string {
+	if strings.TrimSpace(content) == "" {
+		return "empty_response"
+	}
+	if prompt, ok := extractLastChatLoopElement(content, chatLoopNextPromptTagRE); ok {
+		switch strings.ToLower(strings.Join(strings.Fields(prompt), "")) {
+		case "none", "null", "n/a", "na":
+			return "no_action_sentinel"
+		}
+		return "placeholder"
+	}
+	tags := chatLoopNextPromptTagRE.FindAllStringIndex(content, -1)
+	if len(tags) == 2 && !strings.HasPrefix(content[tags[0][0]:tags[0][1]], "</") && strings.HasPrefix(content[tags[1][0]:tags[1][1]], "</") && strings.TrimSpace(content[tags[0][1]:tags[1][0]]) == "" {
+		return "empty_element"
+	}
+	return "malformed_element"
 }
 
 type chatLoopDecision struct {
@@ -460,11 +480,12 @@ func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 	var decision chatLoopDecision
 	var parseErr error
+	var failureCategory string
 	for attempt := 0; attempt < attempts; attempt++ {
 		if parseErr == nil {
 			cmdReq["prompt"] = chatLoopControllerPrompt(state.ControllerPrompt, state.Round)
 		} else {
-			cmdReq["prompt"] = chatLoopControllerRetryPrompt(state.ControllerPrompt, state.Round)
+			cmdReq["prompt"] = chatLoopControllerRetryPrompt(state.ControllerPrompt, state.Round) + "\nRejected decision category: " + failureCategory + "."
 		}
 		s.SessionMu.Lock()
 		latest, loadErr := loadChatSession(s.CfgStore.Snapshot(), sid)
@@ -493,12 +514,13 @@ func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 		if parseErr == nil {
 			break
 		}
+		failureCategory = chatLoopDecisionFailureCategory(msg.Content)
 		if attempt+1 < attempts && !s.recordChatLoopRetry(sid, epoch) {
 			return
 		}
 	}
 	if parseErr != nil {
-		s.finishChatLoop(sid, epoch, chatLoopStatusError, "controller_protocol_error: "+parseErr.Error())
+		s.finishChatLoop(sid, epoch, chatLoopStatusError, "controller_protocol_error: "+parseErr.Error()+" ["+failureCategory+"]")
 		return
 	}
 	if decision.Complete {
