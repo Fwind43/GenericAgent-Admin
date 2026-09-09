@@ -181,3 +181,16 @@
 .oa-conductor-dispatch-card details { margin-top: 10px; color: var(--muted); font-size: 12px; }
 .oa-conductor-dispatch-card summary { cursor: pointer; }
 .oa-conductor-dispatch-card pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; margin-bottom: 0; }
+
+.oa-conductor-agent { padding: 16px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.oa-conductor-agent:last-child { border-bottom: 0; }
+.oa-conductor-agent-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 16px; }
+.oa-conductor-agent-head button { display: flex; align-items: center; gap: 6px; border: 0; padding: 0; background: transparent; color: var(--text); font-family: inherit; font-size: 12px; font-weight: 600; line-height: 1.5; cursor: pointer; }
+.oa-conductor-agent-head button:hover { color: var(--accent); }
+.oa-conductor-agent-head > span { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+.oa-conductor-agent > small { color: var(--muted); font-size: 10px; }
+.oa-conductor-agent h3 { margin: 6px 0 10px; font-size: 13px; line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.oa-conductor-agent details { color: var(--muted); font-size: 12px; line-height: 1.65; }
+.oa-conductor-agent summary { cursor: pointer; }
+.oa-conductor-agent p { white-space: pre-wrap; }
+.oa-conductor-agent > .oa-conductor-stop { margin-top: 12px; }

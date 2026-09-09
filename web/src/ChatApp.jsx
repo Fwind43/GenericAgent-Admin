@@ -59,6 +59,7 @@ import { pollGeneratedChatTitle, shouldPollGeneratedTitle } from './lib/chatTitl
 import {
   canStopConductorWorker,
   conductorChildren,
+  conductorWorkers,
   conductorParentID,
   conductorPollActions,
   conductorSessionTree,
@@ -287,32 +288,31 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   </div>
 })
 
-const ConductorWorkspace = memo(function ConductorWorkspace({ detail, onOpen, onStop, stoppingID = '' }) {
-  const children = conductorChildren(detail)
-  const counts = conductorStatusCounts(children)
-  return <section className="oa-conductor-workspace" aria-label={ct('Conductor 子任务', 'Conductor workers')}>
-    <header className="oa-conductor-workspace-head">
-      <div><span className="oa-conductor-kicker">CONDUCTOR</span><h2>{ct('任务工作区', 'Task workspace')}</h2></div>
-      <div className="oa-conductor-counts" aria-label={ct('子任务统计', 'Worker totals')}>
-        <span>{counts.total} {ct('项', 'total')}</span>
-        {counts.running > 0 && <span className="is-running">{counts.running} {ct('运行中', 'running')}</span>}
-        {counts.failed > 0 && <span className="is-failed">{counts.failed} {ct('失败', 'failed')}</span>}
+const ConductorWorkspace = memo(function ConductorWorkspace({ detail, onOpen, onStop, onClose, stoppingID = '' }) {
+  const workers = conductorWorkers(detail)
+  const counts = conductorStatusCounts(workers)
+  return <aside id="oa-conductor-workers" className="oa-conductor-events oa-conductor-agents" aria-label="Subagents">
+    <div className="oa-conductor-events-body">
+      <header className="oa-conductor-events-head"><b>Subagents <span>{counts.total}</span></b><button type="button" className="oa-icon-btn" onClick={onClose} aria-label={ct('关闭子代理侧栏', 'Close subagents')}><X size={16}/></button></header>
+      <div className="oa-conductor-event-scroll">
+        {workers.length ? workers.map((worker, index) => {
+          const id = String(worker?.session_id || worker?.id || '')
+          const status = workerStatus(worker)
+          const active = canStopConductorWorker(worker) || status === 'cancelling'
+          const objective = String(worker?.objective || '')
+          const taskName = worker?.task_name || worker?.title || objective.split('\n')[0] || ct('未命名任务', 'Untitled task')
+          const statusLabel = ct(({ queued: '排队中', running: '执行中', cancelling: '停止中', succeeded: '已完成', failed: '失败', cancelled: '已取消' })[status] || '未知', status || 'unknown')
+          return <article className="oa-conductor-agent" key={id}>
+            <div className="oa-conductor-agent-head"><button type="button" onClick={()=>onOpen(id)} title={id}>Subagent {index + 1}<ExternalLink size={13}/></button><span><i className={`oa-conductor-status-dot is-${status}`} aria-hidden="true"/>{statusLabel}</span></div>
+            <small>{active ? ct('当前任务', 'Current task') : ct('最近任务', 'Latest task')}</small>
+            <h3 title={taskName}>{taskName}</h3>
+            {objective && <details><summary>{ct('任务详情', 'Task details')}</summary><p>{objective}</p></details>}
+            {canStopConductorWorker(worker) && <button type="button" className="oa-conductor-stop" onClick={()=>onStop(id)} disabled={stoppingID === id}>{stoppingID === id ? ct('停止中…', 'Stopping…') : ct('停止任务', 'Stop task')}</button>}
+          </article>
+        }) : <p className="oa-conductor-empty">{ct('尚未派发子代理。', 'No subagents dispatched yet.')}</p>}
       </div>
-    </header>
-    {children.length ? <div className="oa-conductor-worker-list">{children.map((worker, index) => {
-      const id = String(worker?.id || worker?.session_id || '')
-      const status = workerStatus(worker)
-      const title = worker?.title || worker?.name || `${ct('子任务', 'Worker')} ${index + 1}`
-      return <article className={`oa-conductor-worker is-${status || 'unknown'}`} key={worker.dispatch_id || id || index}>
-        <button type="button" className="oa-conductor-worker-main" onClick={()=>id && onOpen(id)} disabled={!id}>
-          <span className={`oa-conductor-status-dot is-${status || 'unknown'}`} aria-hidden="true"/>
-          <span><b>{title}</b><small>{status || ct('未知', 'unknown')}</small></span>
-        </button>
-        {canStopConductorWorker(worker) && <button type="button" className="oa-conductor-stop" onClick={()=>onStop(id)} disabled={!id || stoppingID === id}>{stoppingID === id ? ct('停止中…', 'Stopping…') : ct('停止', 'Stop')}</button>}
-      </article>
-    })}</div> : <p className="oa-conductor-empty">{ct('向 Conductor 描述目标后，子任务会在这里出现。', 'Describe the objective to Conductor; workers will appear here.')}</p>}
-
-  </section>
+    </div>
+  </aside>
 })
 
 const BUILTIN_SLASH_COMMANDS = [
@@ -4502,6 +4502,7 @@ function CustomSelect({ value, onChange, options, disabled, ariaLabel }) {
 export default function ChatApp() {
   // Theme state: sync with localStorage and system preference
   const [conductorEventsOpen, setConductorEventsOpen] = useState(false)
+  const [conductorWorkersOpen, setConductorWorkersOpen] = useState(false)
   const [theme, setTheme] = useState(getInitialTheme)
   useEffect(() => {
     const activeTheme = applyThemeToDocument(theme)
@@ -7366,7 +7367,8 @@ export default function ChatApp() {
               <GitBranch size={16}/>{ct('世界线', 'Timeline')}{(worldlineForView?.nodes?.length || 0) > 0 && <span>{worldlineForView.nodes.length}</span>}
             </button>
           </div>
-          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>setConductorEventsOpen(v=>!v)}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
+          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
+          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
           <ThemePicker className="oa-topbar-theme" value={theme} onChange={setTheme} lang={chatLanguage()} variant="compact" />
         </div>
         <button
@@ -7401,7 +7403,8 @@ export default function ChatApp() {
           >
             <GitBranch size={17}/><span className="oa-mobile-tools-item-copy">{ct('世界线', 'Timeline')}</span>{(worldlineForView?.nodes?.length || 0) > 0 && <b className="oa-mobile-tools-item-badge">{worldlineForView.nodes.length}</b>}
           </button>
-          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>setConductorEventsOpen(v=>!v)}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
+          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
+          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
           <ThemePicker
             className="oa-mobile-tools-theme"
             value={theme}
@@ -7442,7 +7445,6 @@ export default function ChatApp() {
       <div className={`oa-workspace ${loopRailOpen ? 'has-loop' : ''} ${btwRailOpen && btwMessages.length > 0 ? 'has-btw' : ''} ${btwMessages.length > 0 && !btwRailOpen ? 'has-launchers' : ''}`}>
         <section className="oa-thread" ref={threadRef} aria-busy={sessionLoading} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) pauseFollow() }} onTouchMove={()=>{ if (!isNearBottom(threadRef.current)) pauseFollow() }}>
           {isConductorWorker(activeSessionDetail) && conductorParentID(activeSessionDetail) && <button type="button" className="oa-conductor-back" onClick={()=>openSession(conductorParentID(activeSessionDetail))}>← {ct('返回 Conductor', 'Back to Conductor')}</button>}
-          {isConductorParent(activeSessionDetail) && <ConductorWorkspace detail={activeSessionDetail} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID}/>}
           {sessionLoading && messages.length === 0 && <div className="oa-session-load" role="status" aria-live="polite">
             <RotateCw size={20} className="oa-session-load-spinner" aria-hidden="true"/>
             <span>{ct('对话加载中…', 'Loading conversation…')}</span>
@@ -7476,6 +7478,7 @@ export default function ChatApp() {
             {showFollow && <button className={`oa-follow-btn ${isCurrentRunning ? 'is-live' : ''}`} type="button" onClick={resumeFollow} title={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')} aria-label={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')}><ChevronDown size={16}/></button>}
           </div>}
         </section>
+        {isConductorParent(activeSessionDetail) && conductorWorkersOpen && <ConductorWorkspace detail={activeSessionDetail} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID} onClose={()=>setConductorWorkersOpen(false)}/>}
         {isConductorParent(activeSessionDetail) && conductorEventsOpen && <ConductorEvents conductorDetail={activeSessionDetail} onClose={()=>setConductorEventsOpen(false)}/> }
         <MessageNavigator messages={messages} sessionID={sid} threadRef={threadRef}
           onNavigate={jumpToMessageNode} loading={sessionLoading} ct={ct}

@@ -55,3 +55,13 @@ export const conductorSessionTree = sessions => {
     })
     .map(session => ({ session, workers: byParent.get(String(session?.id || '')) || [] }))
 }
+
+// Dispatch history is append-only; retain the latest task for each worker session.
+export const conductorWorkers = session => {
+  const latest = new Map()
+  conductorChildren(session).forEach(worker => {
+    const id = String(worker?.session_id || worker?.id || '')
+    if (id) latest.set(id, worker)
+  })
+  return [...latest.values()]
+}
