@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	// A malformed next_prompt gets one corrective re-ask before the loop stops.
+	// Model failures and malformed next_prompt replies share a bounded retry budget.
 	chatLoopControllerAttempts = 2
+	chatLoopWorkerRetries      = 2
 	// A controller that keeps asking for the identical next step is spinning.
 	chatLoopMaxPromptRepeats = 2
 
@@ -295,7 +296,7 @@ func (s *Server) publishChatLoopState(sid string, state chatLoopState) {
 
 func (s *Server) afterChatRunTerminal(sid string, success bool) {
 	s.resetChatAutorunAfterReply(sid)
-	if !success {
+	if !success && s.chatRunCanceled(sid) {
 		return
 	}
 	sid = safeChatID(sid)
@@ -317,6 +318,37 @@ func (s *Server) afterChatRunTerminal(sid string, success bool) {
 	// Then check loop mode
 	if !cs.Loop.Enabled || cs.Loop.Status == chatLoopStatusEvaluating {
 		s.SessionMu.Unlock()
+		return
+	}
+	if success {
+		cs.Loop.WorkerErrorStreak = 0
+	} else {
+		cs.Loop.WorkerErrorStreak++
+		if cs.Loop.WorkerErrorStreak > chatLoopWorkerRetries {
+			cs.Loop.Enabled = false
+			cs.Loop.Status = chatLoopStatusError
+			cs.Loop.StopReason = "worker_error: retry budget exhausted"
+			cs.Loop.Epoch++
+			appendChatLoopRecord(&cs.Loop, "error", "Worker failed after automatic retries.", "")
+			err = saveChatSessionLocked(s.CfgStore.Snapshot(), cs)
+			s.SessionMu.Unlock()
+			if err == nil {
+				s.publishChatLoopState(sid, cs.Loop)
+			}
+			return
+		}
+		cs.Loop.Status = chatLoopStatusEvaluating
+		cs.Loop.StopReason = ""
+		appendChatLoopRecord(&cs.Loop, "retry", "Worker failed; retrying the interrupted task.", "")
+		err = saveChatSessionLocked(s.CfgStore.Snapshot(), cs)
+		s.SessionMu.Unlock()
+		if err == nil {
+			s.publishChatLoopState(sid, cs.Loop)
+			go func() {
+				time.Sleep(time.Second)
+				continueChatLoopFunc(s, sid, cs.Loop.Epoch, "The previous run failed. Resume the interrupted task from the existing context. Check which actions already completed before repeating any side effects.")
+			}()
+		}
 		return
 	}
 	cs.Loop.Status = chatLoopStatusEvaluating
@@ -409,13 +441,31 @@ func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 	var decision chatLoopDecision
 	var parseErr error
 	for attempt := 0; attempt < chatLoopControllerAttempts; attempt++ {
-		if attempt == 0 {
+		if parseErr == nil {
 			cmdReq["prompt"] = chatLoopControllerPrompt(state.ControllerPrompt, state.Round)
 		} else {
 			cmdReq["prompt"] = chatLoopControllerRetryPrompt(state.ControllerPrompt, state.Round)
 		}
+		s.SessionMu.Lock()
+		latest, loadErr := loadChatSession(s.CfgStore.Snapshot(), sid)
+		live := loadErr == nil && latest.Loop.Enabled && latest.Loop.Epoch == epoch && latest.Loop.Status == chatLoopStatusEvaluating
+		s.SessionMu.Unlock()
+		if !live {
+			return
+		}
 		msg, err := s.runChatLoopController(sid, epoch, cmdReq)
+		if err == nil && msg.Error {
+			err = errors.New("controller model returned an error response")
+		}
 		if err != nil {
+			if attempt+1 < chatLoopControllerAttempts {
+				if !s.recordChatLoopRetry(sid, epoch) {
+					return
+				}
+				parseErr = nil
+				time.Sleep(time.Second)
+				continue
+			}
 			s.finishChatLoop(sid, epoch, chatLoopStatusError, "controller_error: "+err.Error())
 			return
 		}
@@ -480,8 +530,10 @@ func (s *Server) finishChatLoop(sid string, epoch int64, status, reason string) 
 	}
 }
 
-var continueChatLoopFunc = func(s *Server, sid string, epoch int64, prompt string) {
-	s.continueChatLoop(sid, epoch, prompt)
+var continueChatLoopFunc func(s *Server, sid string, epoch int64, prompt string)
+
+func init() {
+	continueChatLoopFunc = (*Server).continueChatLoop
 }
 
 func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
@@ -513,7 +565,7 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 			latest.Loop.RepeatStreak = 0
 		}
 		latest.Loop.LastPromptFingerprint = fingerprint
-		if latest.Loop.RepeatStreak >= chatLoopMaxPromptRepeats {
+		if latest.Loop.WorkerErrorStreak == 0 && latest.Loop.RepeatStreak >= chatLoopMaxPromptRepeats {
 			latest.Loop.Enabled = false
 			latest.Loop.Status = chatLoopStatusStopped
 			latest.Loop.StopReason = "controller_stalled"

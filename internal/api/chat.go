@@ -169,6 +169,7 @@ type chatLoopRecord struct {
 }
 
 type chatLoopState struct {
+	WorkerErrorStreak     int              `json:"worker_error_streak,omitempty"`
 	Enabled               bool             `json:"enabled"`
 	Status                string           `json:"status"`
 	Epoch                 int64            `json:"epoch"`
