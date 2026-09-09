@@ -85,6 +85,7 @@ const loopStopReasonText = reason => {
   const code = separator >= 0 ? raw.slice(0, separator).trim() : raw
   const detail = separator >= 0 ? raw.slice(separator + 1).trim() : ''
   const labels = {
+    max_rounds: ct('已达到最大轮数', 'Maximum rounds reached'),
     user: ct('\u5df2\u624b\u52a8\u505c\u6b62', 'Stopped manually'),
     controller_complete: ct('\u63a7\u5236\u6a21\u578b\u5224\u5b9a\u76ee\u6807\u5df2\u5b8c\u6210', 'Controller marked the objective complete'),
     controller_no_action: ct('\u63a7\u5236\u6a21\u578b\u672a\u7ed9\u51fa\u53ef\u6267\u884c\u7684\u4e0b\u4e00\u6b65', 'Controller returned no actionable next step'),
@@ -4599,6 +4600,8 @@ export default function ChatApp() {
   const [conductorStoppingID, setConductorStoppingID] = useState('')
   const [loopConfigOpen, setLoopConfigOpen] = useState(false)
   const [loopObjective, setLoopObjective] = useState('')
+  const [loopMaxRounds, setLoopMaxRounds] = useState(0)
+  const [loopMaxRetries, setLoopMaxRetries] = useState(2)
   const [loopUpdating, setLoopUpdating] = useState(false)
   const loopRecords = useMemo(() => normalizeLoopRecords(loopState), [loopState])
   const [busy, setBusy] = useState(false)
@@ -5348,11 +5351,14 @@ export default function ChatApp() {
     const objective = (loopObjective || prompt).trim()
     if (!id) { setErr(ct('请先创建或打开一个会话。', 'Create or open a chat first.')); return }
     if (!objective) { setErr(ct('请填写 Loop 目标。', 'Enter a Loop objective.')); setLoopConfigOpen(true); return }
+    if (loopMaxRounds === '' || loopMaxRetries === '' || !Number.isInteger(Number(loopMaxRounds)) || Number(loopMaxRounds) < 0 || Number(loopMaxRounds) > 10000 || !Number.isInteger(Number(loopMaxRetries)) || Number(loopMaxRetries) < 0 || Number(loopMaxRetries) > 100) {
+      setErr(ct('请输入有效整数：轮数 0-10000，重试 0-100。', 'Enter integers: rounds 0-10000, retries 0-100.')); return
+    }
     const controllerLlmNo = llms.some(model => model.index === loopControllerLlmNo) ? loopControllerLlmNo : llmNo
     setLoopUpdating(true)
     setErr('')
     try {
-      const result = await chatApi(`/api/chat/loop/${id}/start`, { method:'POST', body:JSON.stringify({ objective, controller_llm_no:controllerLlmNo }) })
+      const result = await chatApi(`/api/chat/loop/${id}/start`, { method:'POST', body:JSON.stringify({ objective, controller_llm_no:controllerLlmNo, max_rounds:Number(loopMaxRounds), max_retries:Number(loopMaxRetries) }) })
       setLoopObjective(objective)
       setLoopControllerLlmNo(controllerLlmNo)
       const nextLoopState = result.loop || { enabled:true, status:'waiting', round:0, controller_prompt:objective, controller_llm_no:controllerLlmNo }
@@ -5478,6 +5484,8 @@ export default function ChatApp() {
     setExtraSysPromptPresetID(nextExtraSysPromptPresetID)
     const nextLoopState = st.loop && typeof st.loop === 'object' ? st.loop : null
     setLoopState(nextLoopState)
+    setLoopMaxRounds(nextLoopState?.max_rounds ?? 0)
+    setLoopMaxRetries(nextLoopState?.max_retries ?? 2)
     if (id && nextLoopState) setSessions(xs => updateSessionLoop(xs, id, nextLoopState))
     const savedControllerLlmNo = Number(nextLoopState?.controller_llm_no)
     setLoopControllerLlmNo(Number(nextLoopState?.epoch) > 0 && nextLlms.some(model => model.index === savedControllerLlmNo) ? savedControllerLlmNo : null)
@@ -7516,7 +7524,7 @@ export default function ChatApp() {
               <span className="oa-loop-orbit"><Orbit size={17} className={loopState?.enabled && loopState?.status !== 'waiting' ? 'is-spinning' : ''}/></span>
               <div>
                 <b>{loopState?.enabled ? ct('正在持续完成目标', 'Continuing toward the objective') : ct('由监督模型推进下一轮', 'Let a controller advance the next turn')}</b>
-                <span>{loopState?.enabled ? ct(`已完成 ${Number(loopState.round) || 0} 轮，将持续推进直至目标完成`, `${Number(loopState.round) || 0} rounds completed; continuing until the objective is done`) : ct('设定目标后启动', 'Set an objective to begin')}</span>
+                <span>{loopState?.enabled ? ct(`当前第 ${Number(loopState.round) || 0} 轮${loopState.max_rounds > 0 ? ` / 最多 ${loopState.max_rounds} 轮` : ' / 不限轮数'}`, `Round ${Number(loopState.round) || 0}${loopState.max_rounds > 0 ? ` / ${loopState.max_rounds} maximum` : ' / unlimited'}`) : ct('设定目标后启动', 'Set an objective to begin')}</span>
                 <small className="oa-loop-model">{ct('控制模型：', 'Controller: ')}{loopControllerModelLabel}</small>
               </div>
             </div>
@@ -7572,6 +7580,16 @@ export default function ChatApp() {
                   ariaLabel={ct('Loop 控制模型', 'Loop controller model')}
                   options={llms.map(model => ({ value:model.index, label:`${runtimeModelGroup(model).label} / ${runtimeModelLabel(model)}` }))}
                 />
+              </label>
+              <label>
+                <span>{ct('最大轮数', 'Maximum rounds')}</span>
+                <input type="number" min="0" max="10000" step="1" value={loopMaxRounds} onChange={e => setLoopMaxRounds(e.target.value)} />
+                <small>{ct('0 表示不限；重试不占用新轮次', '0 means unlimited; retries do not count as new rounds')}</small>
+              </label>
+              <label>
+                <span>{ct('单轮内重试次数', 'Retries per round')}</span>
+                <input type="number" min="0" max="100" step="1" value={loopMaxRetries} onChange={e => setLoopMaxRetries(e.target.value)} />
+                <small>{ct('0 表示不重试；执行与控制模型各自适用此上限', '0 disables retries; worker and controller each use this limit')}</small>
               </label>
               <div className="oa-loop-config-actions">
                 <small>{ct('留空目标时使用当前输入内容', 'Uses the current message when objective is empty')}</small>

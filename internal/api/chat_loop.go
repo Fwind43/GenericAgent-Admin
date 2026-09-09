@@ -185,14 +185,27 @@ func parseChatLoopDecision(content string) (chatLoopDecision, error) {
 	return chatLoopDecision{Complete: true, NoAction: true}, nil
 }
 
+func chatLoopRetryBudget(state chatLoopState, fallback int) int {
+	if state.MaxRetries != nil {
+		return *state.MaxRetries
+	}
+	return fallback
+}
+
 func (s *Server) chatLoopStart(w http.ResponseWriter, r *http.Request, sid string) {
 	var req struct {
+		MaxRounds        int    `json:"max_rounds"`
+		MaxRetries       *int   `json:"max_retries"`
 		Objective        string `json:"objective"`
 		ControllerPrompt string `json:"controller_prompt"`
 		ControllerLLMNo  *int   `json:"controller_llm_no"`
 	}
 	if err := decode(r, &req); err != nil {
 		bad(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if req.MaxRounds < 0 || req.MaxRounds > 10000 || (req.MaxRetries != nil && (*req.MaxRetries < 0 || *req.MaxRetries > 100)) {
+		bad(w, http.StatusBadRequest, "max_rounds must be 0..10000 and max_retries must be 0..100")
 		return
 	}
 	objective := strings.TrimSpace(req.Objective)
@@ -226,6 +239,8 @@ func (s *Server) chatLoopStart(w http.ResponseWriter, r *http.Request, sid strin
 			controllerLLMNo = *req.ControllerLLMNo
 		}
 		cs.Loop = chatLoopState{
+			MaxRounds:        req.MaxRounds,
+			MaxRetries:       req.MaxRetries,
 			Enabled:          true,
 			Status:           chatLoopStatusWaiting,
 			Epoch:            cs.Loop.Epoch + 1,
@@ -324,7 +339,7 @@ func (s *Server) afterChatRunTerminal(sid string, success bool) {
 		cs.Loop.WorkerErrorStreak = 0
 	} else {
 		cs.Loop.WorkerErrorStreak++
-		if cs.Loop.WorkerErrorStreak > chatLoopWorkerRetries {
+		if cs.Loop.WorkerErrorStreak > chatLoopRetryBudget(cs.Loop, chatLoopWorkerRetries) {
 			cs.Loop.Enabled = false
 			cs.Loop.Status = chatLoopStatusError
 			cs.Loop.StopReason = "worker_error: retry budget exhausted"
@@ -422,6 +437,11 @@ func (s *Server) cancelChatLoopController(sid string, epoch int64) bool {
 
 func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 	state := cs.Loop
+	if state.MaxRounds > 0 && state.Round >= state.MaxRounds {
+		s.finishChatLoop(sid, epoch, chatLoopStatusStopped, "max_rounds")
+		return
+	}
+	attempts := chatLoopRetryBudget(state, chatLoopControllerAttempts-1) + 1
 	cmdReq := map[string]interface{}{
 		"op":                "btw",
 		"history":           cs.Messages,
@@ -440,7 +460,7 @@ func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 	var decision chatLoopDecision
 	var parseErr error
-	for attempt := 0; attempt < chatLoopControllerAttempts; attempt++ {
+	for attempt := 0; attempt < attempts; attempt++ {
 		if parseErr == nil {
 			cmdReq["prompt"] = chatLoopControllerPrompt(state.ControllerPrompt, state.Round)
 		} else {
@@ -458,7 +478,7 @@ func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 			err = errors.New("controller model returned an error response")
 		}
 		if err != nil {
-			if attempt+1 < chatLoopControllerAttempts {
+			if attempt+1 < attempts {
 				if !s.recordChatLoopRetry(sid, epoch) {
 					return
 				}
@@ -473,7 +493,7 @@ func (s *Server) evaluateChatLoop(sid string, epoch int64, cs chatSession) {
 		if parseErr == nil {
 			break
 		}
-		if attempt+1 < chatLoopControllerAttempts && !s.recordChatLoopRetry(sid, epoch) {
+		if attempt+1 < attempts && !s.recordChatLoopRetry(sid, epoch) {
 			return
 		}
 	}
@@ -558,6 +578,19 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 		if !latest.Loop.Enabled || latest.Loop.Epoch != epoch || latest.Loop.Status != chatLoopStatusEvaluating {
 			return errChatLoopStale
 		}
+		if latest.Loop.WorkerErrorStreak == 0 && latest.Loop.MaxRounds > 0 && latest.Loop.Round >= latest.Loop.MaxRounds {
+			latest.Loop.Enabled = false
+			latest.Loop.Status = chatLoopStatusStopped
+			latest.Loop.StopReason = "max_rounds"
+			appendChatLoopTerminalRecord(&latest.Loop, chatLoopStatusStopped, "max_rounds")
+			latest.Loop.Epoch++
+			if err := saveChatSessionLocked(s.CfgStore.Snapshot(), latest); err != nil {
+				return err
+			}
+			finished := latest.Loop
+			terminalLoop = &finished
+			return errChatLoopStale
+		}
 		fingerprint := chatLoopPromptFingerprint(prompt)
 		if fingerprint != "" && fingerprint == latest.Loop.LastPromptFingerprint {
 			latest.Loop.RepeatStreak++
@@ -578,7 +611,9 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 			terminalLoop = &finished
 			return errChatLoopStale
 		}
-		latest.Loop.Round++
+		if latest.Loop.WorkerErrorStreak == 0 {
+			latest.Loop.Round++
+		}
 		latest.Loop.Status = chatLoopStatusRunning
 		latest.Loop.StopReason = ""
 		appendChatLoopRecord(&latest.Loop, "continue", "Controller queued the next step.", prompt)

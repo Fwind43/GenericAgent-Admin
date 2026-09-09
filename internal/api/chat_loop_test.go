@@ -349,7 +349,7 @@ func TestChatLoopStartAndStopAPI(t *testing.T) {
 	}
 
 	start := httptest.NewRecorder()
-	startReq := httptest.NewRequest(http.MethodPost, "/api/chat/loop/"+sid+"/start", bytes.NewBufferString(`{"objective":"Finish the release","max_rounds":999}`))
+	startReq := httptest.NewRequest(http.MethodPost, "/api/chat/loop/"+sid+"/start", bytes.NewBufferString(`{"objective":"Finish the release","max_rounds":999,"max_retries":0}`))
 	startReq.Header.Set("Content-Type", "application/json")
 	s.chatHandler(start, startReq)
 	if start.Code != http.StatusOK {
@@ -360,6 +360,12 @@ func TestChatLoopStartAndStopAPI(t *testing.T) {
 	}
 	if err := json.Unmarshal(start.Body.Bytes(), &startPayload); err != nil {
 		t.Fatal(err)
+	}
+	{
+		persisted, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+		if err != nil || persisted.Loop.MaxRounds != 999 || persisted.Loop.MaxRetries == nil || *persisted.Loop.MaxRetries != 0 {
+			t.Fatalf("persisted limits=%+v err=%v", persisted.Loop, err)
+		}
 	}
 	if !startPayload.Loop.Enabled || startPayload.Loop.Status != chatLoopStatusEvaluating {
 		t.Fatalf("start loop = %#v", startPayload.Loop)
