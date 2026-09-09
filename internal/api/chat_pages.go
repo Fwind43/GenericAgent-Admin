@@ -124,7 +124,7 @@ func chatSessionView(cs chatSession, r *http.Request) (interface{}, int, error) 
 		"project_provider": cs.ProjectProvider,
 		"project_id":       cs.ProjectID,
 		"autorun":          cs.Autorun, "plan": cs.Plan, "worldline_head": cs.WorldlineHead, "result": latestChatSessionResult(cs),
-		"conductor": cs.Conductor,
+		"conductor": cs.Conductor, "conductor_children": cs.ConductorChildren,
 		"messages": page, "total_messages": len(cs.Messages), "has_more": start > 0, "before": before,
 		"message_index": index, "stats_messages": stats, "context_count": len(cs.RawHistory),
 	}

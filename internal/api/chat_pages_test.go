@@ -34,7 +34,11 @@ func TestChatPagesPreserveConductor(t *testing.T) {
 		t.Run(role, func(t *testing.T) {
 			cs := pageFixture(103)
 			cs.Conductor = &chatConductorState{Role: role}
+			cs.ConductorChildren = []chatConductorChild{{SessionID: "worker-test", Status: "running"}}
 			page := requirePage(t, cs, "")
+			if !reflect.DeepEqual(page["conductor_children"], cs.ConductorChildren) {
+				t.Fatal("initial page lost children")
+			}
 			if !reflect.DeepEqual(page["conductor"], cs.Conductor) {
 				t.Fatal("initial page lost conductor metadata")
 			}

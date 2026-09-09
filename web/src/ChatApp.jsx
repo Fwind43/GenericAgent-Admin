@@ -6777,7 +6777,14 @@ export default function ChatApp() {
             void attachRunningStream(activeID, { waitForRun:true })
           }
           if (conductorPoll.refreshMetadata) {
-            setActiveSessionDetail(current => current && String(current.id) === String(after.id) ? { ...current, ...after } : current)
+            const metadata = isConductorParent(after)
+              ? await chatApi(`/api/chat/conductor/${encodeURIComponent(activeID)}/children`)
+              : null
+            if (!stopped && activeSidRef.current === activeID) {
+              setActiveSessionDetail(current => current && String(current.id) === String(after.id)
+                ? { ...current, ...after, ...(Array.isArray(metadata?.children) ? { conductor_children: metadata.children } : {}) }
+                : current)
+            }
           } else if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {
             void refreshActiveSessionSnapshot(activeID).catch(() => {})
           }
