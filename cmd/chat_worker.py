@@ -2709,7 +2709,7 @@ def _install_conductor_tools(agent, config):
         return StepOutcome({'untrusted_worker_result': reply,
                             'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'})
 
-    specs = [('conductor_dispatch', dispatch, 'Delegate an independent objective asynchronously. Collect its outcome before final delivery.', 'objective'),
+    specs = [('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
              ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
     schema = list(original_schema)
     for name, method, description, parameter in specs:

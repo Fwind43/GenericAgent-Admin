@@ -24,7 +24,7 @@ func TestConductorParentPromptInjection(t *testing.T) {
 				}
 				return
 			}
-			if len(prompts) != 2 || prompts[0] != "existing" || prompts[1] != conductorParentPrompt {
+			if len(prompts) != 3 || prompts[0] != "existing" || prompts[1] != conductorParentPrompt {
 				t.Fatalf("wrong prompts: %v", prompts)
 			}
 			config := req["conductor"].(map[string]interface{})
@@ -38,4 +38,20 @@ func TestConductorParentPromptInjection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConductorReuseRoster(t *testing.T) {
+ s := newChatLoopTestServer(t)
+ cs := chatSession{ID:"roster-test", Conductor:&chatConductorState{Role:conductorRoleParent}, ConductorChildren:[]chatConductorChild{
+ {SessionID:"worker-a",DispatchID:"old",Status:conductorSucceeded},
+ {SessionID:"worker-b",DispatchID:"ready",Status:conductorFailed},
+ {SessionID:"worker-a",DispatchID:"latest",Status:conductorRunning},
+ }}
+ req := map[string]interface{}{}
+ if err:=s.prepareConductorWorkerRequest(cs,req);err!=nil {t.Fatal(err)}
+ prompts:=req["extra_sys_prompts"].([]string)
+ roster:=prompts[len(prompts)-1]
+ if strings.Count(roster, `"session_id":"worker-a"`)!=1 || strings.Contains(roster, `"dispatch_id":"old"`) {t.Fatal(roster)}
+ if !strings.Contains(roster, `"reusable":false,"session_id":"worker-a"`) || !strings.Contains(roster, `"reusable":true,"session_id":"worker-b"`) {t.Fatal(roster)}
+ if strings.Contains(conductorParentPrompt,"does not provide worker resume") || !strings.Contains(conductorParentPrompt,"original session_id") {t.Fatal("missing reuse guidance")}
 }
