@@ -2,7 +2,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-import ChatApp, { MessageList } from './ChatApp.jsx'
+import ChatApp, { ConductorEvents } from './ChatApp.jsx'
 
 const session = (id, title, extra = {}) => ({
   id,
@@ -84,7 +84,7 @@ test('real ChatApp renders a Conductor workspace and navigates and stops workers
   expect(workspace.parentElement.classList.contains('oa-thread')).toBe(true)
   expect(document.querySelector('.oa-main').firstElementChild.classList.contains('oa-topbar')).toBe(true)
   expect(within(workspace).getByRole('heading', { name: 'Task workspace' })).toBeTruthy()
-  expect(document.querySelectorAll('.oa-conductor-inline-event')).toHaveLength(3)
+  expect(document.querySelectorAll('.oa-conductor-event')).toHaveLength(3)
   expect(workspace.querySelector('.oa-conductor-inline-event')).toBeNull()
   expect(screen.getByText('Task dispatched')).toBeTruthy()
   expect(screen.getByText('Worker started')).toBeTruthy()
@@ -109,9 +109,9 @@ test('inline completion appears on detail update without becoming a user message
   const worker = { session_id: 'dynamic-worker', title: 'Live job', created_at: 1788912000 }
   const detail = child => ({ conductor: { role: 'parent' }, conductor_children: [child] })
   const props = { messages: [], isCurrentRunning: true }
-  const view = render(<MessageList {...props} conductorDetail={detail(worker)} />)
+  const view = render(<ConductorEvents {...props} conductorDetail={detail(worker)} />)
   expect(screen.queryByText('Live result')).toBeNull()
-  view.rerender(<MessageList {...props} conductorDetail={detail({ ...worker, finished_at: 1788912002, status: 'completed', result: 'Live result' })} />)
+  view.rerender(<ConductorEvents {...props} conductorDetail={detail({ ...worker, finished_at: 1788912002, status: 'completed', result: 'Live result' })} />)
   expect(screen.getByText('Live result')).toBeTruthy()
-  expect(document.querySelectorAll('.oa-conductor-inline-event')).toHaveLength(2)
+  expect(document.querySelectorAll('.oa-conductor-event')).toHaveLength(2)
 })
