@@ -7238,10 +7238,7 @@ export default function ChatApp() {
               if (!node?.workers?.length) return renderSidebarSession(session)
               return <div className="oa-conductor-tree" key={session.id}>
                 {renderSidebarSession(session)}
-                <details className="oa-conductor-tree-branch" open={node.workers.some(worker => worker.id === sid) || undefined}>
-                  <summary>{ct('子任务', 'Subtasks')} <small>{node.workers.length}</small></summary>
-                  <div className="oa-conductor-tree-children">{node.workers.map(worker => renderSidebarSession(worker, { nested:true }))}</div>
-                </details>
+                <div className="oa-conductor-tree-children">{node.workers.map(worker => renderSidebarSession(worker, { nested:true }))}</div>
               </div>
             })}</div>
           </section>)}
