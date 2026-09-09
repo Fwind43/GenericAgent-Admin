@@ -78,6 +78,9 @@ test('real ChatApp renders a Conductor workspace and navigates and stops workers
   render(<ChatApp />)
 
   const workspace = await screen.findByRole('region', { name: 'Conductor workers' })
+  const badge = screen.getByLabelText('Conductor session')
+  expect(badge.closest('.oa-session-row')).toBeTruthy()
+  expect(badge.nextElementSibling.tagName).toBe('B')
   expect(workspace.parentElement.classList.contains('oa-thread')).toBe(true)
   expect(document.querySelector('.oa-main').firstElementChild.classList.contains('oa-topbar')).toBe(true)
   expect(within(workspace).getByRole('heading', { name: 'Task workspace' })).toBeTruthy()
