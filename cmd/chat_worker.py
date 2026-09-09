@@ -2678,31 +2678,35 @@ def _install_conductor_tools(agent, config):
         return {'ok': False, 'error': 'Parent cancelled'}
 
     def dispatch(handler, args, response):
+        # A missing next_prompt ends the core loop before it records tool_results.
+        def dispatch_result(data):
+            return StepOutcome(data, next_prompt='Review the dispatch receipt and continue coordinating. Worker completion arrives separately.')
+
         if handler.parent is not agent:
-            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+            return dispatch_result({'ok': False, 'error': 'Conductor request mismatch'})
         objective = args.get('objective')
         if not isinstance(objective, str) or not objective.strip():
-            return StepOutcome({'ok': False, 'error': 'objective is required'})
+            return dispatch_result({'ok': False, 'error': 'objective is required'})
         session_id = args.get('session_id', '')
         if not isinstance(session_id, str) or (session_id and not re.fullmatch(r'[A-Za-z0-9_-]+', session_id)):
-            return StepOutcome({'ok': False, 'error': 'Invalid session_id'})
+            return dispatch_result({'ok': False, 'error': 'Invalid session_id'})
         overrides = {}
         if 'project_id' in args:
             value = args['project_id']
             if not isinstance(value, str) or not value.strip():
-                return StepOutcome({'ok': False, 'error': 'project_id must be a non-empty string'})
+                return dispatch_result({'ok': False, 'error': 'project_id must be a non-empty string'})
             if session_id:
-                return StepOutcome({'ok': False, 'error': 'project_id is only supported for new workers; omit session_id'})
+                return dispatch_result({'ok': False, 'error': 'project_id is only supported for new workers; omit session_id'})
             overrides['project_id'] = value.strip()
         if 'llm_no' in args:
             value = args['llm_no']
             if type(value) is not int or value < 0:
-                return StepOutcome({'ok': False, 'error': 'llm_no must be a non-negative integer'})
+                return dispatch_result({'ok': False, 'error': 'llm_no must be a non-negative integer'})
             overrides['llm_no'] = value
         if 'reasoning_effort' in args:
             value = args['reasoning_effort']
             if not isinstance(value, str) or value.strip().lower() not in ('off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'):
-                return StepOutcome({'ok': False, 'error': 'Invalid reasoning_effort'})
+                return dispatch_result({'ok': False, 'error': 'Invalid reasoning_effort'})
             overrides['reasoning_effort'] = value.strip().lower()
         request_id = uuid.uuid4().hex
         emit({'type': 'conductor_dispatch', 'request_id': request_id,
@@ -2711,7 +2715,7 @@ def _install_conductor_tools(agent, config):
         dispatch_id = reply.get('dispatch_id')
         if reply.get('ok') and isinstance(dispatch_id, str) and re.fullmatch(r'[A-Za-z0-9_-]+', dispatch_id):
             receipts[dispatch_id] = reply
-        return StepOutcome(reply)
+        return dispatch_result(reply)
 
     def cancel(handler, args, response):
         if handler.parent is not agent:

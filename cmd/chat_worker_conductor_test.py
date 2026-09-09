@@ -10,7 +10,7 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
         dispatch = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'dispatch' and any(isinstance(x, ast.Constant) and x.value == 'conductor_dispatch' for x in ast.walk(n)))
         self.events = []
         self.agent = object()
-        self.env = dict(agent=self.agent, StepOutcome=lambda value: value,
+        self.env = dict(agent=self.agent, StepOutcome=lambda value, **kwargs: value,
                         re=__import__('re'), uuid=__import__('uuid'), broker=Path('unused'),
                         emit=self.events.append, receipts={},
                         read_reply=lambda *args: {'ok': True, 'dispatch_id': 'd'})
@@ -125,6 +125,91 @@ class ConductorToolBoundaryTest(unittest.TestCase):
             self.assertFalse(hasattr(Handler, 'do_conductor_dispatch'))
             Handler().do_code_run({}, None)
             self.assertEqual(calls, [{}])
+
+
+class ConductorCoreContractTest(ConductorDispatchOptionsTest):
+    def setUp(self):
+        super().setUp()
+        import importlib.util
+        import os
+        import sys
+        from types import ModuleType
+        from unittest.mock import patch
+        source = os.environ.get('GA_CORE_AGENT_LOOP')
+        if not source:
+            self.skipTest('Set GA_CORE_AGENT_LOOP to the real GA agent_loop.py')
+        spec = importlib.util.spec_from_file_location('_conductor_core_contract', source)
+        core = importlib.util.module_from_spec(spec)
+        hooks = ModuleType('plugins.hooks')
+        hooks.trigger = lambda *args, **kwargs: None
+        with patch.dict(sys.modules, {spec.name: core, 'plugins.hooks': hooks}):
+            spec.loader.exec_module(core)
+        self.core = core
+        self.agent = SimpleNamespace(task_dir=None)
+        self.env.update(agent=self.agent, StepOutcome=core.StepOutcome)
+
+    def call(self, **options):
+        return super().call(**options).data
+
+    def exercise_loop(self, reply, first_args=None, legacy=False):
+        import json
+        import copy
+        core, env = self.core, self.env
+        reads, requests = [], []
+        def read_reply(path, timeout):
+            reads.append((path.name, timeout))
+            return reply
+        env['read_reply'] = read_reply
+        class Handler(core.BaseHandler):
+            parent = self.agent
+            _done_hooks = []
+            def do_conductor_dispatch(handler, args, response):
+                outcome = env['dispatch'](handler, args, response)
+                return core.StepOutcome(outcome.data) if legacy else outcome
+            def do_no_tool(handler, args, response):
+                return core.StepOutcome(None)
+        def tool(tid, args):
+            return SimpleNamespace(id=tid, function=SimpleNamespace(
+                name='conductor_dispatch', arguments=json.dumps(args)))
+        class Client:
+            def chat(client, messages, tools):
+                requests.append(copy.deepcopy(messages))
+                calls = [tool('first', first_args or {'objective': 'one'}),
+                         tool('second', {'objective': 'two'})] if len(requests) == 1 else []
+                if False:
+                    yield ''
+                return SimpleNamespace(content='', tool_calls=calls)
+        output = list(core.agent_runner_loop(Client(), '', 'coordinate', Handler(), [], max_turns=2))
+        if legacy:
+            self.assertEqual(len(requests), 1)
+            self.assertEqual(len(reads), 1)
+            return
+        self.assertEqual(len(requests), 2)
+        results = requests[1][0]['tool_results']
+        self.assertEqual([r['tool_use_id'] for r in results], ['first', 'second'])
+        self.assertEqual(json.loads(results[1]['content']), reply)
+        self.assertEqual(json.loads(results[0]['content']), reply if first_args is None else
+                         {'ok': False, 'error': 'objective is required'})
+        self.assertTrue(requests[1][0]['content'])
+        self.assertTrue(all(name.endswith('.response.json') and timeout == 30 for name, timeout in reads))
+        self.assertEqual(len(reads), 2 if first_args is None else 1)
+        # Receipt data belongs in tool_results, not a second copy in streamed text.
+        self.assertNotIn(json.dumps(reply), ''.join(output))
+
+    def test_real_loop_two_async_receipts(self):
+        self.exercise_loop({'ok': True, 'dispatch_id': 'd', 'session_id': 'worker', 'status': 'queued'})
+
+    def test_real_loop_error_and_timeout_receipts(self):
+        for reply in ({'ok': False, 'error': 'capacity'},
+                      {'ok': False, 'pending': True, 'error': 'Conductor wait timed out; outcome unknown'}):
+            with self.subTest(reply=reply):
+                self.exercise_loop(reply)
+
+    def test_real_loop_validation_does_not_cut_batch(self):
+        self.exercise_loop({'ok': True, 'dispatch_id': 'd'}, {'objective': ' '})
+
+    def test_legacy_contract_reproduces_early_exit(self):
+        self.exercise_loop({'ok': True, 'dispatch_id': 'd'}, legacy=True)
 
 
 if __name__ == '__main__':
