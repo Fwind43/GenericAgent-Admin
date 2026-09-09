@@ -216,7 +216,38 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     return nil
 }
 
+type conductorDispatchOptions struct {
+    SessionID string `json:"session_id"`
+    LLMNo *int `json:"llm_no,omitempty"`
+    ReasoningEffort *string `json:"reasoning_effort,omitempty"`
+}
+
+func (o conductorDispatchOptions) apply(st chatSettings) (chatSettings, error) {
+    if o.LLMNo != nil {
+        if *o.LLMNo < 0 { return st, errors.New("llm_no must be a non-negative integer") }
+        st.LLMNo = *o.LLMNo
+    }
+    if o.ReasoningEffort != nil {
+        effort := strings.ToLower(strings.TrimSpace(*o.ReasoningEffort))
+        switch effort {
+        case "off", "none", "minimal", "low", "medium", "high", "xhigh", "max":
+            st.ReasoningEffort = effort
+        default:
+            return st, errors.New("invalid reasoning_effort")
+        }
+    }
+    return st, nil
+}
+
 func (s *Server) dispatchConductor(parentID, objective string, reuseSessionID ...string) (chatConductorChild, error) {
+    options := conductorDispatchOptions{}
+    if len(reuseSessionID) > 0 { options.SessionID = reuseSessionID[0] }
+    return s.dispatchConductorWithOptions(parentID, objective, options)
+}
+
+func (s *Server) dispatchConductorWithOptions(parentID, objective string, options conductorDispatchOptions) (chatConductorChild, error) {
+    if _, err := options.apply(chatSettings{}); err != nil { return chatConductorChild{}, err }
+
     parentID = safeChatID(parentID)
     objective = boundedConductorText(objective, conductorMaxObjective)
     if objective == "" {
@@ -270,8 +301,8 @@ func (s *Server) dispatchConductor(parentID, objective string, reuseSessionID ..
         },
     }
     var previous *chatSession
-    if len(reuseSessionID) > 0 && reuseSessionID[0] != "" {
-        target := reuseSessionID[0]
+    if options.SessionID != "" {
+        target := options.SessionID
         if safeChatID(target) != target {
             s.SessionMu.Unlock()
             return chatConductorChild{}, errors.New("invalid session_id")
@@ -299,6 +330,7 @@ func (s *Server) dispatchConductor(parentID, objective string, reuseSessionID ..
         worker.UpdatedAt = now
         childID, child.SessionID = target, target
     }
+    worker.Settings, _ = options.apply(worker.Settings)
     parent.ConductorChildren = append(parent.ConductorChildren, child)
 
     // Persist both relationship ends before acceptance; restore reused history
@@ -663,8 +695,14 @@ func (s *Server) handleConductorDispatchEvent(parentID string, ev map[string]int
     }
     response := conductorDispatchResponse{}
     objective := boundedConductorText(fmt.Sprint(ev["objective"]), conductorMaxObjective)
-    sessionID, _ := ev["session_id"].(string)
-    child, err := s.dispatchConductor(parentID, objective, sessionID)
+    options := conductorDispatchOptions{}
+    dataOptions, err := json.Marshal(ev)
+    if err == nil { err = json.Unmarshal(dataOptions, &options) }
+    for _, key := range []string{"llm_no", "reasoning_effort"} {
+        if value, present := ev[key]; present && value == nil { err = fmt.Errorf("%s cannot be null", key) }
+    }
+    var child chatConductorChild
+    if err == nil { child, err = s.dispatchConductorWithOptions(parentID, objective, options) }
     if err != nil {
         response.Error = boundedConductorText(err.Error(), 4096)
     } else {

@@ -2686,9 +2686,20 @@ def _install_conductor_tools(agent, config):
         session_id = args.get('session_id', '')
         if not isinstance(session_id, str) or (session_id and not re.fullmatch(r'[A-Za-z0-9_-]+', session_id)):
             return StepOutcome({'ok': False, 'error': 'Invalid session_id'})
+        overrides = {}
+        if 'llm_no' in args:
+            value = args['llm_no']
+            if type(value) is not int or value < 0:
+                return StepOutcome({'ok': False, 'error': 'llm_no must be a non-negative integer'})
+            overrides['llm_no'] = value
+        if 'reasoning_effort' in args:
+            value = args['reasoning_effort']
+            if not isinstance(value, str) or value.strip().lower() not in ('off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'):
+                return StepOutcome({'ok': False, 'error': 'Invalid reasoning_effort'})
+            overrides['reasoning_effort'] = value.strip().lower()
         request_id = uuid.uuid4().hex
         emit({'type': 'conductor_dispatch', 'request_id': request_id,
-              'broker_dir': str(broker), 'objective': objective.strip(), 'session_id': session_id})
+              'broker_dir': str(broker), 'objective': objective.strip(), 'session_id': session_id, **overrides})
         reply = read_reply(broker / (request_id + '.response.json'), 30)
         dispatch_id = reply.get('dispatch_id')
         if reply.get('ok') and isinstance(dispatch_id, str) and re.fullmatch(r'[A-Za-z0-9_-]+', dispatch_id):
@@ -2731,6 +2742,8 @@ def _install_conductor_tools(agent, config):
         properties = {parameter: {'type': 'string'}}
         if name == 'conductor_dispatch':
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
+            properties['llm_no'] = {'type': 'integer', 'minimum': 0, 'description': 'Optional configured runtime model index (not a model name). Overrides this worker only; omitted means inherit parent for new workers, retain existing for reused workers.'}
+            properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}
         schema.append({'type': 'function', 'function': {'name': name, 'description': description,
                        'parameters': {'type': 'object', 'properties': properties,
                                       'required': [parameter], 'additionalProperties': False}}})
