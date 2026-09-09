@@ -72,10 +72,10 @@ test('real ChatApp keeps background attention across selection and clears only t
   await waitFor(() => expect(waitingButton.querySelector('.oa-session-waiting-label')?.textContent).toBe('Waiting'))
   expect(screen.queryByRole('button', { name: /^Waiting for reply/ })).toBeNull()
   expect(document.querySelector('.oa-topbar').classList.contains('has-waiting')).toBe(false)
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
   fireEvent.click(await screen.findByText('Taskbar Beta'))
   await waitFor(() => expect(paths).toContain('/api/chat/session/beta'))
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
   expect(paths).not.toContain('/api/chat/session/background')
 
   const bulkResult = { id: 'background-answer', revision: 'bulk-revision' }
@@ -88,7 +88,7 @@ test('real ChatApp keeps background attention across selection and clears only t
   fireEvent.change(screen.getByRole('textbox', { name: 'Search sessions' }), { target: { value: 'Alpha' } })
   fireEvent.click(screen.getByRole('button', { name: 'Mark all as read' }))
   await waitFor(() => expect(screen.getByRole('button', { name: 'Mark all as read' }).disabled).toBe(true))
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
   expect(paths).not.toContain('/api/chat/session/background')
   fireEvent.change(screen.getByRole('textbox', { name: 'Search sessions' }), { target: { value: '' } })
   expect(screen.getByText('Taskbar Background').closest('button').querySelector('.oa-session-unread-label')).toBeNull()
@@ -109,7 +109,7 @@ test('real ChatApp keeps background attention across selection and clears only t
   // Clear only after the server confirms, independent of pending history.
   await waitFor(() => expect(backgroundButton.querySelector('.oa-session-unread-label')).toBeNull())
   expect(paths).toContain('/api/chat/read')
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
   await act(async () => {
     const data = { ...sessions.find(item => item.id === 'background'), messages: [], queue: [] }
     releaseHistory(new Response(JSON.stringify({ ok: true, ...data, data }), {
@@ -118,14 +118,14 @@ test('real ChatApp keeps background attention across selection and clears only t
   })
   expect(paths).toContain('/api/chat/session/background')
   expect(backgroundButton.querySelector('.oa-session-unread-label')).toBeNull()
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
 
   sessions = sessions.map(item => item.id === 'background'
     ? { ...item, taskbar_state: 'waiting', running: false }
     : item)
   act(() => { window.dispatchEvent(new Event('online')) })
   await waitFor(() => expect(backgroundButton.querySelector('.oa-session-waiting-label')?.textContent).toBe('Waiting'))
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
   expect(backgroundButton.querySelector('.oa-session-running-label')).toBeNull()
   const alphaButton = screen.getByText('Taskbar Alpha').closest('.oa-session')
   fireEvent.click(alphaButton)
@@ -137,7 +137,7 @@ test('real ChatApp keeps background attention across selection and clears only t
   const restoredBackgroundButton = (await screen.findByText('Taskbar Background')).closest('button')
   fireEvent.click(restoredBackgroundButton)
   await waitFor(() => expect(document.querySelector('.oa-title b')?.textContent).toBe('Taskbar Background'))
-  expect(bridge).toHaveBeenLastCalledWith('idle')
+  await waitFor(() => expect(bridge).toHaveBeenLastCalledWith('idle'))
   expect(restoredBackgroundButton.querySelector('.oa-session-waiting-label')?.textContent).toBe('Waiting')
   expect(screen.queryByRole('button', { name: /^Waiting for reply/ })).toBeNull()
 
