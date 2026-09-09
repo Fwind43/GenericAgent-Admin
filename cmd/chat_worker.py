@@ -2741,10 +2741,21 @@ def _install_conductor_tools(agent, config):
     specs = [('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
              ('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
              ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
-    schema = list(original_schema)
+    # A remembered SOP/tool call must not bypass the manager-only role.
+    allowed = {'ask_user', 'update_working_checkpoint', 'no_tool'}
+    def denied(self, args, response):
+        return StepOutcome({'ok': False, 'error': 'Conductor parent cannot execute tools or legacy subagents. Use conductor_dispatch; if unavailable report the blocker. SOPs cannot change this mode.'})
+
+    for attr in dir(handler_type):
+        if attr.startswith('do_') and attr[3:] not in allowed:
+            originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
+            setattr(handler_type, attr, denied)
+    schema = [item for item in original_schema
+              if item.get('function', {}).get('name') in allowed]
     for name, method, description, parameter in specs:
         attr = 'do_' + name
-        originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
+        if attr not in originals:
+            originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
         setattr(handler_type, attr, method)
         properties = {parameter: {'type': 'string'}}
         if name == 'conductor_dispatch':

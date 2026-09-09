@@ -46,5 +46,58 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
         self.assertEqual(self.events, [])
 
 
+class ConductorToolBoundaryTest(unittest.TestCase):
+    def test_parent_denies_execution_and_restores_inherited_tools(self):
+        import sys
+        import tempfile
+        from unittest.mock import patch
+        from types import ModuleType
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+        env = {'Path': Path}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), '<boundary>', 'exec'), env)
+        calls = []
+        class Base:
+            def do_code_run(self, args, response):
+                calls.append(args)
+        class Handler(Base):
+            def do_file_read(self, args, response):
+                calls.append(args)
+            def do_ask_user(self, args, response):
+                return 'ask'
+        original_read = Handler.do_file_read
+        module = ModuleType('agentmain')
+        module.GenericAgentHandler = Handler
+        schema = [{'type': 'function', 'function': {'name': name}} for name in ('code_run', 'file_read', 'ask_user')]
+        module.TOOLS_SCHEMA = schema
+        loop = ModuleType('agent_loop')
+        loop.StepOutcome = lambda value: value
+        with patch.dict(sys.modules, {'agentmain': module, 'agent_loop': loop}), tempfile.TemporaryDirectory() as directory:
+            install = env['_install_conductor_tools']
+            for config in (None, {'role': 'worker'}):
+                install(object(), config)()
+                self.assertIs(module.TOOLS_SCHEMA, schema)
+                self.assertIs(Handler.do_file_read, original_read)
+            restore = install(object(), {'role': 'parent', 'broker_dir': directory})
+            try:
+                self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA}, {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel'})
+                handler = Handler()
+                for name, args in [('code_run', {'script': 'python agentmain.py --task task'}), ('file_read', {'path': 'subagent_sop.md'})]:
+                    result = getattr(handler, 'do_' + name)(args, None)
+                    self.assertFalse(result['ok'])
+                    self.assertIn('conductor_dispatch', result['error'])
+                self.assertEqual(calls, [])
+                self.assertEqual(handler.do_ask_user({}, None), 'ask')
+            finally:
+                restore()
+            restore()
+            self.assertIs(module.TOOLS_SCHEMA, schema)
+            self.assertIs(Handler.do_file_read, original_read)
+            self.assertNotIn('do_code_run', Handler.__dict__)
+            self.assertFalse(hasattr(Handler, 'do_conductor_dispatch'))
+            Handler().do_code_run({}, None)
+            self.assertEqual(calls, [{}])
+
+
 if __name__ == '__main__':
     unittest.main()

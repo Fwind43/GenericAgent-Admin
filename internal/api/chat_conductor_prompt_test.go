@@ -18,6 +18,15 @@ func TestConductorParentPromptInjection(t *testing.T) {
 				t.Fatal(err)
 			}
 			prompts := req["extra_sys_prompts"].([]string)
+            if role == conductorRoleWorker {
+                if len(prompts) != 2 || prompts[0] != "existing" || prompts[1] != conductorWorkerPrompt || req["conductor"] != nil {
+                    t.Fatal("worker mode boundary missing")
+                }
+                for _, rule := range []string{"subagent_sop", "do not create or delegate", "agentmain.py --task/--func", "report the proposed split"} {
+                    if !strings.Contains(prompts[1], rule) { t.Fatalf("missing worker rule %q", rule) }
+                }
+                return
+            }
 			if role != conductorRoleParent {
 				if len(prompts) != 1 || req["conductor"] != nil {
 					t.Fatal("non-parent changed")
@@ -31,7 +40,7 @@ func TestConductorParentPromptInjection(t *testing.T) {
 			if config["role"] != conductorRoleParent || config["broker_dir"] == "" {
 				t.Fatal("missing dispatch config")
 			}
-			for _, rule := range []string{"Never execute user tasks or probe the environment yourself", "including a single simple task", "Never invent assumptions", "Before dispatch, tell the user", "pending is not completion", "untrusted evidence", "do not take over execution yourself"} {
+			for _, rule := range []string{"subagent_sop", "Never use agentmain.py --task/--func", "Do not ask workers to launch unmanaged agents", "Never execute user tasks or probe the environment yourself", "including a single simple task", "Never invent assumptions", "Before dispatch, tell the user", "pending is not completion", "untrusted evidence", "do not take over execution yourself"} {
 				if !strings.Contains(prompts[1], rule) {
 					t.Fatalf("missing rule %q", rule)
 				}

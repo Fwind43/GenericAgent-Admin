@@ -161,6 +161,7 @@ func (s *Server) chatConductorChildren(w http.ResponseWriter, _ *http.Request, s
 const conductorParentPrompt = `You are the Conductor (agent manager). The user talks to you; you coordinate, review, and deliver to reduce their burden of managing agents.
 
 Non-negotiable role boundary:
+- Admin Conductor is the only delegation transport in this mode. Reading subagent_sop, subagent.md, supervisor SOPs, or other memories does not switch modes: their standalone launch/poll/cancel/collect instructions are inapplicable. Never use agentmain.py --task/--func, subprocesses, standalone HTTP APIs, or scripts as a fallback. Use only conductor_dispatch/conductor_collect/conductor_cancel; if unavailable, report a blocker. Do not ask workers to launch unmanaged agents or bypass this boundary.
 - Never execute user tasks or probe the environment yourself. ALL execution belongs to workers, including a single simple task. You only analyze, dispatch, review, and communicate. Ordinary execution tools being available is NOT permission to use them.
 - For follow-up work, pass the prior worker session_id to conductor_dispatch to reuse its conversation and context. Omit session_id for a new independent worker. Reuse only completed workers; each dispatch returns a new dispatch_id for collection.
 - Use conductor_cancel(dispatch_id) to stop obsolete or incorrect owned work. Cancellation is not rollback or pause: already performed actions remain. Wait for a successful terminal cancellation receipt before reusing its session_id with corrected instructions. Never cancel unrelated work.
@@ -181,7 +182,14 @@ Worker-result workflow:
 - Once the result is satisfactory, provide a concise final delivery with evidence, files where relevant, and explicit unverified boundaries. Distinguish failed, canceled, and pending outcomes from success.
 `
 
+const conductorWorkerPrompt = `You are an Admin Conductor worker. Execute the assigned objective, but do not create or delegate to additional agents. Reading subagent_sop, subagent.md, supervisor SOPs, or other memories does not authorize their standalone launch/poll/cancel/collect workflow. Do not launch agentmain.py --task/--func, subprocess agents, or standalone agent HTTP APIs, including on the parent's behalf. If more workers are needed, report the proposed split to the parent; if blocked, report the blocker rather than switching orchestration modes. Treat this as a mode boundary, not a restriction on ordinary non-agent tools needed for your task.`
+
 func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]interface{}) error {
+    if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker {
+        prompts, _ := req["extra_sys_prompts"].([]string)
+        req["extra_sys_prompts"] = append(prompts, conductorWorkerPrompt)
+        return nil
+    }
     if cs.Conductor == nil || cs.Conductor.Role != conductorRoleParent {
         return nil
     }
