@@ -3886,16 +3886,15 @@ export const ConductorEvents = memo(function ConductorEvents({ conductorDetail, 
   const events = conductorChildren(conductorDetail).flatMap((worker, index) => [
     { time: worker.created_at, kind: 'dispatched', label: ct('任务已派发', 'Task dispatched') },
     { time: worker.started_at, kind: 'started', label: ct('子任务已启动', 'Worker started') },
-    { time: worker.finished_at, kind: 'finished', label: `${ct('子任务结束', 'Worker finished')} · ${workerStatus(worker)}` },
+    { time: worker.finished_at, kind: 'finished', label: `${ct('子任务结束', 'Worker finished')} · ${ct(({ succeeded: '已完成', completed: '已完成', failed: '失败', cancelled: '已取消' })[workerStatus(worker)] || workerStatus(worker), workerStatus(worker))}` },
   ].filter(event => Number(event.time) > 0).map(event => ({ ...event, worker, id: `${worker.dispatch_id || worker.session_id || index}-${event.kind}` })))
     .sort((a, b) => Number(a.time) - Number(b.time))
   return <aside id="oa-conductor-events" className="oa-conductor-events" aria-label={ct('任务事件', 'Task events')}>
-    <div>
+    <div className="oa-conductor-events-body">
       <header className="oa-conductor-events-head"><b>{ct('任务事件', 'Task events')} <span>{events.length}</span></b><button type="button" className="oa-icon-btn" onClick={onClose} aria-label={ct('关闭任务事件', 'Close task events')}><X size={16}/></button></header>
-      <div className="oa-conductor-event-scroll">{events.slice().reverse().map(event => <article key={event.id} className="oa-conductor-event">
-        <time>{new Date(Number(event.time) * 1000).toLocaleTimeString()}</time>
-        <strong>{event.label}</strong>
-        <p>{event.worker.title || event.worker.objective || event.worker.session_id}</p>
+      <div className="oa-conductor-event-scroll">{events.slice().reverse().map(event => <article key={event.id} className={`oa-conductor-event is-${event.kind === 'finished' ? workerStatus(event.worker) : event.kind}`}>
+        <div className="oa-conductor-event-meta"><strong>{event.label}</strong><time title={new Date(Number(event.time) * 1000).toLocaleString()}>{new Date(Number(event.time) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>
+        <details className="oa-conductor-event-task"><summary><span>{event.worker.title || event.worker.objective || event.worker.session_id}</span></summary><p>{event.worker.objective || event.worker.title || event.worker.session_id}</p></details>
         {event.kind === 'finished' && (event.worker.result || event.worker.error) && <details><summary>{ct('查看结果 / 错误', 'View result / error')}</summary><pre>{event.worker.error || event.worker.result}</pre></details>}
       </article>)}</div>
     </div>
