@@ -4263,7 +4263,7 @@ export function ProviderModelCascade({
   )
 }
 
-export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeychain, onAutorun, onLoop, commandsOpen, keychainOpen, systemPromptActive, systemPromptLabel, autorunEnabled, loopOpen, triggerRef }) {
+export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeychain, onAutorun, onLoop, onConductor, conductorDisabled, commandsOpen, keychainOpen, systemPromptActive, systemPromptLabel, autorunEnabled, loopOpen, triggerRef }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const fallbackTriggerRef = useRef(null)
@@ -4286,6 +4286,7 @@ export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeycha
     { icon: KeyRound, label: ct('密钥管理', 'Keychain'), onClick: onKeychain, active: keychainOpen },
     { icon: Bot, label: ct('自主行动', 'Auto-action'), onClick: onAutorun, active: autorunEnabled },
     { icon: Orbit, label: 'Loop', onClick: onLoop, active: loopOpen },
+    ...(onConductor ? [{ icon: Bot, label: ct('升级为指挥家', 'Upgrade to Conductor'), onClick: onConductor, disabled: conductorDisabled }] : []),
   ]
 
   return (
@@ -4312,6 +4313,7 @@ export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeycha
                 key={i}
                 type="button"
                 className={action.active ? 'is-active' : ''}
+                disabled={action.disabled}
                 onClick={() => {
                   action.onClick?.()
                   setOpen(false)
@@ -4592,6 +4594,8 @@ export default function ChatApp() {
   const [prompt, setPrompt] = useState('')
   const [loopState, setLoopState] = useState(null)
   const [activeSessionDetail, setActiveSessionDetail] = useState(null)
+  const [conductorEnabling, setConductorEnabling] = useState(false)
+  const conductorEnablingRef = useRef(false)
   const [conductorStoppingID, setConductorStoppingID] = useState('')
   const [loopConfigOpen, setLoopConfigOpen] = useState(false)
   const [loopObjective, setLoopObjective] = useState('')
@@ -5724,6 +5728,26 @@ export default function ChatApp() {
 
   const newProjectSession = async (projectMode) => {
     await createSession(projectMode)
+  }
+
+  const upgradeToConductor = async () => {
+    const target = activeSidRef.current
+    if (!target || conductorEnablingRef.current) return
+    conductorEnablingRef.current = true
+    setConductorEnabling(true)
+    setErr('')
+    try {
+      const result = await api(`/api/chat/conductor/${encodeURIComponent(target)}/enable`, { method: 'POST' })
+      setSessions(items => items.map(item => String(item.id) === String(target) ? { ...item, conductor: result.conductor } : item))
+      if (activeSidRef.current === target) {
+        setActiveSessionDetail(current => current && String(current.id) === String(target) ? { ...current, conductor: result.conductor } : current)
+      }
+    } catch (error) {
+      if (activeSidRef.current === target) setErr(error.message || String(error))
+    } finally {
+      conductorEnablingRef.current = false
+      setConductorEnabling(false)
+    }
   }
 
   const newConductorSession = async () => {
@@ -7750,6 +7774,8 @@ export default function ChatApp() {
               onKeychain={() => setKeychainOpen(true)}
               onAutorun={toggleAutorun}
               onLoop={() => setLoopRailOpen(true)}
+              onConductor={!activeSessionDetail?.conductor?.role ? upgradeToConductor : undefined}
+              conductorDisabled={!sid || sessionLoading || sessionLoadFailed || !activeSessionDetail || isCurrentRunning || activeSessionDetail?.running || queuedMessages.length > 0 || conductorEnabling}
               commandsOpen={cmdManagerOpen}
               keychainOpen={keychainOpen}
               systemPromptActive={extraPromptOpen || extraSysPromptPresetID}

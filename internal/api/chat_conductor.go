@@ -94,23 +94,42 @@ func conductorFindChild(children []chatConductorChild, dispatchID string) int {
     return -1
 }
 
+var errConductorBusy = errors.New("session is running; wait until it finishes")
+var errConductorWorker = errors.New("a worker session cannot become a conductor")
+
+func (s *Server) chatConductorEnable(w http.ResponseWriter, r *http.Request, sid string) {
+    cs, err := s.enableChatConductor(sid)
+    if err != nil {
+        status := http.StatusInternalServerError
+        if errors.Is(err, os.ErrNotExist) { status = http.StatusNotFound }
+        if errors.Is(err, errConductorBusy) || errors.Is(err, errConductorWorker) { status = http.StatusConflict }
+        bad(w, status, err.Error())
+        return
+    }
+    writeJSON(w, map[string]interface{}{"id": cs.ID, "conductor": cs.Conductor})
+}
+
 func (s *Server) enableChatConductor(sid string) (chatSession, error) {
     sid = safeChatID(sid)
     s.SessionMu.Lock()
     defer s.SessionMu.Unlock()
+    if _, err := os.Stat(chatSessionPath(s.CfgStore.Snapshot(), sid)); err != nil {
+        return chatSession{}, err
+    }
     cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)
     if err != nil {
         return chatSession{}, err
     }
-    if cs.ID == "" {
-        return chatSession{}, os.ErrNotExist
-    }
     if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker {
-        return chatSession{}, errors.New("worker sessions cannot become Conductor parents")
+        return chatSession{}, errConductorWorker
     }
-    if cs.Conductor == nil {
-        cs.Conductor = &chatConductorState{Role: conductorRoleParent}
+    if cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent {
+        return cs, nil
     }
+    if s.chatRunActive(sid) || len(cs.QueuedMessages) > 0 {
+        return chatSession{}, errConductorBusy
+    }
+    cs.Conductor = &chatConductorState{Role: conductorRoleParent}
     if err := saveChatSessionLocked(s.CfgStore.Snapshot(), cs); err != nil {
         return chatSession{}, err
     }

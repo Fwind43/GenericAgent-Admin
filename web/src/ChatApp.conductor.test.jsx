@@ -2,7 +2,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-import ChatApp, { ConductorEvents } from './ChatApp.jsx'
+import ChatApp, { ConductorEvents, ComposerActions } from './ChatApp.jsx'
 
 const session = (id, title, extra = {}) => ({
   id,
@@ -122,3 +122,66 @@ test('inline completion appears on detail update without becoming a user message
   expect(screen.getByText('Live result')).toBeTruthy()
   expect(document.querySelectorAll('.oa-conductor-event')).toHaveLength(2)
 })
+
+ test('composer plus menu exposes upgrade only for eligible sessions and respects busy state', () => {
+  localStorage.setItem('ga-admin-lang', 'en')
+  const upgrade = vi.fn()
+  const view = render(<ComposerActions onConductor={upgrade} conductorDisabled />)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+  const action = screen.getByRole('menuitem', { name: 'Upgrade to Conductor' })
+  expect(action.disabled).toBe(true)
+  fireEvent.click(action)
+  expect(upgrade).not.toHaveBeenCalled()
+  view.rerender(<ComposerActions onConductor={upgrade} />)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Upgrade to Conductor' }))
+  expect(upgrade).toHaveBeenCalledTimes(1)
+  view.rerender(<ComposerActions />)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+  expect(screen.queryByRole('menuitem', { name: 'Upgrade to Conductor' })).toBeNull()
+ })
+
+ test.each(['light', 'dark', 'warm'])('ordinary session upgrades in place (%s)', async theme => {
+  document.documentElement.dataset.theme = theme
+  localStorage.setItem('ga-admin-lang', 'en')
+  localStorage.setItem('ga-chat-last-session', 'plain')
+  const json = data => new Response(JSON.stringify({ ok: true, ...data, data }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+  vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} })
+  Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
+  let upgraded = false
+  const fetcher = vi.fn(async (input, init = {}) => {
+    const url = new URL(String(input), 'http://localhost')
+    const current = session('plain', 'Existing conversation', upgraded ? { conductor: { role: 'parent' } } : {})
+    if (url.pathname === '/api/chat/conductor/plain/enable') {
+      expect(init.method).toBe('POST')
+      upgraded = true
+      return json({ id: 'plain', conductor: { role: 'parent' } })
+    }
+    if (url.pathname === '/api/chat/sessions') return json({ sessions: [current] })
+    if (url.pathname === '/api/chat/session/plain') return json(current)
+    if (url.pathname === '/api/chat/ping') return json({ cwd: '/workspace', app_root: '/app', default_workspace: '/workspace' })
+    if (url.pathname === '/api/chat/models') return json({ models: ['test-model'], default: 'test-model', provider_groups: [] })
+    if (url.pathname === '/api/chat/settings') return json({ settings: {}, resolved: {} })
+    if (url.pathname === '/api/chat/projects') return json({ projects: [], default_workspace: '/workspace' })
+    if (url.pathname === '/api/chat/system_prompts') return json({ presets: [] })
+    if (url.pathname === '/api/chat/conductor/plain/children') return json({ children: [] })
+    return json({})
+  })
+  vi.stubGlobal('fetch', fetcher)
+  render(<ChatApp />)
+  await screen.findAllByText('Existing conversation')
+  fireEvent.click(document.querySelector('.oa-session-title'))
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+  const action = screen.getByRole('menuitem', { name: 'Upgrade to Conductor' })
+  await waitFor(() => expect(action.disabled).toBe(false))
+  fireEvent.click(action)
+  await waitFor(() => expect(upgraded).toBe(true))
+  fireEvent.click((await screen.findAllByRole('button', { name: 'Subagents' }))[0])
+  await screen.findByRole('complementary', { name: 'Subagents' })
+  expect(localStorage.getItem('ga-chat-last-session')).toBe('plain')
+  expect(fetcher.mock.calls.some(([url]) => String(url).includes('/api/chat/new'))).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+  expect(screen.queryByRole('menuitem', { name: 'Upgrade to Conductor' })).toBeNull()
+  delete document.documentElement.dataset.theme
+ })

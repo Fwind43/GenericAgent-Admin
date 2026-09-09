@@ -163,6 +163,10 @@ func (s *Server) chatHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "conductor":
+		if len(parts) == 3 && parts[2] == "enable" && r.Method == http.MethodPost {
+			s.chatConductorEnable(w, r, parts[1])
+			return
+		}
 		if len(parts) == 3 && parts[2] == "children" && r.Method == http.MethodGet {
 			s.chatConductorChildren(w, r, parts[1])
 			return
