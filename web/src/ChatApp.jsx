@@ -7233,9 +7233,16 @@ export default function ChatApp() {
         <div className="oa-session-list">
           {recentSessionGroups.map(group => <section className={`oa-recent-group oa-recent-group-${group.key}`} key={group.key}>
             <div className="oa-recent-group-head">{group.key === 'pinned' && <Pin size={12}/>}<span>{recentGroupLabels[group.key]}</span><small>{group.sessions.length}</small></div>
-            <div className="oa-recent-group-body">{group.sessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).flatMap(session => {
+            <div className="oa-recent-group-body">{group.sessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
               const node = conductorSidebarTreeByID.get(String(session.id || ''))
-              return [renderSidebarSession(session), ...(node?.workers || []).map(worker => renderSidebarSession(worker, { nested:true }))]
+              if (!node?.workers?.length) return renderSidebarSession(session)
+              return <div className="oa-conductor-tree" key={session.id}>
+                {renderSidebarSession(session)}
+                <details className="oa-conductor-tree-branch" open={node.workers.some(worker => worker.id === sid) || undefined}>
+                  <summary>{ct('子任务', 'Subtasks')} <small>{node.workers.length}</small></summary>
+                  <div className="oa-conductor-tree-children">{node.workers.map(worker => renderSidebarSession(worker, { nested:true }))}</div>
+                </details>
+              </div>
             })}</div>
           </section>)}
           {!filteredSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
