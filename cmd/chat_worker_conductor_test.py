@@ -46,6 +46,29 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
         self.assertEqual(self.events, [])
 
 
+class ConductorReviewTest(unittest.TestCase):
+    def test_review_forwards_evidence_and_rejects_wrong_parent(self):
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        node = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'review' and any(isinstance(x, ast.Constant) and x.value == 'conductor_review' for x in ast.walk(n)))
+        agent, events, replies = object(), [], []
+        def read_reply(path, timeout):
+            replies.append((path, timeout))
+            return {'ok': True}
+        env = dict(agent=agent, StepOutcome=lambda value: value,
+                   uuid=__import__('uuid'), broker=Path('broker'),
+                   emit=events.append, read_reply=read_reply)
+        exec(compile(ast.Module(body=[node], type_ignores=[]), '<review>', 'exec'), env)
+        args = dict(dispatch_id='d', status='verified', basis='Test output',
+                    evidence_ids=['d:0'], unverified='Production')
+        self.assertFalse(env['review'](SimpleNamespace(parent=object()), args, None)['ok'])
+        self.assertEqual(events, [])
+        self.assertTrue(env['review'](SimpleNamespace(parent=agent), args, None)['ok'])
+        self.assertEqual(len(events), 1)
+        for key, value in args.items():
+            self.assertEqual(events[0][key], value)
+        self.assertEqual(replies, [(Path('broker') / (events[0]['request_id'] + '.response.json'), 30)])
+
+
 class ConductorToolBoundaryTest(unittest.TestCase):
     def test_parent_denies_execution_and_restores_inherited_tools(self):
         import sys
@@ -80,7 +103,11 @@ class ConductorToolBoundaryTest(unittest.TestCase):
                 self.assertIs(Handler.do_file_read, original_read)
             restore = install(object(), {'role': 'parent', 'broker_dir': directory})
             try:
-                self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA}, {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel'})
+                self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA}, {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel', 'conductor_review'})
+                review_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_review')
+                self.assertEqual(set(review_schema['required']), {'dispatch_id', 'status', 'basis', 'evidence_ids'})
+                self.assertEqual(review_schema['properties']['status']['enum'], ['verified', 'needs_work'])
+                self.assertFalse(review_schema['additionalProperties'])
                 handler = Handler()
                 for name, args in [('code_run', {'script': 'python agentmain.py --task task'}), ('file_read', {'path': 'subagent_sop.md'})]:
                     result = getattr(handler, 'do_' + name)(args, None)

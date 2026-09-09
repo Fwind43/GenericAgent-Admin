@@ -291,21 +291,38 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
 const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, onOpen, onStop, onClose, stoppingID = '' }) {
   const workers = conductorWorkers(detail, sessions)
   const counts = conductorStatusCounts(workers)
+  const usage = detail?.conductor_usage_summary
+  const usageText = (value) => `${Number(value?.prompt_tokens || 0).toLocaleString()} / ${Number(value?.output_tokens || 0).toLocaleString()}`
   return <aside id="oa-conductor-workers" className="oa-conductor-events oa-conductor-agents" aria-label="Subagents">
     <div className="oa-conductor-events-body">
       <header className="oa-conductor-events-head"><b>Subagents <span>{counts.total}</span></b><button type="button" className="oa-icon-btn" onClick={onClose} aria-label={ct('关闭子代理侧栏', 'Close subagents')}><X size={16}/></button></header>
       <div className="oa-conductor-event-scroll">
+        <section aria-label={ct('任务用量', 'Task usage')}>
+          <p>{ct('累计派发', 'Dispatches')}: {detail?.conductor_dispatch_count ?? '\u2014'} / {detail?.conductor_dispatch_limit ?? '\u2014'}</p>
+          {usage ? <>
+            <small>{ct('Token：输入 / 输出', 'Tokens: input / output')}</small>
+            <p>{ct('父任务', 'Parent')}: {usageText(usage.parent)}</p>
+            <p>{ct('已封存子任务', 'Finalized children')}: {usageText(usage.children)}</p>
+            <p>{ct('已记录合计', 'Recorded total')}: {usageText(usage.total)}</p>
+            {usage.missing_dispatches > 0 && <p role="status">{ct('缺失用量快照', 'Missing usage snapshots')}: {usage.missing_dispatches}. {ct('合计不完整，缺失不代表零消耗。', 'Total incomplete; missing does not mean zero usage.')}</p>}
+          </> : <p>{ct('用量未知', 'Usage unavailable')}</p>}
+          <small>{ct('运行中用量不完整；子任务仅计入已保存的终态快照。', 'Running usage is incomplete; children include only saved terminal snapshots.')}</small>
+        </section>
         {workers.length ? workers.map((worker, index) => {
           const id = String(worker?.session_id || worker?.id || '')
           const status = workerStatus(worker)
           const active = canStopConductorWorker(worker) || status === 'cancelling'
           const objective = String(worker?.objective || '')
           const taskName = worker?.task_name || worker?.title || objective.split('\n')[0] || ct('未命名任务', 'Untitled task')
-          const statusLabel = ct(({ queued: '排队中', running: '执行中', cancelling: '停止中', succeeded: '已完成', failed: '失败', cancelled: '已取消' })[status] || '未知', status || 'unknown')
+          const statusLabel = ct(({ queued: '排队中', running: '执行中', cancelling: '停止中', succeeded: '执行结束', failed: '失败', cancelled: '已取消' })[status] || '未知', status === 'succeeded' ? 'Execution finished' : status || 'unknown')
           return <article className="oa-conductor-agent" key={id}>
             <div className="oa-conductor-agent-head"><button type="button" onClick={()=>onOpen(id)} title={id}>Subagent {index + 1}<ExternalLink size={13}/></button><span><i className={`oa-conductor-status-dot is-${status}`} aria-hidden="true"/>{statusLabel}</span></div>
             <small>{active ? ct('当前任务', 'Current task') : ct('最近任务', 'Latest task')}</small>
             <h3 title={taskName}>{taskName}</h3>
+            {status === 'succeeded' && <p>{worker.review?.status === 'verified' ? ct('已核验（父代理审查）', 'Verified (parent review)') : worker.review?.status === 'needs_work' ? ct('需补充', 'Needs work') : ct('待核验', 'Pending review')}</p>}
+            {worker.evidence?.length > 0 && <details><summary>{ct('工具记录', 'Tool records')} ({worker.evidence.length})</summary>{worker.evidence.map(item => <p key={item.id}><code>{item.id} · {item.tool}</code><br/>{item.result}</p>)}</details>}
+            {worker.review?.unverified && <p>{worker.review.unverified}</p>}
+            {worker.review?.basis && <p>{worker.review.basis}</p>}
             {objective && <details><summary>{ct('任务详情', 'Task details')}</summary><p>{objective}</p></details>}
             {canStopConductorWorker(worker) && <button type="button" className="oa-conductor-stop" onClick={()=>onStop(id)} disabled={stoppingID === id}>{stoppingID === id ? ct('停止中…', 'Stopping…') : ct('停止任务', 'Stop task')}</button>}
           </article>
@@ -6829,7 +6846,7 @@ export default function ChatApp() {
               : null
             if (!stopped && activeSidRef.current === activeID) {
               setActiveSessionDetail(current => current && String(current.id) === String(after.id)
-                ? { ...current, ...after, ...(Array.isArray(metadata?.children) ? { conductor_children: metadata.children } : {}) }
+                ? { ...current, ...after, ...(Array.isArray(metadata?.children) ? { conductor_children: metadata.children, conductor_usage_summary: metadata.usage_summary, conductor_dispatch_limit: metadata.dispatch_limit, conductor_dispatch_count: metadata.dispatch_count } : {}) }
                 : current)
             }
           } else if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {

@@ -2724,6 +2724,17 @@ def _install_conductor_tools(agent, config):
               'broker_dir': str(broker), 'dispatch_id': dispatch_id})
         return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30))
 
+    def review(handler, args, response):
+        if handler.parent is not agent:
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+        request_id = uuid.uuid4().hex
+        emit({'type': 'conductor_review', 'request_id': request_id,
+              'broker_dir': str(broker), 'dispatch_id': args.get('dispatch_id'),
+              'status': args.get('status'), 'basis': args.get('basis'),
+              'unverified': args.get('unverified', ''),
+              'evidence_ids': args.get('evidence_ids', [])})
+        return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30))
+
     def collect(handler, args, response):
         if handler.parent is not agent:
             return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
@@ -2738,7 +2749,8 @@ def _install_conductor_tools(agent, config):
         return StepOutcome({'untrusted_worker_result': reply,
                             'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'})
 
-    specs = [('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
+    specs = [('conductor_review', review, 'Record parent review of a successful dispatch. verified requires evidence_ids from collected persisted tool records and a basis explaining what they establish. Worker prose is not evidence; tool execution alone does not prove the objective. Use needs_work when incomplete and state unverified scope.', 'dispatch_id'),
+             ('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
              ('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
              ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
     # A remembered SOP/tool call must not bypass the manager-only role.
@@ -2758,6 +2770,13 @@ def _install_conductor_tools(agent, config):
             originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
         setattr(handler_type, attr, method)
         properties = {parameter: {'type': 'string'}}
+        if name == 'conductor_review':
+            properties.update({
+                'status': {'type': 'string', 'enum': ['verified', 'needs_work']},
+                'basis': {'type': 'string', 'minLength': 1},
+                'unverified': {'type': 'string'},
+                'evidence_ids': {'type': 'array', 'maxItems': 64,
+                                 'items': {'type': 'string'}}})
         if name == 'conductor_dispatch':
             properties['project_id'] = {'type': 'string', 'minLength': 1, 'description': 'Optional existing project ID for a NEW worker only; cannot combine with session_id. Omit to inherit parent project and workspace. Uses current global project mode. Explicit selection clears inherited execution workspace; project memory is not a code directory.'}
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
@@ -2765,7 +2784,7 @@ def _install_conductor_tools(agent, config):
             properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}
         schema.append({'type': 'function', 'function': {'name': name, 'description': description,
                        'parameters': {'type': 'object', 'properties': properties,
-                                      'required': [parameter], 'additionalProperties': False}}})
+                                      'required': ([parameter, 'status', 'basis', 'evidence_ids'] if name == 'conductor_review' else [parameter]), 'additionalProperties': False}}})
     agentmain.TOOLS_SCHEMA = schema
 
     def restore():
