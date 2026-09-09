@@ -21,6 +21,7 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
 
     def test_omitted_preserves_absence(self):
         self.assertTrue(self.call()['ok'])
+        self.assertNotIn('project_id', self.events[0])
         self.assertNotIn('llm_no', self.events[0])
         self.assertNotIn('reasoning_effort', self.events[0])
 
@@ -30,6 +31,14 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
             self.assertEqual(self.events[-1]['llm_no'], 0)
             self.assertEqual(self.events[-1]['reasoning_effort'], effort)
             self.assertEqual(self.events[-1]['session_id'], 'worker')
+
+    def test_project_forwarded(self):
+        self.assertTrue(self.call(project_id=' target ')['ok'])
+        self.assertEqual(self.events[-1]['project_id'], 'target')
+        for value in (None, '', ' ', 3):
+            self.assertFalse(self.call(project_id=value)['ok'])
+        self.assertFalse(self.call(project_id='target', session_id='worker')['ok'])
+        self.assertEqual(len(self.events), 1)
 
     def test_invalid_never_emits(self):
         for options in ({'llm_no': -1}, {'llm_no': True}, {'llm_no': 1.5}, {'llm_no': '1'}, {'llm_no': None}, {'reasoning_effort': None}, {'reasoning_effort': ''}, {'reasoning_effort': 'invalid'}):

@@ -217,6 +217,7 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
 }
 
 type conductorDispatchOptions struct {
+    ProjectID *string `json:"project_id,omitempty"`
     SessionID string `json:"session_id"`
     LLMNo *int `json:"llm_no,omitempty"`
     ReasoningEffort *string `json:"reasoning_effort,omitempty"`
@@ -247,6 +248,17 @@ func (s *Server) dispatchConductor(parentID, objective string, reuseSessionID ..
 
 func (s *Server) dispatchConductorWithOptions(parentID, objective string, options conductorDispatchOptions) (chatConductorChild, error) {
     if _, err := options.apply(chatSettings{}); err != nil { return chatConductorChild{}, err }
+
+    var selectedProject *chatProjectItem
+    if options.ProjectID != nil {
+        if strings.TrimSpace(options.SessionID) != "" { return chatConductorChild{}, errors.New("project_id is only supported for new workers; omit session_id") }
+        cfg := s.CfgStore.Snapshot()
+        provider := chatProjectProviderOfficial
+        if cfg.DefaultProjectProvider == chatProjectProviderAdmin { provider = chatProjectProviderAdmin }
+        item, _, err := resolveProject(cfg, provider, strings.TrimSpace(*options.ProjectID))
+        if err != nil { return chatConductorChild{}, fmt.Errorf("invalid project_id: %w", err) }
+        selectedProject = &item
+    }
 
     parentID = safeChatID(parentID)
     objective = boundedConductorText(objective, conductorMaxObjective)
@@ -329,6 +341,13 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
         worker.Conductor = state
         worker.UpdatedAt = now
         childID, child.SessionID = target, target
+    }
+    if selectedProject != nil {
+        worker.ProjectID, worker.ProjectProvider = selectedProject.ID, selectedProject.Provider
+        worker.ProjectMode = ""
+        if selectedProject.Provider == chatProjectProviderOfficial { worker.ProjectMode = selectedProject.ID }
+        // Project memory is not an execution workspace. Match explicit project creation.
+        worker.Workspace = ""
     }
     worker.Settings, _ = options.apply(worker.Settings)
     parent.ConductorChildren = append(parent.ConductorChildren, child)
@@ -698,7 +717,7 @@ func (s *Server) handleConductorDispatchEvent(parentID string, ev map[string]int
     options := conductorDispatchOptions{}
     dataOptions, err := json.Marshal(ev)
     if err == nil { err = json.Unmarshal(dataOptions, &options) }
-    for _, key := range []string{"llm_no", "reasoning_effort"} {
+    for _, key := range []string{"llm_no", "reasoning_effort", "project_id"} {
         if value, present := ev[key]; present && value == nil { err = fmt.Errorf("%s cannot be null", key) }
     }
     var child chatConductorChild
