@@ -1184,6 +1184,11 @@ func (s *Server) chatPost(w http.ResponseWriter, r *http.Request, sid string) {
 // use startOnly so their synchronous put callback can acknowledge admission
 // immediately instead of waiting for the entire streamed model response.
 func (s *Server) chatPostMode(w http.ResponseWriter, r *http.Request, sid string, startOnly bool) {
+	s.chatPostWithSender(w, r, sid, startOnly, "user")
+}
+
+// senderKind is server-owned, never decoded from an HTTP request.
+func (s *Server) chatPostWithSender(w http.ResponseWriter, r *http.Request, sid string, startOnly bool, senderKind string) {
 	var req struct {
 		Prompt              string        `json:"prompt"`
 		Files               []chatUpload  `json:"files"`
@@ -1288,7 +1293,7 @@ func (s *Server) chatPostMode(w http.ResponseWriter, r *http.Request, sid string
 	if uid == "" {
 		uid = newChatID()
 	}
-	userMsg := chatMessage{ID: uid, Role: "user", Content: display, Files: saved, CreatedAt: time.Now().Unix()}
+	userMsg := chatMessage{ID: uid, Role: "user", SenderKind: senderKind, Content: display, Files: saved, CreatedAt: time.Now().Unix()}
 	runStartedAtMS := time.Now().UnixMilli()
 	pendingMsg := chatMessage{ID: newChatID(), Role: "assistant", CreatedAt: time.Now().Unix(), RunStartedAtMS: runStartedAtMS}
 	cs.Messages = append(cs.Messages, userMsg)

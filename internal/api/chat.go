@@ -30,6 +30,7 @@ import (
 type chatMessage struct {
 	ID                string                   `json:"id"`
 	Role              string                   `json:"role"`
+	SenderKind        string                   `json:"sender_kind,omitempty"`
 	Content           string                   `json:"content"`
 	Outputs           []string                 `json:"outputs,omitempty"`
 	ModelID           string                   `json:"model_id,omitempty"`

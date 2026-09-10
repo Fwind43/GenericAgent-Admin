@@ -3648,9 +3648,13 @@ export const ChatMessage = memo(function ChatMessage({
   editDisabled = false, clockNow = 0, conductorWorker = false,
 }) {
   const userText = m.role === 'user' ? stripUserAttachmentBlock(m.content) : m.content
-  const workerInstruction = '\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent. Do not attempt to dispatch other workers.'
-  const delegated = conductorWorker && m.role === 'user' && typeof userText === 'string' && userText.endsWith(workerInstruction)
-  const delegatedObjective = delegated ? userText.slice(0, -workerInstruction.length) : ''
+  const shortInstruction = '\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent.'
+  const workerInstruction = [shortInstruction + ' Do not attempt to dispatch other workers.', shortInstruction]
+    .find(suffix => typeof userText === 'string' && userText.endsWith(suffix)) || ''
+  // Legacy inference is restricted to messages without explicit provenance.
+  const delegated = m.role === 'user' && (m.sender_kind === 'conductor' ||
+    (!m.sender_kind && conductorWorker && !!workerInstruction))
+  const delegatedObjective = delegated ? (workerInstruction ? userText.slice(0, -workerInstruction.length) : userText) : ''
   const messageFiles = Array.isArray(m.files) ? m.files : []
   const imageFiles   = messageFiles.filter(isImageFile)
   const nonImageFiles = messageFiles.filter(f => !isImageFile(f))

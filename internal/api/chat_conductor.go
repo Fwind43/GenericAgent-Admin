@@ -657,7 +657,7 @@ func (s *Server) startConductorChild(parentID string, child chatConductorChild) 
     body, _ := json.Marshal(map[string]interface{}{"prompt": prompt + conductorWorkerInstruction, "llmNo": worker.Settings.LLMNo})
     rr := &conductorResponseWriter{header: make(http.Header)}
     req, _ := http.NewRequest(http.MethodPost, "/api/chat/"+child.SessionID, strings.NewReader(string(body)))
-    s.chatPostMode(rr, req, child.SessionID, true)
+    s.chatPostWithSender(rr, req, child.SessionID, true, "conductor")
     if rr.status >= http.StatusBadRequest {
         s.finishConductorChild(parentID, child.DispatchID, conductorFailed, "", boundedConductorText(rr.body.String(), 4096))
     }
