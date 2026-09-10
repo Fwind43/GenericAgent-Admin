@@ -3649,8 +3649,9 @@ export const ChatMessage = memo(function ChatMessage({
 }) {
   const userText = m.role === 'user' ? stripUserAttachmentBlock(m.content) : m.content
   const shortInstruction = '\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent.'
-  const workerInstruction = [shortInstruction + ' Do not attempt to dispatch other workers.', shortInstruction]
-    .find(suffix => typeof userText === 'string' && userText.endsWith(suffix)) || ''
+  const workerInstruction = typeof userText === 'string' && userText.endsWith(shortInstruction)
+    ? shortInstruction
+    : ''
   // Legacy inference is restricted to messages without explicit provenance.
   const delegated = m.role === 'user' && (m.sender_kind === 'conductor' ||
     (!m.sender_kind && conductorWorker && !!workerInstruction))
