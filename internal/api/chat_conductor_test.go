@@ -372,7 +372,7 @@ func TestConductorTerminalWorkerRejectsLateStart(t *testing.T) {
    saveChatLoopTestSession(t, s, chatSession{ID: sid, Conductor: &chatConductorState{Role: conductorRoleWorker, ParentSessionID: "parent", DispatchID: "dispatch", Status: status}})
    w := httptest.NewRecorder()
    r := httptest.NewRequest(http.MethodPost, "/api/chat/"+sid, strings.NewReader(`{"prompt":"late start"}`))
-   s.chatPostMode(w, r, sid, true)
+   s.chatPostWithSender(w, r, sid, true, "conductor")
    if w.Code != http.StatusConflict { t.Fatalf("status=%d body=%s", w.Code, w.Body.String()) }
    if s.chatRunActive(sid) { t.Fatal("rejected dispatch left an active run") }
    cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)

@@ -796,7 +796,7 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 
 	s.SessionMu.Lock()
 	cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)
-	if err != nil || len(cs.QueuedMessages) == 0 {
+	if err != nil || len(cs.QueuedMessages) == 0 || !s.conductorChatRunnable(cs, "user") {
 		s.SessionMu.Unlock()
 		s.endChatRunOwned(sid, token)
 		return false

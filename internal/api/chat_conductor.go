@@ -413,8 +413,26 @@ const conductorWorkerPrompt = `You are an Admin Conductor worker. Execute the as
 
 const conductorWorkerInstruction = "\n\n[Server-owned Conductor worker instruction]\nComplete only this delegated objective. Return a concise, evidence-based result for the parent."
 
+// conductorChatRunnable separates a historical worker relationship from a live
+// dispatch. The sender is server-owned; a user cannot resume an active dispatch.
+func (s *Server) conductorChatRunnable(cs chatSession, sender string) bool {
+    if cs.Conductor == nil || cs.Conductor.Role != conductorRoleWorker {
+        return true
+    }
+    if sender == "user" {
+        return conductorTerminal(cs.Conductor.Status)
+    }
+    return sender == "conductor" && cs.Conductor.Status == conductorRunning &&
+        !s.chatRunCanceled(cs.Conductor.ParentSessionID)
+}
+
 func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]interface{}) error {
     if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker {
+        // Keep the persisted association for history/reuse/read receipts, but a
+        // terminal dispatch must not impose its worker role on a new user turn.
+        if conductorTerminal(cs.Conductor.Status) {
+            return nil
+        }
         prompts, _ := req["extra_sys_prompts"].([]string)
         req["extra_sys_prompts"] = append(prompts, conductorWorkerPrompt)
         return nil

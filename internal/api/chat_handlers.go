@@ -1228,8 +1228,7 @@ func (s *Server) chatPostWithSender(w http.ResponseWriter, r *http.Request, sid 
 		bad(w, 500, err.Error())
 		return
 	}
-	if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker &&
-		(conductorTerminal(cs.Conductor.Status) || cs.Conductor.Status == "cancelling" || s.chatRunCanceled(cs.Conductor.ParentSessionID)) {
+	if !s.conductorChatRunnable(cs, senderKind) {
 		s.endChatRunOwned(sid, token)
 		bad(w, http.StatusConflict, "Conductor dispatch is no longer runnable")
 		return

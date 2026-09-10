@@ -12,7 +12,11 @@ func TestConductorSenderPersistence(t *testing.T) {
 		t.Run(sender, func(t *testing.T) {
 			s := newChatLoopTestServer(t)
 			const sid = "sender-worker"
-			saveChatLoopTestSession(t, s, chatSession{ID: sid, Conductor: &chatConductorState{Role: conductorRoleWorker}})
+			status := conductorSucceeded
+			if sender == "conductor" {
+				status = conductorRunning
+			}
+			saveChatLoopTestSession(t, s, chatSession{ID: sid, Conductor: &chatConductorState{Role: conductorRoleWorker, Status: status}})
 			blockChatLoopTestWorker(t, s, sid)
 			rr := httptest.NewRecorder()
 			// Client-supplied provenance must not override the normal user entry point.
