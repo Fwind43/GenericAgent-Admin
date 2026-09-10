@@ -4285,7 +4285,7 @@ export function ProviderModelCascade({
   )
 }
 
-export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeychain, onAutorun, onLoop, onConductor, conductorDisabled, commandsOpen, keychainOpen, systemPromptActive, systemPromptLabel, autorunEnabled, loopOpen, triggerRef }) {
+export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeychain, onAutorun, onLoop, onConductor, conductorActive, conductorDisabled, commandsOpen, keychainOpen, systemPromptActive, systemPromptLabel, autorunEnabled, loopOpen, triggerRef }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const fallbackTriggerRef = useRef(null)
@@ -4308,7 +4308,7 @@ export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeycha
     { icon: KeyRound, label: ct('密钥管理', 'Keychain'), onClick: onKeychain, active: keychainOpen },
     { icon: Bot, label: ct('自主行动', 'Auto-action'), onClick: onAutorun, active: autorunEnabled },
     { icon: Orbit, label: 'Loop', onClick: onLoop, active: loopOpen },
-    ...(onConductor ? [{ icon: Bot, label: ct('升级为指挥家', 'Upgrade to Conductor'), onClick: onConductor, disabled: conductorDisabled }] : []),
+    ...(onConductor ? [{ icon: Bot, label: conductorActive ? ct('切换为普通会话', 'Switch to ordinary chat') : ct('升级为指挥家', 'Upgrade to Conductor'), onClick: onConductor, disabled: conductorDisabled }] : []),
   ]
 
   return (
@@ -5760,13 +5760,14 @@ export default function ChatApp() {
   }
 
   const upgradeToConductor = async () => {
+    const action = isConductorParent(activeSessionDetail) ? 'disable' : 'enable'
     const target = activeSidRef.current
     if (!target || conductorEnablingRef.current) return
     conductorEnablingRef.current = true
     setConductorEnabling(true)
     setErr('')
     try {
-      const result = await api(`/api/chat/conductor/${encodeURIComponent(target)}/enable`, { method: 'POST' })
+      const result = await api(`/api/chat/conductor/${encodeURIComponent(target)}/${action}`, { method: 'POST' })
       setSessions(items => items.map(item => String(item.id) === String(target) ? { ...item, conductor: result.conductor } : item))
       if (activeSidRef.current === target) {
         setActiveSessionDetail(current => current && String(current.id) === String(target) ? { ...current, conductor: result.conductor } : current)
@@ -6845,7 +6846,7 @@ export default function ChatApp() {
             void attachRunningStream(activeID, { waitForRun:true })
           }
           if (conductorPoll.refreshMetadata) {
-            const metadata = isConductorParent(after)
+            const metadata = (isConductorParent(after) || after?.conductor_children?.length > 0)
               ? await chatApi(`/api/chat/conductor/${encodeURIComponent(activeID)}/children`)
               : null
             if (!stopped && activeSidRef.current === activeID) {
@@ -7414,8 +7415,8 @@ export default function ChatApp() {
               <GitBranch size={16}/>{ct('世界线', 'Timeline')}{(worldlineForView?.nodes?.length || 0) > 0 && <span>{worldlineForView.nodes.length}</span>}
             </button>
           </div>
-          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
-          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
+          {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
+          {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
           <ThemePicker className="oa-topbar-theme" value={theme} onChange={setTheme} lang={chatLanguage()} variant="compact" />
         </div>
         <button
@@ -7450,8 +7451,8 @@ export default function ChatApp() {
           >
             <GitBranch size={17}/><span className="oa-mobile-tools-item-copy">{ct('世界线', 'Timeline')}</span>{(worldlineForView?.nodes?.length || 0) > 0 && <b className="oa-mobile-tools-item-badge">{worldlineForView.nodes.length}</b>}
           </button>
-          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
-          {isConductorParent(activeSessionDetail) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
+          {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
+          {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
           <ThemePicker
             className="oa-mobile-tools-theme"
             value={theme}
@@ -7525,8 +7526,8 @@ export default function ChatApp() {
             {showFollow && <button className={`oa-follow-btn ${isCurrentRunning ? 'is-live' : ''}`} type="button" onClick={resumeFollow} title={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')} aria-label={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')}><ChevronDown size={16}/></button>}
           </div>}
         </section>
-        {isConductorParent(activeSessionDetail) && conductorWorkersOpen && <ConductorWorkspace detail={activeSessionDetail} sessions={sessions} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID} onClose={()=>setConductorWorkersOpen(false)}/>}
-        {isConductorParent(activeSessionDetail) && conductorEventsOpen && <ConductorEvents conductorDetail={activeSessionDetail} onClose={()=>setConductorEventsOpen(false)}/> }
+        {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && conductorWorkersOpen && <ConductorWorkspace detail={activeSessionDetail} sessions={sessions} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID} onClose={()=>setConductorWorkersOpen(false)}/>}
+        {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && conductorEventsOpen && <ConductorEvents conductorDetail={activeSessionDetail} onClose={()=>setConductorEventsOpen(false)}/> }
         <MessageNavigator messages={messages} sessionID={sid} threadRef={threadRef}
           onNavigate={jumpToMessageNode} loading={sessionLoading} ct={ct}
           hasMore={historyPages.page?.has_more} loadingOlder={historyPages.loading} onLoadOlder={historyPages.loadOlder}/>
@@ -7813,7 +7814,8 @@ export default function ChatApp() {
               onKeychain={() => setKeychainOpen(true)}
               onAutorun={toggleAutorun}
               onLoop={() => setLoopRailOpen(true)}
-              onConductor={!activeSessionDetail?.conductor?.role ? upgradeToConductor : undefined}
+              onConductor={!isConductorWorker(activeSessionDetail) ? upgradeToConductor : undefined}
+              conductorActive={isConductorParent(activeSessionDetail)}
               conductorDisabled={!sid || sessionLoading || sessionLoadFailed || !activeSessionDetail || isCurrentRunning || activeSessionDetail?.running || queuedMessages.length > 0 || conductorEnabling}
               commandsOpen={cmdManagerOpen}
               keychainOpen={keychainOpen}

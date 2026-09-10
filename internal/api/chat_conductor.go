@@ -253,6 +253,48 @@ func (s *Server) chatConductorEnable(w http.ResponseWriter, r *http.Request, sid
     writeJSON(w, map[string]interface{}{"id": cs.ID, "conductor": cs.Conductor})
 }
 
+// disableChatConductor serializes with dispatch, inbox persistence and run admission.
+// Keep the state object and children: stale snapshots must not resurrect the role.
+func (s *Server) disableChatConductor(sid string) (chatSession, error) {
+    sid = safeChatID(sid)
+    s.SessionMu.Lock()
+    defer s.SessionMu.Unlock()
+    // Run persistence can hold ChatMu before SessionMu. Never wait in reverse order.
+    if !s.ChatMu.TryLock() { return chatSession{}, errors.New("session runtime is updating; retry when idle") }
+    defer s.ChatMu.Unlock()
+    cfg := s.CfgStore.Snapshot()
+    if _, err := os.Stat(chatSessionPath(cfg, sid)); err != nil { return chatSession{}, err }
+    cs, err := loadChatSession(cfg, sid)
+    if err != nil { return cs, err }
+    if cs.Conductor != nil && cs.Conductor.Role == conductorRoleWorker { return cs, errConductorWorker }
+    if cs.Conductor == nil || cs.Conductor.Role == "" { return cs, nil }
+    active := func(id string) bool { run := s.ChatRuns[id]; return run != nil && !run.Done }
+    if active(sid) { return cs, errors.New("parent session has a running turn") }
+    if len(cs.QueuedMessages) > 0 { return cs, errors.New("parent session has queued messages or unprocessed completion receipts") }
+    for _, child := range cs.ConductorChildren {
+        if !conductorTerminal(child.Status) { return cs, fmt.Errorf("dispatch %s is %s; wait for a terminal state", child.DispatchID, child.Status) }
+        if child.Status == conductorSucceeded && (child.Review == nil || (child.Review.Status != "verified" && child.Review.Status != "needs_work")) { return cs, fmt.Errorf("dispatch %s has an unprocessed review", child.DispatchID) }
+        if active(child.SessionID) { return cs, fmt.Errorf("worker %s has a running turn", child.SessionID) }
+        worker, loadErr := loadChatSession(cfg, child.SessionID)
+        if loadErr != nil { return cs, fmt.Errorf("worker %s cannot be checked: %w", child.SessionID, loadErr) }
+        if len(worker.QueuedMessages) > 0 { return cs, fmt.Errorf("worker %s has queued messages", child.SessionID) }
+        if worker.Conductor != nil && !conductorTerminal(worker.Conductor.Status) { return cs, fmt.Errorf("worker %s is not terminal", child.SessionID) }
+    }
+    cs.Conductor.Role = ""
+    return cs, saveChatSessionLocked(cfg, cs)
+}
+
+func (s *Server) chatConductorDisable(w http.ResponseWriter, r *http.Request, sid string) {
+    cs, err := s.disableChatConductor(sid)
+    if err != nil {
+        code := http.StatusConflict
+        if os.IsNotExist(err) { code = http.StatusNotFound }
+        bad(w, code, err.Error())
+        return
+    }
+    writeJSON(w, map[string]interface{}{"ok": true, "conductor": cs.Conductor})
+}
+
 func (s *Server) enableChatConductor(sid string) (chatSession, error) {
     sid = safeChatID(sid)
     s.SessionMu.Lock()
@@ -270,7 +312,10 @@ func (s *Server) enableChatConductor(sid string) (chatSession, error) {
     if cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent {
         return cs, nil
     }
-    if s.chatRunActive(sid) || len(cs.QueuedMessages) > 0 {
+    s.ChatMu.Lock()
+    defer s.ChatMu.Unlock()
+    run := s.ChatRuns[sid]
+    if (run != nil && !run.Done) || len(cs.QueuedMessages) > 0 {
         return chatSession{}, errConductorBusy
     }
     cs.Conductor = &chatConductorState{Role: conductorRoleParent}
@@ -317,7 +362,7 @@ func (s *Server) chatConductorChildren(w http.ResponseWriter, _ *http.Request, s
         bad(w, http.StatusInternalServerError, err.Error())
         return
     }
-    if cs.ID == "" || cs.Conductor == nil || cs.Conductor.Role != conductorRoleParent {
+    if cs.ID == "" || (len(cs.ConductorChildren) == 0 && (cs.Conductor == nil || cs.Conductor.Role != conductorRoleParent)) {
         bad(w, http.StatusNotFound, "Conductor parent not found")
         return
     }

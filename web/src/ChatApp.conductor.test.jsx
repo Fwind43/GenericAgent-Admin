@@ -198,7 +198,12 @@ test('inline completion appears on detail update without becoming a user message
   let upgraded = false
   const fetcher = vi.fn(async (input, init = {}) => {
     const url = new URL(String(input), 'http://localhost')
-    const current = session('plain', 'Existing conversation', upgraded ? { conductor: { role: 'parent' } } : {})
+    const current = session('plain', 'Existing conversation', { conductor: { role: upgraded ? 'parent' : '' }, conductor_children: [{ session_id: 'old-worker', dispatch_id: 'old-dispatch', status: 'succeeded', objective: 'Historical task', review: { status: 'verified' } }] })
+    if (url.pathname === '/api/chat/conductor/plain/disable') {
+      expect(init.method).toBe('POST')
+      upgraded = false
+      return json({ conductor: { role: '' } })
+    }
     if (url.pathname === '/api/chat/conductor/plain/enable') {
       expect(init.method).toBe('POST')
       upgraded = true
@@ -228,6 +233,13 @@ test('inline completion appears on detail update without becoming a user message
   expect(localStorage.getItem('ga-chat-last-session')).toBe('plain')
   expect(fetcher.mock.calls.some(([url]) => String(url).includes('/api/chat/new'))).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
-  expect(screen.queryByRole('menuitem', { name: 'Upgrade to Conductor' })).toBeNull()
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Switch to ordinary chat' }))
+  await waitFor(() => expect(upgraded).toBe(false))
+  expect((await screen.findAllByRole('button', { name: 'Subagents' })).length).toBeGreaterThan(0)
+  fireEvent.click(screen.getByRole('button', { name: 'More actions' }))
+  const again = await screen.findByRole('menuitem', { name: 'Upgrade to Conductor' })
+  await waitFor(() => expect(again.disabled).toBe(false))
+  fireEvent.click(again)
+  await waitFor(() => expect(upgraded).toBe(true))
   delete document.documentElement.dataset.theme
  })
