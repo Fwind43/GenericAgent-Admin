@@ -25,6 +25,91 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
         self.assertNotIn('llm_no', self.events[0])
         self.assertNotIn('reasoning_effort', self.events[0])
 
+    def test_null_inherits_and_allows_reuse(self):
+        for options in ({'project_id': None}, {'project_id': None, 'session_id': 'worker'}):
+            self.assertTrue(self.call(**options)['ok'])
+            self.assertNotIn('project_id', self.events[-1])
+            self.assertEqual(self.events[-1]['session_id'], options.get('session_id', ''))
+
+    def test_outbound_schema_to_dispatch_payload(self):
+        import copy
+        import json
+        import os
+        import sys
+        import tempfile
+        import time
+        from types import ModuleType
+        from unittest.mock import patch
+        source = os.environ.get('GA_CORE_AGENT_LOOP')
+        if not source:
+            self.skipTest('Set GA_CORE_AGENT_LOOP to exercise the real outbound builder')
+        # Extract only pure request builders: no core module initialization or network.
+        tree = ast.parse(Path(source).with_name('llmcore.py').read_text(encoding='utf-8'))
+        names = {'_openai_stream', '_prepare_oai_tools', '_to_responses_input'}
+        nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
+        self.assertEqual(len(nodes), len(names))
+        payloads = []
+        def capture(sess, url, headers, payload, parser):
+            payloads.append(copy.deepcopy(payload))
+            return iter(())
+        wire = dict(_stream_with_retry=capture, auto_make_url=lambda base, path: base + path,
+                    _RESP_CACHE_KEY='test', _RESP_CODEX_KEY='test',
+                    _stamp_oai_cache_markers=lambda *args: None)
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), '<real-outbound>', 'exec'), wire)
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+        module, loop = ModuleType('agentmain'), ModuleType('agent_loop')
+        module.GenericAgentHandler = type('Handler', (), {})
+        module.TOOLS_SCHEMA = []
+        loop.StepOutcome = lambda data, **kwargs: data
+        events = []
+        with tempfile.TemporaryDirectory() as directory:
+            def emit(event):
+                events.append(event)
+                reply = ({'ok': False, 'error': 'invalid project_id: missing'}
+                         if event.get('project_id') == 'missing' else {'ok': True, 'dispatch_id': 'd'})
+                (Path(directory) / (event['request_id'] + '.response.json')).write_text(json.dumps(reply), encoding='utf-8')
+            env = dict(Path=Path, re=__import__('re'), json=json, time=time, emit=emit)
+            exec(compile(ast.Module(body=[node], type_ignores=[]), '<installed-tools>', 'exec'), env)
+            agent = object()
+            with patch.dict(sys.modules, {'agentmain': module, 'agent_loop': loop}):
+                restore = env['_install_conductor_tools'](agent, {'role': 'parent', 'broker_dir': directory})
+                try:
+                    handler = module.GenericAgentHandler()
+                    handler.parent = agent
+                    for mode in ('responses', 'chat_completions'):
+                        sess = SimpleNamespace(model='gpt-test', api_mode=mode, temperature=1,
+                            api_key='dummy', user_agent='test', api_base='offline/', stream=False,
+                            system='', reasoning_effort='', max_tokens=0, service_tier='', tools=module.TOOLS_SCHEMA)
+                        list(wire['_openai_stream'](sess, []))
+                        tools = payloads[-1]['tools']
+                        funcs = tools if mode == 'responses' else [t['function'] for t in tools]
+                        schema = next(t['parameters'] for t in funcs if t['name'] == 'conductor_dispatch')
+                        self.assertEqual(schema['properties']['project_id']['type'], ['string', 'null'])
+                        self.assertNotIn('project_id', schema['required'])
+                        cases = [({}, True), ({'project_id': None}, True),
+                                 ({'project_id': 'target'}, True), ({'project_id': 'missing'}, False),
+                                 ({'session_id': 'worker'}, True),
+                                 ({'project_id': None, 'session_id': 'worker'}, True),
+                                 ({'project_id': 'target', 'session_id': 'worker'}, False)]
+                        for options, ok in cases:
+                            with self.subTest(mode=mode, options=options):
+                                args = json.loads(json.dumps({'objective': 'task', **options}))
+                                before = len(events)
+                                result = handler.do_conductor_dispatch(args, None)
+                                self.assertEqual(result['ok'], ok)
+                                if options.get('project_id') and options.get('session_id'):
+                                    self.assertEqual(len(events), before)
+                                else:
+                                    self.assertEqual(len(events), before + 1)
+                                    if options.get('project_id') is None:
+                                        self.assertNotIn('project_id', events[-1])
+                                    else:
+                                        self.assertEqual(events[-1]['project_id'], options['project_id'])
+                                    self.assertEqual(events[-1]['session_id'], options.get('session_id', ''))
+                finally:
+                    restore()
+
     def test_overrides_forwarded(self):
         for effort in ('off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'):
             self.assertTrue(self.call(llm_no=0, reasoning_effort=effort, session_id='worker')['ok'])
@@ -35,7 +120,7 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
     def test_project_forwarded(self):
         self.assertTrue(self.call(project_id=' target ')['ok'])
         self.assertEqual(self.events[-1]['project_id'], 'target')
-        for value in (None, '', ' ', 3):
+        for value in ('', ' ', 3, False, [], {}):
             self.assertFalse(self.call(project_id=value)['ok'])
         self.assertFalse(self.call(project_id='target', session_id='worker')['ok'])
         self.assertEqual(len(self.events), 1)

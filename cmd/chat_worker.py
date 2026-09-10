@@ -2718,7 +2718,7 @@ def _install_conductor_tools(agent, config):
         if not isinstance(session_id, str) or (session_id and not re.fullmatch(r'[A-Za-z0-9_-]+', session_id)):
             return dispatch_result({'ok': False, 'error': 'Invalid session_id'})
         overrides = {}
-        if 'project_id' in args:
+        if args.get('project_id') is not None:
             value = args['project_id']
             if not isinstance(value, str) or not value.strip():
                 return dispatch_result({'ok': False, 'error': 'project_id must be a non-empty string'})
@@ -2809,7 +2809,7 @@ def _install_conductor_tools(agent, config):
                 'evidence_ids': {'type': 'array', 'maxItems': 64,
                                  'items': {'type': 'string'}}})
         if name == 'conductor_dispatch':
-            properties['project_id'] = {'type': 'string', 'minLength': 1, 'description': 'Optional exact existing project ID for a NEW worker only, never a role label such as web/browser/coder or a display name; cannot combine with session_id. Omit to inherit parent project and workspace. Uses current global project mode. Explicit selection clears inherited execution workspace; project memory is not a code directory.'}
+            properties['project_id'] = {'type': ['string', 'null'], 'minLength': 1, 'description': 'Omit or set null for no project override: inherit parent project and workspace for new workers, retain existing project for reused sessions. A non-null value must be an exact existing project ID for a NEW worker only, never a role label such as web/browser/coder or a display name; cannot combine with session_id. Uses current global project mode. Explicit selection clears inherited execution workspace; project memory is not a code directory.'}
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
             properties['llm_no'] = {'type': 'integer', 'minimum': 0, 'description': 'Optional configured runtime model index (not a model name). Overrides this worker only; omitted means inherit parent for new workers, retain existing for reused workers.'}
             properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}
