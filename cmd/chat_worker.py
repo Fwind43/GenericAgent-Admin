@@ -2680,7 +2680,7 @@ def _install_conductor_tools(agent, config):
     def dispatch(handler, args, response):
         # Keep next_prompt nonempty so the core records every receipt.
         fingerprint = repr([(key, args[key]) for key in
-                            ('project_id', 'session_id', 'llm_no', 'reasoning_effort') if key in args])
+                            ('session_id', 'llm_no', 'reasoning_effort') if key in args])
         if getattr(dispatch, 'failure_key', None) != fingerprint:
             dispatch.failure_key, dispatch.failure_count = fingerprint, 0
 
@@ -2700,7 +2700,7 @@ def _install_conductor_tools(agent, config):
                     dispatch.failure_count = 0
                 prompt = 'Dispatch failed, not accepted. Correct the reported parameters before retrying; this receipt is not a worker completion.'
                 if invalid:
-                    prompt += ' No worker was created for this invalid request. Omit project_id to inherit, or use an existing exact project ID, not a role label.'
+                    prompt += ' No worker was created for this invalid request. Project context is controlled by the current session, not dispatch parameters.'
             return StepOutcome(data, next_prompt=prompt)
 
         if handler.parent is agent and dispatch.failure_count >= 3:
@@ -2718,13 +2718,7 @@ def _install_conductor_tools(agent, config):
         if not isinstance(session_id, str) or (session_id and not re.fullmatch(r'[A-Za-z0-9_-]+', session_id)):
             return dispatch_result({'ok': False, 'error': 'Invalid session_id'})
         overrides = {}
-        if args.get('project_id') is not None:
-            value = args['project_id']
-            if not isinstance(value, str) or not value.strip():
-                return dispatch_result({'ok': False, 'error': 'project_id must be a non-empty string'})
-            if session_id:
-                return dispatch_result({'ok': False, 'error': 'project_id is only supported for new workers; omit session_id'})
-            overrides['project_id'] = value.strip()
+        # Legacy project_id is intentionally ignored; project context is server-owned.
         if 'llm_no' in args:
             value = args['llm_no']
             if type(value) is not int or value < 0:
@@ -2809,7 +2803,6 @@ def _install_conductor_tools(agent, config):
                 'evidence_ids': {'type': 'array', 'maxItems': 64,
                                  'items': {'type': 'string'}}})
         if name == 'conductor_dispatch':
-            properties['project_id'] = {'type': ['string', 'null'], 'minLength': 1, 'description': 'Omit or set null for no project override: inherit parent project and workspace for new workers, retain existing project for reused sessions. A non-null value must be an exact existing project ID for a NEW worker only, never a role label such as web/browser/coder or a display name; cannot combine with session_id. Uses current global project mode. Explicit selection clears inherited execution workspace; project memory is not a code directory.'}
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
             properties['llm_no'] = {'type': 'integer', 'minimum': 0, 'description': 'Optional configured runtime model index (not a model name). Overrides this worker only; omitted means inherit parent for new workers, retain existing for reused workers.'}
             properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}

@@ -65,7 +65,7 @@ func TestConductorDispatchOverrides(t *testing.T) {
 }
 
 func TestConductorDispatchInvalidOverrides(t *testing.T) {
-	for _, raw := range []string{`{"project_id":null}`, `{"project_id":3}`, `{"project_id":""}`, `{"project_id":"../escape"}`, `{"project_id":"missing"}`, `{"project_id":"target","session_id":"worker"}`, `{"llm_no":-1}`, `{"llm_no":1.5}`, `{"llm_no":true}`, `{"llm_no":"1"}`, `{"llm_no":null}`, `{"reasoning_effort":null}`, `{"reasoning_effort":"invalid"}`, `{"reasoning_effort":""}`, `{"reasoning_effort":3}`} {
+	for _, raw := range []string{`{"llm_no":-1}`, `{"llm_no":1.5}`, `{"llm_no":true}`, `{"llm_no":"1"}`, `{"llm_no":null}`, `{"reasoning_effort":null}`, `{"reasoning_effort":"invalid"}`, `{"reasoning_effort":""}`, `{"reasoning_effort":3}`} {
 		t.Run(raw, func(t *testing.T) {
 			s := newChatLoopTestServer(t)
 			saveChatLoopTestSession(t, s, chatSession{ID: "parent", Conductor: &chatConductorState{Role: conductorRoleParent}})
@@ -87,10 +87,14 @@ func TestConductorDispatchInvalidOverrides(t *testing.T) {
 			json.Unmarshal(data, &receipt)
 			if raw == `{"project_id":"missing"}` {
 				for _, hint := range []string{"no worker created", "Omit project_id", "exact project ID", "provider"} {
-					if !strings.Contains(receipt.Error, hint) { t.Fatalf("missing hint %q: %s", hint, data) }
+					if !strings.Contains(receipt.Error, hint) {
+						t.Fatalf("missing hint %q: %s", hint, data)
+					}
 				}
 			}
-			if receipt.DispatchID != "" || receipt.SessionID != "" { t.Fatalf("invalid request allocated worker: %s", data) }
+			if receipt.DispatchID != "" || receipt.SessionID != "" {
+				t.Fatalf("invalid request allocated worker: %s", data)
+			}
 			if receipt.OK || receipt.Error == "" {
 				t.Fatalf("accepted invalid options: %s", data)
 			}
@@ -102,8 +106,70 @@ func TestConductorDispatchInvalidOverrides(t *testing.T) {
 	}
 }
 
+func TestConductorDispatchReuseProjectIsolation(t *testing.T) {
+	for _, scenario := range []string{"same", "project", "workspace", "legacy"} {
+		t.Run(scenario, func(t *testing.T) {
+			s := newChatLoopTestServer(t)
+			cfg := s.CfgStore.Snapshot()
+			parent := chatSession{ID: "parent", ProjectProvider: "official", ProjectID: "source", ProjectMode: "source", Workspace: "work", Conductor: &chatConductorState{Role: conductorRoleParent}}
+			worker := parent
+			worker.ID = "worker"
+			worker.Conductor = &chatConductorState{Role: conductorRoleWorker, ParentSessionID: "parent", DispatchID: "old", Status: conductorSucceeded}
+			parent.ConductorChildren = []chatConductorChild{{DispatchID: "old", SessionID: "worker", Status: conductorSucceeded}}
+			switch scenario {
+			case "project":
+				worker.ProjectID, worker.ProjectMode = "other", "other"
+			case "workspace":
+				worker.Workspace = "other-work"
+			case "legacy":
+				worker.ProjectID, worker.ProjectProvider = "", ""
+			}
+			for _, cs := range []chatSession{parent, worker} {
+				if err := saveChatSessionLocked(cfg, cs); err != nil {
+					t.Fatal(err)
+				}
+			}
+			token := s.beginChatRun("parent")
+			defer s.endChatRunOwned("parent", token)
+			beforeParent, _ := os.ReadFile(chatSessionPath(cfg, "parent"))
+			beforeWorker, _ := os.ReadFile(chatSessionPath(cfg, "worker"))
+			for attempt := 0; attempt < 2; attempt++ {
+				broker := chatConductorBrokerDirForSession(chatSessionDir(cfg), "parent")
+				s.handleConductorDispatchEvent("parent", map[string]interface{}{"broker_dir": broker, "request_id": "request", "objective": "task", "session_id": "worker", "project_id": "other"})
+				data, err := os.ReadFile(filepath.Join(broker, "request.response.json"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var reply map[string]interface{}
+				if err = json.Unmarshal(data, &reply); err != nil {
+					t.Fatal(err)
+				}
+				if scenario == "project" || scenario == "workspace" {
+					if reply["ok"] != false || !strings.Contains(fmt.Sprint(reply["error"]), "differs") {
+						t.Fatal(reply)
+					}
+					afterParent, _ := os.ReadFile(chatSessionPath(cfg, "parent"))
+					afterWorker, _ := os.ReadFile(chatSessionPath(cfg, "worker"))
+					if string(beforeParent) != string(afterParent) || string(beforeWorker) != string(afterWorker) {
+						t.Fatal("rejected reuse mutated sessions")
+					}
+				} else {
+					if reply["ok"] != true {
+						t.Fatal(reply)
+					}
+					got, _ := loadChatSession(cfg, "worker")
+					if got.ProjectID != worker.ProjectID || got.ProjectProvider != worker.ProjectProvider || got.ProjectMode != worker.ProjectMode || got.Workspace != worker.Workspace {
+						t.Fatal("reuse migrated project")
+					}
+					break
+				}
+			}
+		})
+	}
+}
+
 func TestConductorDispatchProject(t *testing.T) {
-	for _, explicit := range []bool{false, true} {
+	for _, explicit := range []interface{}{nil, false, 3, "", "../escape", "missing", "target", []interface{}{}, map[string]interface{}{}} {
 		t.Run(fmt.Sprint(explicit), func(t *testing.T) {
 			s := newChatLoopTestServer(t)
 			cfg := s.CfgStore.Snapshot()
@@ -119,9 +185,7 @@ func TestConductorDispatchProject(t *testing.T) {
 			defer s.endChatRunOwned("parent", token)
 			dir := chatConductorBrokerDirForSession(chatSessionDir(cfg), "parent")
 			ev := map[string]interface{}{"objective": "test", "request_id": "project", "broker_dir": dir}
-			if explicit {
-				ev["project_id"] = "target"
-			}
+			ev["project_id"] = explicit
 			s.handleConductorDispatchEvent("parent", ev)
 			data, err := os.ReadFile(filepath.Join(dir, "project.response.json"))
 			if err != nil {
@@ -135,22 +199,14 @@ func TestConductorDispatchProject(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if explicit {
-				if worker.ProjectID != "target" || worker.Workspace != "" {
-					t.Fatalf("bad binding: %+v", worker)
-				}
+			for _, mode := range []string{"official", "admin"} {
+				cfg.DefaultProjectProvider = mode
 				fields := projectRequestFields(worker, cfg)
-				if fields["project_id"] != "target" {
+				if fields["project_id"] != "source" || fields["project_provider"] != mode {
 					t.Fatal(fields)
 				}
-				provider := "official"
-				if cfg.DefaultProjectProvider == "admin" {
-					provider = "admin"
-				}
-				if worker.ProjectProvider != provider || (provider == "official" && worker.ProjectMode != "target") || (provider == "admin" && worker.ProjectMode != "") {
-					t.Fatalf("bad mode: %+v", worker)
-				}
-			} else if worker.ProjectID != parent.ProjectID || worker.Workspace != parent.Workspace || worker.ProjectProvider != parent.ProjectProvider {
+			}
+			if worker.ProjectID != parent.ProjectID || worker.Workspace != parent.Workspace || worker.ProjectProvider != parent.ProjectProvider {
 				t.Fatal("inheritance changed")
 			}
 			after, _ := loadChatSession(cfg, "parent")

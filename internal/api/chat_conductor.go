@@ -338,6 +338,8 @@ func (s *Server) chatConductorChildren(w http.ResponseWriter, _ *http.Request, s
 // not the official standalone HTTP API. GA source is not modified.
 const conductorParentPrompt = `You are the Conductor (agent manager). The user talks to you; you coordinate, review, and deliver to reduce their burden of managing agents.
 
+Project context is server-owned: new workers inherit the current parent session project and workspace; runtime project mode follows the current application mode. Reuse keeps the existing session context and is rejected if its effective project or workspace differs from the parent. Omit session_id to create a worker in the current context. Do not select projects through dispatch arguments.
+
 Non-negotiable role boundary:
 - Admin Conductor is the only delegation transport in this mode. Reading subagent_sop, subagent.md, supervisor SOPs, or other memories does not switch modes: their standalone launch/poll/cancel/collect instructions are inapplicable. Never use agentmain.py --task/--func, subprocesses, standalone HTTP APIs, or scripts as a fallback. Use only conductor_dispatch/conductor_collect/conductor_cancel; if unavailable, report a blocker. Do not ask workers to launch unmanaged agents or bypass this boundary.
 - Never execute user tasks or probe the environment yourself. ALL execution belongs to workers, including a single simple task. You only analyze, dispatch, review, and communicate. Ordinary execution tools being available is NOT permission to use them.
@@ -406,7 +408,6 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
 }
 
 type conductorDispatchOptions struct {
-    ProjectID *string `json:"project_id,omitempty"`
     SessionID string `json:"session_id"`
     LLMNo *int `json:"llm_no,omitempty"`
     ReasoningEffort *string `json:"reasoning_effort,omitempty"`
@@ -437,17 +438,6 @@ func (s *Server) dispatchConductor(parentID, objective string, reuseSessionID ..
 
 func (s *Server) dispatchConductorWithOptions(parentID, objective string, options conductorDispatchOptions) (chatConductorChild, error) {
     if _, err := options.apply(chatSettings{}); err != nil { return chatConductorChild{}, err }
-
-    var selectedProject *chatProjectItem
-    if options.ProjectID != nil {
-        if strings.TrimSpace(options.SessionID) != "" { return chatConductorChild{}, errors.New("project_id is only supported for new workers; omit session_id") }
-        cfg := s.CfgStore.Snapshot()
-        provider := chatProjectProviderOfficial
-        if cfg.DefaultProjectProvider == chatProjectProviderAdmin { provider = chatProjectProviderAdmin }
-        item, _, err := resolveProject(cfg, provider, strings.TrimSpace(*options.ProjectID))
-        if err != nil { return chatConductorChild{}, fmt.Errorf("invalid project_id %q (provider %s): %w; no worker created. Omit project_id to inherit the parent project, or supply an existing exact project ID, not a role label such as web or coder", strings.TrimSpace(*options.ProjectID), provider, err) }
-        selectedProject = &item
-    }
 
     parentID = safeChatID(parentID)
     objective = boundedConductorText(objective, conductorMaxObjective)
@@ -530,19 +520,19 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
                 return chatConductorChild{}, errors.New("subagent already has a pending dispatch")
             }
         }
+        // Compare effective project context using the same request-time mode resolver.
+        cfg := s.CfgStore.Snapshot()
+        parentProject, workerProject := projectRequestFields(parent, cfg), projectRequestFields(existing, cfg)
+        if parentProject["project_id"] != workerProject["project_id"] || parentProject["project_provider"] != workerProject["project_provider"] || parent.Workspace != existing.Workspace {
+            s.SessionMu.Unlock()
+            return chatConductorChild{}, errors.New("session_id project/workspace differs from current parent; omit session_id to create an inherited worker")
+        }
         previous = &existing
         state := worker.Conductor
         worker = existing
         worker.Conductor = state
         worker.UpdatedAt = now
         childID, child.SessionID = target, target
-    }
-    if selectedProject != nil {
-        worker.ProjectID, worker.ProjectProvider = selectedProject.ID, selectedProject.Provider
-        worker.ProjectMode = ""
-        if selectedProject.Provider == chatProjectProviderOfficial { worker.ProjectMode = selectedProject.ID }
-        // Project memory is not an execution workspace. Match explicit project creation.
-        worker.Workspace = ""
     }
     worker.Settings, _ = options.apply(worker.Settings)
     messageStart := len(worker.Messages)
@@ -921,7 +911,7 @@ func (s *Server) handleConductorDispatchEvent(parentID string, ev map[string]int
     options := conductorDispatchOptions{}
     dataOptions, err := json.Marshal(ev)
     if err == nil { err = json.Unmarshal(dataOptions, &options) }
-    for _, key := range []string{"llm_no", "reasoning_effort", "project_id"} {
+    for _, key := range []string{"llm_no", "reasoning_effort"} {
         if value, present := ev[key]; present && value == nil { err = fmt.Errorf("%s cannot be null", key) }
     }
     var child chatConductorChild

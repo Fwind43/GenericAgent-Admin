@@ -85,28 +85,22 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
                         tools = payloads[-1]['tools']
                         funcs = tools if mode == 'responses' else [t['function'] for t in tools]
                         schema = next(t['parameters'] for t in funcs if t['name'] == 'conductor_dispatch')
-                        self.assertEqual(schema['properties']['project_id']['type'], ['string', 'null'])
+                        self.assertNotIn('project_id', schema['properties'])
                         self.assertNotIn('project_id', schema['required'])
                         cases = [({}, True), ({'project_id': None}, True),
-                                 ({'project_id': 'target'}, True), ({'project_id': 'missing'}, False),
+                                 ({'project_id': 'target'}, True), ({'project_id': 'missing'}, True),
                                  ({'session_id': 'worker'}, True),
                                  ({'project_id': None, 'session_id': 'worker'}, True),
-                                 ({'project_id': 'target', 'session_id': 'worker'}, False)]
+                                 ({'project_id': 'target', 'session_id': 'worker'}, True)]
                         for options, ok in cases:
                             with self.subTest(mode=mode, options=options):
                                 args = json.loads(json.dumps({'objective': 'task', **options}))
                                 before = len(events)
                                 result = handler.do_conductor_dispatch(args, None)
                                 self.assertEqual(result['ok'], ok)
-                                if options.get('project_id') and options.get('session_id'):
-                                    self.assertEqual(len(events), before)
-                                else:
-                                    self.assertEqual(len(events), before + 1)
-                                    if options.get('project_id') is None:
-                                        self.assertNotIn('project_id', events[-1])
-                                    else:
-                                        self.assertEqual(events[-1]['project_id'], options['project_id'])
-                                    self.assertEqual(events[-1]['session_id'], options.get('session_id', ''))
+                                self.assertEqual(len(events), before + 1)
+                                self.assertNotIn('project_id', events[-1])
+                                self.assertEqual(events[-1]['session_id'], options.get('session_id', ''))
                 finally:
                     restore()
 
@@ -117,13 +111,13 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
             self.assertEqual(self.events[-1]['reasoning_effort'], effort)
             self.assertEqual(self.events[-1]['session_id'], 'worker')
 
-    def test_project_forwarded(self):
-        self.assertTrue(self.call(project_id=' target ')['ok'])
-        self.assertEqual(self.events[-1]['project_id'], 'target')
-        for value in ('', ' ', 3, False, [], {}):
-            self.assertFalse(self.call(project_id=value)['ok'])
-        self.assertFalse(self.call(project_id='target', session_id='worker')['ok'])
-        self.assertEqual(len(self.events), 1)
+    def test_legacy_project_ignored(self):
+        for value in (None, '', ' ', 3, False, [], {}, 'target', '../escape'):
+            for session in ('', 'worker'):
+                self.assertTrue(self.call(project_id=value, session_id=session)['ok'])
+                self.assertNotIn('project_id', self.events[-1])
+                self.assertEqual(self.events[-1]['session_id'], session)
+        self.assertEqual(len(self.events), 18)
 
     def outcome(self, **options):
         return self.env['dispatch'](SimpleNamespace(parent=self.agent), {'objective': 'test', **options}, None)
@@ -139,7 +133,7 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
             self.assertEqual(result.data['error_code'], 'repeated_invalid_parameters')
         self.assertEqual(len(self.events), 3)
         self.env['read_reply'] = lambda *args: {'ok': True, 'dispatch_id': 'd', 'status': 'queued'}
-        for options in ({'project_id': 'real-project'}, {}, {'session_id': 'worker'}):
+        for options in ({'llm_no': 0}, {'llm_no': 1}, {'session_id': 'worker'}):
             result = self.outcome(**options)
             self.assertTrue(result.data['ok'])
             self.assertIn('Dispatch accepted', result.next_prompt)
