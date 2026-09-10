@@ -445,7 +445,7 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
         provider := chatProjectProviderOfficial
         if cfg.DefaultProjectProvider == chatProjectProviderAdmin { provider = chatProjectProviderAdmin }
         item, _, err := resolveProject(cfg, provider, strings.TrimSpace(*options.ProjectID))
-        if err != nil { return chatConductorChild{}, fmt.Errorf("invalid project_id: %w", err) }
+        if err != nil { return chatConductorChild{}, fmt.Errorf("invalid project_id %q (provider %s): %w; no worker created. Omit project_id to inherit the parent project, or supply an existing exact project ID, not a role label such as web or coder", strings.TrimSpace(*options.ProjectID), provider, err) }
         selectedProject = &item
     }
 

@@ -40,6 +40,36 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
         self.assertFalse(self.call(project_id='target', session_id='worker')['ok'])
         self.assertEqual(len(self.events), 1)
 
+    def outcome(self, **options):
+        return self.env['dispatch'](SimpleNamespace(parent=self.agent), {'objective': 'test', **options}, None)
+
+    def test_repeated_invalid_project_and_recovery(self):
+        self.env['StepOutcome'] = lambda data, **kwargs: SimpleNamespace(data=data, **kwargs)
+        self.env['read_reply'] = lambda *args: {'ok': False, 'error': 'invalid project_id: missing'}
+        for _ in range(3):
+            result = self.outcome(project_id='web')
+            self.assertIn('No worker was created', result.next_prompt)
+        for _ in range(5):
+            result = self.outcome(project_id='web', objective='reworded task')
+            self.assertEqual(result.data['error_code'], 'repeated_invalid_parameters')
+        self.assertEqual(len(self.events), 3)
+        self.env['read_reply'] = lambda *args: {'ok': True, 'dispatch_id': 'd', 'status': 'queued'}
+        for options in ({'project_id': 'real-project'}, {}, {'session_id': 'worker'}):
+            result = self.outcome(**options)
+            self.assertTrue(result.data['ok'])
+            self.assertIn('Dispatch accepted', result.next_prompt)
+        self.assertEqual(len(self.events), 6)
+        self.assertIn('d', self.env['receipts'])
+
+    def test_pending_is_not_rejection(self):
+        self.env['StepOutcome'] = lambda data, **kwargs: SimpleNamespace(data=data, **kwargs)
+        self.env['read_reply'] = lambda *args: {'ok': False, 'pending': True, 'error': 'timeout'}
+        for _ in range(4):
+            result = self.outcome()
+            self.assertIn('outcome unknown', result.next_prompt)
+            self.assertNotIn('No worker was created', result.next_prompt)
+        self.assertEqual(len(self.events), 4)
+
     def test_invalid_never_emits(self):
         for options in ({'llm_no': -1}, {'llm_no': True}, {'llm_no': 1.5}, {'llm_no': '1'}, {'llm_no': None}, {'reasoning_effort': None}, {'reasoning_effort': ''}, {'reasoning_effort': 'invalid'}):
             self.assertFalse(self.call(**options)['ok'])

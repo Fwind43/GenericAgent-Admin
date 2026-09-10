@@ -2678,9 +2678,36 @@ def _install_conductor_tools(agent, config):
         return {'ok': False, 'error': 'Parent cancelled'}
 
     def dispatch(handler, args, response):
-        # A missing next_prompt ends the core loop before it records tool_results.
+        # Keep next_prompt nonempty so the core records every receipt.
+        fingerprint = repr([(key, args[key]) for key in
+                            ('project_id', 'session_id', 'llm_no', 'reasoning_effort') if key in args])
+        if getattr(dispatch, 'failure_key', None) != fingerprint:
+            dispatch.failure_key, dispatch.failure_count = fingerprint, 0
+
         def dispatch_result(data):
-            return StepOutcome(data, next_prompt='Review the dispatch receipt and continue coordinating. Worker completion arrives separately.')
+            if data.get('ok'):
+                dispatch.failure_count = 0
+                prompt = 'Dispatch accepted. Worker completion arrives separately; do not treat this receipt as completed work.'
+            elif data.get('pending'):
+                dispatch.failure_count = 0
+                prompt = 'Dispatch outcome unknown. Do not assume no worker exists or blindly redispatch; reconcile the pending receipt.'
+            else:
+                invalid = data.get('error_code') == 'invalid_project_id' or str(data.get('error', '')).startswith(
+                    ('invalid project_id', 'project_id ', 'Invalid session_id', 'llm_no ', 'Invalid reasoning_effort'))
+                if invalid:
+                    dispatch.failure_count += 1
+                else:
+                    dispatch.failure_count = 0
+                prompt = 'Dispatch failed, not accepted. Correct the reported parameters before retrying; this receipt is not a worker completion.'
+                if invalid:
+                    prompt += ' No worker was created for this invalid request. Omit project_id to inherit, or use an existing exact project ID, not a role label.'
+            return StepOutcome(data, next_prompt=prompt)
+
+        if handler.parent is agent and dispatch.failure_count >= 3:
+            return StepOutcome({'ok': False, 'error_code': 'repeated_invalid_parameters',
+                                'error': 'Repeated invalid parameters blocked; no worker created. Correct parameters before retrying.',
+                                'worker_created': False},
+                               next_prompt='Stop repeating this invalid dispatch. Change or omit the invalid parameters, or report the blocker. No worker was created.')
 
         if handler.parent is not agent:
             return dispatch_result({'ok': False, 'error': 'Conductor request mismatch'})
@@ -2782,7 +2809,7 @@ def _install_conductor_tools(agent, config):
                 'evidence_ids': {'type': 'array', 'maxItems': 64,
                                  'items': {'type': 'string'}}})
         if name == 'conductor_dispatch':
-            properties['project_id'] = {'type': 'string', 'minLength': 1, 'description': 'Optional existing project ID for a NEW worker only; cannot combine with session_id. Omit to inherit parent project and workspace. Uses current global project mode. Explicit selection clears inherited execution workspace; project memory is not a code directory.'}
+            properties['project_id'] = {'type': 'string', 'minLength': 1, 'description': 'Optional exact existing project ID for a NEW worker only, never a role label such as web/browser/coder or a display name; cannot combine with session_id. Omit to inherit parent project and workspace. Uses current global project mode. Explicit selection clears inherited execution workspace; project memory is not a code directory.'}
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
             properties['llm_no'] = {'type': 'integer', 'minimum': 0, 'description': 'Optional configured runtime model index (not a model name). Overrides this worker only; omitted means inherit parent for new workers, retain existing for reused workers.'}
             properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}

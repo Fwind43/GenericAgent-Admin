@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -84,6 +85,12 @@ func TestConductorDispatchInvalidOverrides(t *testing.T) {
 			}
 			var receipt conductorDispatchResponse
 			json.Unmarshal(data, &receipt)
+			if raw == `{"project_id":"missing"}` {
+				for _, hint := range []string{"no worker created", "Omit project_id", "exact project ID", "provider"} {
+					if !strings.Contains(receipt.Error, hint) { t.Fatalf("missing hint %q: %s", hint, data) }
+				}
+			}
+			if receipt.DispatchID != "" || receipt.SessionID != "" { t.Fatalf("invalid request allocated worker: %s", data) }
 			if receipt.OK || receipt.Error == "" {
 				t.Fatalf("accepted invalid options: %s", data)
 			}
