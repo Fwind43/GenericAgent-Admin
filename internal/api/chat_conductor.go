@@ -50,6 +50,7 @@ type chatConductorChild struct {
     StartedAt  int64  `json:"started_at,omitempty"`
     FinishedAt int64  `json:"finished_at,omitempty"`
     Result     string `json:"result,omitempty"`
+    ResultReceipt *chatSessionResult `json:"result_receipt,omitempty"`
     Review     *conductorReview `json:"review,omitempty"`
     MessageStart *int `json:"message_start,omitempty"`
     Evidence []conductorEvidence `json:"evidence,omitempty"`
@@ -794,6 +795,7 @@ func (s *Server) finishConductorChild(parentID, dispatchID, status, result, reas
     child.FinishedAt = now
     child.Review = conductorInitialReview(status)
     if workerValid {
+        child.ResultReceipt = conductorResultReceipt(child, worker)
         child.Evidence = conductorCollectEvidence(child, worker)
         if child.MessageStart != nil && *child.MessageStart >= 0 && *child.MessageStart <= len(worker.Messages) {
             usage := conductorMessageUsage(worker.Messages[*child.MessageStart:])

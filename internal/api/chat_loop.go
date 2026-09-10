@@ -911,6 +911,10 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 
 	if internalCompletion {
 		cmdReq["input_kind"] = "conductor_completion"
+		dispatchID := strings.TrimPrefix(queuedItem.ID, "conductor-")
+		if idx := conductorFindChild(cs.ConductorChildren, dispatchID); idx >= 0 {
+			cmdReq["conductor_completion_receipt"] = cs.ConductorChildren[idx]
+		}
 	}
 
 	for key, value := range conductorReq {

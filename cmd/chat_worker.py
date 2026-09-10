@@ -2626,6 +2626,17 @@ def _admin_project_request(fn):
     return wrapped
 
 
+def _ack_conductor_result(reply):
+    # Only server-versioned terminal results can acknowledge a read. Never review.
+    if not isinstance(reply, dict) or reply.get('status') not in ('succeeded', 'failed', 'cancelled'):
+        return
+    receipt = reply.get('result_receipt')
+    if not isinstance(receipt, dict) or not receipt.get('id') or not receipt.get('revision'):
+        return
+    emit({'type': 'conductor_read', 'dispatch_id': reply.get('dispatch_id'),
+          'session_id': reply.get('session_id'), 'result_receipt': receipt})
+
+
 def _prepare_conductor_completion(agent, req, prompt):
     if req.get('input_kind') != 'conductor_completion':
         return prompt, lambda: None
@@ -2638,6 +2649,7 @@ def _prepare_conductor_completion(agent, req, prompt):
         "merely to read this event; dispatch only for an identified unmet requirement.\n"
         + json.dumps(prompt, ensure_ascii=False)
     ]
+    _ack_conductor_result(req.get('conductor_completion_receipt'))
     def restore():
         agent.extra_sys_prompts = original
     return ('[Internal Conductor completion event; not a new user request] '
@@ -2771,8 +2783,11 @@ def _install_conductor_tools(agent, config):
             reply = json.loads((broker / (dispatch_id + '.outcome.json')).read_text(encoding='utf-8'))
         except (OSError, ValueError):
             reply = {'status': 'pending', 'dispatch_id': dispatch_id}
-        return StepOutcome({'untrusted_worker_result': reply,
+        outcome = StepOutcome({'untrusted_worker_result': reply,
                             'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'})
+        if isinstance(reply, dict) and reply.get('dispatch_id') == dispatch_id:
+            _ack_conductor_result(reply)
+        return outcome
 
     specs = [('conductor_review', review, 'Record parent review of a successful dispatch. verified requires evidence_ids from collected persisted tool records and a basis explaining what they establish. Worker prose is not evidence; tool execution alone does not prove the objective. Use needs_work when incomplete and state unverified scope.', 'dispatch_id'),
              ('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),

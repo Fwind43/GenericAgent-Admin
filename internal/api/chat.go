@@ -579,6 +579,12 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 			s.handleConductorCancelEvent(sid, ev)
 			continue
 		}
+		if ev["type"] == "conductor_read" {
+			if readErr := s.confirmConductorRead(sid, ev); readErr != nil {
+				s.publishChatRun(sid, map[string]interface{}{"type": "warning", "message": "Conductor read receipt persistence failed: " + readErr.Error()})
+			}
+			continue
+		}
 		if ev["type"] == "conductor_collect" {
 			s.handleConductorCollectEvent(sid, ev)
 			continue
