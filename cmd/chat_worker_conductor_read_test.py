@@ -12,7 +12,7 @@ class ConductorReadTest(unittest.TestCase):
         nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
         collect = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'collect' and any(isinstance(x, ast.Constant) and x.value == 'conductor_collect' for x in ast.walk(n)))
         self.events = []
-        self.env = dict(emit=self.events.append, json=json, StepOutcome=lambda x:x)
+        self.env = dict(emit=self.events.append, json=json, StepOutcome=lambda data, **kw: SimpleNamespace(data=data, **kw))
         exec(compile(ast.Module(body=nodes+[collect], type_ignores=[]), '<read>', 'exec'), self.env)
         self.result = dict(dispatch_id='d', session_id='w', status='succeeded', result_receipt=dict(id='a',revision='v'))
 
@@ -40,7 +40,7 @@ class ConductorReadTest(unittest.TestCase):
                 outcome=self.env['collect'](SimpleNamespace(parent=agent),dict(dispatch_id='d'),None)
                 self.assertEqual(any(e['type']=='conductor_read' for e in self.events), value==json.dumps(self.result))
             self.events.clear()
-            self.env['StepOutcome']=lambda x: (_ for _ in ()).throw(ValueError('cannot return'))
+            self.env['StepOutcome']=lambda data, **kw: (_ for _ in ()).throw(ValueError('cannot return'))
             with self.assertRaises(ValueError):self.env['collect'](SimpleNamespace(parent=agent),dict(dispatch_id='d'),None)
             self.assertFalse(any(e['type']=='conductor_read' for e in self.events))
 
@@ -51,7 +51,7 @@ class ConductorReadTest(unittest.TestCase):
         collect = next(n for n in install.body if isinstance(n, ast.FunctionDef) and n.name == 'collect')
         with tempfile.TemporaryDirectory() as directory:
             broker = Path(directory)
-            env = dict(self.env, broker=broker, Path=Path, StepOutcome=lambda *args, **kw: kw,
+            env = dict(self.env, broker=broker, Path=Path, StepOutcome=lambda data, **kw: SimpleNamespace(data=data, **kw),
                        _same_agent_instance=lambda a, b: True, agent=object())
             exec(compile(ast.Module(body=[collect], type_ignores=[]), '<collect>', 'exec'), env)
             owner = SimpleNamespace(parent=env['agent'])

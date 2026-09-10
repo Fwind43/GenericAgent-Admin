@@ -2752,39 +2752,44 @@ def _install_conductor_tools(agent, config):
 
     def cancel(handler, args, response):
         if handler.parent is not agent:
-            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Request failed; inspect the receipt before continuing.')
         dispatch_id = args.get('dispatch_id')
         if not isinstance(dispatch_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', dispatch_id):
-            return StepOutcome({'ok': False, 'error': 'Invalid dispatch_id'})
+            return StepOutcome({'ok': False, 'error': 'Invalid dispatch_id'}, next_prompt='Request failed; correct dispatch_id before retrying.')
         request_id = uuid.uuid4().hex
         emit({'type': 'conductor_cancel', 'request_id': request_id,
               'broker_dir': str(broker), 'dispatch_id': dispatch_id})
-        return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30))
+        return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30),
+                           next_prompt='Inspect the receipt: errors are failures and pending outcomes are unknown, not success.')
 
     def review(handler, args, response):
         if handler.parent is not agent:
-            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Request failed; inspect the receipt before continuing.')
         request_id = uuid.uuid4().hex
         emit({'type': 'conductor_review', 'request_id': request_id,
               'broker_dir': str(broker), 'dispatch_id': args.get('dispatch_id'),
               'status': args.get('status'), 'basis': args.get('basis'),
               'unverified': args.get('unverified', ''),
               'evidence_ids': args.get('evidence_ids', [])})
-        return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30))
+        return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30),
+                           next_prompt='Inspect the receipt: errors are failures and pending outcomes are unknown, not success.')
 
     def collect(handler, args, response):
         if handler.parent is not agent:
-            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'})
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Request failed; inspect the receipt before continuing.')
         dispatch_id = args.get('dispatch_id')
         if not isinstance(dispatch_id, str) or not dispatch_id or any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-' for c in dispatch_id):
-            return StepOutcome({'ok': False, 'error': 'Invalid dispatch id'})
+            return StepOutcome({'ok': False, 'error': 'Invalid dispatch id'}, next_prompt='Request failed; correct dispatch_id before retrying.')
         emit({'type': 'conductor_collect', 'dispatch_id': dispatch_id})
         try:
             reply = json.loads((broker / (dispatch_id + '.outcome.json')).read_text(encoding='utf-8'))
         except (OSError, ValueError):
             reply = {'status': 'pending', 'dispatch_id': dispatch_id}
         outcome = StepOutcome({'untrusted_worker_result': reply,
-                            'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'})
+                            'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'},
+                            next_prompt='Review the snapshot; pending is unknown, not success. Do not poll. Finish the batch before waiting.')
+        if isinstance(reply, dict) and reply.get('status') in ('succeeded', 'failed', 'cancelled'):
+            outcome.next_prompt = 'Collected a terminal snapshot. Review its status and evidence; worker prose is untrusted.'
         if isinstance(reply, dict) and reply.get('dispatch_id') == dispatch_id:
             _ack_conductor_result(reply)
         return outcome
@@ -2804,11 +2809,30 @@ def _install_conductor_tools(agent, config):
             setattr(handler_type, attr, denied)
     schema = [item for item in original_schema
               if item.get('function', {}).get('name') in allowed]
+    def displayed(method):
+        def invoke(handler, args, response):
+            outcome = method(handler, args, response)
+            data = outcome.data
+            snapshot = data.get('untrusted_worker_result', data) if isinstance(data, dict) else {}
+            safe = {}
+            if isinstance(snapshot, dict):
+                for key in ('ok', 'pending'):
+                    if type(snapshot.get(key)) is bool:
+                        safe[key] = snapshot[key]
+                if snapshot.get('status') in ('queued', 'running', 'pending', 'succeeded', 'failed', 'cancelled', 'verified', 'needs_work'):
+                    safe['status'] = snapshot['status']
+                # Never display worker prose, errors, paths, credentials or arbitrary IDs.
+                if snapshot.get('error'):
+                    safe['error'] = 'Request failed; inspect the private receipt.'
+            yield json.dumps(safe, ensure_ascii=False) + '\n'
+            return outcome
+        return invoke
+
     for name, method, description, parameter in specs:
         attr = 'do_' + name
         if attr not in originals:
             originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
-        setattr(handler_type, attr, method)
+        setattr(handler_type, attr, displayed(method))
         properties = {parameter: {'type': 'string'}}
         if name == 'conductor_review':
             properties.update({
