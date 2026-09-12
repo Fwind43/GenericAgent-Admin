@@ -214,14 +214,14 @@ type chatSession struct {
 
 const (
 	maxChatUploadFiles        = 8
-	maxChatUploadBytesPerFile = 20 << 20
-	maxChatUploadBytesTotal   = 40 << 20
+	maxChatUploadBytesPerFile = 300 << 20
+	maxChatUploadBytesTotal   = 300 << 20
 	maxChatTitleRunes         = 50
 	// maxChatPostBodyBytes must accommodate base64-encoded uploads (which inflate
 	// raw bytes by ~4/3) plus prompt text and per-file metadata, so it is set well
 	// above maxChatUploadBytesTotal. The decoded raw size is still capped by
 	// saveChatUploads, so this only governs the transport payload size.
-	maxChatPostBodyBytes = 64 << 20
+	maxChatPostBodyBytes = (maxChatUploadBytesTotal+2)/3*4 + (4 << 20)
 	// Worker stdout is NDJSON, but a single final/error event can contain a large
 	// assistant answer. bufio.Scanner hard-limits tokens unless configured and
 	// drops data above that limit, so runChatWorker uses readChatWorkerLine instead.

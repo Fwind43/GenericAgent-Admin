@@ -654,8 +654,8 @@ function JsonTree({ data, name = 'root', depth = 0 }) {
 }
 
 const MAX_CHAT_UPLOAD_FILES = 8
-const MAX_CHAT_UPLOAD_BYTES_PER_FILE = 20 * 1024 * 1024
-const MAX_CHAT_UPLOAD_BYTES_TOTAL = 40 * 1024 * 1024
+const MAX_CHAT_UPLOAD_BYTES_PER_FILE = 300 * 1024 * 1024
+const MAX_CHAT_UPLOAD_BYTES_TOTAL = 300 * 1024 * 1024
 
 const uploadFileName = (f) => String(f?.name || f?.Name || 'attachment')
 const uploadFileSource = (f) => String(f?.dataURL || f?.DataURL || f?.url || f?.URL || '')
@@ -6236,13 +6236,13 @@ export default function ChatApp() {
     }
     const tooLarge = files.find((file) => (Number(file.size) || 0) > MAX_CHAT_UPLOAD_BYTES_PER_FILE)
     if (tooLarge) {
-      setErr(ct(`附件过大：${tooLarge.name || 'attachment'}，单个限制 20MB`, `Attachment too large: ${tooLarge.name || 'attachment'}; limit 20 MB per file`))
+      setErr(ct(`附件过大：${tooLarge.name || 'attachment'}，单个限制 300MiB`, `Attachment too large: ${tooLarge.name || 'attachment'}; limit 300 MiB per file`))
       return
     }
     const totalBytes = attachments.reduce((sum, file) => sum + (Number(file.size) || 0), 0)
       + files.reduce((sum, file) => sum + (Number(file.size) || 0), 0)
     if (totalBytes > MAX_CHAT_UPLOAD_BYTES_TOTAL) {
-      setErr(ct('附件总大小限制 40MB', 'Total attachment size is limited to 40 MB'))
+      setErr(ct('附件总大小限制 300MiB', 'Total attachment size is limited to 300 MiB'))
       return
     }
     const readOne = (file) => new Promise((resolve, reject) => {
