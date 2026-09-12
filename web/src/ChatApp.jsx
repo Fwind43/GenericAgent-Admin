@@ -1,4 +1,6 @@
 import './conductor.css'
+import FileDownloadLink from './components/FileDownloadLink'
+import { fileDownloadTarget } from './lib/fileDownload.js'
 import ProjectSessionPage from './components/ProjectSessionPage'
 import ProjectActionsMenu from './components/ProjectActionsMenu'
 import ProjectDragHandle from './components/ProjectDragHandle'
@@ -528,6 +530,8 @@ function MarkdownLink({ node }) {
   const [opening, setOpening] = useState(false)
 
   if (!resolved.isLocal) {
+    const target = fileDownloadTarget(node.href)
+    if (target) return <FileDownloadLink href={target.href} download={target.name} title={node.title || undefined}><InlineNodes nodes={node.children} /></FileDownloadLink>
     return (
       <a href={node.href} title={node.title || undefined} target="_blank" rel="noreferrer noopener">
         <InlineNodes nodes={node.children} />
@@ -555,7 +559,7 @@ function MarkdownLink({ node }) {
 
   return (
     <span className="oa-md-file-link-wrap">
-      <a
+      <FileDownloadLink
         href={resolved.href}
         download={resolved.downloadName}
         className="oa-md-file-link"
@@ -567,7 +571,7 @@ function MarkdownLink({ node }) {
         }}
       >
         <InlineNodes nodes={node.children} />
-      </a>
+      </FileDownloadLink>
       <button
         type="button"
         className="oa-md-file-link-action"
@@ -749,7 +753,7 @@ function FileAttachment({ path }) {
       <em>{directory || ct('本地文件', 'Local file')}</em>
     </span>
     <span className="oa-file-actions">
-      <a href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title="下载文件" aria-label={`下载文件 ${name}`}><Download size={15}/></a>
+      <FileDownloadLink href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title="下载文件" aria-label={`下载文件 ${name}`}><Download size={15}/></FileDownloadLink>
       <button type="button" onClick={() => open('file')} title={ct('打开文件', 'Open file')} aria-label={`打开文件 ${name}`}><ExternalLink size={15}/></button>
       <button type="button" onClick={() => open('folder')} title={ct('打开所在位置', 'Open containing folder')} aria-label={`打开 ${name} 所在位置`}><FolderOpen size={15}/></button>
       <CopyButton text={clean} compact />

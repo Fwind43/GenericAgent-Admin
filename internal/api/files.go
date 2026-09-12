@@ -132,7 +132,8 @@ func (s *Server) filesDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) filesDownload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
 		bad(w, 405, "method not allowed")
 		return
 	}

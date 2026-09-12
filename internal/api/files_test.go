@@ -297,6 +297,37 @@ func TestFilesEndpointsAcceptExplicitAbsolutePathsOutsideRoot(t *testing.T) {
 	}
 }
 
+func TestFilesDownloadHeadAndRange(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "download.txt"), []byte("payload"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	h := newGoalTestServer(t, root).Routes()
+	for _, tc := range []struct {
+		method      string
+		rangeHeader string
+		status      int
+		body        string
+		length      string
+	}{
+		{http.MethodHead, "", 200, "", "7"},
+		{http.MethodGet, "bytes=0-2", 206, "pay", "3"},
+	} {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(tc.method, "/api/files/download?path=download.txt", nil)
+		if tc.rangeHeader != "" {
+			req.Header.Set("Range", tc.rangeHeader)
+		}
+		h.ServeHTTP(rr, req)
+		if rr.Code != tc.status || rr.Body.String() != tc.body || rr.Header().Get("Content-Length") != tc.length {
+			t.Fatalf("%s: status=%d body=%q headers=%v", tc.method, rr.Code, rr.Body.String(), rr.Header())
+		}
+		if !strings.Contains(rr.Header().Get("Content-Disposition"), "download.txt") {
+			t.Fatal("missing attachment filename")
+		}
+	}
+}
+
 func TestFilesDownloadServesFile(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "download.txt"), []byte("payload"), 0644); err != nil {

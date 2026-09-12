@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { downloadFile as fetchDownload } from '../lib/fileDownload.js'
 import { confirmDanger } from '../lib/danger'
 import { clampTailLines, dirnameForPath, fileEditorDirty } from '../lib/filesSafety'
 
@@ -135,9 +136,14 @@ export function useFiles({ t, setMsg, setBusy, onOpen }) {
     } finally { setBusy(false) }
   }
 
-  const downloadFile = (target = path) => {
+  const downloadFile = async (target = path) => {
     if (!target) return
-    window.open(`/api/files/download?path=${encodeURIComponent(target)}`, '_blank', 'noopener,noreferrer')
+    try {
+      await fetchDownload(`/api/files/download?path=${encodeURIComponent(target)}`)
+    } catch (e) {
+      setMsg(e.message)
+      setStatus({ kind: 'error', action: 'download', message: e.message, onRetry: () => downloadFile(target) })
+    }
   }
 
   const runSearch = async () => {
