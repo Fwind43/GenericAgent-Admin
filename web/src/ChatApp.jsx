@@ -1,5 +1,6 @@
 import './conductor.css'
 import FileDownloadLink from './components/FileDownloadLink'
+import FilePreviewLink from './components/FilePreviewLink'
 import { fileDownloadTarget } from './lib/fileDownload.js'
 import ProjectSessionPage from './components/ProjectSessionPage'
 import ProjectActionsMenu from './components/ProjectActionsMenu'
@@ -531,7 +532,7 @@ function MarkdownLink({ node }) {
 
   if (!resolved.isLocal) {
     const target = fileDownloadTarget(node.href)
-    if (target) return <FileDownloadLink href={target.href} download={target.name} title={node.title || undefined}><InlineNodes nodes={node.children} /></FileDownloadLink>
+    if (target) return <FilePreviewLink href={target.href} download={target.name} title={node.title || undefined}><InlineNodes nodes={node.children} /></FilePreviewLink>
     return (
       <a href={node.href} title={node.title || undefined} target="_blank" rel="noreferrer noopener">
         <InlineNodes nodes={node.children} />
@@ -559,7 +560,7 @@ function MarkdownLink({ node }) {
 
   return (
     <span className="oa-md-file-link-wrap">
-      <FileDownloadLink
+      <FilePreviewLink
         href={resolved.href}
         download={resolved.downloadName}
         className="oa-md-file-link"
@@ -571,7 +572,7 @@ function MarkdownLink({ node }) {
         }}
       >
         <InlineNodes nodes={node.children} />
-      </FileDownloadLink>
+      </FilePreviewLink>
       <button
         type="button"
         className="oa-md-file-link-action"
@@ -749,7 +750,7 @@ function FileAttachment({ path }) {
       {isImage && <img src={imageUrl} alt="" loading="lazy" onError={(e)=>{ e.currentTarget.style.display='none' }} />}
     </button>
     <span className="oa-file-meta">
-      <span className="oa-file-name-row"><b>{name}</b><small>{extension}</small></span>
+      <span className="oa-file-name-row"><FilePreviewLink href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title="预览文件"><b>{name}</b></FilePreviewLink><small>{extension}</small></span>
       <em>{directory || ct('本地文件', 'Local file')}</em>
     </span>
     <span className="oa-file-actions">
