@@ -7358,6 +7358,7 @@ export default function ChatApp() {
               {projectSortMode && <ProjectDragHandle name={projectKey} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.provider ? group : group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
+              <button type="button" onClick={()=>createSession(group.provider ? group : group.name, { mode:'conductor' })} disabled={batchDeleting}><span className="oa-conductor-new-mark" aria-hidden="true">C</span>{ct('新建项目指挥家', 'New project Conductor')}</button>
               <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(projectKey, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
               <button type="button" onClick={()=>openProjectFolder(group)} title={ct('在服务器上打开项目文件夹', 'Open project folder on the server')}><FolderOpen size={14}/>{ct('打开项目文件夹', 'Open project folder')}</button>
               </ProjectActionsMenu>
