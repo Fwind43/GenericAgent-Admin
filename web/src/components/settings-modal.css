@@ -45,7 +45,11 @@
   .settings-modal.settings-modal .ant-modal-container,
   .settings-modal.settings-modal .ant-modal-content { border-radius: 0; height: 100dvh; border: 0; display: flex; flex-direction: column; }
   .settings-modal .ant-modal-header { padding-top: max(16px, env(safe-area-inset-top, 0px)); flex: 0 0 auto; }
-  .settings-modal .ant-modal-close { top: max(12px, env(safe-area-inset-top, 0px)); }
+  .settings-modal .ant-modal-close { top: max(12px, env(safe-area-inset-top, 0px)); width: 44px; height: 44px; }
+  .settings-modal .set-segmented button,
+  .settings-modal .ga-status-actions button,
+  .settings-modal .admin-back-to-chat { min-height: 44px; }
+  .settings-modal .ga-status-actions button { min-width: 44px; }
   .settings-modal .ant-modal-body { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .settings-modal-hint { flex: 0 0 auto; padding-bottom: 10px; }
   .settings-modal .app.app-embedded { flex: 1; height: auto; flex-direction: column; min-height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
