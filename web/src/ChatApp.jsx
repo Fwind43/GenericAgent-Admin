@@ -7405,7 +7405,7 @@ export default function ChatApp() {
             {chatInstances.map(instance => <option key={instance.id} value={instance.id} disabled={instance.initializing}>{instance.name}{instance.initializing ? ct('（初始化中）', ' (initializing)') : ''}</option>)}
           </select>
         </label>
-        <button onClick={()=>setSettingsOpen(true)}><Settings size={15}/>{ct('设置', 'Settings')}</button>
+        <button className="oa-sidebar-settings" onClick={()=>setSettingsOpen(true)}><Settings size={15}/>{ct('设置', 'Settings')}</button>
       </div>
     </aside>
     <div className={`oa-sidebar-backdrop ${collapsed ? '' : 'is-visible'}`} aria-hidden={collapsed} onClick={()=>setCollapsed(true)} />

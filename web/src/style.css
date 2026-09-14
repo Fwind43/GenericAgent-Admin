@@ -16372,8 +16372,16 @@ html[data-color-scheme="dark"] .logs-page {
 .oa-sidebar .oa-session-row.active .oa-session { background:transparent !important; }
 
 .oa-sidebar-foot {
-  padding-top:8px;
+  gap:4px;
+  padding:8px 0 2px;
   border-top:1px solid var(--oa-side-line);
+}
+.oa-sidebar-foot .oa-sidebar-settings {
+  width:100%;
+  min-width:0;
+  height:36px;
+  min-height:36px;
+  padding-inline:10px;
 }
 .oa-sidebar-foot button { border:1px solid transparent; }
 .oa-sidebar-foot button:hover {
@@ -16391,9 +16399,12 @@ html[data-color-scheme="dark"] .logs-page {
   }
 }
 
-/* /chat instance switcher: a compact inline control without changing native select behavior. */
+/* /chat footer: aligned instance and settings rows, with native selection intact. */
 .oa-sidebar-instance {
   position:relative;
+  width:100%;
+  box-sizing:border-box;
+  padding:0 10px;
   grid-template-columns:max-content minmax(0,1fr);
   align-items:center;
   column-gap:8px;
@@ -16404,27 +16415,37 @@ html[data-color-scheme="dark"] .logs-page {
   align-items:center;
   min-height:16px;
   color:color-mix(in srgb, var(--oa-muted) 86%, var(--oa-text));
-  font-size:10px;
-  letter-spacing:.045em;
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:0;
   white-space:nowrap;
 }
 .oa-sidebar-instance select {
   appearance:none;
   -webkit-appearance:none;
-  height:32px;
-  padding:0 30px 0 11px;
-  border-radius:9px;
+  height:36px;
+  min-height:36px;
+  padding:0 28px 0 10px;
+  border-radius:6px;
+  border-color:color-mix(in srgb, var(--oa-muted) 16%, transparent);
+  background-color:transparent;
   background-image:none;
+  font-size:12px;
+  font-weight:410;
+  letter-spacing:0;
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis;
   transition:border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
 }
 .oa-sidebar-instance::after {
   content:"";
   position:absolute;
   top:50%;
-  right:13px;
+  right:22px;
   bottom:auto;
-  width:7px;
-  height:7px;
+  width:5px;
+  height:5px;
   border-right:1.5px solid var(--oa-muted);
   border-bottom:1.5px solid var(--oa-muted);
   transform:translateY(-65%) rotate(45deg);
@@ -16444,12 +16465,12 @@ html[data-color-scheme="dark"] .logs-page {
 /* On a touch screen the rail is a drawer operated by thumb, so its controls keep
    the taller box even though the desktop rail reads better compact. */
 @media (max-width:680px) {
-  .oa-sidebar-instance select {
-    height:36px;
-    padding-left:11px;
-    padding-right:32px;
+  .oa-sidebar-instance select,
+  .oa-sidebar-foot .oa-sidebar-settings {
+    height:44px;
+    min-height:44px;
   }
-  .oa-sidebar-instance::after { right:13px; }
+  .oa-sidebar-instance select { font-size:14px; }
   .oa-side-head { height:44px; }
   .oa-sidebar-search,
   .oa-new-chat,
@@ -18552,37 +18573,6 @@ html .oa-sidebar .oa-project-add:hover:not(:disabled) {
 .oa-sidebar .oa-session-title:has(> .oa-session-running-dot) {
   margin-inline-start: -4px;
   padding-inline-start: 4px;
-}
-
-/* Compact sidebar instance switcher; keep native selection and focus behavior. */
-.oa-sidebar-instance {
-  width:fit-content;
-  max-width:100%;
-  grid-template-columns:max-content minmax(0,112px);
-  column-gap:7px;
-}
-.oa-sidebar-instance select {
-  height:28px;
-  min-height:0;
-  padding:0 24px 0 8px;
-  border-radius:6px;
-  border-color:color-mix(in srgb, var(--oa-muted) 16%, transparent);
-  background-color:transparent;
-  font-size:12px;
-  font-weight:410;
-  text-overflow:ellipsis;
-  cursor:pointer;
-}
-.oa-sidebar-instance::after {
-  right:13px;
-  width:5px;
-  height:5px;
-}
-@media (max-width:680px) {
-  .oa-sidebar-instance select {
-    height:32px;
-    font-size:14px;
-  }
 }
 
 .oa-project-load-more {
