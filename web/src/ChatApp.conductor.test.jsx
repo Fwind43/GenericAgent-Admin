@@ -135,14 +135,14 @@ test.each(['light', 'dark', 'warm'])('review evidence remains distinct from exec
     let data = {}
     if (path === '/api/chat/sessions') data = { sessions }
     else if (path === '/api/chat/session/review-parent') data = { ...parent, messages: [], queue: [] }
-    else if (path === '/api/chat/conductor/review-parent/children') data = { children, dispatch_count: 3, dispatch_limit: 48, usage_summary: { parent: { prompt_tokens: 10, output_tokens: 2 }, children: { prompt_tokens: 50, output_tokens: 7 }, total: { prompt_tokens: 60, output_tokens: 9 }, missing_dispatches: 1 } }
+    else if (path === '/api/chat/conductor/review-parent/children') data = { children, dispatch_count: 53, usage_summary: { parent: { prompt_tokens: 10, output_tokens: 2 }, children: { prompt_tokens: 50, output_tokens: 7 }, total: { prompt_tokens: 60, output_tokens: 9 }, missing_dispatches: 1 } }
     return new Response(JSON.stringify({ ok: true, ...data, data }), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
   render(<ChatApp />)
   fireEvent.click(await screen.findByRole('button', { name: 'Subagents' }))
   const workspace = within(await screen.findByRole('complementary', { name: 'Subagents' }))
   await waitFor(() => expect(workspace.getByText('Recorded total: 60 / 9')).toBeTruthy(), { timeout: 5000 })
-  expect(workspace.getByText('Dispatches: 3 / 48')).toBeTruthy()
+  expect(workspace.getByText('Dispatches: 53')).toBeTruthy()
   expect(workspace.getByText('Parent: 10 / 2')).toBeTruthy()
   expect(workspace.getByText('Finalized children: 50 / 7')).toBeTruthy()
   expect(workspace.getByText(/Missing usage snapshots: 1/)).toBeTruthy()

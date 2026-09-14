@@ -302,7 +302,7 @@ const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, 
       <header className="oa-conductor-events-head"><b>Subagents <span>{counts.total}</span></b><button type="button" className="oa-icon-btn" onClick={onClose} aria-label={ct('关闭子代理侧栏', 'Close subagents')}><X size={16}/></button></header>
       <div className="oa-conductor-event-scroll">
         <section aria-label={ct('任务用量', 'Task usage')}>
-          <p>{ct('累计派发', 'Dispatches')}: {detail?.conductor_dispatch_count ?? '\u2014'} / {detail?.conductor_dispatch_limit ?? '\u2014'}</p>
+          <p>{ct('累计派发', 'Dispatches')}: {detail?.conductor_dispatch_count ?? '\u2014'}</p>
           {usage ? <>
             <small>{ct('Token：输入 / 输出', 'Tokens: input / output')}</small>
             <p>{ct('父任务', 'Parent')}: {usageText(usage.parent)}</p>
@@ -6858,7 +6858,7 @@ export default function ChatApp() {
               : null
             if (!stopped && activeSidRef.current === activeID) {
               setActiveSessionDetail(current => current && String(current.id) === String(after.id)
-                ? { ...current, ...after, ...(Array.isArray(metadata?.children) ? { conductor_children: metadata.children, conductor_usage_summary: metadata.usage_summary, conductor_dispatch_limit: metadata.dispatch_limit, conductor_dispatch_count: metadata.dispatch_count } : {}) }
+                ? { ...current, ...after, ...(Array.isArray(metadata?.children) ? { conductor_children: metadata.children, conductor_usage_summary: metadata.usage_summary, conductor_dispatch_count: metadata.dispatch_count } : {}) }
                 : current)
             }
           } else if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {

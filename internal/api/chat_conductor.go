@@ -23,7 +23,6 @@ const (
 
     conductorMaxRunning       = 3
     conductorMaxPerParentTurn = 12
-    conductorMaxDispatchesPerSession = 48
     conductorMaxObjective     = 4096
     conductorMaxResult        = 32768
 )
@@ -375,7 +374,6 @@ func (s *Server) chatConductorChildren(w http.ResponseWriter, _ *http.Request, s
         "parent_session_id": sid,
         "children": children,
         "usage_summary": conductorSummarizeUsage(cs),
-        "dispatch_limit": conductorMaxDispatchesPerSession,
         "dispatch_count": len(cs.ConductorChildren),
     })
 }
@@ -527,12 +525,6 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
     if !s.chatRunActive(parentID) || s.chatRunCanceled(parentID) {
         s.SessionMu.Unlock()
         return chatConductorChild{}, errors.New("Conductor parent is not running")
-    }
-    // Lifetime accepted dispatches, including completed/cancelled and reused workers.
-    // Check under SessionMu before creating or modifying either session.
-    if len(parent.ConductorChildren) >= conductorMaxDispatchesPerSession {
-        s.SessionMu.Unlock()
-        return chatConductorChild{}, errors.New("Conductor cumulative dispatch limit reached (48 per parent session); start a new parent session to continue")
     }
     nonTerminal := 0
     for _, existing := range parent.ConductorChildren {

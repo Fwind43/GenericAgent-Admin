@@ -27,58 +27,52 @@ func TestConductorUsageSummaryEndpoint(t *testing.T) {
  if recorder.Code != http.StatusOK { t.Fatalf("status: %d: %s", recorder.Code, recorder.Body.String()) }
  var response struct {
   Usage conductorUsageSummary `json:"usage_summary"`
-  Limit int `json:"dispatch_limit"`
+  Limit *int `json:"dispatch_limit"`
   Count int `json:"dispatch_count"`
  }
  if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil { t.Fatal(err) }
- if response.Limit != conductorMaxDispatchesPerSession || response.Count != 4 { t.Fatalf("limits: %+v", response) }
+ if response.Limit != nil || response.Count != 4 { t.Fatalf("limits: %+v", response) }
  if response.Usage.Parent.PromptTokens != 10 || response.Usage.Children.PromptTokens != 50 || response.Usage.Total.PromptTokens != 60 || response.Usage.Total.OutputTokens != 9 || response.Usage.Total.ObservedCalls != 3 || response.Usage.MissingDispatches != 2 {
   t.Fatalf("summary: %+v", response.Usage)
  }
 }
 
-func TestConductorDispatchLimitAccepts48Rejects49(t *testing.T) {
+func TestConductorDispatchContinuesPast48(t *testing.T) {
  s := newChatLoopTestServer(t)
  if s.beginChatRun("boundary-parent") == nil { t.Fatal("parent run not started") }
- children := make([]chatConductorChild, conductorMaxDispatchesPerSession-1)
- for i := range children {
-  children[i] = chatConductorChild{Status: conductorSucceeded}
-  if i < conductorMaxRunning { children[i].Status = conductorRunning }
- }
- saveChatLoopTestSession(t, s, chatSession{ID: "boundary-parent", Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: children})
- child, err := s.dispatchConductorWithOptions("boundary-parent", "boundary task", conductorDispatchOptions{})
- if err != nil { t.Fatalf("48th dispatch: %v", err) }
- parent, err := loadChatSession(s.CfgStore.Snapshot(), "boundary-parent")
- if err != nil { t.Fatal(err) }
- if len(parent.ConductorChildren) != 48 || child.Status != conductorQueued { t.Fatalf("48th not accepted: %+v", child) }
- worker, err := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
- if err != nil { t.Fatal(err) }
- if worker.Conductor == nil || worker.Conductor.DispatchID != child.DispatchID { t.Fatal("worker not persisted") }
- path := chatSessionPath(s.CfgStore.Snapshot(), parent.ID)
- before, err := os.ReadFile(path); if err != nil { t.Fatal(err) }
- if _, err = s.dispatchConductorWithOptions(parent.ID, "one too many", conductorDispatchOptions{}); err == nil || !strings.Contains(err.Error(), "cumulative") { t.Fatalf("49th dispatch: %v", err) }
- after, err := os.ReadFile(path); if err != nil { t.Fatal(err) }
- if !bytes.Equal(before, after) { t.Fatal("49th dispatch changed parent") }
-}
-
-func TestConductorCumulativeDispatchLimitPreservesSession(t *testing.T) {
- s := newChatLoopTestServer(t)
- if s.beginChatRun("limit-parent") == nil { t.Fatal("parent run not started") }
  children := make([]chatConductorChild, 48)
  statuses := []string{conductorSucceeded, conductorFailed, conductorCancelled}
  for i := range children {
-  children[i] = chatConductorChild{SessionID: "reused-worker", Status: statuses[i%len(statuses)]}
+  children[i] = chatConductorChild{Status: statuses[i%len(statuses)]}
+  if i < conductorMaxRunning { children[i].Status = conductorRunning }
+ }
+ saveChatLoopTestSession(t, s, chatSession{ID: "boundary-parent", Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: children})
+ for count := 49; count <= 51; count++ {
+  child, err := s.dispatchConductorWithOptions("boundary-parent", "continue task", conductorDispatchOptions{})
+  if err != nil { t.Fatalf("dispatch %d: %v", count, err) }
+  parent, err := loadChatSession(s.CfgStore.Snapshot(), "boundary-parent")
+  if err != nil { t.Fatal(err) }
+  if len(parent.ConductorChildren) != count || child.Status != conductorQueued { t.Fatalf("dispatch %d not persisted/queued: %+v", count, child) }
+  worker, err := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
+  if err != nil { t.Fatal(err) }
+  if worker.Conductor == nil || worker.Conductor.DispatchID != child.DispatchID { t.Fatal("worker not persisted") }
+ }
+}
+
+func TestConductorNonTerminalLimitPreservesSession(t *testing.T) {
+ s := newChatLoopTestServer(t)
+ if s.beginChatRun("limit-parent") == nil { t.Fatal("parent run not started") }
+ children := make([]chatConductorChild, 60)
+ for i := range children {
+  children[i].Status = conductorSucceeded
+  if i < conductorMaxPerParentTurn { children[i].Status = conductorQueued }
  }
  saveChatLoopTestSession(t, s, chatSession{ID: "limit-parent", Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: children})
  path := chatSessionPath(s.CfgStore.Snapshot(), "limit-parent")
- before, err := os.ReadFile(path)
- if err != nil { t.Fatal(err) }
- for _, reuse := range []string{"", "reused-worker", "reused-worker"} {
-  _, err := s.dispatchConductor("limit-parent", "continue task", reuse)
-  if err == nil || !strings.Contains(err.Error(), "cumulative dispatch limit") { t.Fatalf("expected cumulative limit, got %v", err) }
-  after, readErr := os.ReadFile(path)
-  if readErr != nil || !bytes.Equal(before, after) { t.Fatal("rejected dispatch mutated parent") }
- }
+ before, err := os.ReadFile(path); if err != nil { t.Fatal(err) }
+ if _, err := s.dispatchConductor("limit-parent", "too many active", ""); err == nil || !strings.Contains(err.Error(), "dispatch limit reached") { t.Fatalf("expected active limit, got %v", err) }
+ after, err := os.ReadFile(path); if err != nil { t.Fatal(err) }
+ if !bytes.Equal(before, after) { t.Fatal("rejected dispatch mutated parent") }
 }
 
 func TestConductorMessageUsageMixedProtocols(t *testing.T) {
