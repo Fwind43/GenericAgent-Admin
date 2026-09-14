@@ -14,7 +14,7 @@ import {
 // GA Admin releases, GA source status, and the login autostart entry. These
 // three all answer "is this install current and how does it come up". Pulling
 // the GA source is deliberately absent: GA updates itself from `/update`.
-export function useVersionUpdates({ t, lang, setMsg, setBusy }) {
+export function useVersionUpdates({ t, lang, setMsg, setBusy, active = true }) {
   const [info, setInfo] = useState(null)
   const [check, setCheck] = useState(null)
   const [status, setStatus] = useState(null)
@@ -52,6 +52,7 @@ export function useVersionUpdates({ t, lang, setMsg, setBusy }) {
   }
 
   useEffect(() => {
+    if (!active) return undefined
     let stopped = false
     const tick = async () => {
       try {
@@ -73,15 +74,15 @@ export function useVersionUpdates({ t, lang, setMsg, setBusy }) {
     }
     tick()
     return () => { stopped = true }
-  }, [check, status?.running])
+  }, [check, status?.running, active])
 
   useEffect(() => {
-    if (!status?.running) return undefined
+    if (!active || !status?.running) return undefined
     const timer = setInterval(() => refreshStatus().catch(e => {
       if (shouldReportVersionPollError(restartGraceUntil.current)) setMsg(e.message)
     }), VERSION_RELOAD_RETRY_MS)
     return () => clearInterval(timer)
-  }, [status?.running])
+  }, [status?.running, active])
 
   const checkVersion = async () => {
     setVersionBusy(true)

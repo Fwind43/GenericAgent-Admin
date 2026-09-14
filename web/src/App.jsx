@@ -54,12 +54,12 @@ const NAV_ICONS = {
   logs: <FolderCog size={16}/>,
 }
 
-export default function App() {
+export default function App({ embedded = false, active = true, onClose }) {
   const defaultLang = 'zh'
   const [lang, setLang] = useState(() => localStorage.getItem('ga-admin-lang-explicit') === '1' ? (localStorage.getItem('ga-admin-lang') || defaultLang) : defaultLang)
   const [theme, setTheme] = useState(getInitialTheme)
   const [adminSidebarOpen, setAdminSidebarOpen] = useState(false)
-  const initialRoute = useMemo(() => parseRoute(), [])
+  const initialRoute = useMemo(() => embedded ? { tab: 'settings', taskSubTab: 'schedule' } : parseRoute(), [embedded])
   const [tab, setTab] = useState(initialRoute.tab)
   const [taskSection, setTaskSection] = useState(initialRoute.taskSubTab)
   const [cfg, setCfg] = useState(null)
@@ -98,23 +98,36 @@ export default function App() {
     persistTheme(activeTheme.id)
   }, [theme])
   useEffect(() => { document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en' }, [lang])
+  // The retained embedded console must follow changes made by the chat shell.
   useEffect(() => {
+    if (!embedded) return undefined
+    const syncTheme = event => setTheme(event.detail || getInitialTheme())
+    const syncLang = event => setLang(event.detail || 'zh')
+    window.addEventListener('ga-admin-theme-change', syncTheme)
+    window.addEventListener('ga-admin-language-change', syncLang)
+    return () => {
+      window.removeEventListener('ga-admin-theme-change', syncTheme)
+      window.removeEventListener('ga-admin-language-change', syncLang)
+    }
+  }, [embedded])
+  useEffect(() => {
+    if (embedded) return
     const url = buildRoute(tab, taskSection)
     if (window.location.pathname !== url) window.history.replaceState(null, '', url)
-  }, [tab, taskSection])
+  }, [tab, taskSection, embedded])
 
   const openTab = (next) => {
     setAdminSidebarOpen(false)
     setTab(next)
   }
   const services = useServices({ t, setMsg, setBusy })
-  const logStream = useLogStream({ active: tab === 'logs' })
-  const version = useVersionUpdates({ t, lang, setMsg, setBusy })
+  const logStream = useLogStream({ active: active && tab === 'logs' })
+  const version = useVersionUpdates({ t, lang, setMsg, setBusy, active })
   const files = useFiles({ t, setMsg, setBusy, onOpen: () => setTab('files') })
   const schedule = useSchedule({ t, lang, setMsg, setBusy, onOpenSection: (section) => { setTab('tasks'); setTaskSection(section) } })
-  const goals = useGoals({ t, lang, setMsg, setBusy, active: tab === 'goals' })
-  const models = useModelsConfig({ t, lang, setMsg, setBusy, active: tab === 'models' })
-  const titleModel = useTitleModel({ t, lang, setMsg, active: tab === 'chat', fallbackProfiles: models.persistedProfiles })
+  const goals = useGoals({ t, lang, setMsg, setBusy, active: active && tab === 'goals' })
+  const models = useModelsConfig({ t, lang, setMsg, setBusy, active: active && tab === 'models' })
+  const titleModel = useTitleModel({ t, lang, setMsg, active: active && tab === 'chat', fallbackProfiles: models.persistedProfiles })
 
   const inventory = health?.inventory || {}
   const scheduleSummary = schedule.data || inventory.schedule || {}
@@ -159,7 +172,7 @@ export default function App() {
 
   // Route-scoped data: each page pulls what it needs the first time it opens.
   useEffect(() => {
-    if (!health?.ok) return
+    if (!active || !health?.ok) return
     if (tab === 'tasks') {
       schedule.loadScheduleTasks({ quiet: true }).catch(() => {})
       goals.loadGoals().catch(() => {})
@@ -167,10 +180,10 @@ export default function App() {
     }
     if (tab === 'goals' && !services.llms.length) services.loadLLMs()
     if (tab === 'files' && !files.list.length) files.loadFiles(files.path).catch(e => setMsg(e.message))
-  }, [tab, health?.ok])
+  }, [tab, health?.ok, active])
 
   useGSAP(() => {
-    if (prefersReducedMotion()) return
+    if (embedded || prefersReducedMotion()) return
     const ctx = gsap.context(() => {
       const q = gsap.utils.selector(appScope)
       let tl
@@ -187,7 +200,7 @@ export default function App() {
       return () => { window.cancelAnimationFrame(raf); window.clearTimeout(guard); tl?.kill() }
     }, appScope)
     return () => ctx.revert()
-  }, { scope: appScope, dependencies: [tab, lang] })
+  }, { scope: appScope, dependencies: [tab, lang, embedded] })
 
   const saveConfig = async () => {
     if (!await confirmDanger('config-save', lang === 'zh' ? '保存 GA Admin 配置？会写入配置文件并可能切换 GA 根目录。' : 'Save the GA Admin configuration? This writes the configuration file and may switch the GA root.')) return
@@ -261,14 +274,14 @@ export default function App() {
         </div>
       </div>
     </div>}
-    <div ref={appScope} className={`app app-tab-${tab} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
+    <div ref={appScope} className={`app app-tab-${tab} ${embedded ? 'app-embedded' : ''} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
       <button type="button" className="admin-sidebar-scrim" aria-label={lang === 'zh' ? '关闭管理导航' : 'Close admin navigation'} onClick={()=>setAdminSidebarOpen(false)} />
       <aside id="admin-sidebar" className="sidebar">
         <div className="admin-sidebar-heading">
           <div className="brand"><img className="brand-logo" src="/icon.png" alt=""/><div><h1>{t.appName}</h1><p>{t.tagline}</p></div></div>
           <button type="button" className="admin-sidebar-close" aria-label={lang === 'zh' ? '收起管理导航' : 'Collapse admin navigation'} onClick={()=>setAdminSidebarOpen(false)}><PanelLeftClose size={20} aria-hidden="true"/></button>
         </div>
-        <button type="button" className="admin-back-to-chat" onClick={()=>{ window.location.href = '/' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
+        <button type="button" className="admin-back-to-chat" onClick={()=>{ if (embedded) onClose?.(); else window.location.href = '/' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
         <nav aria-label={t.mainNavigation}>
           {SETTINGS_GROUPS.map(group => <div className="set-nav-group" key={group.id}>
             <span className="set-nav-group-title">{t.navGroups[group.id]}</span>

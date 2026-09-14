@@ -1762,6 +1762,33 @@ describe('operator shell feedback', () => {
     expect(adminMobileStyles).toMatch(/\.admin-sidebar-scrim\s*\{[^}]*z-index:\s*1000;/s)
   })
 
+  test('embedded settings preserve chat URL and draft without saving on hide', async () => {
+    installBrowserPolyfills()
+    window.history.replaceState(null, '', '/chat?session=retained#draft')
+    globalThis.fetch = vi.fn(async (url) => shellPayload(url))
+    const onClose = vi.fn()
+    const view = render(<App embedded active onClose={onClose}/>)
+    await waitFor(() => expect(document.querySelector('#settings-ga-root')).toBeTruthy())
+    const originalURL = window.location.href
+    const input = document.querySelector('#settings-ga-root')
+    expect(input).toBeTruthy()
+    fireEvent.change(input, { target: { value: 'retained-settings-draft' } })
+    fireEvent.click(screen.getByRole('button', { name: /^(对话|Chat)$/i }))
+    await waitFor(() => expect(document.querySelector('.app-tab-chat')).toBeTruthy())
+    expect(window.location.href).toBe(originalURL)
+    fireEvent.click(screen.getByRole('button', { name: /^(常规|General)$/i }))
+    await waitFor(() => expect(document.querySelector('#settings-ga-root')?.value).toBe('retained-settings-draft'))
+    view.rerender(<App embedded active={false} onClose={onClose}/>)
+    view.rerender(<App embedded active onClose={onClose}/>)
+    expect(document.querySelector('#settings-ga-root').value).toBe('retained-settings-draft')
+    expect(window.location.href).toBe(originalURL)
+    expect(globalThis.fetch.mock.calls.some(([url, options]) => String(url) === '/api/config' && ['POST', 'PUT'].includes(options?.method))).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: /Back to chat|回到聊天|返回对话/i }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(window.location.href).toBe(originalURL)
+    window.history.replaceState(null, '', '/')
+  })
+
   test('navigation exposes the selected route with native keyboard semantics', async () => {
     installBrowserPolyfills()
     globalThis.fetch = vi.fn(async (url) => shellPayload(url))

@@ -1,0 +1,40 @@
+.settings-modal.settings-modal { top: 4vh; padding-bottom: 0; }
+.settings-modal.settings-modal .ant-modal-container,
+.settings-modal.settings-modal .ant-modal-content { padding: 0 !important; overflow: hidden; background: var(--surface-strong); color: var(--text); border: 1px solid var(--border); }
+.settings-modal .ant-modal-header { margin: 0; padding: 16px 52px 8px 20px; background: var(--surface-strong); }
+.settings-modal .ant-modal-title { color: var(--text); }
+.settings-modal .ant-modal-close { color: var(--muted); }
+.settings-modal .ant-modal-body { padding: 0; }
+.settings-modal-hint { margin: 0; padding: 0 20px 12px; font-size: 12px; color: var(--muted); }
+.settings-modal .app.app-embedded { display: flex !important; min-height: 0; height: min(78vh, 820px); width: 100%; overflow: hidden; border-top: 1px solid var(--border); }
+.settings-modal .app.app-embedded::before { display: none !important; }
+.settings-modal .app.app-embedded > #admin-sidebar { position: relative !important; inset: auto !important; flex: 0 0 224px; width: 224px !important; height: 100%; min-height: 0; max-height: 100%; overflow-y: auto; padding: 16px !important; }
+.settings-modal .app.app-embedded > .main { height: 100%; min-height: 0; min-width: 0; overflow-y: auto; padding: 16px 20px !important; overscroll-behavior: contain; }
+.settings-modal .app-embedded .brand,
+.settings-modal .app-embedded .admin-sidebar-close,
+.settings-modal .app-embedded .admin-mobile-bar,
+.settings-modal .app-embedded .admin-sidebar-scrim { display: none !important; }
+.settings-modal .app-embedded .main > .admin-page-header { margin-top: 0; }
+.settings-modal .app-embedded .main > .set-page { padding: 0; }
+.settings-modal .set-page input { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.settings-modal .set-page input[type="checkbox"] { width: 16px !important; height: 16px !important; min-height: 0 !important; flex: 0 0 16px; }
+
+@media (max-width: 900px) {
+  .settings-modal.settings-modal { top: 0 !important; margin: 0 !important; width: 100vw !important; max-width: 100vw !important; padding: 0; }
+  .settings-modal.settings-modal .ant-modal-container,
+  .settings-modal.settings-modal .ant-modal-content { border-radius: 0; height: 100dvh; border: 0; display: flex; flex-direction: column; }
+  .settings-modal .ant-modal-header { padding-top: max(16px, env(safe-area-inset-top, 0px)); flex: 0 0 auto; }
+  .settings-modal .ant-modal-close { top: max(12px, env(safe-area-inset-top, 0px)); }
+  .settings-modal .ant-modal-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .settings-modal .app.app-embedded { flex: 1; height: auto; flex-direction: column; min-height: 0; }
+  .settings-modal .app.app-embedded > #admin-sidebar { flex: 0 0 auto; width: 100% !important; height: auto !important; min-height: 0 !important; max-height: none; padding: 8px 12px !important; transform: none !important; visibility: visible !important; box-shadow: none; border-right: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .settings-modal .app-embedded #admin-sidebar .admin-sidebar-heading,
+  .settings-modal .app-embedded #admin-sidebar > .refresh,
+  .settings-modal .app-embedded #admin-sidebar > .lang-switch,
+  .settings-modal .app-embedded #admin-sidebar > .ga-status-notice { display: none !important; }
+  .settings-modal .app-embedded #admin-sidebar > nav { display: flex !important; flex-direction: row !important; width: max-content; gap: 12px; }
+  .settings-modal .app-embedded #admin-sidebar .set-nav-group { display: flex !important; gap: 4px; }
+  .settings-modal .app-embedded #admin-sidebar .set-nav-group-title { display: none !important; }
+  .settings-modal .app-embedded #admin-sidebar nav button { width: auto !important; min-height: 40px; flex: 0 0 auto !important; padding: 8px 10px; white-space: nowrap !important; }
+  .settings-modal .app.app-embedded > .main { flex: 1; height: auto; padding: 14px !important; }
+}
