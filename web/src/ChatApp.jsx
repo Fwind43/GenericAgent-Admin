@@ -3781,7 +3781,7 @@ export const ChatMessage = memo(function ChatMessage({
               {imageFiles.length > 0 && (
                 <div className="oa-msg-images">
                   {imageFiles.map((f, i) => {
-                    const src = f.url || f.data_url
+                    const src = f.url || f.data_url || f.dataURL
                     return (
                       <a key={i} className="oa-msg-image-link" href={src} target="_blank" rel="noreferrer" title={ct('打开原图', 'Open original image')}>
                         <img src={src} alt={f.name || ct('图片', 'Image')} className="oa-msg-image" />
