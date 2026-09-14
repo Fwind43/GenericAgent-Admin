@@ -1,3 +1,4 @@
+import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
 import './conductor.css'
 import FileDownloadLink from './components/FileDownloadLink'
 import FilePreviewLink from './components/FilePreviewLink'
@@ -658,7 +659,7 @@ const MAX_CHAT_UPLOAD_BYTES_PER_FILE = 300 * 1024 * 1024
 const MAX_CHAT_UPLOAD_BYTES_TOTAL = 300 * 1024 * 1024
 
 const uploadFileName = (f) => String(f?.name || f?.Name || 'attachment')
-const uploadFileSource = (f) => String(f?.dataURL || f?.DataURL || f?.url || f?.URL || '')
+const uploadFileSource = chatAttachmentSource
 
 function isImageFile(f) {
   if (!f) return false
@@ -697,7 +698,7 @@ export const PendingAttachments = memo(function PendingAttachments({ attachments
 
   return <>
     <div className="oa-attach-preview">
-      {attachments.map((attachment) => {
+      {normalizeChatAttachments(attachments).map((attachment) => {
         const name = uploadFileName(attachment)
         const image = isImageFile(attachment)
         const source = image ? uploadFileSource(attachment) : ''
@@ -3661,7 +3662,7 @@ export const ChatMessage = memo(function ChatMessage({
   const delegated = m.role === 'user' && (m.sender_kind === 'conductor' ||
     (!m.sender_kind && conductorWorker && !!workerInstruction))
   const delegatedObjective = delegated ? (workerInstruction ? userText.slice(0, -workerInstruction.length) : userText) : ''
-  const messageFiles = Array.isArray(m.files) ? m.files : []
+  const messageFiles = normalizeChatAttachments(m.files)
   const imageFiles   = messageFiles.filter(isImageFile)
   const nonImageFiles = messageFiles.filter(f => !isImageFile(f))
   const metadataFilePaths = nonImageFiles
@@ -3781,7 +3782,7 @@ export const ChatMessage = memo(function ChatMessage({
               {imageFiles.length > 0 && (
                 <div className="oa-msg-images">
                   {imageFiles.map((f, i) => {
-                    const src = f.url || f.data_url || f.dataURL
+                    const src = chatAttachmentSource(f)
                     return (
                       <a key={i} className="oa-msg-image-link" href={src} target="_blank" rel="noreferrer" title={ct('打开原图', 'Open original image')}>
                         <img src={src} alt={f.name || ct('图片', 'Image')} className="oa-msg-image" />
@@ -6423,7 +6424,7 @@ export default function ChatApp() {
   const runSend = async (item = {}) => {
     const guidedQueueId = guidingQueueRef.current
     const text = String(item.text || '').trim()
-    const files = (item.files || []).map(({ name, type, dataURL }) => ({ name, type, dataURL }))
+    const files = normalizeChatAttachments(item.files).map(({ name, type, dataURL }) => ({ name, type, dataURL }))
     if (!text && !files.length) return
     const runToken = ++runSeqRef.current
     const streamToken = ++streamActivitySeqRef.current
@@ -6587,7 +6588,7 @@ export default function ChatApp() {
     const hasStringOverride = typeof textOverride === 'string'
     const sourceText = hasStringOverride ? textOverride : prompt
     const text = expandCustomSlashCommand(String(sourceText || '').trim())
-    const files = attachments.map(({ name, type, dataURL }) => ({ name, type, dataURL }))
+    const files = normalizeChatAttachments(attachments).map(({ name, type, dataURL }) => ({ name, type, dataURL }))
     if (text === '/new' && !files.length) {
       if (busy || activeRunRef.current) {
         setNotice(ct('当前正在执行，完成后可使用 /new 创建新对话', 'A run is in progress. Use /new after it completes.'))
@@ -6711,7 +6712,7 @@ export default function ChatApp() {
       id:`guided-${next.id}`,
       role:'user',
       content:String(next.text || ''),
-      files:Array.isArray(next.files) ? next.files : [],
+      files:normalizeChatAttachments(next.files),
       created_at:Math.floor(Date.now()/1000),
     } : null
     let guideStarted = false
