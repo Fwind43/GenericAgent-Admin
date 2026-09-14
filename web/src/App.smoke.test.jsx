@@ -1762,6 +1762,26 @@ describe('operator shell feedback', () => {
     expect(adminMobileStyles).toMatch(/\.admin-sidebar-scrim\s*\{[^}]*z-index:\s*1000;/s)
   })
 
+  test('embedded settings mobile back keeps draft and restores category focus', async () => {
+    installBrowserPolyfills()
+    window.matchMedia = vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    globalThis.fetch = vi.fn(async (url) => shellPayload(url))
+    render(<App embedded />)
+    await waitFor(() => expect(document.querySelector('#settings-ga-root')).toBeTruthy())
+    const root = document.querySelector('#settings-ga-root')
+    const general = document.querySelector('#admin-sidebar nav button[aria-current="page"]')
+    fireEvent.click(general)
+    const back = screen.getByRole('button', { name: '返回分类' })
+    await waitFor(() => expect(document.activeElement).toBe(back))
+    fireEvent.change(root, { target: { value: 'mobile-unsaved' } })
+    fireEvent.click(back)
+    await waitFor(() => expect(document.querySelector('.app-embedded').classList.contains('settings-list')).toBe(true))
+    await waitFor(() => expect(document.activeElement).toBe(general))
+    fireEvent.click(general)
+    expect(root.value).toBe('mobile-unsaved')
+    expect(globalThis.fetch.mock.calls.some(([url, options]) => String(url) === '/api/config' && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(options?.method))).toBe(false)
+  })
+
   test('embedded settings preserve chat URL and draft without saving on hide', async () => {
     installBrowserPolyfills()
     window.history.replaceState(null, '', '/chat?session=retained#draft')

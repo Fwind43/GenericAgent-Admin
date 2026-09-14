@@ -124,7 +124,7 @@ function RemoteAccessSection({ text, t, cfg, patch, dirty, onSave, busy }) {
 
     <SettingFooter>
       <SettingNote tone="muted" icon={<ShieldAlert size={14}/>}>{text.remote.restartNote}</SettingNote>
-      <span className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
+      <span role="status" aria-live="polite" className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
       <button className="primary" type="button" onClick={onSave} disabled={busy || !cfg || !dirty}><Save size={15}/>{busy ? t.busy : text.saveChanges}</button>
     </SettingFooter>
   </SettingsSection>
@@ -201,7 +201,7 @@ export function GeneralPage({
       </SettingRow>
       <SettingFooter>
         <SettingNote tone="muted" icon={<ShieldAlert size={14}/>}>{text.confirmNote}</SettingNote>
-        <span className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
+        <span role="status" aria-live="polite" className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
         <button className="primary" type="button" onClick={onSave} disabled={busy || !cfg || !dirty}><Save size={15}/>{busy ? t.busy : text.saveChanges}</button>
       </SettingFooter>
     </SettingsSection>

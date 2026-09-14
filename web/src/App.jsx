@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { Activity, BarChart3, BrainCircuit, FileCode2, FolderCog, Globe2, KeyRound, Menu, MessageSquare, PanelLeftClose, Play, RefreshCw, Server, SlidersHorizontal, Sparkles, Target, Terminal } from 'lucide-react'
+import { ArrowLeft, Activity, BarChart3, BrainCircuit, FileCode2, FolderCog, Globe2, KeyRound, Menu, MessageSquare, PanelLeftClose, Play, RefreshCw, Server, SlidersHorizontal, Sparkles, Target, Terminal } from 'lucide-react'
 import './admin-mobile.css'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import { api } from './lib/api'
@@ -59,6 +59,9 @@ export default function App({ embedded = false, active = true, onClose }) {
   const [lang, setLang] = useState(() => localStorage.getItem('ga-admin-lang-explicit') === '1' ? (localStorage.getItem('ga-admin-lang') || defaultLang) : defaultLang)
   const [theme, setTheme] = useState(getInitialTheme)
   const [adminSidebarOpen, setAdminSidebarOpen] = useState(false)
+  const [settingsDetail, setSettingsDetail] = useState(false)
+  const settingsBackRef = useRef(null)
+  const settingsNavRef = useRef(null)
   const initialRoute = useMemo(() => embedded ? { tab: 'settings', taskSubTab: 'schedule' } : parseRoute(), [embedded])
   const [tab, setTab] = useState(initialRoute.tab)
   const [taskSection, setTaskSection] = useState(initialRoute.taskSubTab)
@@ -119,7 +122,13 @@ export default function App({ embedded = false, active = true, onClose }) {
   const openTab = (next) => {
     setAdminSidebarOpen(false)
     setTab(next)
+    if (embedded) setSettingsDetail(true)
   }
+  useEffect(() => {
+    if (!embedded || !active || !window.matchMedia('(max-width: 900px)').matches) return
+    if (settingsDetail) settingsBackRef.current?.focus()
+    else settingsNavRef.current?.querySelector('[aria-current="page"]')?.focus()
+  }, [embedded, active, settingsDetail, tab])
   const services = useServices({ t, setMsg, setBusy })
   const logStream = useLogStream({ active: active && tab === 'logs' })
   const version = useVersionUpdates({ t, lang, setMsg, setBusy, active })
@@ -274,7 +283,7 @@ export default function App({ embedded = false, active = true, onClose }) {
         </div>
       </div>
     </div>}
-    <div ref={appScope} className={`app app-tab-${tab} ${embedded ? 'app-embedded' : ''} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
+    <div ref={appScope} className={`app app-tab-${tab} ${embedded ? `app-embedded ${settingsDetail ? 'settings-detail' : 'settings-list'}` : ''} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
       <button type="button" className="admin-sidebar-scrim" aria-label={lang === 'zh' ? '关闭管理导航' : 'Close admin navigation'} onClick={()=>setAdminSidebarOpen(false)} />
       <aside id="admin-sidebar" className="sidebar">
         <div className="admin-sidebar-heading">
@@ -282,7 +291,7 @@ export default function App({ embedded = false, active = true, onClose }) {
           <button type="button" className="admin-sidebar-close" aria-label={lang === 'zh' ? '收起管理导航' : 'Collapse admin navigation'} onClick={()=>setAdminSidebarOpen(false)}><PanelLeftClose size={20} aria-hidden="true"/></button>
         </div>
         <button type="button" className="admin-back-to-chat" onClick={()=>{ if (embedded) onClose?.(); else window.location.href = '/' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
-        <nav aria-label={t.mainNavigation}>
+        <nav ref={settingsNavRef} aria-label={t.mainNavigation}>
           {SETTINGS_GROUPS.map(group => <div className="set-nav-group" key={group.id}>
             <span className="set-nav-group-title">{t.navGroups[group.id]}</span>
             {group.items.map(item => <button
@@ -295,7 +304,7 @@ export default function App({ embedded = false, active = true, onClose }) {
           </div>)}
         </nav>
         <button type="button" className="refresh" onClick={load} disabled={booting}><RefreshCw size={15} aria-hidden="true"/>{booting ? t.busy : t.refresh}</button>
-        <StatusNotice kind={notice?.kind} message={notice?.message} retryLabel={t.retry} dismissLabel={t.close} onRetry={notice?.kind === 'error' ? load : undefined} onDismiss={notice?.kind === 'success' ? ()=>setNotice(null) : undefined}/>
+        {!embedded && <StatusNotice kind={notice?.kind} message={notice?.message} retryLabel={t.retry} dismissLabel={t.close} onRetry={notice?.kind === 'error' ? load : undefined} onDismiss={notice?.kind === 'success' ? ()=>setNotice(null) : undefined}/>}
         {serviceStatus}
       </aside>
       <main className="main">
@@ -304,10 +313,13 @@ export default function App({ embedded = false, active = true, onClose }) {
           <span>{t.appName}</span>
           {serviceStatus}
         </div>
+        {embedded && <button ref={settingsBackRef} type="button" className="settings-back" onClick={()=>setSettingsDetail(false)}><ArrowLeft size={18} aria-hidden="true"/>{lang === 'zh' ? '返回分类' : 'All categories'}</button>}
         <header className="admin-page-header">
           <h2>{t.nav[tab]}</h2>
           <p>{t.desc[tab]}</p>
         </header>
+        {embedded && <StatusNotice kind={notice?.kind} message={notice?.message} retryLabel={t.retry} dismissLabel={t.close} onRetry={notice?.kind === 'error' ? load : undefined} onDismiss={notice?.kind === 'success' ? ()=>setNotice(null) : undefined}/>}
+        <div className={embedded ? "settings-content-scroll" : undefined} style={embedded ? undefined : { display: 'contents' }}>
         <ErrorBoundary resetKey={tab}>
           <Suspense fallback={<RouteFallback label={t.loading} />}>
             {tab==='overview' && <OverviewPage
@@ -374,6 +386,7 @@ export default function App({ embedded = false, active = true, onClose }) {
             {tab==='logs' && <LogsPage t={t} services={services.services} stream={logStream} onStart={startService} onStop={stopService}/>}
           </Suspense>
         </ErrorBoundary>
+        </div>
       </main>
     </div>
   </>
