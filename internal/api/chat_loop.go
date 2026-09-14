@@ -329,6 +329,19 @@ func (s *Server) publishChatLoopState(sid string, state chatLoopState) {
 	s.publishChatRun(sid, map[string]interface{}{"type": "loop", "loop": state})
 }
 
+// Only completion events should wake a conductor with work still in flight.
+func chatLoopHasPendingConductorWork(cs chatSession) bool {
+	if cs.Conductor == nil || cs.Conductor.Role != conductorRoleParent {
+		return false
+	}
+	for _, child := range cs.ConductorChildren {
+		if !conductorTerminal(child.Status) {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Server) afterChatRunTerminal(sid string, success bool) {
 	s.resetChatAutorunAfterReply(sid)
 	if !success && s.chatRunCanceled(sid) {
@@ -353,6 +366,19 @@ func (s *Server) afterChatRunTerminal(sid string, success bool) {
 	// Then check loop mode
 	if !cs.Loop.Enabled || cs.Loop.Status == chatLoopStatusEvaluating {
 		s.SessionMu.Unlock()
+		return
+	}
+	if chatLoopHasPendingConductorWork(cs) {
+		if cs.Loop.Status != chatLoopStatusWaiting || cs.Loop.StopReason != "conductor_pending" {
+			cs.Loop.Status = chatLoopStatusWaiting
+			cs.Loop.StopReason = "conductor_pending"
+			appendChatLoopRecord(&cs.Loop, "waiting", "Waiting for Conductor workers to finish.", "")
+			err = saveChatSessionLocked(s.CfgStore.Snapshot(), cs)
+		}
+		s.SessionMu.Unlock()
+		if err == nil {
+			s.publishChatLoopState(sid, cs.Loop)
+		}
 		return
 	}
 	if success {
@@ -560,6 +586,17 @@ func (s *Server) finishChatLoop(sid string, epoch int64, status, reason string) 
 		s.SessionMu.Unlock()
 		return
 	}
+	if status == chatLoopStatusCompleted && (chatLoopHasPendingConductorWork(cs) || len(cs.QueuedMessages) > 0) {
+		cs.Loop.Status = chatLoopStatusWaiting
+		cs.Loop.StopReason = "conductor_pending"
+		err = saveChatSessionLocked(s.CfgStore.Snapshot(), cs)
+		s.SessionMu.Unlock()
+		if err == nil {
+			s.publishChatLoopState(sid, cs.Loop)
+			s.processNextQueuedMessage(sid)
+		}
+		return
+	}
 	cs.Loop.Enabled = false
 	cs.Loop.Status = status
 	cs.Loop.StopReason = reason
@@ -590,6 +627,7 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 	pendingMsg := chatMessage{ID: newChatID(), Role: "assistant", CreatedAt: time.Now().Unix(), RunStartedAtMS: runStartedAtMS}
 	var cs chatSession
 	var terminalLoop *chatLoopState
+	conductorReq := map[string]interface{}{}
 	owned, saveErr := s.saveChatRunPending(sid, token, pendingMsg.ID, runStartedAtMS, func() error {
 		s.SessionMu.Lock()
 		defer s.SessionMu.Unlock()
@@ -599,6 +637,20 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 		}
 		if !latest.Loop.Enabled || latest.Loop.Epoch != epoch || latest.Loop.Status != chatLoopStatusEvaluating {
 			return errChatLoopStale
+		}
+		if chatLoopHasPendingConductorWork(latest) {
+			latest.Loop.Status = chatLoopStatusWaiting
+			latest.Loop.StopReason = "conductor_pending"
+			if err := saveChatSessionLocked(s.CfgStore.Snapshot(), latest); err != nil {
+				return err
+			}
+			waiting := latest.Loop
+			terminalLoop = &waiting
+			return errChatLoopStale
+		}
+		conductorReq["extra_sys_prompts"] = append([]string(nil), latest.ExtraSysPrompts...)
+		if err := s.prepareConductorWorkerRequest(latest, conductorReq); err != nil {
+			return err
 		}
 		if latest.Loop.WorkerErrorStreak == 0 && latest.Loop.MaxRounds > 0 && latest.Loop.Round >= latest.Loop.MaxRounds {
 			latest.Loop.Enabled = false
@@ -684,6 +736,9 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 		"ga_root":                  s.CfgStore.Snapshot().GARoot,
 		"_ga_pending_assistant_id": pendingMsg.ID,
 		"_ga_run_started_at_ms":    runStartedAtMS,
+	}
+	for key, value := range conductorReq {
+		cmdReq[key] = value
 	}
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
 	go s.runChatWorkerOwned(sid, token, cs, cmdReq)
@@ -879,6 +934,11 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 	}
 	// Internal completion evidence wakes the model, but is not a user turn.
 	internalCompletion := queuedItem.Kind == "conductor_completion"
+	if internalCompletion && cs.Loop.Enabled {
+		cs.Loop.Epoch++
+		cs.Loop.Status = chatLoopStatusRunning
+		cs.Loop.StopReason = ""
+	}
 	workerHistory := append([]chatMessage(nil), cs.Messages...)
 	if !internalCompletion {
 		cs.Messages = append(cs.Messages, queuedUserMsg)

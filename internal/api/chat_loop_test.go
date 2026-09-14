@@ -1001,3 +1001,79 @@ func TestFinishChatLoopRecordDoesNotExposeControllerOutput(t *testing.T) {
 		t.Fatalf("controller output leaked into observer records: %s", recordsJSON)
 	}
 }
+
+func TestConductorLoopWaitsWithoutSpendingRounds(t *testing.T) {
+	for _, status := range []string{conductorQueued, conductorRunning} {
+		t.Run(status, func(t *testing.T) {
+			s := newChatLoopTestServer(t)
+			cs := chatSession{ID: "loop-conductor-wait", Conductor: &chatConductorState{Role: conductorRoleParent},
+				ConductorChildren: []chatConductorChild{{Status: status}},
+				Loop:              chatLoopState{Enabled: true, Status: chatLoopStatusRunning, Epoch: 4, Round: 2}}
+			saveChatLoopTestSession(t, s, cs)
+			s.afterChatRunTerminal(cs.ID, true)
+			first, err := os.ReadFile(chatSessionPath(s.CfgStore.Snapshot(), cs.ID))
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.afterChatRunTerminal(cs.ID, true)
+			second, err := os.ReadFile(chatSessionPath(s.CfgStore.Snapshot(), cs.ID))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(first, second) {
+				t.Fatal("repeated wait changed persisted state")
+			}
+			got, err := loadChatSession(s.CfgStore.Snapshot(), cs.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !got.Loop.Enabled || got.Loop.Status != chatLoopStatusWaiting || got.Loop.Round != 2 {
+				t.Fatalf("unexpected state: %#v", got.Loop)
+			}
+			got.Loop.Status = chatLoopStatusEvaluating
+			saveChatLoopTestSession(t, s, got)
+			s.continueChatLoop(cs.ID, 4, "must not dispatch while waiting")
+			got, err = loadChatSession(s.CfgStore.Snapshot(), cs.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Loop.Status != chatLoopStatusWaiting || got.Loop.Round != 2 || len(got.Messages) != 0 || s.chatRunActive(cs.ID) {
+				t.Fatalf("continued pending work: %#v", got)
+			}
+			s.finishChatLoop(cs.ID, 4, chatLoopStatusCompleted, "premature")
+			got, err = loadChatSession(s.CfgStore.Snapshot(), cs.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !got.Loop.Enabled || got.Loop.Status != chatLoopStatusWaiting {
+				t.Fatalf("completed with pending workers: %#v", got.Loop)
+			}
+			for _, terminal := range []string{conductorSucceeded, conductorFailed, conductorCancelled} {
+				got.ConductorChildren[0].Status = terminal
+				if chatLoopHasPendingConductorWork(got) {
+					t.Fatalf("terminal %s blocks evaluation", terminal)
+				}
+			}
+		})
+	}
+}
+
+func TestConductorLoopCompletionInvalidatesOldDecision(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	sid := "loop-conductor-receipt"
+	blockChatLoopTestWorker(t, s, sid)
+	saveChatLoopTestSession(t, s, chatSession{ID: sid, Conductor: &chatConductorState{Role: conductorRoleParent},
+		Loop:           chatLoopState{Enabled: true, Status: chatLoopStatusEvaluating, Epoch: 5},
+		QueuedMessages: []chatQueuedMessage{{ID: "conductor-receipt", Kind: "conductor_completion", Text: "worker done"}}})
+	if !s.processNextQueuedMessage(sid) {
+		t.Fatal("receipt did not start")
+	}
+	s.finishChatLoop(sid, 5, chatLoopStatusCompleted, "stale decision")
+	got, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Loop.Enabled || got.Loop.Epoch != 6 || got.Loop.Status != chatLoopStatusRunning {
+		t.Fatalf("stale observer stopped receipt: %#v", got.Loop)
+	}
+}
