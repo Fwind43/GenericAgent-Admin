@@ -16884,7 +16884,7 @@ html[data-color-scheme="dark"] .logs-page {
     bottom: 0;
     margin: 0 auto !important;
     z-index: 14;
-    width: min(var(--oa-chat-measure), calc(100% - 56px)) !important;
+    width: min(var(--oa-chat-measure), calc(100% - 60px)) !important;
     padding: 18px 0 18px !important;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0), var(--surface-strong) 44%) !important;
     pointer-events: none;
