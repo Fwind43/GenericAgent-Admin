@@ -290,7 +290,7 @@ export default function App({ embedded = false, active = true, onClose }) {
           <div className="brand"><img className="brand-logo" src="/icon.png" alt=""/><div><h1>{t.appName}</h1><p>{t.tagline}</p></div></div>
           <button type="button" className="admin-sidebar-close" aria-label={lang === 'zh' ? '收起管理导航' : 'Collapse admin navigation'} onClick={()=>setAdminSidebarOpen(false)}><PanelLeftClose size={20} aria-hidden="true"/></button>
         </div>
-        <button type="button" className="admin-back-to-chat" onClick={()=>{ if (embedded) onClose?.(); else window.location.href = '/' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
+        <button type="button" className="admin-back-to-chat" onClick={()=>{ if (onClose) onClose(); else window.location.href = '/chat' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
         <nav ref={settingsNavRef} aria-label={t.mainNavigation}>
           {SETTINGS_GROUPS.map(group => <div className="set-nav-group" key={group.id}>
             <span className="set-nav-group-title">{t.navGroups[group.id]}</span>

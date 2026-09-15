@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -21,7 +21,34 @@ const isAdmin = rootPath === '/admin' || rootPath.startsWith('/admin/')
 // list, so the admin bundle's stylesheet was never linked in a build.
 const AdminRoot = lazy(() => import('./App.jsx'))
 const ChatRoot = lazy(() => import('./ChatApp.jsx'))
-const Root = isAdmin ? AdminRoot : ChatRoot
+function RoutedRoot() {
+  const [admin, setAdmin] = useState(isAdmin)
+  const [chatVisited, setChatVisited] = useState(!isAdmin)
+  const chatURL = useRef(isAdmin ? '/chat' : window.location.pathname + window.location.search + window.location.hash)
+  useEffect(() => {
+    const onPopState = () => {
+      const nextAdmin = /^\/admin(?:\/|$)/.test(window.location.pathname)
+      if (!nextAdmin) setChatVisited(true)
+      setAdmin(nextAdmin)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+  const openSettings = () => {
+    chatURL.current = window.location.pathname + window.location.search + window.location.hash
+    window.history.pushState(null, '', '/admin')
+    setAdmin(true)
+  }
+  const backToChat = () => {
+    window.history.pushState(null, '', chatURL.current)
+    setChatVisited(true)
+    setAdmin(false)
+  }
+  return <>
+    {chatVisited && <div style={{ display: admin ? 'none' : 'contents' }}><ChatRoot onOpenSettings={openSettings}/></div>}
+    {admin && <AdminRoot onClose={backToChat}/>}
+  </>
+}
 
 const storedLanguage = () => localStorage.getItem('ga-admin-lang-explicit') === '1' && localStorage.getItem('ga-admin-lang') === 'en' ? 'en' : 'zh'
 
@@ -61,7 +88,7 @@ function LocalizedRoot() {
     <GlobalImagePreview />
     <ErrorBoundary>
       <Suspense fallback={<RouteFallback label={loading} />}>
-        <Root />
+        <RoutedRoot />
       </Suspense>
     </ErrorBoundary>
   </ConfigProvider>

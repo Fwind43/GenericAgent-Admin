@@ -1,7 +1,6 @@
 import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
 import './conductor.css'
 import FileDownloadLink from './components/FileDownloadLink'
-import SettingsModal from './components/SettingsModal'
 import FilePreviewLink from './components/FilePreviewLink'
 import { fileDownloadTarget } from './lib/fileDownload.js'
 import ProjectSessionPage from './components/ProjectSessionPage'
@@ -4530,8 +4529,7 @@ function CustomSelect({ value, onChange, options, disabled, ariaLabel }) {
   )
 }
 
-export default function ChatApp() {
-  const [settingsOpen, setSettingsOpen] = useState(false)
+export default function ChatApp({ onOpenSettings } = {}) {
   // Theme state: sync with localStorage and system preference
   const [conductorEventsOpen, setConductorEventsOpen] = useState(false)
   const [conductorWorkersOpen, setConductorWorkersOpen] = useState(false)
@@ -7251,7 +7249,6 @@ export default function ChatApp() {
   />
 
   return <div ref={chatScope} className={`oa-chat ${collapsed ? 'is-collapsed' : ''}`}>
-    <SettingsModal open={settingsOpen} onClose={()=>setSettingsOpen(false)} lang={chatLanguage()}/>
     <aside className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-sidebar-search">
@@ -7405,7 +7402,7 @@ export default function ChatApp() {
             {chatInstances.map(instance => <option key={instance.id} value={instance.id} disabled={instance.initializing}>{instance.name}{instance.initializing ? ct('（初始化中）', ' (initializing)') : ''}</option>)}
           </select>
         </label>
-        <button className="oa-sidebar-settings" onClick={()=>setSettingsOpen(true)}><Settings size={15}/>{ct('设置', 'Settings')}</button>
+        <button className="oa-sidebar-settings" onClick={()=>{ if (onOpenSettings) onOpenSettings(); else window.location.href = '/admin' }}><Settings size={15}/>{ct('设置', 'Settings')}</button>
       </div>
     </aside>
     <div className={`oa-sidebar-backdrop ${collapsed ? '' : 'is-visible'}`} aria-hidden={collapsed} onClick={()=>setCollapsed(true)} />
