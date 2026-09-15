@@ -16875,14 +16875,16 @@ html[data-color-scheme="dark"] .logs-page {
   /* The !importants push back a legacy pass (see the .oa-composer-wrap block
      near line 3126) that pins the wrap with margin-right and an !important
      width of its own. */
+  /* Match the thread's scrollbar-free content box. Its stable 8px gutter shifts
+     the shared reading column 4px left of the main area's geometric center. */
   .oa-composer-wrap {
     position: absolute;
     left: 0;
-    right: 0;
+    right: 8px;
     bottom: 0;
     margin: 0 auto !important;
     z-index: 14;
-    width: min(var(--oa-chat-measure), calc(100% - 48px)) !important;
+    width: min(var(--oa-chat-measure), calc(100% - 56px)) !important;
     padding: 18px 0 18px !important;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0), var(--surface-strong) 44%) !important;
     pointer-events: none;
