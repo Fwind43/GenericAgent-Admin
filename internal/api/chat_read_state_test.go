@@ -102,6 +102,31 @@ func TestChatResultVersion(t *testing.T) {
 	if got := summaryFromChatSession(cs).Result; *got != *original {
 		t.Fatal("summary version mismatch")
 	}
+	if original.VisibleRevision == "" {
+		t.Fatal("missing visible result version")
+	}
+	metadata := cs
+	metadata.Messages = append([]chatMessage(nil), cs.Messages...)
+	metadata.Messages[1].RunStartedAtMS = 999
+	metadata.Messages[1].ElapsedMS = 321
+	metadataResult := latestChatSessionResult(metadata)
+	if metadataResult.Revision == original.Revision || metadataResult.VisibleRevision != original.VisibleRevision {
+		t.Fatal("metadata refresh must change only the full revision")
+	}
+	if !chatResultRead(*original, *metadataResult) {
+		t.Fatal("read visible content became unread after metadata refresh")
+	}
+	changed := metadata
+	changed.Messages = append([]chatMessage(nil), metadata.Messages...)
+	changed.Messages[1].Content = "final answer plus new visible text"
+	changedResult := latestChatSessionResult(changed)
+	if chatResultRead(*original, *changedResult) {
+		t.Fatal("new visible content must remain unread")
+	}
+	legacy := chatSessionResult{ID: original.ID, Revision: original.Revision}
+	if !chatResultRead(legacy, *original) || chatResultRead(legacy, *metadataResult) {
+		t.Fatal("legacy receipts must match their exact full revision only")
+	}
 	page := requirePage(t, cs, "")
 	if got := page["result"].(*chatSessionResult); *got != *original {
 		t.Fatal("page result mismatch")

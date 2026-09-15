@@ -118,12 +118,11 @@ func (s *Server) chatMarkRead(w http.ResponseWriter, r *http.Request) {
 	changed := false
 	for _, receipt := range req.Receipts {
 		summary, ok := current[receipt.SID]
-		running, _ := s.chatSessionTaskbarSnapshot(summary)
-		if !ok || running || summary.Result == nil || *summary.Result != receipt.Result {
+		if !ok || summary.Result == nil || !chatResultRead(receipt.Result, *summary.Result) {
 			continue
 		}
-		if state[receipt.SID] != receipt.Result {
-			state[receipt.SID] = receipt.Result
+		if !chatResultRead(state[receipt.SID], *summary.Result) {
+			state[receipt.SID] = *summary.Result
 			changed = true
 		}
 		accepted = append(accepted, receipt)

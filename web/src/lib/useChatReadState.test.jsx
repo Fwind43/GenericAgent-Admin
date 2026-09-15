@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { useChatReadState } from './useChatReadState.js'
 
 
-const answer = { id: 'a', revision: 'v1' }
+const answer = { id: 'a', revision: 'v1', visible_revision: 'visible-1' }
 let focused, covered, bottom, props
 beforeEach(() => {
   vi.useFakeTimers()
@@ -71,6 +71,31 @@ test('mark all skips running results and waits for confirmation', async () => {
   expect(h.result.current.hasUnread).toBe(true)
   expect(JSON.parse(props.api.mock.calls[0][1].body).receipts).toHaveLength(1)
   await act(async () => { resolve({ receipts: [{ sid: 's', result: answer }] }) })
+  expect(h.result.current.hasUnread).toBe(false)
+})
+
+test('viewed result stays read after switching to a newly created session', async () => {
+  const h = setup()
+  await act(async () => { vi.advanceTimersByTime(1200) })
+  expect(props.api).toHaveBeenCalledTimes(1)
+  h.rerender({ ...props, sid: 'new-session', snapshot: { id: 'new-session' } })
+  expect(h.result.current.hasUnread).toBe(false)
+})
+
+test('visible running conductor content is receipted before switching away', async () => {
+  props = { ...props, running: true, sessions: [{ ...props.sessions[0], running: true }] }
+  const h = setup()
+  expect(h.result.current.currentUnread).toBe(false)
+  await act(async () => { vi.advanceTimersByTime(1200) })
+  expect(props.api).toHaveBeenCalledTimes(1)
+  expect(JSON.parse(props.api.mock.calls[0][1].body).receipts).toEqual([{ sid: 's', result: answer }])
+  h.rerender({
+    ...props,
+    sid: 'other',
+    snapshot: { id: 'other' },
+    running: false,
+    sessions: [{ id: 's', result: { ...answer, revision: 'metadata-v2' }, unread: false }],
+  })
   expect(h.result.current.hasUnread).toBe(false)
 })
 

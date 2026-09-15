@@ -11,11 +11,42 @@ import (
 	"genericagent-admin-go/internal/config"
 )
 
-const chatSessionListIndexVersion = 5
+const chatSessionListIndexVersion = 6
 
 type chatSessionResult struct {
-	ID       string `json:"id"`
-	Revision string `json:"revision"`
+	ID              string `json:"id"`
+	Revision        string `json:"revision"`
+	VisibleRevision string `json:"visible_revision,omitempty"`
+}
+
+type chatVisibleResult struct {
+	ID                string                   `json:"id"`
+	Content           string                   `json:"content"`
+	Files             []map[string]interface{} `json:"files,omitempty"`
+	StructuredContent []map[string]interface{} `json:"structured_content,omitempty"`
+}
+
+func visibleChatSessionResult(m chatMessage) chatVisibleResult {
+	return chatVisibleResult{ID: m.ID, Content: m.Content, Files: m.Files, StructuredContent: m.StructuredContent}
+}
+
+func chatVisibleRevision(m chatMessage) string {
+	b, err := json.Marshal(visibleChatSessionResult(m))
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(b))
+}
+
+func chatResultRead(read, current chatSessionResult) bool {
+	if read.ID == "" || read.ID != current.ID {
+		return false
+	}
+	if read.VisibleRevision != "" && current.VisibleRevision != "" {
+		return read.VisibleRevision == current.VisibleRevision
+	}
+	// Receipts written before visible revisions were introduced remain valid.
+	return read.Revision != "" && read.Revision == current.Revision
 }
 
 func latestChatSessionResult(cs chatSession) *chatSessionResult {
@@ -35,7 +66,10 @@ func latestChatSessionResult(cs chatSession) *chatSessionResult {
 		if err != nil {
 			return nil
 		}
-		return &chatSessionResult{ID: m.ID, Revision: fmt.Sprintf("%x", sha256.Sum256(b))}
+		return &chatSessionResult{
+			ID: m.ID, Revision: fmt.Sprintf("%x", sha256.Sum256(b)),
+			VisibleRevision: chatVisibleRevision(m),
+		}
 	}
 	return nil
 }
