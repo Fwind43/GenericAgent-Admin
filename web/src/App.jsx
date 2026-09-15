@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { ArrowLeft, Activity, BarChart3, BrainCircuit, FileCode2, FolderCog, Globe2, KeyRound, Menu, MessageSquare, PanelLeftClose, Play, RefreshCw, Server, SlidersHorizontal, Sparkles, Target, Terminal } from 'lucide-react'
+import { ArrowLeft, Activity, BarChart3, BrainCircuit, FileCode2, FolderCog, Globe2, KeyRound, Menu, MessageSquare, PanelLeftClose, Play, Server, SlidersHorizontal, Sparkles, Target, Terminal } from 'lucide-react'
 import './admin-mobile.css'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import { api } from './lib/api'
@@ -303,7 +303,6 @@ export default function App({ embedded = false, active = true, onClose }) {
             >{NAV_ICONS[item]}{t.nav[item]}</button>)}
           </div>)}
         </nav>
-        <button type="button" className="refresh" onClick={load} disabled={booting}><RefreshCw size={15} aria-hidden="true"/>{booting ? t.busy : t.refresh}</button>
         {!embedded && <StatusNotice kind={notice?.kind} message={notice?.message} retryLabel={t.retry} dismissLabel={t.close} onRetry={notice?.kind === 'error' ? load : undefined} onDismiss={notice?.kind === 'success' ? ()=>setNotice(null) : undefined}/>}
         {serviceStatus}
       </aside>
