@@ -18719,3 +18719,36 @@ html[data-color-scheme="dark"] .oa-chat .oa-composer:focus-within {
 @media (prefers-reduced-motion: reduce) {
   .oa-chat .oa-composer { transition: none; }
 }
+
+/* Ordinary sidebar feedback stays inline; error notices retain their card and retry. */
+#admin-sidebar > .ga-status-notice:is(.ga-status-pending, .ga-status-success) {
+  width: auto;
+  max-width: 100%;
+  min-height: 28px;
+  flex-shrink: 0;
+  margin-top: 4px;
+  padding: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+#admin-sidebar > .ga-status-notice:is(.ga-status-pending, .ga-status-success) .ga-status-mark {
+  margin-top: 0;
+  box-shadow: none;
+}
+#admin-sidebar > .ga-status-notice:is(.ga-status-pending, .ga-status-success) .ga-status-actions {
+  grid-column: 3;
+  grid-row: 1;
+  width: auto;
+  margin-top: 0;
+}
+@media (max-width: 768px) {
+  #admin-sidebar > .ga-status-notice:is(.ga-status-pending, .ga-status-success) .ga-status-dismiss {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
