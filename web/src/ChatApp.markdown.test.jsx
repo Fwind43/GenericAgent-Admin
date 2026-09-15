@@ -1,6 +1,6 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { ChatMessage, MessageList } from './ChatApp.jsx'
 import { mergeStreamTerminalMessage } from './lib/chatStream.js'
 import { reconcileHistoryPage } from './lib/chatHistoryPages.js'
@@ -196,6 +196,36 @@ describe('assistant markdown rendering', () => {
     expect(firstFile.getAttribute('aria-expanded')).toBe('true')
     fireEvent.keyDown(firstFile, { key: 'Enter' })
     expect(firstFile.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  test('copies each file summary path without toggling its diff', async () => {
+    const path = 'src/components/Demo.jsx'
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+    const container = renderAssistant([
+      '\u{1F6E0}\uFE0F Tool: `file_write`',
+      '```text',
+      JSON.stringify({ path, content: 'export default true', mode: 'overwrite' }),
+      '```',
+    ].join('\n'))
+
+    const fileRow = container.querySelector('.oa-file-summary-item')
+    const copy = fileRow.querySelector('.oa-mini-copy')
+    expect(copy.getAttribute('aria-label')).toContain(path)
+    expect(fileRow.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(copy)
+
+    expect(writeText).toHaveBeenCalledOnce()
+    expect(writeText).toHaveBeenCalledWith(path)
+    expect(fileRow.getAttribute('aria-expanded')).toBe('false')
+    await waitFor(() => expect(copy.getAttribute('aria-label')).toBe('\u8def\u5f84\u5df2\u590d\u5236'))
+
+    fireEvent.keyDown(copy, { key: 'Enter' })
+    expect(fileRow.getAttribute('aria-expanded')).toBe('false')
   })
 
   test('starts a many-file summary collapsed and expands only on demand', () => {

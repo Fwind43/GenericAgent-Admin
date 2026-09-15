@@ -2189,6 +2189,11 @@ html[data-color-scheme="dark"] .oa-code-action-btn:hover{background:rgba(255,255
 .oa-file-chevron{flex-shrink:0;color:var(--muted);transition:transform .2s ease}
 .oa-file-chevron.open{transform:rotate(180deg)}
 .oa-file-name{flex-shrink:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text);font-size:12px;line-height:18px;font-weight:600;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oa-file-summary-item .oa-mini-copy{display:inline-flex;width:22px;height:22px;min-width:22px;align-items:center;justify-content:center;flex:0 0 22px;padding:0;border:0;border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;opacity:.65;transition:background .12s ease,color .12s ease,opacity .12s ease}
+.oa-file-summary-item:hover .oa-mini-copy,.oa-file-summary-item .oa-mini-copy:focus-visible{opacity:1}
+.oa-file-summary-item .oa-mini-copy:hover{background:var(--surface-strong);color:var(--text)}
+.oa-file-summary-item .oa-mini-copy:focus-visible{outline:2px solid var(--primary);outline-offset:-1px}
+.oa-file-summary-item .oa-mini-copy span{display:none}
 .oa-file-stats{flex-shrink:0;display:flex;gap:6px;font:650 11px/16px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .oa-file-stats .stat-added{color:var(--i-18864b)}
 .oa-file-stats .stat-removed{color:var(--i-c43b43)}

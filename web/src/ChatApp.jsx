@@ -600,7 +600,7 @@ function InlineMarkdown({ text = '', nodes }) {
   return <InlineNodes nodes={nodes || parseInline(text)} />
 }
 
-function CopyButton({ text, compact = false }) {
+function CopyButton({ text, compact = false, label = ct('复制', 'Copy'), copiedLabel = ct('已复制', 'Copied') }) {
   const [ok, setOk] = useState(false)
   const copy = async (e) => {
     e?.stopPropagation?.()
@@ -610,8 +610,9 @@ function CopyButton({ text, compact = false }) {
       setTimeout(() => setOk(false), 1200)
     } catch {}
   }
-  return <button className={compact ? 'oa-mini-copy' : 'oa-copy'} onClick={copy} title={ct('复制', 'Copy')}>
-    {ok ? <Check size={14}/> : <Copy size={14}/>}<span>{ok ? ct('已复制', 'Copied') : ct('复制', 'Copy')}</span>
+  const statusLabel = ok ? copiedLabel : label
+  return <button type="button" className={compact ? 'oa-mini-copy' : 'oa-copy'} onClick={copy} title={statusLabel} aria-label={statusLabel}>
+    {ok ? <Check size={14}/> : <Copy size={14}/>}<span>{statusLabel}</span>
   </button>
 }
 
@@ -2687,7 +2688,7 @@ const FileSummaryCard = memo(function FileSummaryCard({ content = '' }) {
                 tabIndex={0}
                 aria-expanded={expanded}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                     e.preventDefault()
                     toggleExpand(group.path)
                   }
@@ -2695,6 +2696,12 @@ const FileSummaryCard = memo(function FileSummaryCard({ content = '' }) {
               >
                 <ChevronDown size={11} className={'oa-file-chevron' + (expanded ? ' open' : '')} />
                 <span className="oa-file-name">{filename}</span>
+                <CopyButton
+                  text={group.path}
+                  compact
+                  label={ct(`复制路径：${group.path}`, `Copy path: ${group.path}`)}
+                  copiedLabel={ct('路径已复制', 'Path copied')}
+                />
                 {multi && <span className="oa-file-op-count">×{group.ops.length}</span>}
                 <span className="oa-file-stats">
                   {group.removed > 0 && <span className="stat-removed">-{group.removed}</span>}
