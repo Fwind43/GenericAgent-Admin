@@ -18,7 +18,7 @@ test('renders the instance selector once directly above settings in the session 
   const search = chatSource.indexOf('className="oa-sidebar-search"', sidebar)
   const footer = chatSource.indexOf('className="oa-sidebar-foot"', sidebar)
   const selector = chatSource.indexOf('className="oa-sidebar-instance"', footer)
-  const settings = chatSource.indexOf("window.location.href='/admin'", footer)
+  const settings = chatSource.indexOf('className="oa-sidebar-settings"', footer)
   const sidebarEnd = chatSource.indexOf('</aside>', sidebar)
   assert.ok(sidebar >= 0)
   assert.ok(search > sidebar && search < footer)
