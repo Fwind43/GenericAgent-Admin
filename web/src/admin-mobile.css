@@ -102,7 +102,7 @@
   }
 
   .app > .sidebar .refresh {
-    width: 100%;
+    width: fit-content;
     min-height: 44px;
     margin-top: auto;
   }
