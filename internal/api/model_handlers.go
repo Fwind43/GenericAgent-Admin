@@ -204,10 +204,11 @@ func (s *Server) models(w http.ResponseWriter, r *http.Request) {
 			bad(w, http.StatusInternalServerError, err.Error())
 			return
 		}
+		s.invalidateGARuntimeLLMs(s.CfgStore.Snapshot())
 		writeJSON(w, d)
 		return
 	}
-	bad(w, 405, "method not allowed")
+	bad(w, http.StatusMethodNotAllowed, "method not allowed")
 }
 
 func (s *Server) modelsRaw(w http.ResponseWriter, r *http.Request) {

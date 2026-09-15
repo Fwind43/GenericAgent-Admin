@@ -997,7 +997,7 @@ func (s *Server) chatState(w http.ResponseWriter, r *http.Request, sid string) {
 	}
 	cs.Settings = normalizeChatSettings(cs.Settings)
 	cfg := s.CfgStore.Snapshot()
-	llms, err := s.listGARuntimeLLMs(cfg)
+	llms, err := s.cachedGARuntimeLLMs(cfg)
 	markChatLLMActive(llms, cs.Settings.LLMNo)
 	backend := map[string]interface{}{"class": "GenericAgent worker", "source": "agentmain.GenericAgent.list_llms"}
 	if err != nil {

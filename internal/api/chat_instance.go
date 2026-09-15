@@ -102,6 +102,7 @@ func (s *Server) chatRequestServer(cfgStore, baseStore *config.Store, runtime *c
 		ChatTitleJobs:           s.ChatTitleJobs,
 		ChatRuntimes:            s.ChatRuntimes,
 		ChatRuntime:             s.ChatRuntime,
+		ChatLLMCache:            s.ChatLLMCache,
 		BaseCfgStore:            baseStore,
 		titleBackfillStarted:    s.titleBackfillStarted,
 		chatSessionMutationHook: s.chatSessionMutationHook,

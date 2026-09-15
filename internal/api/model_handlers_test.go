@@ -191,6 +191,35 @@ func TestModelsSaveRequiresDangerousConfirm(t *testing.T) {
 	}
 }
 
+func TestModelsSaveInvalidatesChatLLMCache(t *testing.T) {
+	root := t.TempDir()
+	s := newModelTestServer(t, root)
+	cfg := s.CfgStore.Snapshot()
+	key := chatLLMKey(cfg)
+	calls := 0
+	loader := func() ([]map[string]interface{}, error) {
+		calls++
+		return []map[string]interface{}{{"model": "cached"}}, nil
+	}
+	if _, err := s.ChatLLMCache.load(key, loader); err != nil {
+		t.Fatal(err)
+	}
+
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/models", strings.NewReader(`{"profiles":[]}`))
+	markDangerous(req)
+	s.Routes().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("PUT status=%d want=200 body=%s", rr.Code, rr.Body.String())
+	}
+	if _, err := s.ChatLLMCache.load(key, loader); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("loader calls=%d want 2 after models save", calls)
+	}
+}
+
 func TestModelsRawWithDangerousConfirmReturnsUnmaskedSecret(t *testing.T) {
 	root := t.TempDir()
 	writeTestMyKey(t, root, "sk-raw-secret")

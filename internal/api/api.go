@@ -52,6 +52,7 @@ type Server struct {
 	ChatTitleJobs       map[string]bool
 	ChatRuntimes        *chatRuntimeRegistry
 	ChatRuntime         *chatRuntime
+	ChatLLMCache        *chatLLMCache
 	BaseCfgStore        *config.Store
 	// PasswordConfigured reports whether an admin password exists. The
 	// credential itself lives outside this package, so remote-access settings
@@ -89,6 +90,7 @@ func New(cfg *config.Store, svc *service.Manager, models *modelconfig.Store, sta
 		ChatRuns: defaultRuntime.runs, ChatWorkers: defaultRuntime.workers,
 		ChatLoopControllers: defaultRuntime.loopControllers,
 		ChatTitleJobs:       defaultRuntime.titleJobs, ChatRuntimes: chatRuntimes, ChatRuntime: defaultRuntime,
+		ChatLLMCache:         newChatLLMCache(),
 		instanceInstallTasks: make(map[string]*instanceInstallTask),
 	}
 	s.resumeInstanceInstalls()
