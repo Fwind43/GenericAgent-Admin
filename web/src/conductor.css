@@ -106,7 +106,23 @@
 .oa-conductor-worker-main small { color: var(--muted); font-size: 11px; text-transform: capitalize; }
 .oa-conductor-status-dot { width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #8f96a3; }
 .oa-conductor-status-dot.is-queued { background: #e5a62d; }
-.oa-conductor-status-dot.is-running { background: #e5a62d; box-shadow: 0 0 0 4px color-mix(in srgb, #e5a62d 18%, transparent); }
+.oa-conductor-status-dot.is-running { position: relative; background: #e5a62d; box-shadow: 0 0 0 4px color-mix(in srgb, #e5a62d 18%, transparent); }
+.oa-conductor-status-dot.is-running::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border: 1px solid #e5a62d;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: oa-conductor-running-ring 1.8s ease-out infinite;
+}
+@keyframes oa-conductor-running-ring {
+  0% { opacity: .5; transform: scale(.8); }
+  72%, 100% { opacity: 0; transform: scale(2.25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oa-conductor-status-dot.is-running::after { display: none; }
+}
 .oa-conductor-status-dot.is-succeeded { background: #28a96b; }
 .oa-conductor-status-dot.is-failed,
 .oa-conductor-status-dot.is-cancelled { background: #d65959; }
