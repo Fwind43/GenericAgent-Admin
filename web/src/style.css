@@ -18721,6 +18721,29 @@ html[data-color-scheme="dark"] .oa-chat .oa-composer:focus-within {
 }
 
 /* Ordinary sidebar feedback stays inline; error notices retain their card and retry. */
+.settings-modal .app-embedded .main > .ga-status-notice:is(.ga-status-pending, .ga-status-success) {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: calc(100% - 48px);
+  min-height: 28px;
+  padding: 0;
+  gap: 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.settings-modal .app-embedded .main > .ga-status-notice:is(.ga-status-pending, .ga-status-success) .ga-status-mark {
+  box-shadow: none;
+}
+@media (max-width: 768px) {
+  .settings-modal .app-embedded .main > .ga-status-notice:is(.ga-status-pending, .ga-status-success) {
+    max-width: calc(100% - 32px);
+  }
+}
 #admin-sidebar > .ga-status-notice:is(.ga-status-pending, .ga-status-success) {
   width: auto;
   max-width: 100%;
