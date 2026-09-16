@@ -2802,7 +2802,8 @@ def _install_conductor_tools(agent, config):
     def tasks(handler, args, response):
         offset = args.get('offset', 0)
         if type(offset) is not int or offset < 0:
-            return StepOutcome({'ok': False, 'error': 'offset must be a nonnegative integer'})
+            return StepOutcome({'ok': False, 'error': 'offset must be a nonnegative integer'},
+                               next_prompt='conductor_tasks rejected offset: use a nonnegative integer and retry.')
         rows = config.get('tasks', [])
         end = min(offset + 48, len(rows))
         reply = {'ok': True, 'snapshot': 'parent_request', 'total': len(rows),
