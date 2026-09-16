@@ -99,6 +99,24 @@ test('visible running conductor content is receipted before switching away', asy
   expect(h.result.current.hasUnread).toBe(false)
 })
 
+test('an unmounted result placeholder never marks read until its body returns', async () => {
+  const thread = props.threadRef.current
+  const body = thread.querySelector('.oa-message')
+  const placeholder = document.createElement('div')
+  placeholder.className = 'oa-message-slot is-placeholder'
+  placeholder.dataset.messageId = 'a'
+  placeholder.style.height = '300px'
+  body.replaceWith(placeholder)
+  const h = setup()
+  await act(async () => { vi.advanceTimersByTime(2000) })
+  expect(props.api).not.toHaveBeenCalled()
+  expect(h.result.current.currentUnread).toBe(true)
+  placeholder.replaceWith(body)
+  await act(async () => { vi.advanceTimersByTime(1200) })
+  expect(props.api).toHaveBeenCalledTimes(1)
+  expect(h.result.current.currentUnread).toBe(false)
+})
+
 test('visible final result marks read after dwell, never while covered', async () => {
   covered = true
   const h = setup()
