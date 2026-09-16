@@ -74,7 +74,8 @@ func TestConductorReuseRoster(t *testing.T) {
  if err:=s.prepareConductorWorkerRequest(cs,req);err!=nil {t.Fatal(err)}
  prompts:=req["extra_sys_prompts"].([]string)
  roster:=prompts[len(prompts)-1]
- if strings.Count(roster, `"session_id":"worker-a"`)!=1 || strings.Contains(roster, `"dispatch_id":"old"`) {t.Fatal(roster)}
- if !strings.Contains(roster, `"reusable":false,"session_id":"worker-a"`) || !strings.Contains(roster, `"reusable":true,"session_id":"worker-b"`) {t.Fatal(roster)}
+ if strings.Count(roster, `"session_id":"worker-a"`)!=2 || !strings.Contains(roster, `"dispatch_id":"old"`) {t.Fatal(roster)}
+ rows := req["conductor"].(map[string]interface{})["tasks"].([]map[string]interface{})
+ for _, row := range rows { if row["reusable"] != (row["session_id"] == "worker-b") { t.Fatal(row) } }
  if strings.Contains(conductorParentPrompt,"does not provide worker resume") || !strings.Contains(conductorParentPrompt,"original session_id") {t.Fatal("missing reuse guidance")}
 }
