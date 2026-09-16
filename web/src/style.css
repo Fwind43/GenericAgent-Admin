@@ -6365,6 +6365,16 @@ html[data-color-scheme="dark"] .oa-tools-act:hover:not(:disabled) { background: 
   --oa-chat-measure: 960px;
   --oa-chat-compact-shadow: 0 10px 32px rgba(0,0,0,.08);
 }
+.oa-message-list,
+.oa-message-slot {
+  width:100%;
+  min-width:0;
+}
+.oa-message-slot.is-placeholder {
+  flex:0 0 auto;
+  contain:layout style paint;
+  overflow:hidden;
+}
 .oa-message {
   width:min(var(--oa-chat-measure), calc(100% - 52px));
   grid-template-columns:30px minmax(0,1fr);

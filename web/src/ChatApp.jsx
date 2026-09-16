@@ -3955,61 +3955,215 @@ export const ConductorEvents = memo(function ConductorEvents({ conductorDetail, 
   </aside>
 })
 
+const MESSAGE_RENDER_TAIL = 2
+const MESSAGE_RENDER_LIMIT = 12
+const MESSAGE_HEIGHT_CACHE_LIMIT = 160
+const messageHeightCache = new Map()
+
+function messageRenderKey(message) {
+  return String(message?.render_key || message?.id || '')
+}
+
+function estimatedMessageHeight(message, showTimeline, showVersions) {
+  const chars = String(message?.content || '').length
+  const base = message?.role === 'user' ? 72 : 96
+  return Math.min(1200, base + Math.ceil(chars / 90) * 24 + (showTimeline ? 38 : 0) + (showVersions ? 32 : 0))
+}
+
+function rememberMessageHeight(cacheKey, height) {
+  if (!cacheKey || !Number.isFinite(height) || height <= 0) return
+  messageHeightCache.delete(cacheKey)
+  messageHeightCache.set(cacheKey, Math.ceil(height))
+  while (messageHeightCache.size > MESSAGE_HEIGHT_CACHE_LIMIT) {
+    messageHeightCache.delete(messageHeightCache.keys().next().value)
+  }
+}
+
+const VirtualMessageSlot = memo(function VirtualMessageSlot({
+  active, cacheKey, estimatedHeight, messageID, messageKey, children,
+}) {
+  const slotRef = useRef(null)
+  useLayoutEffect(() => {
+    if (!active || !slotRef.current) return undefined
+    const slot = slotRef.current
+    const measure = () => rememberMessageHeight(cacheKey, slot.getBoundingClientRect().height)
+    measure()
+    if (typeof ResizeObserver !== 'function') return undefined
+    const observer = new ResizeObserver(measure)
+    observer.observe(slot)
+    return () => observer.disconnect()
+  }, [active, cacheKey])
+  const height = messageHeightCache.get(cacheKey) || estimatedHeight
+  return (
+    <div
+      ref={slotRef}
+      className={`oa-message-slot ${active ? 'is-active' : 'is-placeholder'}`}
+      data-message-id={messageID}
+      data-message-key={messageKey}
+      style={active ? undefined : { height }}
+      aria-hidden={active ? undefined : 'true'}
+    >
+      {active ? children : null}
+    </div>
+  )
+})
+
+function MessageListContent({
+  messages, isCurrentRunning, onAskReply, onEditResend, onRetryBTW, clockNow,
+  worldline, onSwitchVersion, conductorDetail, sessionKey,
+}) {
+  const rootRef = useRef(null)
+  const threadMessages = useMemo(() => messages.filter(message => message.kind !== 'btw'), [messages])
+  const lastMessageId = threadMessages.at(-1)?.id
+  const tailKeys = useMemo(() => new Set(threadMessages.slice(-MESSAGE_RENDER_TAIL).map(messageRenderKey)), [threadMessages])
+  const [activeKeys, setActiveKeys] = useState(() => new Set(tailKeys))
+  const activationOrderRef = useRef([])
+  const queueRef = useRef([])
+  const frameRef = useRef(0)
+
+  const activateKey = useCallback(key => {
+    if (!key) return
+    setActiveKeys(current => {
+      const next = new Set(current)
+      next.add(key)
+      activationOrderRef.current = [...activationOrderRef.current.filter(item => item !== key), key]
+      if (next.size > MESSAGE_RENDER_LIMIT) {
+        const removable = activationOrderRef.current.filter(item => next.has(item) && !tailKeys.has(item))
+        for (const victim of removable) {
+          if (next.size <= MESSAGE_RENDER_LIMIT) break
+          next.delete(victim)
+          activationOrderRef.current = activationOrderRef.current.filter(item => item !== victim)
+        }
+      }
+      return next
+    })
+  }, [tailKeys])
+
+  useEffect(() => {
+    const available = new Set(threadMessages.map(messageRenderKey))
+    activationOrderRef.current = activationOrderRef.current.filter(key => available.has(key))
+    setActiveKeys(current => {
+      const next = new Set([...current].filter(key => available.has(key)))
+      tailKeys.forEach(key => next.add(key))
+      if (next.size > MESSAGE_RENDER_LIMIT) {
+        for (const key of next) {
+          if (next.size <= MESSAGE_RENDER_LIMIT) break
+          if (!tailKeys.has(key)) next.delete(key)
+        }
+      }
+      return next
+    })
+  }, [threadMessages, tailKeys])
+
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return undefined
+    const forceActivate = event => activateKey(String(event.detail?.key || ''))
+    root.addEventListener('ga-activate-message', forceActivate)
+    return () => root.removeEventListener('ga-activate-message', forceActivate)
+  }, [activateKey])
+
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root || typeof IntersectionObserver !== 'function') {
+      setActiveKeys(current => {
+        const next = new Set(threadMessages.map(messageRenderKey))
+        if (next.size === current.size && [...next].every(key => current.has(key))) return current
+        return next
+      })
+      return undefined
+    }
+    const scrollRoot = root.closest('.oa-thread')
+    const activateNext = () => {
+      frameRef.current = 0
+      const key = queueRef.current.shift()
+      if (!key) return
+      activateKey(key)
+      if (queueRef.current.length) frameRef.current = requestAnimationFrame(activateNext)
+    }
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        const key = entry.target.dataset.messageKey
+        if (key && !queueRef.current.includes(key)) queueRef.current.push(key)
+      }
+      if (queueRef.current.length && !frameRef.current) frameRef.current = requestAnimationFrame(activateNext)
+    }, { root: scrollRoot, rootMargin: '120% 0px' })
+    root.querySelectorAll('.oa-message-slot.is-placeholder').forEach(node => observer.observe(node))
+    return () => {
+      observer.disconnect()
+      if (frameRef.current) cancelAnimationFrame(frameRef.current)
+      frameRef.current = 0
+      queueRef.current = []
+    }
+  }, [activateKey, sessionKey, threadMessages])
+
+  return (
+    <div ref={rootRef} className="oa-message-list">
+      {threadMessages.map((m, i) => {
+        const key = messageRenderKey(m)
+        const dateKey = fmtDate(m.created_at)
+        const prevDate = i > 0 ? fmtDate(threadMessages[i - 1]?.created_at) : ''
+        const showTimeline = i === 0 || dateKey !== prevDate
+        const versionInfo = m.role === 'user' && onSwitchVersion ? messageVersionInfo(worldline, m.id) : null
+        const showVersions = Boolean(versionInfo && versionInfo.total > 1)
+        const cacheKey = `${sessionKey}:${key}`
+        return (
+          <VirtualMessageSlot
+            key={key}
+            active={activeKeys.has(key)}
+            cacheKey={cacheKey}
+            estimatedHeight={estimatedMessageHeight(m, showTimeline, showVersions)}
+            messageID={m.id}
+            messageKey={key}
+          >
+            {showTimeline && <div className="oa-timeline"><span>{dateKey}</span></div>}
+            <ChatMessage
+              message={m}
+              conductorWorker={conductorDetail?.conductor?.role === 'worker'}
+              pending={!m.kind && isCurrentRunning && m.id === lastMessageId}
+              onAskReply={onAskReply}
+              isLatestMessage={m.role === 'assistant' && m.id === lastMessageId}
+              onEditResend={onEditResend}
+              onRetryBTW={onRetryBTW}
+              editDisabled={isCurrentRunning}
+              clockNow={clockNow}
+            />
+            {showVersions && <div className="oa-msg-versions">
+              <button type="button" disabled={isCurrentRunning || !versionInfo.previous_node_id}
+                onClick={() => onSwitchVersion(versionInfo.previous_node_id)} title="上一个版本" aria-label="上一个版本">
+                <ChevronLeft size={13}/>
+              </button>
+              <em>{versionInfo.index}/{versionInfo.total}</em>
+              <button type="button" disabled={isCurrentRunning || !versionInfo.next_node_id}
+                onClick={() => onSwitchVersion(versionInfo.next_node_id)} title="下一个版本" aria-label="下一个版本">
+                <ChevronRight size={13}/>
+              </button>
+            </div>}
+          </VirtualMessageSlot>
+        )
+      })}
+    </div>
+  )
+}
+
 export const MessageList = memo(function MessageList({
   messages, isCurrentRunning, onAskReply, onEditResend, onRetryBTW, clockNow,
-  worldline = null, onSwitchVersion = null, conductorDetail = null,
+  worldline = null, onSwitchVersion = null, conductorDetail = null, sessionKey = '',
 }) {
-  const threadMessages = messages.filter(message => message.kind !== 'btw')
-  const lastMessageId = threadMessages.at(-1)?.id
-  return (
-    <>
-      {threadMessages.flatMap((m, i) => {
-        const dateKey  = fmtDate(m.created_at)
-        const prevDate = i > 0 ? fmtDate(threadMessages[i - 1]?.created_at) : ''
-        const nodes = []
-        if (i === 0 || dateKey !== prevDate) {
-          nodes.push(
-            <div key={`tl-${dateKey}-${i}`} className="oa-timeline">
-              <span>{fmtDate(m.created_at)}</span>
-            </div>
-          )
-        }
-        nodes.push(
-          <ChatMessage
-            key={m.render_key || m.id}
-            message={m}
-            conductorWorker={conductorDetail?.conductor?.role === 'worker'}
-            pending={!m.kind && isCurrentRunning && m.id === lastMessageId}
-            onAskReply={onAskReply}
-            isLatestMessage={m.role === 'assistant' && m.id === lastMessageId}
-            onEditResend={onEditResend}
-            onRetryBTW={onRetryBTW}
-            editDisabled={isCurrentRunning}
-            clockNow={clockNow}
-          />
-        )
-        if (m.role === 'user' && onSwitchVersion) {
-          const versionInfo = messageVersionInfo(worldline, m.id)
-          if (versionInfo && versionInfo.total > 1) {
-            nodes.push(
-              <div key={`wlv-${m.id}`} className="oa-msg-versions">
-                <button type="button" disabled={isCurrentRunning || !versionInfo.previous_node_id}
-                  onClick={() => onSwitchVersion(versionInfo.previous_node_id)} title="上一个版本" aria-label="上一个版本">
-                  <ChevronLeft size={13}/>
-                </button>
-                <em>{versionInfo.index}/{versionInfo.total}</em>
-                <button type="button" disabled={isCurrentRunning || !versionInfo.next_node_id}
-                  onClick={() => onSwitchVersion(versionInfo.next_node_id)} title="下一个版本" aria-label="下一个版本">
-                  <ChevronRight size={13}/>
-                </button>
-              </div>
-            )
-          }
-        }
-        return nodes
-      })}
-    </>
-  )
+  return <MessageListContent
+    key={sessionKey}
+    messages={messages}
+    isCurrentRunning={isCurrentRunning}
+    onAskReply={onAskReply}
+    onEditResend={onEditResend}
+    onRetryBTW={onRetryBTW}
+    clockNow={clockNow}
+    worldline={worldline}
+    onSwitchVersion={onSwitchVersion}
+    conductorDetail={conductorDetail}
+    sessionKey={sessionKey}
+  />
 })
 
 function ReasoningEffortOptions({ options = [], value = 'off', onChange }) {
@@ -7039,11 +7193,23 @@ export default function ChatApp({ onOpenSettings } = {}) {
     requestAnimationFrame(() => {
       // A session switch can win the frame between releasing follow and jumping.
       if (activeSidRef.current !== sessionID || threadRef.current !== thread) return
-      const card = [...thread.querySelectorAll('.oa-message.user')].find(el => el.dataset.id === messageID)
-      if (!card) return
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-      markProgrammaticScroll(thread, reducedMotion ? FOLLOW_SETTLE_MS : SMOOTH_SETTLE_MS)
-      thread.scrollTo({ top: thread.scrollTop + cardTopOffset(card) - JUMP_TOP_MARGIN, behavior: reducedMotion ? 'auto' : 'smooth' })
+      const finishJump = () => {
+        if (activeSidRef.current !== sessionID || threadRef.current !== thread) return
+        const card = [...thread.querySelectorAll('.oa-message.user')].find(el => el.dataset.id === messageID)
+        if (!card) return
+        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        markProgrammaticScroll(thread, reducedMotion ? FOLLOW_SETTLE_MS : SMOOTH_SETTLE_MS)
+        thread.scrollTo({ top: thread.scrollTop + cardTopOffset(card) - JUMP_TOP_MARGIN, behavior: reducedMotion ? 'auto' : 'smooth' })
+      }
+      const slot = [...thread.querySelectorAll('.oa-message-slot')].find(el => el.dataset.messageId === messageID)
+      if (slot?.classList.contains('is-placeholder')) {
+        slot.closest('.oa-message-list')?.dispatchEvent(new CustomEvent('ga-activate-message', {
+          detail: { key: slot.dataset.messageKey },
+        }))
+        requestAnimationFrame(finishJump)
+        return
+      }
+      finishJump()
     })
   }
   const updateFollowFromScroll = () => {
@@ -7536,6 +7702,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
             worldline={worldlineForView}
             conductorDetail={activeSessionDetail}
             onSwitchVersion={switchWorldline}
+            sessionKey={sid}
           />
           {showFollow && <div className="oa-follow-row">
             {showFollow && <button className={`oa-follow-btn ${isCurrentRunning ? 'is-live' : ''}`} type="button" onClick={resumeFollow} title={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')} aria-label={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')}><ChevronDown size={16}/></button>}

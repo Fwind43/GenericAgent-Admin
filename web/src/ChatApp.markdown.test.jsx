@@ -1,6 +1,6 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { ChatMessage, MessageList } from './ChatApp.jsx'
 import { mergeStreamTerminalMessage } from './lib/chatStream.js'
 import { reconcileHistoryPage } from './lib/chatHistoryPages.js'
@@ -533,6 +533,72 @@ describe('completion render identity', () => {
       if (paged) latest.message_index = [{ id: finalMessage.id }]
       messages = reconcileHistoryPage(latest, { messages }).messages
       assertMounted()
+    }
+  })
+})
+
+describe('message list on-demand rendering', () => {
+  test('keeps the tail mounted and activates nearby messages one per frame within the active cap', () => {
+    const observers = []
+    const frames = []
+    let frameID = 0
+    class MockIntersectionObserver {
+      constructor(callback) {
+        this.callback = callback
+        this.nodes = []
+        observers.push(this)
+      }
+      observe(node) { this.nodes.push(node) }
+      disconnect() {}
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+    vi.stubGlobal('requestAnimationFrame', callback => {
+      frames.push(callback)
+      frameID += 1
+      return frameID
+    })
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    try {
+      const messages = Array.from({ length: 15 }, (_, index) => ({
+        id: `virtual-${index}`,
+        role: index % 2 ? 'assistant' : 'user',
+        content: `message ${index}`,
+        files: [],
+        created_at: index + 1,
+      }))
+      const frame = sessionKey => <MessageList
+        messages={messages}
+        isCurrentRunning={false}
+        onAskReply={vi.fn()}
+        sessionKey={sessionKey}
+      />
+      const view = render(frame('session-a'))
+      const activeSlots = () => view.container.querySelectorAll('.oa-message-slot.is-active')
+      const placeholderSlots = () => view.container.querySelectorAll('.oa-message-slot.is-placeholder')
+
+      expect(activeSlots()).toHaveLength(2)
+      expect(placeholderSlots()).toHaveLength(13)
+      expect(view.container.querySelector('[data-message-id="virtual-13"]').classList).toContain('is-active')
+      expect(view.container.querySelector('[data-message-id="virtual-14"]').classList).toContain('is-active')
+
+      const observer = observers[0]
+      act(() => observer.callback(observer.nodes.map(target => ({ target, isIntersecting: true }))))
+      expect(frames).toHaveLength(1)
+      act(() => frames.shift()())
+      expect(activeSlots()).toHaveLength(3)
+
+      while (frames.length) act(() => frames.shift()())
+      expect(activeSlots()).toHaveLength(12)
+      expect(placeholderSlots()).toHaveLength(3)
+      expect(view.container.querySelector('[data-message-id="virtual-13"]').classList).toContain('is-active')
+      expect(view.container.querySelector('[data-message-id="virtual-14"]').classList).toContain('is-active')
+
+      view.rerender(frame('session-b'))
+      expect(activeSlots()).toHaveLength(2)
+      expect(placeholderSlots()).toHaveLength(13)
+      expect(observers).toHaveLength(2)
+    } finally {
+      vi.unstubAllGlobals()
     }
   })
 })

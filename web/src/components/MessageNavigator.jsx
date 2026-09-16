@@ -59,8 +59,10 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
     if (!thread || loading) return
     let frame = 0
     const ids = new Set(JSON.parse(nodeSignature))
-    const cards = [...thread.querySelectorAll('.oa-message')]
-    const userCards = cards.filter(card => ids.has(card.dataset.id))
+    const slots = [...thread.querySelectorAll('.oa-message-slot')]
+    const cards = slots.length ? slots : [...thread.querySelectorAll('.oa-message')]
+    const cardID = card => card?.dataset.messageId || card?.dataset.id || ''
+    const userCards = cards.filter(card => ids.has(cardID(card)))
     const measure = () => {
       frame = 0
       const bounds = thread.getBoundingClientRect()
@@ -69,13 +71,13 @@ export default function MessageNavigator({ messages, sessionID, threadRef, onNav
       const height = Math.max(0, thread.clientHeight - composer - 32)
       const next = { right: Math.max(8, parent.right - bounds.right + 12), top: bounds.top - parent.top + 16, height }
       setLayout(old => old.right === next.right && old.top === next.top && old.height === next.height ? old : next)
-      let current = userCards[0]?.dataset.id || ''
+      let current = cardID(userCards[0]) || ''
       const anchor = bounds.top + Math.min(100, thread.clientHeight * 0.2)
       for (const card of userCards) {
         if (card.getBoundingClientRect().top > anchor) break
-        current = card.dataset.id
+        current = cardID(card)
       }
-      if (thread.scrollHeight > thread.clientHeight && thread.scrollHeight - thread.scrollTop - thread.clientHeight <= 4) current = userCards.at(-1)?.dataset.id || current
+      if (thread.scrollHeight > thread.clientHeight && thread.scrollHeight - thread.scrollTop - thread.clientHeight <= 4) current = cardID(userCards.at(-1)) || current
       setActiveID(current)
     }
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure) }

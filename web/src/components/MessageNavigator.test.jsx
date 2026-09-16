@@ -16,10 +16,12 @@ const messages = [
 ]
 const ct = (zh, en) => en
 let resize
-function Harness({ items = messages, ...props }) {
+function Harness({ items = messages, virtualSlots = false, ...props }) {
   const threadRef = useRef(null)
   return <div><section className="oa-thread" ref={threadRef}>
-    {items.filter(m => m.kind !== 'btw').map(m => <article key={m.id} className={`oa-message ${m.role}`} data-id={m.id}>{m.content}</article>)}
+    {items.filter(m => m.kind !== 'btw').map(m => virtualSlots
+      ? <div key={m.id} className="oa-message-slot is-placeholder" data-message-id={m.id}/>
+      : <article key={m.id} className={`oa-message ${m.role}`} data-id={m.id}>{m.content}</article>)}
   </section><MessageNavigator messages={items} sessionID="s1" threadRef={threadRef} ct={ct} onNavigate={() => {}} {...props}/></div>
 }
 
@@ -37,7 +39,8 @@ beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(2000)
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
     const thread = this.closest('.oa-thread')
-    const top = this.dataset.id === 'u2' ? 900 - thread.scrollTop : this.dataset.id ? -thread.scrollTop : 0
+    const messageID = this.dataset.messageId || this.dataset.id
+    const top = messageID === 'u2' ? 900 - thread.scrollTop : messageID ? -thread.scrollTop : 0
     return { top, bottom: top + 600, left: 0, right: 800, width: 800, height: 600 }
   })
 })
@@ -289,6 +292,15 @@ describe('message nodes', () => {
     expect(screen.getByRole('button', { name: /Second question/ }).getAttribute('aria-current')).toBe('location')
     thread.scrollTop = 0
     act(() => resize()); flush()
+    expect(screen.getByRole('button', { name: /First question/ }).getAttribute('aria-current')).toBe('location')
+    thread.scrollTop = 1400
+    fireEvent.scroll(thread); flush()
+    expect(screen.getByRole('button', { name: /Second question/ }).getAttribute('aria-current')).toBe('location')
+  })
+  test('tracks virtual placeholder slots before their message cards mount', () => {
+    const { container } = render(<Harness virtualSlots/>)
+    const thread = container.querySelector('.oa-thread')
+    expect(container.querySelectorAll('.oa-message')).toHaveLength(0)
     expect(screen.getByRole('button', { name: /First question/ }).getAttribute('aria-current')).toBe('location')
     thread.scrollTop = 1400
     fireEvent.scroll(thread); flush()
