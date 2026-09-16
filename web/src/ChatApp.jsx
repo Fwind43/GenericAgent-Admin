@@ -4018,17 +4018,19 @@ function MessageListContent({
   const tailKeys = useMemo(() => new Set(threadMessages.slice(-MESSAGE_RENDER_TAIL).map(messageRenderKey)), [threadMessages])
   const [activeKeys, setActiveKeys] = useState(() => new Set(tailKeys))
   const activationOrderRef = useRef([])
+  const visibleKeysRef = useRef(new Set())
   const queueRef = useRef([])
   const frameRef = useRef(0)
 
   const activateKey = useCallback(key => {
-    if (!key) return
     setActiveKeys(current => {
       const next = new Set(current)
-      next.add(key)
-      activationOrderRef.current = [...activationOrderRef.current.filter(item => item !== key), key]
+      if (key) {
+        next.add(key)
+        activationOrderRef.current = [...activationOrderRef.current.filter(item => item !== key), key]
+      }
       if (next.size > MESSAGE_RENDER_LIMIT) {
-        const removable = activationOrderRef.current.filter(item => next.has(item) && !tailKeys.has(item))
+        const removable = [...next].filter(item => !tailKeys.has(item) && !visibleKeysRef.current.has(item))
         for (const victim of removable) {
           if (next.size <= MESSAGE_RENDER_LIMIT) break
           next.delete(victim)
@@ -4048,7 +4050,7 @@ function MessageListContent({
       if (next.size > MESSAGE_RENDER_LIMIT) {
         for (const key of next) {
           if (next.size <= MESSAGE_RENDER_LIMIT) break
-          if (!tailKeys.has(key)) next.delete(key)
+          if (!tailKeys.has(key) && !visibleKeysRef.current.has(key)) next.delete(key)
         }
       }
       return next
@@ -4078,23 +4080,32 @@ function MessageListContent({
       frameRef.current = 0
       const key = queueRef.current.shift()
       if (!key) return
-      activateKey(key)
+      if (visibleKeysRef.current.has(key)) activateKey(key)
       if (queueRef.current.length) frameRef.current = requestAnimationFrame(activateNext)
     }
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
-        if (!entry.isIntersecting) continue
         const key = entry.target.dataset.messageKey
-        if (key && !queueRef.current.includes(key)) queueRef.current.push(key)
+        if (!key) continue
+        if (entry.isIntersecting) {
+          visibleKeysRef.current.add(key)
+          if (!queueRef.current.includes(key)) queueRef.current.push(key)
+        } else {
+          visibleKeysRef.current.delete(key)
+          queueRef.current = queueRef.current.filter(item => item !== key)
+        }
       }
+      // The budget is soft only for the actual viewport and the streaming tail.
+      activateKey(null)
       if (queueRef.current.length && !frameRef.current) frameRef.current = requestAnimationFrame(activateNext)
-    }, { root: scrollRoot, rootMargin: '120% 0px' })
-    root.querySelectorAll('.oa-message-slot.is-placeholder').forEach(node => observer.observe(node))
+    }, { root: scrollRoot, rootMargin: '0px' })
+    root.querySelectorAll('.oa-message-slot').forEach(node => observer.observe(node))
     return () => {
       observer.disconnect()
       if (frameRef.current) cancelAnimationFrame(frameRef.current)
       frameRef.current = 0
       queueRef.current = []
+      visibleKeysRef.current.clear()
     }
   }, [activateKey, sessionKey, threadMessages])
 

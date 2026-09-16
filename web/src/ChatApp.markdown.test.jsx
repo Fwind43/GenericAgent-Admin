@@ -541,6 +541,12 @@ describe('message list on-demand rendering', () => {
   test('keeps the tail mounted and activates nearby messages one per frame within the active cap', () => {
     const observers = []
     const frames = []
+    const resizeObservers = []
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback) { this.callback = callback; resizeObservers.push(this) }
+      observe(node) { this.node = node }
+      disconnect() {}
+    })
     let frameID = 0
     class MockIntersectionObserver {
       constructor(callback) {
@@ -588,15 +594,37 @@ describe('message list on-demand rendering', () => {
       expect(activeSlots()).toHaveLength(3)
 
       while (frames.length) act(() => frames.shift()())
+      expect(activeSlots()).toHaveLength(15)
+      expect(placeholderSlots()).toHaveLength(0)
+      expect(observer.nodes).toHaveLength(15)
+
+      const measured = resizeObservers.find(item => item.node === observer.nodes[0])
+      observer.nodes[0].getBoundingClientRect = () => ({ height: 700 })
+      act(() => measured.callback())
+      observer.nodes[0].getBoundingClientRect = () => ({ height: 90 })
+      act(() => measured.callback())
+      // A smaller viewport (or scrolling away) releases only offscreen bodies.
+      act(() => observer.callback(observer.nodes.slice(0, 10).map(target => ({ target, isIntersecting: false }))))
       expect(activeSlots()).toHaveLength(12)
       expect(placeholderSlots()).toHaveLength(3)
+      expect(observer.nodes[0].style.height).toBe('90px')
+      for (const node of observer.nodes.slice(10)) expect(node.classList).toContain('is-active')
+      // Previously active slots remain observed and can remount on reverse scroll.
+      act(() => observer.callback(observer.nodes.map(target => ({ target, isIntersecting: true }))))
+      while (frames.length) act(() => frames.shift()())
+      expect(activeSlots()).toHaveLength(15)
+      expect(placeholderSlots()).toHaveLength(0)
       expect(view.container.querySelector('[data-message-id="virtual-13"]').classList).toContain('is-active')
       expect(view.container.querySelector('[data-message-id="virtual-14"]').classList).toContain('is-active')
 
+      messages.push({ id: 'stream-tail', role: 'assistant', content: 'streaming', files: [], created_at: 20 })
+      view.rerender(<MessageList messages={[...messages]} isCurrentRunning={true} onAskReply={vi.fn()} sessionKey="session-a" />)
+      expect(view.container.querySelector('[data-message-id="stream-tail"]').classList).toContain('is-active')
+
       view.rerender(frame('session-b'))
       expect(activeSlots()).toHaveLength(2)
-      expect(placeholderSlots()).toHaveLength(13)
-      expect(observers).toHaveLength(2)
+      expect(placeholderSlots()).toHaveLength(14)
+      expect(observers).toHaveLength(3)
     } finally {
       vi.unstubAllGlobals()
     }
