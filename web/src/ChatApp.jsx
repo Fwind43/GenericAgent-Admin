@@ -7024,7 +7024,10 @@ export default function ChatApp({ onOpenSettings } = {}) {
           if (conductorPoll.attachRunningStream) {
             void attachRunningStream(activeID, { waitForRun:true })
           }
-          if (conductorPoll.refreshMetadata) {
+          if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {
+            await refreshActiveSessionSnapshot(activeID).catch(() => {})
+          }
+          if (conductorPoll.refreshMetadata && !stopped && activeSidRef.current === activeID) {
             const metadata = (isConductorParent(after) || after?.conductor_children?.length > 0)
               ? await chatApi(`/api/chat/conductor/${encodeURIComponent(activeID)}/children`)
               : null
@@ -7033,8 +7036,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
                 ? { ...current, ...after, ...(Array.isArray(metadata?.children) ? { conductor_children: metadata.children, conductor_usage_summary: metadata.usage_summary, conductor_dispatch_count: metadata.dispatch_count } : {}) }
                 : current)
             }
-          } else if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {
-            void refreshActiveSessionSnapshot(activeID).catch(() => {})
           }
         }
       } catch {

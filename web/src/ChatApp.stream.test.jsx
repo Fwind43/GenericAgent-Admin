@@ -151,6 +151,31 @@ async function replayRace({ type = 'done', mirror = true, stateFirst = true } = 
   }
 }
 
+describe('background snapshot guards', () => {
+  test.each(['session switch', 'new stream', 'stream controller'])('discards snapshot after %s', async race => {
+    const gate = deferred()
+    let applied = 0
+    const sandbox = {
+      activeSidRef: { current: 'selected' },
+      streamActivitySeqRef: { current: 1 },
+      streamAbortRef: { current: null },
+      chatApi: () => gate.promise,
+      sessionsRef: { current: [{ id: 'selected', running: false }] },
+      activeRunRef: { current: null },
+      historyPages: { apply: () => { applied++; return {} } },
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(between('  const refreshActiveSessionSnapshot =', '  const loadWorldline =') + '\nglobalThis.refresh = refreshActiveSessionSnapshot', sandbox)
+    const pending = sandbox.refresh('selected')
+    if (race === 'session switch') sandbox.activeSidRef.current = 'other'
+    if (race === 'new stream') sandbox.streamActivitySeqRef.current++
+    if (race === 'stream controller') sandbox.streamAbortRef.current = {}
+    gate.resolve({ id: 'selected', messages: [] })
+    await pending
+    expect(applied).toBe(0)
+  })
+})
+
 describe('concurrent session snapshots and completed stream replay', () => {
   test.each(['done', 'error'])('%s replay merges into history before any detail refresh', type => replayRace({ type }))
   test('does not depend on a fresh messagesRef', () => replayRace({ mirror: false }))

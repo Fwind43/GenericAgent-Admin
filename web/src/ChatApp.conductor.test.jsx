@@ -14,6 +14,45 @@ const session = (id, title, extra = {}) => ({
   ...extra,
 })
 
+test.each([['parent', false], ['worker', false], ['parent', true]])(
+  'background completion refreshes body: %s metadata failure=%s', async (role, failMetadata) => {
+    localStorage.setItem('ga-admin-lang', 'en')
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+    vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} })
+    Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
+    let completed = false
+    let snapshots = 0
+    const data = () => session('poll-session', 'Polling session', {
+      count: completed ? 2 : 1,
+      updated_at: completed ? '2026-09-08T02:00:00Z' : '2026-09-08T01:00:00Z',
+      conductor: { role, status: 'idle' },
+    })
+    vi.stubGlobal('fetch', vi.fn(async input => {
+      const url = new URL(typeof input === 'string' ? input : input.url, window.location.origin)
+      let payload = {}
+      if (url.pathname === '/api/instances') payload = { instances: [] }
+      else if (url.pathname === '/api/chat/sessions') payload = { sessions: [data()], projects: [], pinned_projects: [] }
+      else if (url.pathname === '/api/chat/session/poll-session') {
+        snapshots++
+        payload = { ...data(), messages: [{ id: 'result', role: 'assistant', content: completed ? 'Background result arrived' : 'Initial body' }], queue: [] }
+      } else if (url.pathname.includes('/children')) {
+        if (failMetadata) throw new Error('mock metadata unavailable')
+        payload = { children: [] }
+      } else if (url.pathname.startsWith('/api/chat/state')) payload = { llms: [], settings: {} }
+      return new Response(JSON.stringify({ ok: true, ...payload, data: payload }), { headers: { 'Content-Type': 'application/json' } })
+    }))
+    render(<ChatApp />)
+    expect(await screen.findByText('Initial body')).toBeTruthy()
+    const initialSnapshots = snapshots
+    completed = true
+    window.dispatchEvent(new Event('online'))
+    expect(await screen.findByText('Background result arrived')).toBeTruthy()
+    expect(snapshots).toBe(initialSnapshots + 1)
+    expect(screen.queryByText('Initial body')).toBeNull()
+  },
+)
+
 const originalScrollTo = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTo')
 
 afterEach(() => {
