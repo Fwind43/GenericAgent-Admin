@@ -7868,7 +7868,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
           })}
         </div>}
         <ChatKeychainDialog open={keychainOpen} onClose={() => setKeychainOpen(false)} returnFocusRef={composerActionsTriggerRef}/>
-        {cmdManagerOpen && <div className="oa-cmd-manager-backdrop" onMouseDown={()=>setCmdManagerOpen(false)}>
+        {cmdManagerOpen && createPortal(
+          <div className="oa-cmd-manager-backdrop" onMouseDown={()=>setCmdManagerOpen(false)}>
           <div className="oa-cmd-manager" role="dialog" aria-modal="true" aria-label={ct('自定义斜杠命令', 'Custom slash commands')} onMouseDown={e=>e.stopPropagation()}>
             <div className="oa-cmd-manager-head">
               <div><h3>{ct('自定义斜杠命令', 'Custom slash commands')}</h3><p>{ct('官方命令只读锁定；用户命令可新增、编辑、删除。', 'Official commands are read-only; custom commands can be added, edited, and deleted.')}</p></div>
@@ -7903,8 +7904,11 @@ export default function ChatApp({ onOpenSettings } = {}) {
               </div>)}
             </div>
           </div>
-        </div>}
-        {extraPromptOpen && <div className="oa-cmd-manager-backdrop" onMouseDown={()=>setExtraPromptOpen(false)}>
+          </div>,
+          document.body,
+        )}
+        {extraPromptOpen && createPortal(
+          <div className="oa-cmd-manager-backdrop" onMouseDown={()=>setExtraPromptOpen(false)}>
           <div className={`oa-cmd-manager oa-prompt-preset-dialog ${promptPresetManagerOpen ? 'is-managing' : 'is-picking'}`} role="dialog" aria-modal="true" aria-label={ct('系统提示预设', 'System-prompt presets')} onMouseDown={e=>e.stopPropagation()}>
             <div className="oa-cmd-manager-head">
               <div>
@@ -7963,7 +7967,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
               </div>
             </>}
           </div>
-        </div>}
+          </div>,
+          document.body,
+        )}
         <div className={`oa-composer ${dragging ? 'is-dragging' : ''}`} onDragOver={e=>{e.preventDefault(); setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDropFiles}>
           <input ref={fileRef} type="file" multiple hidden onChange={e=>{ addAttachmentFiles(e.target.files); e.target.value='' }} />
           {attachments.length > 0 && <PendingAttachments attachments={attachments} onRemove={removeAttachment}/>}
