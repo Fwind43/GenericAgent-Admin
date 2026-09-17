@@ -135,6 +135,19 @@ Open the URL printed on startup, or run `go run . --port 8787` to pin a loopback
 - **Service Management:** Start/stop worker, monitor logs, check process status
 - **Chat Interface:** `/chat` entrypoint with streaming, usage tracking, model switching
 
+### Choosing a Project Mode
+
+Open **Chat settings → Project mode → Global runtime mode**, choose a mode, and click **Save**. This changes project memory handling, not the model or a capability tier.
+
+| Mode | Memory organization | When to choose it |
+| :--- | :--- | :--- |
+| **Official project mode** | Uses GenericAgent's official project mechanism and the project's `project_memory.md` | Keep the official workflow |
+| **Admin project mode (L1–L3)** | L1 persistent rules and index, L2 project knowledge, L3 topic-specific procedures; L1 is injected into model requests and details are read on demand | Long-lived projects with growing rules and knowledge |
+
+The agent maintains project memory according to the memory rules; routine manual organization of L1–L3 is not required. After saving, **all existing and new projects use the selected mode from the next turn**. Active turns and session execution workspaces are unchanged. Both memory stores are preserved, but are not automatically synchronized in full: Admin can read the official memory source and distill relevant knowledge as needed.
+
+See [User Quick Start: project modes (Chinese)](docs/USER_QUICKSTART.md#project-modes) for setup steps, memory files, and switching boundaries.
+
 ### Choosing an Autonomy Mode
 
 Three features keep an agent working without new input. They are not interchangeable:
@@ -411,6 +424,19 @@ go run .
 
 - **服务管理：** 启动/停止 worker，监控日志，检查进程状态
 - **聊天界面：** `/chat` 入口，流式响应，用量跟踪，模型切换
+
+### 项目模式怎么选
+
+在**聊天设置 → 项目模式 → 全局运行模式**中选择模式并点击**保存**。这里改变的是项目记忆机制，不是模型或能力档位。
+
+| 模式 | 记忆组织方式 | 选择建议 |
+| :--- | :--- | :--- |
+| **官方项目模式** | 沿用 GenericAgent 官方项目机制，使用项目的 `project_memory.md` | 希望保持官方使用习惯时选择 |
+| **Admin 项目模式（L1–L3）** | L1 常驻规则与索引、L2 项目知识、L3 专题流程；L1 随模型请求注入，详细知识按需读取 | 适合长期积累、规则和知识较多的项目 |
+
+项目记忆由 Agent 根据项目内对话维护，无需日常手动整理 L1–L3。保存后，**已有项目和新项目从下一轮起使用所选模式**，正在执行的轮次不变；切换不改变会话的执行工作目录。两套记忆分别保留，但不会自动全量同步：Admin 可参考官方旧记忆，按需提炼有效知识。
+
+设置步骤、分层文件和切换边界见[用户快速开始：项目模式](docs/USER_QUICKSTART.md#project-modes)。
 
 ### 三种自动推进模式怎么选
 
