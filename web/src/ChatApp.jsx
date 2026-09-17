@@ -4705,6 +4705,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   // Theme state: sync with localStorage and system preference
   const [conductorEventsOpen, setConductorEventsOpen] = useState(false)
   const [conductorWorkersOpen, setConductorWorkersOpen] = useState(false)
+  const [conductorConflict, setConductorConflict] = useState(null)
   const [theme, setTheme] = useState(getInitialTheme)
   useEffect(() => {
     const activeTheme = applyThemeToDocument(theme)
@@ -5943,6 +5944,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     const target = activeSidRef.current
     if (!target || conductorEnablingRef.current) return
     conductorEnablingRef.current = true
+    setConductorConflict(null)
     setConductorEnabling(true)
     setErr('')
     try {
@@ -5952,7 +5954,12 @@ export default function ChatApp({ onOpenSettings } = {}) {
         setActiveSessionDetail(current => current && String(current.id) === String(target) ? { ...current, conductor: result.conductor } : current)
       }
     } catch (error) {
-      if (activeSidRef.current === target) setErr(error.message || String(error))
+      if (activeSidRef.current === target) {
+        if (error.status === 409 && error.body?.code === 'conductor_review_required') {
+          setConductorConflict({ ...error.body, parent_session_id: target })
+          setConductorWorkersOpen(true)
+        } else setErr(error.message || String(error))
+      }
     } finally {
       conductorEnablingRef.current = false
       setConductorEnabling(false)
@@ -7689,6 +7696,11 @@ export default function ChatApp({ onOpenSettings } = {}) {
           {sessionLoading && messages.length === 0 && <div className="oa-session-load" role="status" aria-live="polite">
             <RotateCw size={20} className="oa-session-load-spinner" aria-hidden="true"/>
             <span>{ct('对话加载中…', 'Loading conversation…')}</span>
+          </div>}
+          {conductorConflict?.parent_session_id === sid && <div className="oa-session-load" role="alert" style={{ flexWrap: 'wrap', overflowWrap: 'anywhere' }}>
+            <span>{ct('切换前请先审查子任务；执行结束不代表已经核验。', 'Review the subtask before switching; execution finished does not mean verified.')} <code>{conductorConflict.dispatch_id}</code></span>
+            <button type="button" onClick={() => openSession(conductorConflict.session_id)}>{ct('查看待审核任务', 'Open task awaiting review')}</button>
+            <button type="button" onClick={() => setConductorConflict(null)}>{ct('关闭', 'Dismiss')}</button>
           </div>}
           {sessionLoadFailed && <div className="oa-session-load" role="alert">
             <span>{ct('对话加载失败', 'Could not load conversation')}</span>

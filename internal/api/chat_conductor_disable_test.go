@@ -5,6 +5,7 @@ import (
  "net/http/httptest"
  "strings"
  "reflect"
+ "encoding/json"
 )
 
 func TestConductorDisableRoundTrip(t *testing.T) {
@@ -57,5 +58,17 @@ func TestConductorDisableConcurrentRunAdmission(t *testing.T) {
   close(start);err:=<-done;role:=<-runDone
   if err==nil && role!="" {t.Fatal("run admitted with stale conductor role")}
   s.ChatMu.Lock();s.ChatRuns["p"].Done=true;s.ChatMu.Unlock()
+ }
+}
+
+func TestConductorReviewConflictIsStructuredAndReadOnly(t *testing.T) {
+ s:=newChatLoopTestServer(t); cfg:=s.CfgStore.Snapshot()
+ saveChatSession(cfg,chatSession{ID:"p",Conductor:&chatConductorState{Role:conductorRoleParent},ConductorChildren:[]chatConductorChild{{SessionID:"w",DispatchID:"dispatch-review",Status:conductorSucceeded,Review:&conductorReview{Status:"pending"}}}})
+ before,_:=loadChatSession(cfg,"p")
+ for i:=0;i<2;i++ {
+  w:=httptest.NewRecorder();s.chatConductorDisable(w,httptest.NewRequest("POST","/",nil),"p")
+  var body map[string]interface{};if err:=json.Unmarshal(w.Body.Bytes(),&body);err!=nil{t.Fatal(err)}
+  if w.Code!=409 || body["code"]!="conductor_review_required" || body["session_id"]!="w" || body["dispatch_id"]!="dispatch-review" || body["parent_session_id"]!="p" {t.Fatal(w.Code,body)}
+  after,_:=loadChatSession(cfg,"p");if !reflect.DeepEqual(before,after){t.Fatal("review changed")}
  }
 }

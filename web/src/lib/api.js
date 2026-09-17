@@ -22,7 +22,12 @@ export const parseApiResponse = async (res, url = '') => {
       throw new Error(`Expected JSON from ${url}, got ${text.slice(0, 40)}`)
     }
   }
-  if (!res.ok) throw new Error(body?.detail || body?.error || text || `${res.status} ${res.statusText}`)
+  if (!res.ok) {
+    const error = new Error(body?.detail || body?.error || text || `${res.status} ${res.statusText}`)
+    error.status = res.status
+    error.body = body
+    throw error
+  }
   return body
 }
 

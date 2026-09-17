@@ -321,3 +321,38 @@ for (const theme of ['light', 'dark', 'warm']) {
   })
  }
 }
+
+test.each(['light', 'dark', 'warm'])('review conflict is actionable without consuming review: %s', async theme => {
+ localStorage.setItem('ga-admin-lang', 'en')
+ document.documentElement.dataset.theme = theme
+ vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+ vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+ vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} })
+ Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
+ const parent = session('review-parent', 'Review parent', { conductor: { role: 'parent' }, conductor_children: [{session_id: 'review-worker', dispatch_id: 'review-dispatch', status: 'succeeded', review: {status: 'pending'}}] })
+ const worker = session('review-worker', 'Review worker', {conductor: {role: 'worker', parent_session_id: 'review-parent', dispatch_id: 'review-dispatch', status: 'succeeded'}})
+ const posts = []
+ vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
+  const path = new URL(String(input), 'http://localhost').pathname
+  if (init.method === 'POST') posts.push(path)
+  if (path.endsWith('/disable')) return new Response(JSON.stringify({code: 'conductor_review_required', error: 'unprocessed review', session_id: 'review-worker', dispatch_id: 'review-dispatch'}), {status:409})
+  let data = {}
+  if (path === '/api/chat/sessions') data = {sessions: [parent, worker]}
+  else if (path === '/api/chat/session/review-parent') data = parent
+  else if (path === '/api/chat/session/review-worker') data = {...worker, messages: [{id: 'proof', role: 'assistant', content: 'Pending review result'}]}
+  else if (path.endsWith('/children')) data = {children: parent.conductor_children}
+  return new Response(JSON.stringify({ok: true, ...data, data}), {headers: {'Content-Type':'application/json'}})
+ }))
+ render(<ChatApp />)
+ await screen.findAllByText('Review parent')
+ fireEvent.click(screen.getByRole('button', {name: 'More actions'}))
+ const action = screen.getByRole('menuitem', {name:'Switch to ordinary chat'})
+ await waitFor(() => expect(action.disabled).toBe(false))
+ fireEvent.click(action)
+ const link = await screen.findByRole('button', {name:'Open task awaiting review'})
+ expect(screen.getByRole('alert').textContent).toContain('review-dispatch')
+ fireEvent.click(link)
+ await screen.findByText('Pending review result')
+ expect(posts).toEqual(['/api/chat/conductor/review-parent/disable'])
+ delete document.documentElement.dataset.theme
+})

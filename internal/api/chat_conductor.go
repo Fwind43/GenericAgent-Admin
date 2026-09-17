@@ -254,6 +254,15 @@ func (s *Server) chatConductorEnable(w http.ResponseWriter, r *http.Request, sid
     writeJSON(w, map[string]interface{}{"id": cs.ID, "conductor": cs.Conductor})
 }
 
+type conductorReviewConflict struct {
+    DispatchID string `json:"dispatch_id"`
+    SessionID string `json:"session_id"`
+}
+
+func (e *conductorReviewConflict) Error() string {
+    return fmt.Sprintf("dispatch %s has an unprocessed review", e.DispatchID)
+}
+
 // disableChatConductor serializes with dispatch, inbox persistence and run admission.
 // Keep the state object and children: stale snapshots must not resurrect the role.
 func (s *Server) disableChatConductor(sid string) (chatSession, error) {
@@ -274,7 +283,7 @@ func (s *Server) disableChatConductor(sid string) (chatSession, error) {
     if len(cs.QueuedMessages) > 0 { return cs, errors.New("parent session has queued messages or unprocessed completion receipts") }
     for _, child := range cs.ConductorChildren {
         if !conductorTerminal(child.Status) { return cs, fmt.Errorf("dispatch %s is %s; wait for a terminal state", child.DispatchID, child.Status) }
-        if child.Status == conductorSucceeded && (child.Review == nil || (child.Review.Status != "verified" && child.Review.Status != "needs_work")) { return cs, fmt.Errorf("dispatch %s has an unprocessed review", child.DispatchID) }
+        if child.Status == conductorSucceeded && (child.Review == nil || (child.Review.Status != "verified" && child.Review.Status != "needs_work")) { return cs, &conductorReviewConflict{DispatchID: child.DispatchID, SessionID: child.SessionID} }
         if active(child.SessionID) { return cs, fmt.Errorf("worker %s has a running turn", child.SessionID) }
         worker, loadErr := loadChatSession(cfg, child.SessionID)
         if loadErr != nil { return cs, fmt.Errorf("worker %s cannot be checked: %w", child.SessionID, loadErr) }
@@ -288,6 +297,16 @@ func (s *Server) disableChatConductor(sid string) (chatSession, error) {
 func (s *Server) chatConductorDisable(w http.ResponseWriter, r *http.Request, sid string) {
     cs, err := s.disableChatConductor(sid)
     if err != nil {
+        var conflict *conductorReviewConflict
+        if errors.As(err, &conflict) {
+            w.Header().Set("Content-Type", "application/json")
+            w.WriteHeader(http.StatusConflict)
+            _ = json.NewEncoder(w).Encode(map[string]interface{}{
+                "error": err.Error(), "code": "conductor_review_required",
+                "parent_session_id": sid, "dispatch_id": conflict.DispatchID, "session_id": conflict.SessionID,
+            })
+            return
+        }
         code := http.StatusConflict
         if os.IsNotExist(err) { code = http.StatusNotFound }
         bad(w, code, err.Error())
