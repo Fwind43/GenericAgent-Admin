@@ -103,8 +103,10 @@
 }
 
 /* Header and instance/settings stay fixed; all navigation scrolls together. */
-.oa-chat .oa-sidebar .oa-sidebar-scroll-tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-.oa-chat .oa-sidebar .oa-side-head { padding-bottom: 6px; }
+.oa-chat .oa-sidebar .oa-sidebar-scroll-tools { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.oa-chat .oa-sidebar { gap: 0; }
+.oa-chat .oa-sidebar .oa-side-head { padding-bottom: 2px; }
+.oa-chat .oa-sidebar .oa-sidebar-scroll-tools > .oa-sidebar-search { margin-top: 0; }
 .oa-chat .oa-sidebar .oa-sidebar-sections { padding-top: 0; }
 
 /* Flat folder navigation, matching the lightweight project reference. */
