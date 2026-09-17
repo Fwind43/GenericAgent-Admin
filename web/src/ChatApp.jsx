@@ -7526,7 +7526,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
                 else next.add(projectKey)
                 return next
               })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
-                <Folder size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/><b title={group.name}>{group.name}</b>
+                {expanded
+                  ? <FolderOpen size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>
+                  : <Folder size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>}<b title={group.name}>{group.name}</b>
               </button>
               {group.pinned && <span className="oa-project-pinned-badge" title={ct('项目已置顶', 'Project pinned')}><Pin size={11} aria-hidden="true"/>{ct('置顶', 'Pinned')}</span>}
               {projectSortMode && <ProjectDragHandle name={projectKey} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
