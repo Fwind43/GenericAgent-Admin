@@ -130,3 +130,19 @@
   .oa-chat .oa-sidebar .oa-project-head:hover > .oa-project-add,
   .oa-chat .oa-sidebar .oa-project-head:focus-within > .oa-project-add { opacity: 1; }
 }
+/* Quiet metadata badge; same treatment for static and expandable conductors. */
+.oa-chat .oa-sidebar .oa-session-conductor-badge {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: auto; min-width: 0; height: 18px; min-height: 18px; padding: 0 5px;
+  border: 0; border-radius: 4px; box-shadow: none;
+  background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--muted);
+  font-family: inherit; font-size: 10px; font-weight: 400; line-height: 18px;
+  letter-spacing: 0; white-space: nowrap;
+}
+.oa-chat .oa-sidebar .oa-conductor-badge-toggle { cursor: pointer; }
+.oa-chat .oa-sidebar .oa-conductor-badge-toggle:hover {
+  background: var(--oa-side-hover); color: var(--text);
+}
+.oa-chat .oa-sidebar .oa-conductor-badge-toggle:focus-visible {
+  outline: 2px solid var(--muted); outline-offset: 2px;
+}
