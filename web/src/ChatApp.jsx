@@ -253,12 +253,10 @@ export const SessionAutorunBadge = memo(function SessionAutorunBadge({ enabled =
 })
 
 function ConductorSessionTree({ session, workers, renderSession }) {
+  const [expanded, setExpanded] = useState(true)
   return <div className="oa-conductor-tree">
-    {renderSession(session)}
-    <details className="oa-conductor-tree-branch" open>
-      <summary>{ct('子任务', 'Subtasks')} <small>{workers.length}</small></summary>
-      <div className="oa-conductor-tree-children">{workers.map(worker => renderSession(worker, { nested:true }))}</div>
-    </details>
+    {renderSession(session, { treeExpanded: expanded, onToggleTree: () => setExpanded(value => !value) })}
+    {expanded && <div className="oa-conductor-tree-children">{workers.map(worker => renderSession(worker, { nested:true }))}</div>}
   </div>
 }
 

@@ -146,3 +146,15 @@
 .oa-chat .oa-sidebar .oa-conductor-badge-toggle:focus-visible {
   outline: 2px solid var(--muted); outline-offset: 2px;
 }
+/* One quiet indentation level, without file-tree elbows or a second heading. */
+.oa-chat .oa-sidebar .oa-conductor-tree-children {
+  margin: 0 0 2px 12px; padding-left: 6px;
+  border-left: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+}
+.oa-chat .oa-sidebar .oa-conductor-tree-children > .oa-session-row.is-conductor-worker {
+  margin-left: 0;
+}
+.oa-chat .oa-sidebar .oa-conductor-tree-children > .oa-session-row.is-conductor-worker::before,
+.oa-chat .oa-sidebar .oa-conductor-tree-children > .oa-session-row.is-conductor-worker::after {
+  content: none;
+}
