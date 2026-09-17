@@ -178,39 +178,42 @@
 
 /* Compact project-only empty state; keep generic sidebar empty lists untouched. */
 .oa-chat .oa-sidebar .oa-sidebar-section .oa-projects-empty {
-  min-height: 96px;
-  align-items: flex-start;
+  min-height: 0;
+  flex-flow: row wrap;
+  align-items: center;
   justify-content: flex-start;
-  gap: 6px;
-  padding: 10px 10px 10px 22px;
+  gap: 4px 8px;
+  margin: 0;
+  padding: 2px 10px 4px 22px;
   color: var(--muted);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 20px;
   text-align: left;
   opacity: 1;
 }
-.oa-chat .oa-sidebar .oa-projects-empty > svg {
-  width: 20px;
-  height: 20px;
-  color: var(--green);
-  opacity: .78;
+.oa-chat .oa-sidebar .oa-projects-empty > svg,
+.oa-chat .oa-sidebar .oa-projects-empty-cta > svg {
+  display: none;
 }
 .oa-chat .oa-sidebar .oa-projects-empty > span { opacity: .78; }
 .oa-chat .oa-sidebar .oa-projects-empty-cta {
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--green) 42%, var(--border));
-  border-radius: 6px;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
   background: transparent;
   color: var(--green);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+  font: inherit;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  transition: color 120ms ease, opacity 120ms ease;
 }
+.oa-chat .oa-sidebar .oa-projects-empty-cta::before { content: '\ff0b'; }
 .oa-chat .oa-sidebar .oa-projects-empty-cta:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--green) 58%, var(--border));
-  background: color-mix(in srgb, var(--green) 10%, transparent);
+  color: color-mix(in srgb, var(--green) 78%, var(--text));
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .oa-chat .oa-sidebar .oa-projects-empty-cta:focus-visible {
   outline: 2px solid var(--green);
