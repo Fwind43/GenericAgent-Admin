@@ -1,3 +1,4 @@
+import { readSidebarPreferences, sortSidebarSessions } from './lib/chatSidebarPreferences.js'
 import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
 import './conductor.css'
 import './chatSidebar.css'
@@ -4756,6 +4757,14 @@ export default function ChatApp({ onOpenSettings } = {}) {
     finally { setProjectOrderSaving(false) }
   }
 
+  const [sidebarPreferences, setSidebarPreferences] = useState(() => readSidebarPreferences())
+  const updateSidebarPreference = (key, value) => {
+    setSidebarPreferences(current => {
+      const next = { ...current, [key]: value }
+      try { localStorage.setItem('ga-chat-sidebar-preferences', JSON.stringify(next)) } catch { /* Optional preference storage. */ }
+      return next
+    })
+  }
   const [historyExpanded, setHistoryExpanded] = useState(true)
   const [projectsExpanded, setProjectsExpanded] = useState(true)
   const [projectSortMode, setProjectSortMode] = useState(false)
@@ -7331,13 +7340,13 @@ export default function ChatApp({ onOpenSettings } = {}) {
     if (lastMessage) gsap.from(lastMessage, { y: 14, autoAlpha: 0, duration: 0.32, ease: 'power2.out', clearProps: 'transform,opacity,visibility' })
   }, { scope: chatScope, dependencies: [messages.length] })
 
-  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sessions, pinnedProjects, projectOrder), [projects, sessions, pinnedProjects, projectOrder])
+  const sortedSidebarSessions = useMemo(() => sortSidebarSessions(sessions, sidebarPreferences.sort), [sessions, sidebarPreferences.sort])
+  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions, pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
   const filteredSessions = useMemo(() => {
-    if (!sidebarSearch.trim()) return sessions
+    if (!sidebarSearch.trim()) return sortedSidebarSessions
     const q = sidebarSearch.trim().toLowerCase()
-    return sessions.filter(s => (s.title || '').toLowerCase().includes(q))
-  }, [sessions, sidebarSearch])
-  const recentSessionGroups = useMemo(() => groupRecentSessions(filteredSessions), [filteredSessions])
+    return sortedSidebarSessions.filter(s => (s.title || '').toLowerCase().includes(q))
+  }, [sortedSidebarSessions, sidebarSearch])
   const conductorSidebarTrees = useMemo(() => conductorSessionTree(filteredSessions), [filteredSessions])
   const conductorSidebarTreeByID = useMemo(() => new Map(conductorSidebarTrees.map(node => [String(node.session?.id || ''), node])), [conductorSidebarTrees])
   const conductorNestedWorkerIDs = useMemo(() => new Set(conductorSidebarTrees.flatMap(node => node.workers.map(worker => String(worker?.id || '')))), [conductorSidebarTrees])
@@ -7478,8 +7487,17 @@ export default function ChatApp({ onOpenSettings } = {}) {
           />
           {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
         </div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 12px' }}>
+          <span>{ct('整理侧边栏', 'Organize sidebar')}</span>
+          <ProjectActionsMenu label={ct('整理侧边栏', 'Organize sidebar')}>
+            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('整理侧边栏', 'Organize sidebar')}</div>
+            {[['projects', '按项目', 'By project'], ['list', '按列表', 'As list']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.layout === value} onClick={()=>updateSidebarPreference('layout', value)}><Check size={14} style={{ visibility:sidebarPreferences.layout === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
+            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('聊天排序方式', 'Chat sort order')}</div>
+            {[['priority', '优先级', 'Priority'], ['updated', '最近更新', 'Recently updated']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.sort === value} onClick={()=>updateSidebarPreference('sort', value)}><Check size={14} style={{ visibility:sidebarPreferences.sort === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
+          </ProjectActionsMenu>
         </div>
-        <section className="oa-sidebar-section">
+        </div>
+        <section className="oa-sidebar-section" hidden={sidebarPreferences.layout === 'list'}>
           <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={projectsExpanded} aria-controls="oa-sidebar-projects-body" onClick={()=>setProjectsExpanded(value => !value)}>
             <span aria-hidden="true">{projectsExpanded ? '\u2304' : '\u203a'}</span>{ct('项目', 'Projects')}
@@ -7576,7 +7594,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
         <div className="oa-session-list">
-          {recentSessionGroups.flatMap(group => group.sessions).filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
+          {filteredSessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
             const node = conductorSidebarTreeByID.get(String(session.id || ''))
             if (!node?.workers?.length) return renderSidebarSession(session)
             return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
