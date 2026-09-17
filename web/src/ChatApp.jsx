@@ -7598,7 +7598,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
         </form>}
         <div className="oa-session-list oa-project-list">
         {(showAllProjects || sidebarSearch || projectSortMode ? regularProjectGroups : regularProjectGroups.slice(0, 5)).map(renderSidebarProject)}
-        {!sidebarSearch && !projectSortMode && regularProjectGroups.length > 5 && <button type="button" className="oa-project-show-more" aria-expanded={showAllProjects} onClick={()=>setShowAllProjects(value => !value)}>{showAllProjects ? ct('收起显示', 'Show less') : ct('展开显示', 'Show more')}</button>}
+        {!sidebarSearch && !projectSortMode && regularProjectGroups.length > 5 && <button type="button" className="oa-project-show-more" aria-expanded={showAllProjects} onClick={()=>setShowAllProjects(value => !value)}><span aria-hidden="true" style={{ display: 'inline-flex', transform: showAllProjects ? 'rotate(180deg)' : undefined }}><ChevronDown size={12}/></span>{showAllProjects ? ct('收起更多项目', 'Show fewer projects') : ct(`展开其余 ${regularProjectGroups.length - 5} 个项目`, `Show ${regularProjectGroups.length - 5} more projects`)}</button>}
         {!regularProjectGroups.length && <div className="oa-empty-list oa-projects-empty">
           <FolderOpen size={20}/>
           <span>{sidebarSearch ? ct('无匹配项目', 'No matching projects') : ct('暂无可用项目', 'No projects available')}</span>
