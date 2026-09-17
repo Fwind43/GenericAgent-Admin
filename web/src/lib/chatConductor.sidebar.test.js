@@ -24,3 +24,14 @@ test('worker search preserves parent context and orphan workers remain accessibl
   assert.equal(conductorSidebarSections([worker]).conductors[0].session.id, 'w')
   assert.equal(conductorSidebarSections([ordinary]).conductors.length, 0)
 })
+
+test('disabled conductor section falls back to recent with tree and search intact', () => {
+  const result = conductorSidebarSections([parent, worker, ordinary], '', false)
+  assert.equal(result.conductors.length, 0)
+  assert.deepEqual(result.recent.map(n => n.session.id), ['p', 'o'])
+  assert.deepEqual(result.recent[0].workers, [worker])
+  assert.equal(conductorSidebarSections([parent, worker], 'research', false).recent[0].session.id, 'p')
+  const pinned = conductorSidebarSections([{...parent,pinned:true},worker], '', false)
+  assert.equal(pinned.pinned.length, 1)
+  assert.equal(pinned.recent.length, 0)
+})

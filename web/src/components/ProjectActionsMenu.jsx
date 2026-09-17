@@ -41,7 +41,7 @@ export default function ProjectActionsMenu({ label, children }) {
   </>
 }
 
-export function SidebarPreferenceSubmenu({ label, value, options, onChange }) {
+export function SidebarPreferenceSubmenu({ label, value, options, onChange, multiple = false }) {
   const [pos, setPos] = useState(null)
   const trigger = useRef(null)
   const panel = useRef(null)
@@ -58,9 +58,9 @@ export function SidebarPreferenceSubmenu({ label, value, options, onChange }) {
     </button>
     {pos && <div ref={panel} role="menu" aria-label={label} className="oa-session-menu" style={{ ...pos, position:'fixed', zIndex:10001 }}
       onKeyDown={e=>{ if (e.key === 'ArrowLeft' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setPos(null); trigger.current?.focus() } }}>
-      {options.map(option=><button key={option.value} type="button" role="menuitemradio" aria-checked={value === option.value} onClick={()=>onChange(option.value)}>
-        <span aria-hidden="true" style={{ width:16, height:16, borderRadius:'50%', border:'2px solid', borderColor:value === option.value ? 'var(--accent, #1677ff)' : 'currentColor', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-          {value === option.value && <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--accent, #1677ff)' }}/>}
+      {options.map(option=><button key={option.value} type="button" role={multiple ? "menuitemcheckbox" : "menuitemradio"} aria-checked={multiple ? value.includes(option.value) : value === option.value} onClick={e=>{ if (multiple) e.stopPropagation(); onChange(option.value) }}>
+        <span aria-hidden="true" style={{ width:16, height:16, borderRadius:multiple ? 3 : '50%', border:'2px solid', borderColor:(multiple ? value.includes(option.value) : value === option.value) ? 'var(--accent, #1677ff)' : 'currentColor', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          {(multiple ? value.includes(option.value) : value === option.value) && <span style={{ width:8, height:8, borderRadius:multiple ? 1 : '50%', background:'var(--accent, #1677ff)' }}/>}
         </span>{option.label}
       </button>)}
     </div>}

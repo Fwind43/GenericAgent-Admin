@@ -72,12 +72,12 @@ export const conductorWorkers = (session, sessions = []) => {
 }
 
 // Search whole trees so a matching worker never loses its parent context.
-export const conductorSidebarSections = (sessions, query = '') => {
+export const conductorSidebarSections = (sessions, query = '', showConductor = true) => {
   const q = query.trim().toLowerCase()
   const matches = session => !q || String(session?.title || '').toLowerCase().includes(q)
   const trees = conductorSessionTree(sessions).filter(node => matches(node.session) || node.workers.some(matches))
   const pinned = trees.filter(node => node.session.pinned)
-  const conductors = trees.filter(node => !node.session.pinned && (isConductorParent(node.session) || isConductorWorker(node.session) || node.workers.length))
-  const recent = trees.filter(node => !node.session.pinned && !isConductorParent(node.session) && !isConductorWorker(node.session) && !node.workers.length)
+  const conductors = trees.filter(node => showConductor && !node.session.pinned && (isConductorParent(node.session) || isConductorWorker(node.session) || node.workers.length))
+  const recent = trees.filter(node => !node.session.pinned && (!showConductor || (!isConductorParent(node.session) && !isConductorWorker(node.session) && !node.workers.length)))
   return { pinned, conductors, recent }
 }

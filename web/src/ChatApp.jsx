@@ -7344,16 +7344,16 @@ export default function ChatApp({ onOpenSettings } = {}) {
 
   const sortedSidebarSessions = useMemo(() => sortSidebarSessions(sessions, sidebarPreferences.sort), [sessions, sidebarPreferences.sort])
   const sidebarPreferenceMenu = <>
-    <SidebarPreferenceSubmenu label={ct('显示方式', 'View mode')} value={sidebarPreferences.layout}
-      options={[{ value:'projects', label:ct('按项目', 'By project') }, { value:'list', label:ct('按列表', 'As list') }]}
-      onChange={value=>updateSidebarPreference('layout', value)}/>
+    <SidebarPreferenceSubmenu label={ct('显示方式', 'View mode')} multiple value={['showProjects', 'showConductor'].filter(key => sidebarPreferences[key])}
+      options={[{ value:'showProjects', label:ct('显示项目', 'Show projects') }, { value:'showConductor', label:ct('显示指挥家', 'Show conductor') }]}
+      onChange={key=>updateSidebarPreference(key, !sidebarPreferences[key])}/>
     <SidebarPreferenceSubmenu label={ct('聊天排序方式', 'Chat sort order')} value={sidebarPreferences.sort}
       options={[{ value:'priority', label:ct('优先级', 'Priority') }, { value:'updated', label:ct('最近更新', 'Recently updated') }]}
       onChange={value=>updateSidebarPreference('sort', value)}/>
   </>
 
   const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions.filter(session => !isConductorParent(session) && !isConductorWorker(session)), pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
-  const sidebarSections = useMemo(() => conductorSidebarSections(sortedSidebarSessions, sidebarSearch), [sortedSidebarSessions, sidebarSearch])
+  const sidebarSections = useMemo(() => conductorSidebarSections(sortedSidebarSessions, sidebarSearch, sidebarPreferences.showConductor), [sortedSidebarSessions, sidebarSearch, sidebarPreferences.showConductor])
   const recentGroupLabels = {
     pinned: ct('\u7f6e\u9876', 'Pinned'),
     today: ct('\u4eca\u5929', 'Today'),
@@ -7562,7 +7562,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
             <div className="oa-session-list">{sidebarSections.conductors.map(renderSidebarTree)}</div>
           </div>
         </section>}
-        <section className="oa-sidebar-section" hidden={sidebarPreferences.layout === 'list'}>
+        <section className="oa-sidebar-section" hidden={!sidebarPreferences.showProjects}>
           <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={projectsExpanded} aria-controls="oa-sidebar-projects-body" onClick={()=>setProjectsExpanded(value => !value)}>
             <span aria-hidden="true">{projectsExpanded ? '\u2304' : '\u203a'}</span>{ct('项目', 'Projects')}

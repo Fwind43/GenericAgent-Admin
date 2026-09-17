@@ -1,8 +1,8 @@
 export function readSidebarPreferences(storage = globalThis.localStorage) {
   try {
     const value = JSON.parse(storage.getItem('ga-chat-sidebar-preferences') || '{}')
-    return { layout: value?.layout === 'list' ? 'list' : 'projects', sort: value?.sort === 'priority' ? 'priority' : 'updated' }
-  } catch { return { layout: 'projects', sort: 'updated' } }
+    return { showProjects: typeof value?.showProjects === 'boolean' ? value.showProjects : value?.layout !== 'list', showConductor: value?.showConductor !== false, sort: value?.sort === 'priority' ? 'priority' : 'updated' }
+  } catch { return { showProjects: true, showConductor: true, sort: 'updated' } }
 }
 export function sortSidebarSessions(sessions, mode) {
   const time = value => {
