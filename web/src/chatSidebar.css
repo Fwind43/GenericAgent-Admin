@@ -68,7 +68,7 @@
 .oa-chat .oa-sidebar .oa-recent-group-head { min-height: 22px; padding: 6px 10px 3px; font-size: 10px; font-weight: 400; color: var(--muted); opacity: .7; }
 .oa-chat .oa-sidebar .oa-recent-group-head small { display: none; }
 .oa-chat .oa-sidebar .oa-session-row .oa-session { min-height: 34px; padding-top: 7px; padding-bottom: 7px; padding-left: 10px; gap: 2px; }
-.oa-chat .oa-sidebar .oa-session-title b { font-size: 13px; font-weight: 400; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: clip; mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); }
+.oa-chat .oa-sidebar .oa-session-title b { font-size: 13px; font-weight: 400; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; mask-image: none; }
 .oa-chat .oa-sidebar .oa-project-head { background: transparent; border: 0; box-shadow: none; }
 .oa-chat .oa-sidebar .oa-project-toggle b { font-size: 13px; font-weight: 450; }
 .oa-chat .oa-sidebar .oa-project-toggle small { font-weight: 400; opacity: .55; }
