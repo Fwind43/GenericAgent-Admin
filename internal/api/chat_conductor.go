@@ -28,6 +28,7 @@ const (
 )
 
 type chatConductorState struct {
+    Defaults conductorDispatchOptions `json:"subtask_defaults,omitempty"`
     Role            string `json:"role"`
     ParentSessionID string `json:"parent_session_id,omitempty"`
     DispatchID      string `json:"dispatch_id,omitempty"`
@@ -478,6 +479,9 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     }
     prompts, _ := req["extra_sys_prompts"].([]string)
     prompts = append(prompts, conductorParentPrompt)
+    defaultsJSON, err := json.Marshal(cs.Conductor.Defaults)
+    if err != nil { return err }
+    prompts = append(prompts, "Current persistent subtask defaults: " + string(defaultsJSON) + ". Use conductor_models to list dispatch indexes and conductor_defaults to get/set/reset defaults. Explicit dispatch fields override these defaults; unset defaults preserve new-worker inheritance or reused-worker settings. Defaults affect only future dispatches.")
     tasks := conductorTaskOverview(cs.ConductorChildren)
     req["conductor"].(map[string]interface{})["tasks"] = tasks
     end := len(tasks)
@@ -612,6 +616,8 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
         worker.UpdatedAt = now
         childID, child.SessionID = target, target
     }
+    worker.Settings, err = parent.Conductor.Defaults.apply(worker.Settings)
+    if err != nil { s.SessionMu.Unlock(); return chatConductorChild{}, err }
     worker.Settings, _ = options.apply(worker.Settings)
     messageStart := len(worker.Messages)
     child.MessageStart = &messageStart

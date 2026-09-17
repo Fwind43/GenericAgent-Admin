@@ -27,7 +27,7 @@ class InstallationTest(unittest.TestCase):
 
             class Handler(loop.BaseHandler):
                 def __init__(self):
-                    self.parent = types.SimpleNamespace(task_dir=None)
+                    self.parent = agent
                     self._done_hooks = []
 
                 def do_no_tool(self, args, response):
@@ -39,7 +39,8 @@ class InstallationTest(unittest.TestCase):
             source = Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8')
             function = next(n for n in ast.parse(source).body
                             if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
-            scope = {'Path': Path, 'json': json}
+            import re
+            scope = {'Path': Path, 'json': json, 're': re}
             exec(compile(ast.Module(body=[function], type_ignores=[]), 'chat_worker.py', 'exec'), scope)
             rows = [{'dispatch_id': str(i), 'objective': 'task-' + str(i)} for i in range(113)]
             offsets = [-1, True, '48', 1.5, 0, 48, 96, 999]
@@ -72,7 +73,8 @@ class InstallationTest(unittest.TestCase):
 
             with tempfile.TemporaryDirectory() as broker:
                 config = {'role': 'parent', 'broker_dir': broker, 'tasks': rows}
-                restore = scope['_install_conductor_tools'](types.SimpleNamespace(stop_sig=False), config)
+                agent = types.SimpleNamespace(stop_sig=False, task_dir=None)
+                restore = scope['_install_conductor_tools'](agent, config)
                 try:
                     self.assertTrue(hasattr(Handler, 'do_conductor_tasks'))
                     model = FakeModel()
@@ -86,6 +88,47 @@ class InstallationTest(unittest.TestCase):
                     self.assertEqual([p['next_offset'] for p in received[4:]], [48, 96, None, None])
                     self.assertEqual([row for p in received[4:7] for row in p['tasks']], rows)
                     self.assertEqual(list(Path(broker).iterdir()), [])
+                    import time
+                    scope['time'] = time
+                    defaults = {}
+                    events = []
+                    def emit(event):
+                        events.append(event)
+                        args = event.get('args', {})
+                        if event['type'] == 'conductor_models':
+                            reply = {'ok': True, 'models': [{'index': 7, 'model': 'fake'}]}
+                        elif event['type'] == 'conductor_defaults':
+                            if args.get('action') == 'set':
+                                defaults.update(llm_no=args['llm_no'], reasoning_effort=args['reasoning_effort'])
+                            reply = {'ok': True, 'defaults': dict(defaults)}
+                        else:
+                            reply = {'ok': True, 'dispatch_id': 'fake-dispatch', 'session_id': 'fake-worker', 'status': 'queued'}
+                        reply['request_id'] = event['request_id']
+                        (Path(broker) / (event['request_id'] + '.response.json')).write_text(json.dumps(reply))
+                    scope['emit'] = emit
+                    calls = [('conductor_models', {}), ('conductor_defaults', {'action': 'set', 'llm_no': 7, 'reasoning_effort': 'low'}), ('conductor_dispatch', {'objective': 'isolated fake'})]
+                    class SettingsModel:
+                        turn = 0
+                        def chat(self, messages, tools):
+                            names = {t['function']['name']: t['function'] for t in tools}
+                            owner.assertIn('conductor_models', names)
+                            owner.assertEqual(names['conductor_defaults']['parameters']['required'], ['action'])
+                            if self.turn:
+                                owner.assertTrue(json.loads(messages[-1]['tool_results'][0]['content'])['ok'], messages[-1])
+                            tool_calls = []
+                            if self.turn < len(calls):
+                                name, args = calls[self.turn]
+                                tool_calls = [types.SimpleNamespace(id=str(self.turn), function=types.SimpleNamespace(name=name, arguments=json.dumps(args)))]
+                            self.turn += 1
+                            if False:
+                                yield None
+                            return types.SimpleNamespace(content='', tool_calls=tool_calls)
+                    settings_model = SettingsModel()
+                    result = loop.exhaust(loop.agent_runner_loop(settings_model, 'test', 'test', Handler(), fake.TOOLS_SCHEMA, max_turns=5))
+                    self.assertEqual(settings_model.turn, 4)
+                    self.assertEqual(defaults, {'llm_no': 7, 'reasoning_effort': 'low'})
+                    self.assertEqual(len(events), 3)
+                    print('settings schema/install/broker/continuation: 3 tool calls, 4 fake-model turns PASS')
                 finally:
                     restore()
                 self.assertIs(fake.TOOLS_SCHEMA, original)
