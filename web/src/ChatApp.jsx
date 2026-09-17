@@ -7612,7 +7612,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
         <section className="oa-sidebar-section">
           <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={historyExpanded} aria-controls="oa-sidebar-history-body" onClick={()=>setHistoryExpanded(value => !value)}>
-            <span aria-hidden="true">{historyExpanded ? '\u2304' : '\u203a'}</span>{ct('最近对话', 'Recent')}
+            <span aria-hidden="true">{historyExpanded ? '\u2304' : '\u203a'}</span>{ct('最近', 'Recent')}
           </button>
           <div className="oa-sidebar-view-actions">
             <button
@@ -7623,7 +7623,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
               title={ct('一键已读', 'Mark all as read')}
               aria-label={ct('一键已读', 'Mark all as read')}
             ><CheckCheck size={16}/></button>
-            <ProjectActionsMenu label={ct('最近对话更多', 'More recent chat options')}>
+            <ProjectActionsMenu label={ct('最近更多', 'More recent options')}>
               {sidebarPreferenceMenu}
               <button type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理会话', 'Manage sessions')}</button>
             </ProjectActionsMenu>
