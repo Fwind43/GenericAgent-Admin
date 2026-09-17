@@ -46,6 +46,14 @@
 .oa-chat .oa-sidebar .oa-sidebar-section .oa-empty-list { padding: 14px 10px 18px 31px; font-size: 12px; text-align: left; align-items: flex-start; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .oa-chat .oa-sidebar .oa-sidebar-section-toggle, .oa-chat .oa-sidebar .oa-sidebar-section-toggle > span::before { transition: none; } }
 
+/* Reveal section tools only for desktop mouse users; touch stays discoverable. */
+@media (min-width: 921px) and (hover: hover) and (pointer: fine) {
+  .oa-chat .oa-sidebar .oa-sidebar-section-head > .oa-sidebar-view-actions { opacity: 0; pointer-events: none; }
+  .oa-chat .oa-sidebar .oa-sidebar-section-head:hover > .oa-sidebar-view-actions,
+  .oa-chat .oa-sidebar .oa-sidebar-section-head:focus-within > .oa-sidebar-view-actions,
+  .oa-chat .oa-sidebar .oa-sidebar-section-head:has(.oa-sidebar-view-actions [aria-expanded="true"]) > .oa-sidebar-view-actions { opacity: 1; pointer-events: auto; }
+}
+
 /* Directory-like hierarchy: quiet labels, trailing chevrons, inline tools. */
 .oa-chat .oa-sidebar { padding: 0; }
 .oa-chat .oa-sidebar .oa-side-head { padding-left: 6px; padding-right: 6px; }
