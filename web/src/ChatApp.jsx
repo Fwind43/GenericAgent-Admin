@@ -7584,7 +7584,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
             <span aria-hidden="true">{historyExpanded ? '\u2304' : '\u203a'}</span>{ct('最近对话', 'Recent')}
           </button>
           <div className="oa-sidebar-view-actions">
-            <button type="button" className="oa-session-manage-open oa-recent-new-chat" onClick={newSession} disabled={batchDeleting} title={ct('新对话', 'New chat')} aria-label={ct('新对话', 'New chat')}><Plus size={16} aria-hidden="true"/></button>
             <button
               type="button"
               className="oa-session-manage-open oa-mark-all-read"
@@ -7597,6 +7596,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
               {sidebarPreferenceMenu}
               <button type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理会话', 'Manage sessions')}</button>
             </ProjectActionsMenu>
+            <button type="button" className="oa-session-manage-open oa-recent-new-chat" onClick={newSession} disabled={batchDeleting} title={ct('新对话', 'New chat')} aria-label={ct('新对话', 'New chat')}><Plus size={16} aria-hidden="true"/></button>
           </div>
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
