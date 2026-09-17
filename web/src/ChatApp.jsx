@@ -4766,6 +4766,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     })
   }
   const [historyExpanded, setHistoryExpanded] = useState(true)
+  const [pinnedExpanded, setPinnedExpanded] = useState(true)
   const [projectsExpanded, setProjectsExpanded] = useState(true)
   const [projectSortMode, setProjectSortMode] = useState(false)
   const [sidebarSearch, setSidebarSearch] = useState('')
@@ -7463,6 +7464,45 @@ export default function ChatApp({ onOpenSettings } = {}) {
     actionsRef={sidebarSessionActionsRef}
   />
 
+  const pinnedProjectGroups = filteredProjectGroups.filter(group => group.pinned)
+  const regularProjectGroups = filteredProjectGroups.filter(group => !group.pinned)
+  const pinnedSessions = filteredSessions.filter(session => session.pinned)
+  const recentSessions = filteredSessions.filter(session => !session.pinned)
+  const renderSidebarProject = (group, index) => {
+          const projectKey = group.key || group.name
+          const expanded = expandedProjectNames.has(projectKey)
+          const bodyId = `oa-project-sessions-${group.pinned ? 'pinned' : 'normal'}-${index}`
+          const toggleLabel = ct(`${expanded ? '收起' : '展开'} ${group.name}`, `${expanded ? 'Collapse' : 'Expand'} ${group.name}`)
+          const pinLabel = group.pinned
+            ? ct(`取消置顶 ${group.name}`, `Unpin ${group.name}`)
+            : ct(`置顶 ${group.name}`, `Pin ${group.name}`)
+          return <section data-project-name={projectKey} className={`oa-project-group ${expanded ? 'is-expanded' : 'is-collapsed'} ${group.pinned ? 'is-pinned' : ''}`} key={projectKey}>
+            <div className="oa-project-head">
+              <button className="oa-project-toggle" type="button" onClick={()=>setExpandedProjectNames(current => {
+                const next = new Set(current)
+                if (next.has(projectKey)) next.delete(projectKey)
+                else next.add(projectKey)
+                return next
+              })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
+                {expanded
+                  ? <FolderOpen size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>
+                  : <Folder size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>}<b title={group.name}>{group.name}</b>
+              </button>
+              {projectSortMode && <ProjectDragHandle name={projectKey} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
+              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.provider ? group : group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
+              <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
+              <button type="button" onClick={()=>createSession(group.provider ? group : group.name, { mode:'conductor' })} disabled={batchDeleting}><span className="oa-conductor-new-mark" aria-hidden="true">C</span>{ct('新建项目指挥家', 'New project Conductor')}</button>
+              <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(projectKey, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
+              <button type="button" onClick={()=>openProjectFolder(group)} title={ct('在服务器上打开项目文件夹', 'Open project folder on the server')}><FolderOpen size={14}/>{ct('打开项目文件夹', 'Open project folder')}</button>
+              </ProjectActionsMenu>
+            </div>
+            <div className="oa-project-body" id={bodyId} hidden={!expanded}>
+              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessions} renderItem={renderSidebarSession} ct={ct}/>
+              {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
+            </div>
+          </section>
+  }
+
   return <div ref={chatScope} className={`oa-chat ${collapsed ? 'is-collapsed' : ''}`}>
     <aside className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
@@ -7497,6 +7537,24 @@ export default function ChatApp({ onOpenSettings } = {}) {
           {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
         </div>
         </div>
+        {(pinnedSessions.length > 0 || pinnedProjectGroups.length > 0) && <section className="oa-sidebar-section oa-sidebar-pinned">
+          <div className="oa-sidebar-section-head">
+            <button type="button" className="oa-sidebar-section-toggle" aria-expanded={pinnedExpanded} aria-controls="oa-sidebar-pinned-body" onClick={()=>setPinnedExpanded(value => !value)}>
+              <span aria-hidden="true">{pinnedExpanded ? '\u2304' : '\u203a'}</span>{ct('置顶', 'Pinned')}
+            </button>
+            <div className="oa-sidebar-view-actions">
+              <ProjectActionsMenu label={ct('置顶更多', 'More pinned options')}>{sidebarPreferenceMenu}</ProjectActionsMenu>
+            </div>
+          </div>
+          <div id="oa-sidebar-pinned-body" hidden={!pinnedExpanded}>
+            <div className="oa-session-list">{pinnedSessions.map(session => {
+              const node = conductorSidebarTreeByID.get(String(session.id || ''))
+              if (!node?.workers?.length) return renderSidebarSession(session)
+              return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
+            })}</div>
+            <div className="oa-session-list oa-project-list">{pinnedProjectGroups.map(renderSidebarProject)}</div>
+          </div>
+        </section>}
         <section className="oa-sidebar-section" hidden={sidebarPreferences.layout === 'list'}>
           <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={projectsExpanded} aria-controls="oa-sidebar-projects-body" onClick={()=>setProjectsExpanded(value => !value)}>
@@ -7532,43 +7590,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
           <button type="button" onClick={closeProjectDraft} disabled={projectCreating}>{ct('取消', 'Cancel')}</button>
         </form>}
         <div className="oa-session-list oa-project-list">
-        {(showAllProjects || sidebarSearch || projectSortMode ? filteredProjectGroups : filteredProjectGroups.slice(0, 5)).map((group, index) => {
-          const projectKey = group.key || group.name
-          const expanded = expandedProjectNames.has(projectKey)
-          const bodyId = `oa-project-sessions-${index}`
-          const toggleLabel = ct(`${expanded ? '收起' : '展开'} ${group.name}`, `${expanded ? 'Collapse' : 'Expand'} ${group.name}`)
-          const pinLabel = group.pinned
-            ? ct(`取消置顶 ${group.name}`, `Unpin ${group.name}`)
-            : ct(`置顶 ${group.name}`, `Pin ${group.name}`)
-          return <section data-project-name={projectKey} className={`oa-project-group ${expanded ? 'is-expanded' : 'is-collapsed'} ${group.pinned ? 'is-pinned' : ''}`} key={projectKey}>
-            <div className="oa-project-head">
-              <button className="oa-project-toggle" type="button" onClick={()=>setExpandedProjectNames(current => {
-                const next = new Set(current)
-                if (next.has(projectKey)) next.delete(projectKey)
-                else next.add(projectKey)
-                return next
-              })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
-                {expanded
-                  ? <FolderOpen size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>
-                  : <Folder size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>}<b title={group.name}>{group.name}</b>
-              </button>
-              {group.pinned && <span className="oa-project-pinned-badge" title={ct('项目已置顶', 'Project pinned')}><Pin size={11} aria-hidden="true"/>{ct('置顶', 'Pinned')}</span>}
-              {projectSortMode && <ProjectDragHandle name={projectKey} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
-              <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.provider ? group : group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
-              <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
-              <button type="button" onClick={()=>createSession(group.provider ? group : group.name, { mode:'conductor' })} disabled={batchDeleting}><span className="oa-conductor-new-mark" aria-hidden="true">C</span>{ct('新建项目指挥家', 'New project Conductor')}</button>
-              <button className={`oa-project-pin ${group.pinned ? 'is-pinned' : ''}`} type="button" onClick={()=>toggleProjectPinned(projectKey, !group.pinned)} aria-pressed={group.pinned} title={pinLabel} aria-label={pinLabel}><Pin size={14}/>{pinLabel}</button>
-              <button type="button" onClick={()=>openProjectFolder(group)} title={ct('在服务器上打开项目文件夹', 'Open project folder on the server')}><FolderOpen size={14}/>{ct('打开项目文件夹', 'Open project folder')}</button>
-              </ProjectActionsMenu>
-            </div>
-            <div className="oa-project-body" id={bodyId} hidden={!expanded}>
-              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessions} renderItem={renderSidebarSession} ct={ct}/>
-              {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
-            </div>
-          </section>
-        })}
-        {!sidebarSearch && !projectSortMode && filteredProjectGroups.length > 5 && <button type="button" className="oa-project-show-more" aria-expanded={showAllProjects} onClick={()=>setShowAllProjects(value => !value)}>{showAllProjects ? ct('收起显示', 'Show less') : ct('展开显示', 'Show more')}</button>}
-        {!filteredProjectGroups.length && <div className="oa-empty-list oa-projects-empty">
+        {(showAllProjects || sidebarSearch || projectSortMode ? regularProjectGroups : regularProjectGroups.slice(0, 5)).map(renderSidebarProject)}
+        {!sidebarSearch && !projectSortMode && regularProjectGroups.length > 5 && <button type="button" className="oa-project-show-more" aria-expanded={showAllProjects} onClick={()=>setShowAllProjects(value => !value)}>{showAllProjects ? ct('收起显示', 'Show less') : ct('展开显示', 'Show more')}</button>}
+        {!regularProjectGroups.length && <div className="oa-empty-list oa-projects-empty">
           <FolderOpen size={20}/>
           <span>{sidebarSearch ? ct('无匹配项目', 'No matching projects') : ct('暂无可用项目', 'No projects available')}</span>
           {!sidebarSearch && !projectDraftOpen && <button className="oa-projects-empty-cta" type="button" onClick={openProjectDraft} disabled={projectCreating}>
@@ -7601,12 +7625,12 @@ export default function ChatApp({ onOpenSettings } = {}) {
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
         <div className="oa-session-list">
-          {filteredSessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
+          {recentSessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
             const node = conductorSidebarTreeByID.get(String(session.id || ''))
             if (!node?.workers?.length) return renderSidebarSession(session)
             return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
           })}
-          {!filteredSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
+          {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
           </div>
         </section>
