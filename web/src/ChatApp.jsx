@@ -65,7 +65,7 @@ import { pollGeneratedChatTitle, shouldPollGeneratedTitle } from './lib/chatTitl
 import {
   COMPOSER_MOBILE_BREAKPOINT,
   composerTextareaLayout,
-  isComposerResizeHandlePointer,
+  composerDragHeight,
 } from './lib/composerHeight.js'
 import {
   canStopConductorWorker,
@@ -5100,37 +5100,30 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }, [followScheduler])
 
   const beginComposerResize = useCallback((event) => {
-    const el = event.currentTarget
-    const isNarrow = window.matchMedia?.(`(max-width: ${COMPOSER_MOBILE_BREAKPOINT}px)`).matches
-      ?? window.innerWidth <= COMPOSER_MOBILE_BREAKPOINT
-    const rect = el.getBoundingClientRect()
-    if (isNarrow || !isComposerResizeHandlePointer(event, rect)) return
-    composerResizePointerRef.current = { pointerId: event.pointerId, startHeight: rect.height }
+    const el = promptRef.current
+    if (!el || event.button !== 0 || window.innerWidth <= COMPOSER_MOBILE_BREAKPOINT) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    composerResizePointerRef.current = {
+      pointerId: event.pointerId, startHeight: el.getBoundingClientRect().height, startY: event.clientY,
+    }
   }, [])
 
-  const finishComposerResize = useCallback((event) => {
+  const moveComposerResize = useCallback((event) => {
     const started = composerResizePointerRef.current
-    if (!started || (event.pointerId != null && event.pointerId !== started.pointerId)) return
-    composerResizePointerRef.current = null
-    const el = promptRef.current
-    if (!el) return
-    const height = el.getBoundingClientRect().height
-    if (Math.abs(height - started.startHeight) < 1) return
-    composerManualHeightRef.current = height
+    if (!started || event.pointerId !== started.pointerId) return
+    composerManualHeightRef.current = composerDragHeight(started.startHeight, started.startY, event.clientY, window.innerHeight)
     applyComposerHeight()
   }, [applyComposerHeight])
 
+  const finishComposerResize = useCallback(() => {
+    composerResizePointerRef.current = null
+  }, [])
+
   useEffect(() => {
-    const cancelComposerResize = () => { composerResizePointerRef.current = null }
-    window.addEventListener('pointerup', finishComposerResize)
-    window.addEventListener('pointercancel', cancelComposerResize)
     window.addEventListener('resize', applyComposerHeight)
-    return () => {
-      window.removeEventListener('pointerup', finishComposerResize)
-      window.removeEventListener('pointercancel', cancelComposerResize)
-      window.removeEventListener('resize', applyComposerHeight)
-    }
-  }, [applyComposerHeight, finishComposerResize])
+    return () => window.removeEventListener('resize', applyComposerHeight)
+  }, [applyComposerHeight])
 
   useEffect(() => {
     if (!busy && !streamingSid) return undefined
@@ -8144,7 +8137,15 @@ export default function ChatApp({ onOpenSettings } = {}) {
             </details>}
           </div>}
           {isUltraPlanPrompt && <div className="oa-ultraplan-mode" aria-live="polite"><span><Sparkles size={14}/>UltraPlan</span><b>{ct('将以规划模式执行，并在完成后展示 run 目录与日志摘要', 'Runs in planning mode and shows the run directory and log summary when complete')}</b></div>}
-          <textarea ref={promptRef} value={prompt} onPaste={onPaste} onChange={handlePromptChange} onKeyDown={handlePromptKeyDown} onPointerDown={beginComposerResize} placeholder={ct('向 GenericAgent 发送消息，可选择/粘贴/拖拽任意文件…', 'Message GenericAgent; select, paste, or drag any file…')} rows={1}/>
+          <button type="button" className="oa-composer-resize" title={ct('向上拖动增高，向下拖动缩小', 'Drag up to expand, down to shrink')} aria-label={ct('调整输入区高度', 'Resize message input')}
+            onPointerDown={beginComposerResize} onPointerMove={moveComposerResize} onPointerUp={finishComposerResize} onPointerCancel={finishComposerResize} onLostPointerCapture={finishComposerResize}
+            onKeyDown={event => {
+              if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+              event.preventDefault()
+              composerManualHeightRef.current = composerDragHeight(promptRef.current.getBoundingClientRect().height, 0, event.key === 'ArrowUp' ? -20 : 20, window.innerHeight)
+              applyComposerHeight()
+            }}><span aria-hidden="true">↕</span></button>
+          <textarea ref={promptRef} value={prompt} onPaste={onPaste} onChange={handlePromptChange} onKeyDown={handlePromptKeyDown} placeholder={ct('向 GenericAgent 发送消息，可选择/粘贴/拖拽任意文件…', 'Message GenericAgent; select, paste, or drag any file…')} rows={1}/>
           <div className="oa-composer-bar">
             <ComposerActions
               onAttach={() => fileRef.current?.click()}

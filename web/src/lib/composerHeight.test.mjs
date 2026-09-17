@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { composerManualHeightLimit, composerTextareaLayout, isComposerResizeHandlePointer } from './composerHeight.js'
+import { composerManualHeightLimit, composerTextareaLayout, composerDragHeight } from './composerHeight.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -21,11 +21,12 @@ test('manual height survives content changes and clamps to viewport', () => {
   assert.equal(composerTextareaLayout({ scrollHeight: 600, manualHeight: 360, viewportHeight: 500, isNarrow: false }).height, 280)
 })
 
-test('narrow layout ignores manual height and handle detection is corner-only', () => {
+test('top handle grows upwards, shrinks downwards and clamps', () => {
+  assert.equal(composerDragHeight(100, 500, 400, 900), 200)
+  assert.equal(composerDragHeight(200, 400, 460, 900), 140)
+  assert.equal(composerDragHeight(100, 500, 900, 900), 34)
+  assert.equal(composerDragHeight(100, 500, -900, 900), 680)
   assert.equal(composerTextareaLayout({ scrollHeight: 90, manualHeight: 360, viewportHeight: 800, isNarrow: true }).manual, false)
-  const rect = { right: 500, bottom: 300 }
-  assert.equal(isComposerResizeHandlePointer({ clientX: 495, clientY: 295 }, rect), true)
-  assert.equal(isComposerResizeHandlePointer({ clientX: 400, clientY: 295 }, rect), false)
 })
 
 test('chat composer wires desktop resize and narrow fallback', () => {
@@ -36,6 +37,6 @@ test('chat composer wires desktop resize and narrow fallback', () => {
   assert.match(chatApp, /root\.style\.setProperty\('--oa-composer-h', `\$\{Math\.ceil\(wrap\.getBoundingClientRect\(\)\.height\)\}px`\)/)
   assert.match(chatApp, /autoFollowRef\.current\) followScheduler\.request\('auto'\)/)
   assert.doesNotMatch(chatApp, /followScheduler\.schedule/)
-  assert.match(style, /max-height:max\(34px, calc\(100dvh - 220px\)\).*resize:vertical !important/)
+  assert.match(style, /max-height:max\(34px, calc\(100dvh - 220px\)\).*resize:none !important/)
   assert.match(style, /@media \(max-width:680px\)[\s\S]*?max-height:160px !important;resize:none !important/)
 })

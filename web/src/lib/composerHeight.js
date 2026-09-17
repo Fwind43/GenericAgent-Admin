@@ -31,12 +31,7 @@ export const composerTextareaLayout = ({ scrollHeight, manualHeight, viewportHei
   }
 }
 
-export const isComposerResizeHandlePointer = (event, rect, handleSize = 24) => {
-  if (!event || !rect) return false
-  const x = finiteNumber(event.clientX)
-  const y = finiteNumber(event.clientY)
-  return x >= finiteNumber(rect.right) - handleSize
-    && x <= finiteNumber(rect.right)
-    && y >= finiteNumber(rect.bottom) - handleSize
-    && y <= finiteNumber(rect.bottom)
-}
+export const composerDragHeight = (startHeight, startY, currentY, viewportHeight) => Math.min(
+  composerManualHeightLimit(viewportHeight),
+  Math.max(COMPOSER_MIN_HEIGHT, finiteNumber(startHeight) + finiteNumber(startY) - finiteNumber(currentY)),
+)
