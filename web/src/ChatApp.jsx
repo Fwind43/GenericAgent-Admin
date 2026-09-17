@@ -63,6 +63,11 @@ import { buildChatRunPayload, buildEditResendItem } from './lib/worldlineEdit'
 import { buildWorldlineEdges, buildWorldlineRows, worldlineMaxLevel, messageVersionInfo, worldlineNodeTitle, worldlineNodeKindLabel } from './lib/worldlineTree'
 import { pollGeneratedChatTitle, shouldPollGeneratedTitle } from './lib/chatTitlePolling'
 import {
+  COMPOSER_MOBILE_BREAKPOINT,
+  composerTextareaLayout,
+  isComposerResizeHandlePointer,
+} from './lib/composerHeight.js'
+import {
   canStopConductorWorker,
   conductorChildren,
   conductorWorkers,
@@ -4895,6 +4900,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const [streamClock, setStreamClock] = useState(() => Date.now())
   const threadRef = useRef(null)
   const composerWrapRef = useRef(null)
+  const composerManualHeightRef = useRef(null)
+  const composerResizePointerRef = useRef(null)
   const fileRef = useRef(null)
   const composerActionsTriggerRef = useRef(null)
   const promptRef = useRef(null)
@@ -5066,8 +5073,64 @@ export default function ChatApp({ onOpenSettings } = {}) {
     setPrompt(next)
     persistSessionDraft(sessionId, next)
   }, [persistSessionDraft])
-  // Auto-grow composer textarea to fit content (clamped), reset to single row when cleared.
-  const COMPOSER_MAX_H = 160
+  // Auto-grow to 160px until the user resizes. A manual desktop height then wins
+  // across prompt edits and sends, but is clamped whenever the viewport shrinks.
+  const applyComposerHeight = useCallback(() => {
+    const el = promptRef.current
+    if (!el) return
+    const isNarrow = typeof window !== 'undefined' && (
+      window.matchMedia?.(`(max-width: ${COMPOSER_MOBILE_BREAKPOINT}px)`).matches
+      ?? window.innerWidth <= COMPOSER_MOBILE_BREAKPOINT
+    )
+    if (!composerManualHeightRef.current || isNarrow) el.style.height = 'auto'
+    const layout = composerTextareaLayout({
+      scrollHeight: el.scrollHeight,
+      manualHeight: composerManualHeightRef.current,
+      viewportHeight: window.innerHeight,
+      isNarrow,
+    })
+    el.style.height = `${layout.height}px`
+    el.style.overflowY = layout.overflowY
+    const wrap = composerWrapRef.current
+    const root = chatScope.current
+    if (wrap && root) {
+      root.style.setProperty('--oa-composer-h', `${Math.ceil(wrap.getBoundingClientRect().height)}px`)
+      if (autoFollowRef.current) followScheduler.request('auto')
+    }
+  }, [followScheduler])
+
+  const beginComposerResize = useCallback((event) => {
+    const el = event.currentTarget
+    const isNarrow = window.matchMedia?.(`(max-width: ${COMPOSER_MOBILE_BREAKPOINT}px)`).matches
+      ?? window.innerWidth <= COMPOSER_MOBILE_BREAKPOINT
+    const rect = el.getBoundingClientRect()
+    if (isNarrow || !isComposerResizeHandlePointer(event, rect)) return
+    composerResizePointerRef.current = { pointerId: event.pointerId, startHeight: rect.height }
+  }, [])
+
+  const finishComposerResize = useCallback((event) => {
+    const started = composerResizePointerRef.current
+    if (!started || (event.pointerId != null && event.pointerId !== started.pointerId)) return
+    composerResizePointerRef.current = null
+    const el = promptRef.current
+    if (!el) return
+    const height = el.getBoundingClientRect().height
+    if (Math.abs(height - started.startHeight) < 1) return
+    composerManualHeightRef.current = height
+    applyComposerHeight()
+  }, [applyComposerHeight])
+
+  useEffect(() => {
+    const cancelComposerResize = () => { composerResizePointerRef.current = null }
+    window.addEventListener('pointerup', finishComposerResize)
+    window.addEventListener('pointercancel', cancelComposerResize)
+    window.addEventListener('resize', applyComposerHeight)
+    return () => {
+      window.removeEventListener('pointerup', finishComposerResize)
+      window.removeEventListener('pointercancel', cancelComposerResize)
+      window.removeEventListener('resize', applyComposerHeight)
+    }
+  }, [applyComposerHeight, finishComposerResize])
 
   useEffect(() => {
     if (!busy && !streamingSid) return undefined
@@ -5104,13 +5167,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }, [])
 
   useLayoutEffect(() => {
-    const el = promptRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    const next = Math.min(el.scrollHeight, COMPOSER_MAX_H)
-    el.style.height = next + 'px'
-    el.style.overflowY = el.scrollHeight > COMPOSER_MAX_H ? 'auto' : 'hidden'
-  }, [prompt])
+    applyComposerHeight()
+  }, [applyComposerHeight, prompt])
 
   const toggleAutorun = useCallback(async () => {
     if (!sid || autorunSavingRef.current) return
@@ -8086,7 +8144,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
             </details>}
           </div>}
           {isUltraPlanPrompt && <div className="oa-ultraplan-mode" aria-live="polite"><span><Sparkles size={14}/>UltraPlan</span><b>{ct('将以规划模式执行，并在完成后展示 run 目录与日志摘要', 'Runs in planning mode and shows the run directory and log summary when complete')}</b></div>}
-          <textarea ref={promptRef} value={prompt} onPaste={onPaste} onChange={handlePromptChange} onKeyDown={handlePromptKeyDown} placeholder={ct('向 GenericAgent 发送消息，可选择/粘贴/拖拽任意文件…', 'Message GenericAgent; select, paste, or drag any file…')} rows={1}/>
+          <textarea ref={promptRef} value={prompt} onPaste={onPaste} onChange={handlePromptChange} onKeyDown={handlePromptKeyDown} onPointerDown={beginComposerResize} placeholder={ct('向 GenericAgent 发送消息，可选择/粘贴/拖拽任意文件…', 'Message GenericAgent; select, paste, or drag any file…')} rows={1}/>
           <div className="oa-composer-bar">
             <ComposerActions
               onAttach={() => fileRef.current?.click()}

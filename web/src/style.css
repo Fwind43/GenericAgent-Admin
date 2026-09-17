@@ -4259,7 +4259,11 @@ pre, code { font-variant-ligatures: none; }
 }
 .oa-composer.is-dragging{border-color:#111 !important;background:var(--n-fbfbfb) !important}
 .oa-composer textarea,
-.oa-composer textarea:not(.file-editor){order:2;width:100% !important;min-height:34px !important;max-height:160px !important;padding:5px 4px 2px !important;font-size:15.5px !important;line-height:1.55 !important;color: var(--text) !important;background:transparent !important;border:0 !important;box-shadow:none !important;resize:none !important}
+.oa-composer textarea:not(.file-editor){order:2;width:100% !important;min-height:34px !important;max-height:max(34px, calc(100dvh - 220px)) !important;padding:5px 4px 2px !important;font-size:15.5px !important;line-height:1.55 !important;color: var(--text) !important;background:transparent !important;border:0 !important;box-shadow:none !important;resize:vertical !important}
+@media (max-width:680px){
+  .oa-composer textarea,
+  .oa-composer textarea:not(.file-editor){max-height:160px !important;resize:none !important}
+}
 .oa-composer .oa-attach-preview{order:1;margin:0 !important;padding:0 0 1px !important}
 .oa-composer .oa-composer-bar{order:3;display:flex !important;align-items:center !important;gap:8px !important;min-height:36px !important}
 .oa-composer .oa-composer-model{margin-left:auto !important;max-width:min(330px, 48%) !important;height:34px !important;background:var(--surface-strong) !important}
