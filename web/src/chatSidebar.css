@@ -175,3 +175,48 @@
 .oa-chat .oa-sidebar .oa-conductor-tree-children > .oa-session-row.is-conductor-worker::after {
   content: none;
 }
+
+/* Compact project-only empty state; keep generic sidebar empty lists untouched. */
+.oa-chat .oa-sidebar .oa-sidebar-section .oa-projects-empty {
+  min-height: 96px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 10px 10px 10px 22px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: left;
+  opacity: 1;
+}
+.oa-chat .oa-sidebar .oa-projects-empty > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--green);
+  opacity: .78;
+}
+.oa-chat .oa-sidebar .oa-projects-empty > span { opacity: .78; }
+.oa-chat .oa-sidebar .oa-projects-empty-cta {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--green) 42%, var(--border));
+  border-radius: 6px;
+  background: transparent;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.oa-chat .oa-sidebar .oa-projects-empty-cta:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--green) 58%, var(--border));
+  background: color-mix(in srgb, var(--green) 10%, transparent);
+}
+.oa-chat .oa-sidebar .oa-projects-empty-cta:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.oa-chat .oa-sidebar .oa-projects-empty-cta:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
