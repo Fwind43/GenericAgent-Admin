@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, ChevronRight } from 'lucide-react'
 
 export default function ProjectActionsMenu({ label, children }) {
   const [pos, setPos] = useState(null)
@@ -34,9 +34,35 @@ export default function ProjectActionsMenu({ label, children }) {
         const rect = e.currentTarget.getBoundingClientRect()
         setPos(pos ? null : { top:Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 110)), left:Math.max(8, Math.min(rect.right - 190, window.innerWidth - 198)) })
       }} style={{ cursor:'pointer' }}><MoreHorizontal size={16}/></button>
-    {pos && createPortal(<div ref={menu} className="oa-session-menu" aria-label={label} style={{ position:'fixed', ...pos, width:190, zIndex:10000 }}
+    {pos && createPortal(<div ref={menu} className="oa-session-menu" aria-label={label} style={{ position:'fixed', ...pos, width:190, zIndex:10000, overflow:'visible' }}
       onClick={e => { e.stopPropagation(); if (e.target.closest('button:not(:disabled)')) { setPos(null); trigger.current?.focus() } }}>
       {children}
     </div>, document.body)}
   </>
+}
+
+export function SidebarPreferenceSubmenu({ label, value, options, onChange }) {
+  const [pos, setPos] = useState(null)
+  const trigger = useRef(null)
+  const panel = useRef(null)
+  const open = () => {
+    const rect = trigger.current.getBoundingClientRect()
+    const width = Math.min(160, window.innerWidth - 16)
+    setPos({ left: Math.max(8, rect.right + width + 8 <= window.innerWidth ? rect.right : rect.left - width), top: Math.max(8, Math.min(rect.top - 6, window.innerHeight - options.length * 36 - 22)), width })
+  }
+  return <div onMouseEnter={open} onMouseLeave={()=>setPos(null)} onBlur={e=>{ if (!e.currentTarget.contains(e.relatedTarget)) setPos(null) }}>
+    <button ref={trigger} type="button" aria-haspopup="menu" aria-expanded={!!pos}
+      onClick={e=>{ e.stopPropagation(); if (pos) setPos(null); else open() }}
+      onKeyDown={e=>{ if (e.key === 'ArrowRight') { e.preventDefault(); open(); requestAnimationFrame(()=>panel.current?.querySelector('button')?.focus()) } }}>
+      <span style={{ flex:1 }}>{label}</span><ChevronRight size={14}/>
+    </button>
+    {pos && <div ref={panel} role="menu" aria-label={label} className="oa-session-menu" style={{ ...pos, position:'fixed', zIndex:10001 }}
+      onKeyDown={e=>{ if (e.key === 'ArrowLeft' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setPos(null); trigger.current?.focus() } }}>
+      {options.map(option=><button key={option.value} type="button" role="menuitemradio" aria-checked={value === option.value} onClick={()=>onChange(option.value)}>
+        <span aria-hidden="true" style={{ width:16, height:16, borderRadius:'50%', border:'2px solid', borderColor:value === option.value ? 'var(--accent, #1677ff)' : 'currentColor', display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          {value === option.value && <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--accent, #1677ff)' }}/>}
+        </span>{option.label}
+      </button>)}
+    </div>}
+  </div>
 }

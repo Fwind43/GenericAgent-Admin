@@ -6,7 +6,7 @@ import FileDownloadLink from './components/FileDownloadLink'
 import FilePreviewLink from './components/FilePreviewLink'
 import { fileDownloadTarget } from './lib/fileDownload.js'
 import ProjectSessionPage from './components/ProjectSessionPage'
-import ProjectActionsMenu from './components/ProjectActionsMenu'
+import ProjectActionsMenu, { SidebarPreferenceSubmenu } from './components/ProjectActionsMenu'
 import ProjectDragHandle from './components/ProjectDragHandle'
 import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -7342,10 +7342,12 @@ export default function ChatApp({ onOpenSettings } = {}) {
 
   const sortedSidebarSessions = useMemo(() => sortSidebarSessions(sessions, sidebarPreferences.sort), [sessions, sidebarPreferences.sort])
   const sidebarPreferenceMenu = <>
-            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('整理侧边栏', 'Organize sidebar')}</div>
-            {[['projects', '按项目', 'By project'], ['list', '按列表', 'As list']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.layout === value} onClick={()=>updateSidebarPreference('layout', value)}><Check size={14} style={{ visibility:sidebarPreferences.layout === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
-            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('聊天排序方式', 'Chat sort order')}</div>
-            {[['priority', '优先级', 'Priority'], ['updated', '最近更新', 'Recently updated']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.sort === value} onClick={()=>updateSidebarPreference('sort', value)}><Check size={14} style={{ visibility:sidebarPreferences.sort === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
+    <SidebarPreferenceSubmenu label={ct('显示方式', 'View mode')} value={sidebarPreferences.layout}
+      options={[{ value:'projects', label:ct('按项目', 'By project') }, { value:'list', label:ct('按列表', 'As list') }]}
+      onChange={value=>updateSidebarPreference('layout', value)}/>
+    <SidebarPreferenceSubmenu label={ct('聊天排序方式', 'Chat sort order')} value={sidebarPreferences.sort}
+      options={[{ value:'priority', label:ct('优先级', 'Priority') }, { value:'updated', label:ct('最近更新', 'Recently updated') }]}
+      onChange={value=>updateSidebarPreference('sort', value)}/>
   </>
 
   const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions, pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
