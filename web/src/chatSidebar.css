@@ -117,7 +117,7 @@
 .oa-chat .oa-sidebar .oa-project-head:focus-within { background: var(--oa-side-hover); }
 .oa-chat .oa-sidebar .oa-project-toggle { min-height: 38px; padding: 0 10px; gap: 11px; color: var(--text); border-radius: 6px; }
 .oa-chat .oa-sidebar .oa-project-toggle:hover { background: transparent; }
-.oa-chat .oa-sidebar .oa-project-toggle b { font-size: 14px; font-weight: 400; line-height: 22px; letter-spacing: 0; }
+.oa-chat .oa-sidebar .oa-project-toggle b { font-size: 13px; font-weight: 400; line-height: 20px; letter-spacing: 0; }
 .oa-chat .oa-sidebar .oa-project-folder { flex: 0 0 auto; }
 .oa-chat .oa-sidebar .oa-project-body { border: 0; padding: 0 0 0 27px; }
 .oa-chat .oa-sidebar .oa-project-show-more { display: block; width: 100%; border: 0; background: transparent; color: var(--muted); padding: 7px 10px; text-align: left; font: inherit; font-size: 13px; cursor: pointer; border-radius: 6px; }
