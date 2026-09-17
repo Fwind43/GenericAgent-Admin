@@ -25,7 +25,7 @@ func (s *Server) conductorRecoveryView(cs chatSession) chatSession {
 				}
 			}
 		}
-		worker, err := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
+		worker, err := s.loadChatSessionSummary(s.CfgStore.Snapshot(), child.SessionID)
 		if err != nil || worker.Conductor == nil || worker.Conductor.Role != conductorRoleWorker || worker.Conductor.ParentSessionID != parent || worker.Conductor.DispatchID != child.DispatchID || worker.Conductor.Status != child.Status {
 			return "pending_confirmation"
 		}

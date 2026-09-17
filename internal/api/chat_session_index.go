@@ -149,6 +149,45 @@ func writeChatSessionListIndex(path string, entries map[string]chatSessionListIn
 	return writeChatFileAtomic(path, b, 0644)
 }
 
+// loadChatSessionSummary reuses the list index for a single related session.
+// Callers hold SessionMu, as with loadChatSessionSummaries. Only the compact
+// summary is retained; unchanged worker histories are never decoded again.
+func (s *Server) loadChatSessionSummary(cfg config.AppConfig, sid string) (chatSessionSummary, error) {
+	path := chatSessionPath(cfg, sid)
+	info, err := os.Stat(path)
+	if err != nil {
+		return chatSessionSummary{}, err
+	}
+	runtime := s.ChatRuntime
+	if runtime == nil {
+		cs, err := loadChatSession(cfg, sid)
+		return summaryFromChatSession(cs), err
+	}
+	runtime.sessionListMu.Lock()
+	defer runtime.sessionListMu.Unlock()
+	indexPath := chatSessionListIndexPath(cfg)
+	if !runtime.sessionListLoaded || runtime.sessionListPath != indexPath {
+		runtime.sessionListPath = indexPath
+		runtime.sessionListEntries = readChatSessionListIndex(indexPath)
+		runtime.sessionListLoaded = true
+	}
+	key := filepath.Base(path)
+	cached, ok := runtime.sessionListEntries[key]
+	if ok && cached.Size == info.Size() && cached.ModTimeNS == info.ModTime().UnixNano() && cached.Summary.ID != "" {
+		return cached.Summary, nil
+	}
+	if runtime.sessionListLoadHook != nil {
+		runtime.sessionListLoadHook(sid)
+	}
+	cs, err := loadChatSession(cfg, sid)
+	if err != nil {
+		return chatSessionSummary{}, err
+	}
+	summary := summaryFromChatSession(cs)
+	runtime.sessionListEntries[key] = chatSessionListIndexEntry{Size: info.Size(), ModTimeNS: info.ModTime().UnixNano(), Summary: summary}
+	return summary, nil
+}
+
 func (s *Server) loadChatSessionSummaries(cfg config.AppConfig) ([]chatSessionSummary, error) {
 	if err := ensureChatDataMigrated(cfg); err != nil {
 		return nil, err
