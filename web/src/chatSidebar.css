@@ -162,6 +162,7 @@
 }
 .oa-chat .oa-sidebar .oa-conductor-tree-children > .oa-session-row.is-conductor-worker {
   margin-left: 0;
+  width: 100%;
 }
 .oa-chat .oa-sidebar .oa-conductor-tree-children > .oa-session-row.is-conductor-worker::before,
 .oa-chat .oa-sidebar .oa-conductor-tree-children > .oa-session-row.is-conductor-worker::after {
