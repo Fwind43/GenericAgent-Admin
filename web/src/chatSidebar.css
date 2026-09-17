@@ -15,13 +15,13 @@
 }
 .oa-chat .oa-sidebar .oa-sidebar-search { order: 4; flex: 0 0 32px; width: 100%; min-height: 32px; margin-top: 8px; border-color: transparent; background: transparent; box-shadow: none; }
 .oa-chat .oa-sidebar .oa-side-head > .oa-new-chat,
-.oa-chat .oa-sidebar .oa-side-head > .oa-new-conductor {
+.oa-chat .oa-sidebar .oa-sidebar-scroll-tools > .oa-new-conductor {
   display: flex; align-items: center; justify-content: flex-start; gap: 10px;
   width: 100%; height: 36px; padding: 0 10px; border: 0; border-radius: 7px;
   background: transparent; color: var(--text); box-shadow: none; font-size: 13px; font-weight: 450;
 }
 .oa-chat .oa-sidebar .oa-side-head > .oa-new-chat:hover,
-.oa-chat .oa-sidebar .oa-side-head > .oa-new-conductor:hover { background: var(--oa-side-hover); }
+.oa-chat .oa-sidebar .oa-sidebar-scroll-tools > .oa-new-conductor:hover { background: var(--oa-side-hover); }
 .oa-chat .oa-sidebar .oa-session-manager-head { height: auto; flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 0; padding: 4px 12px 8px; border: 0; }
 .oa-chat .oa-sidebar .oa-sidebar-view-actions { margin-top: 6px; justify-content: flex-end; }
 .oa-chat .oa-sidebar .oa-session { border-color: transparent; box-shadow: none; border-radius: 6px; }
@@ -101,3 +101,8 @@
   .oa-chat .oa-sidebar .oa-sidebar-sections { scrollbar-color: auto; }
   .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-thumb { background: ButtonText; }
 }
+
+/* Header and instance/settings stay fixed; all navigation scrolls together. */
+.oa-chat .oa-sidebar .oa-sidebar-scroll-tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.oa-chat .oa-sidebar .oa-side-head { padding-bottom: 6px; }
+.oa-chat .oa-sidebar .oa-sidebar-sections { padding-top: 0; }

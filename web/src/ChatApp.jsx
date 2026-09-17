@@ -7447,6 +7447,24 @@ export default function ChatApp({ onOpenSettings } = {}) {
     <aside className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-sidebar-brand">GenericAgent <span>Admin</span></div>
+        <button
+          className="oa-new-chat"
+          onClick={newSession}
+          disabled={batchDeleting}
+          title={ct('新对话', 'New chat')}
+          aria-label={ct('新对话', 'New chat')}
+        ><MessageSquarePlus size={16}/><span>{ct('新对话', 'New chat')}</span></button>
+        <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('收起侧栏', 'Collapse sidebar')} aria-label={ct('收起侧栏', 'Collapse sidebar')}><PanelLeftClose size={18} aria-hidden="true"/></button>
+      </div>
+      <div className="oa-sidebar-sections">
+        <div className="oa-sidebar-scroll-tools">
+        <button
+          className="oa-icon-btn oa-new-conductor"
+          onClick={newConductorSession}
+          disabled={batchDeleting}
+          title={ct('新建 Conductor', 'New Conductor')}
+          aria-label={ct('新建 Conductor', 'New Conductor')}
+        ><span className="oa-conductor-new-mark" aria-hidden="true">C</span><span>Conductor</span></button>
         <div className="oa-sidebar-search">
           <Search size={15}/>
           <input
@@ -7458,23 +7476,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
           />
           {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
         </div>
-        <button
-          className="oa-new-chat"
-          onClick={newSession}
-          disabled={batchDeleting}
-          title={ct('新对话', 'New chat')}
-          aria-label={ct('新对话', 'New chat')}
-        ><MessageSquarePlus size={16}/><span>{ct('新对话', 'New chat')}</span></button>
-        <button
-          className="oa-icon-btn oa-new-conductor"
-          onClick={newConductorSession}
-          disabled={batchDeleting}
-          title={ct('新建 Conductor', 'New Conductor')}
-          aria-label={ct('新建 Conductor', 'New Conductor')}
-        ><span className="oa-conductor-new-mark" aria-hidden="true">C</span><span>Conductor</span></button>
-        <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('收起侧栏', 'Collapse sidebar')} aria-label={ct('收起侧栏', 'Collapse sidebar')}><PanelLeftClose size={18} aria-hidden="true"/></button>
-      </div>
-      <div className="oa-sidebar-sections">
+        </div>
         <section className="oa-sidebar-section">
           <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={projectsExpanded} aria-controls="oa-sidebar-projects-body" onClick={()=>setProjectsExpanded(value => !value)}>
