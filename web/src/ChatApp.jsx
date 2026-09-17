@@ -24,7 +24,7 @@ import { projectNameError, projectNameErrorText } from './lib/projectName.js'
 import { Collapse, Tag } from 'antd'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { Bot, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Loader2, Lock, Maximize, Maximize2, MessageSquarePlus, MoreHorizontal, Orbit, PanelLeftOpen, PanelLeftClose, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Bot, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Loader2, Lock, Maximize, Maximize2, MessageSquarePlus, MoreHorizontal, Orbit, PanelLeftOpen, PanelLeftClose, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { api, apiStream } from './lib/api'
 import { createChatSessionCache } from './lib/chatSessionCache.js'
 import { useChatHistoryPages } from './lib/useChatHistoryPages.js'
@@ -4759,6 +4759,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const [projectsExpanded, setProjectsExpanded] = useState(true)
   const [projectSortMode, setProjectSortMode] = useState(false)
   const [sidebarSearch, setSidebarSearch] = useState('')
+  const [showAllProjects, setShowAllProjects] = useState(false)
   const [expandedProjectNames, setExpandedProjectNames] = useState(() => new Set())
   const [projectDraftOpen, setProjectDraftOpen] = useState(false)
   const [projectDraftName, setProjectDraftName] = useState('')
@@ -7483,13 +7484,13 @@ export default function ChatApp({ onOpenSettings } = {}) {
             <span aria-hidden="true">{projectsExpanded ? '\u2304' : '\u203a'}</span>{ct('项目', 'Projects')}
           </button>
           <div className="oa-sidebar-view-actions">
-            <button className="oa-session-manage-open" type="button" aria-pressed={projectSortMode}
+            <button className="oa-session-manage-open" type="button" aria-pressed={projectSortMode} aria-label={ct('项目排序', 'Sort projects')}
               onClick={()=>setProjectSortMode(current => !current)} disabled={batchDeleting || projectOrderSaving || (!projectSortMode && projectSessionGroups.length < 2)}
               title={ct('开启后长按项目手柄拖动，顺序自动保存', 'Enable, then hold a project handle to drag. Order saves automatically.')}>
-              {projectSortMode ? ct('完成', 'Done') : ct('排序', 'Sort')}
+              {projectSortMode ? ct('完成', 'Done') : <MoreHorizontal size={16}/>}
             </button>
             <button className="oa-session-manage-open" type="button" onClick={()=>{ setProjectsExpanded(true); openProjectDraft() }} disabled={projectCreating || projectDraftOpen} title={ct("\u65b0\u5efa\u9879\u76ee", "New project")} aria-label={ct("\u65b0\u5efa\u9879\u76ee", "New project")}>
-              <FolderPlus size={15}/>
+              <Plus size={16}/>
             </button>
           </div>
           </div>
@@ -7509,7 +7510,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
           <button type="button" onClick={closeProjectDraft} disabled={projectCreating}>{ct('取消', 'Cancel')}</button>
         </form>}
         <div className="oa-session-list oa-project-list">
-        {filteredProjectGroups.map((group, index) => {
+        {(showAllProjects || sidebarSearch || projectSortMode ? filteredProjectGroups : filteredProjectGroups.slice(0, 5)).map((group, index) => {
           const projectKey = group.key || group.name
           const expanded = expandedProjectNames.has(projectKey)
           const bodyId = `oa-project-sessions-${index}`
@@ -7525,7 +7526,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
                 else next.add(projectKey)
                 return next
               })} aria-expanded={expanded} aria-controls={bodyId} aria-label={toggleLabel} title={toggleLabel}>
-                <ChevronRight size={13} className="oa-project-chevron" aria-hidden="true"/><b title={group.name}>{group.name}</b><small>{group.sessions.length}</small>
+                <Folder size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/><b title={group.name}>{group.name}</b>
               </button>
               {group.pinned && <span className="oa-project-pinned-badge" title={ct('项目已置顶', 'Project pinned')}><Pin size={11} aria-hidden="true"/>{ct('置顶', 'Pinned')}</span>}
               {projectSortMode && <ProjectDragHandle name={projectKey} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
@@ -7542,6 +7543,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
             </div>
           </section>
         })}
+        {!sidebarSearch && !projectSortMode && filteredProjectGroups.length > 5 && <button type="button" className="oa-project-show-more" aria-expanded={showAllProjects} onClick={()=>setShowAllProjects(value => !value)}>{showAllProjects ? ct('收起显示', 'Show less') : ct('展开显示', 'Show more')}</button>}
         {!filteredProjectGroups.length && <div className="oa-empty-list oa-projects-empty">
           <FolderOpen size={20}/>
           <span>{sidebarSearch ? ct('无匹配项目', 'No matching projects') : ct('暂无可用项目', 'No projects available')}</span>

@@ -106,3 +106,25 @@
 .oa-chat .oa-sidebar .oa-sidebar-scroll-tools { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .oa-chat .oa-sidebar .oa-side-head { padding-bottom: 6px; }
 .oa-chat .oa-sidebar .oa-sidebar-sections { padding-top: 0; }
+
+/* Flat folder navigation, matching the lightweight project reference. */
+.oa-chat .oa-sidebar .oa-project-list { gap: 0; }
+.oa-chat .oa-sidebar .oa-project-group,
+.oa-chat .oa-sidebar .oa-project-group.is-expanded,
+.oa-chat .oa-sidebar .oa-project-group.is-pinned { margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
+.oa-chat .oa-sidebar .oa-project-head { position: relative; min-height: 38px; padding: 0; gap: 0; border-radius: 6px; }
+.oa-chat .oa-sidebar .oa-project-head:hover,
+.oa-chat .oa-sidebar .oa-project-head:focus-within { background: var(--oa-side-hover); }
+.oa-chat .oa-sidebar .oa-project-toggle { min-height: 38px; padding: 0 10px; gap: 11px; color: var(--text); border-radius: 6px; }
+.oa-chat .oa-sidebar .oa-project-toggle:hover { background: transparent; }
+.oa-chat .oa-sidebar .oa-project-toggle b { font-size: 14px; font-weight: 400; line-height: 22px; letter-spacing: 0; }
+.oa-chat .oa-sidebar .oa-project-folder { flex: 0 0 auto; }
+.oa-chat .oa-sidebar .oa-project-body { border: 0; padding: 0 0 0 27px; }
+.oa-chat .oa-sidebar .oa-project-show-more { display: block; width: 100%; border: 0; background: transparent; color: var(--muted); padding: 7px 10px; text-align: left; font: inherit; font-size: 13px; cursor: pointer; border-radius: 6px; }
+.oa-chat .oa-sidebar .oa-project-show-more:hover { background: var(--oa-side-hover); color: var(--text); }
+.oa-chat .oa-sidebar .oa-project-show-more:focus-visible { outline: 2px solid var(--oa-green); outline-offset: -2px; }
+@media (hover: hover) and (pointer: fine) {
+  .oa-chat .oa-sidebar .oa-project-head > .oa-project-add { opacity: 0; }
+  .oa-chat .oa-sidebar .oa-project-head:hover > .oa-project-add,
+  .oa-chat .oa-sidebar .oa-project-head:focus-within > .oa-project-add { opacity: 1; }
+}
