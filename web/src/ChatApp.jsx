@@ -7476,20 +7476,22 @@ export default function ChatApp({ onOpenSettings } = {}) {
       </div>
       <div className="oa-sidebar-sections">
         <section className="oa-sidebar-section">
+          <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={projectsExpanded} aria-controls="oa-sidebar-projects-body" onClick={()=>setProjectsExpanded(value => !value)}>
             <span aria-hidden="true">{projectsExpanded ? '\u2304' : '\u203a'}</span>{ct('项目', 'Projects')}
           </button>
-          <div id="oa-sidebar-projects-body" hidden={!projectsExpanded}>
-            <div className="oa-sidebar-view-actions">
+          <div className="oa-sidebar-view-actions">
             <button className="oa-session-manage-open" type="button" aria-pressed={projectSortMode}
               onClick={()=>setProjectSortMode(current => !current)} disabled={batchDeleting || projectOrderSaving || (!projectSortMode && projectSessionGroups.length < 2)}
               title={ct('开启后长按项目手柄拖动，顺序自动保存', 'Enable, then hold a project handle to drag. Order saves automatically.')}>
               {projectSortMode ? ct('完成', 'Done') : ct('排序', 'Sort')}
             </button>
-            <button className="oa-session-manage-open" type="button" onClick={openProjectDraft} disabled={projectCreating || projectDraftOpen}>
-              <FolderPlus size={13}/>{ct('新建项目', 'New project')}
+            <button className="oa-session-manage-open" type="button" onClick={()=>{ setProjectsExpanded(true); openProjectDraft() }} disabled={projectCreating || projectDraftOpen} title={ct("\u65b0\u5efa\u9879\u76ee", "New project")} aria-label={ct("\u65b0\u5efa\u9879\u76ee", "New project")}>
+              <FolderPlus size={15}/>
             </button>
           </div>
+          </div>
+          <div id="oa-sidebar-projects-body" hidden={!projectsExpanded}>
         {projectDraftOpen && <form className="oa-project-draft" onSubmit={e=>{ e.preventDefault(); createProject() }}>
           <input
             autoFocus
@@ -7549,11 +7551,11 @@ export default function ChatApp({ onOpenSettings } = {}) {
           </div>
         </section>
         <section className="oa-sidebar-section">
+          <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={historyExpanded} aria-controls="oa-sidebar-history-body" onClick={()=>setHistoryExpanded(value => !value)}>
             <span aria-hidden="true">{historyExpanded ? '\u2304' : '\u203a'}</span>{ct('最近对话', 'Recent')}
           </button>
-          <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
-            <div className="oa-sidebar-view-actions">
+          <div className="oa-sidebar-view-actions">
             <button
               type="button"
               className="oa-session-manage-open oa-mark-all-read"
@@ -7562,8 +7564,10 @@ export default function ChatApp({ onOpenSettings } = {}) {
               title={ct('一键已读', 'Mark all as read')}
               aria-label={ct('一键已读', 'Mark all as read')}
             ><CheckCheck size={16}/></button>
-            <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理', 'Manage')}</button>
+            <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length} title={ct('管理', 'Manage')} aria-label={ct('管理', 'Manage')}><MoreHorizontal size={16}/></button>
           </div>
+          </div>
+          <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
         <div className="oa-session-list">
           {recentSessionGroups.map(group => <section className={`oa-recent-group oa-recent-group-${group.key}`} key={group.key}>
             <div className="oa-recent-group-head">{group.key === 'pinned' && <Pin size={12}/>}<span>{recentGroupLabels[group.key]}</span><small>{group.sessions.length}</small></div>
