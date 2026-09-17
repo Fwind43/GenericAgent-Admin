@@ -7575,14 +7575,11 @@ export default function ChatApp({ onOpenSettings } = {}) {
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
         <div className="oa-session-list">
-          {recentSessionGroups.map(group => <section className={`oa-recent-group oa-recent-group-${group.key}`} key={group.key}>
-            <div className="oa-recent-group-head">{group.key === 'pinned' && <Pin size={12}/>}<span>{recentGroupLabels[group.key]}</span><small>{group.sessions.length}</small></div>
-            <div className="oa-recent-group-body">{group.sessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
-              const node = conductorSidebarTreeByID.get(String(session.id || ''))
-              if (!node?.workers?.length) return renderSidebarSession(session)
-              return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession}/>
-            })}</div>
-          </section>)}
+          {recentSessionGroups.flatMap(group => group.sessions).filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
+            const node = conductorSidebarTreeByID.get(String(session.id || ''))
+            if (!node?.workers?.length) return renderSidebarSession(session)
+            return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession}/>
+          })}
           {!filteredSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
           </div>
