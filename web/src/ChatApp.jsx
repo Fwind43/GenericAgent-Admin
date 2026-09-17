@@ -1,3 +1,4 @@
+import { conductorSidebarSections } from './lib/chatConductor.js'
 import { readSidebarPreferences, sortSidebarSessions } from './lib/chatSidebarPreferences.js'
 import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
 import './conductor.css'
@@ -67,7 +68,6 @@ import {
   conductorWorkers,
   conductorParentID,
   conductorPollActions,
-  conductorSessionTree,
   conductorStatusCounts,
   isConductorParent,
   isConductorWorker,
@@ -4767,6 +4767,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }
   const [historyExpanded, setHistoryExpanded] = useState(true)
   const [pinnedExpanded, setPinnedExpanded] = useState(true)
+  const [conductorsExpanded, setConductorsExpanded] = useState(true)
   const [projectsExpanded, setProjectsExpanded] = useState(true)
   const [projectSortMode, setProjectSortMode] = useState(false)
   const [sidebarSearch, setSidebarSearch] = useState('')
@@ -7351,15 +7352,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
       onChange={value=>updateSidebarPreference('sort', value)}/>
   </>
 
-  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions, pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
-  const filteredSessions = useMemo(() => {
-    if (!sidebarSearch.trim()) return sortedSidebarSessions
-    const q = sidebarSearch.trim().toLowerCase()
-    return sortedSidebarSessions.filter(s => (s.title || '').toLowerCase().includes(q))
-  }, [sortedSidebarSessions, sidebarSearch])
-  const conductorSidebarTrees = useMemo(() => conductorSessionTree(filteredSessions), [filteredSessions])
-  const conductorSidebarTreeByID = useMemo(() => new Map(conductorSidebarTrees.map(node => [String(node.session?.id || ''), node])), [conductorSidebarTrees])
-  const conductorNestedWorkerIDs = useMemo(() => new Set(conductorSidebarTrees.flatMap(node => node.workers.map(worker => String(worker?.id || '')))), [conductorSidebarTrees])
+  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions.filter(session => !isConductorParent(session) && !isConductorWorker(session)), pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
+  const sidebarSections = useMemo(() => conductorSidebarSections(sortedSidebarSessions, sidebarSearch), [sortedSidebarSessions, sidebarSearch])
   const recentGroupLabels = {
     pinned: ct('\u7f6e\u9876', 'Pinned'),
     today: ct('\u4eca\u5929', 'Today'),
@@ -7466,8 +7460,11 @@ export default function ChatApp({ onOpenSettings } = {}) {
 
   const pinnedProjectGroups = filteredProjectGroups.filter(group => group.pinned)
   const regularProjectGroups = filteredProjectGroups.filter(group => !group.pinned)
-  const pinnedSessions = filteredSessions.filter(session => session.pinned)
-  const recentSessions = filteredSessions.filter(session => !session.pinned)
+  const pinnedSessions = sidebarSections.pinned
+  const recentSessions = sidebarSections.recent
+  const renderSidebarTree = node => node.workers.length
+    ? <ConductorSessionTree key={node.session.id} session={node.session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
+    : renderSidebarSession(node.session)
   const renderSidebarProject = (group, index) => {
           const projectKey = group.key || group.name
           const expanded = expandedProjectNames.has(projectKey)
@@ -7518,13 +7515,13 @@ export default function ChatApp({ onOpenSettings } = {}) {
       </div>
       <div className="oa-sidebar-sections">
         <div className="oa-sidebar-scroll-tools">
-        <button
+        {sidebarSections.conductors.length === 0 && <button
           className="oa-icon-btn oa-new-conductor"
           onClick={newConductorSession}
           disabled={batchDeleting}
           title={ct('新建 Conductor', 'New Conductor')}
           aria-label={ct('新建 Conductor', 'New Conductor')}
-        ><span className="oa-conductor-new-mark" aria-hidden="true">C</span><span>Conductor</span></button>
+        ><span className="oa-conductor-new-mark" aria-hidden="true">C</span><span>Conductor</span></button>}
         <div className="oa-sidebar-search">
           <Search size={15}/>
           <input
@@ -7547,12 +7544,22 @@ export default function ChatApp({ onOpenSettings } = {}) {
             </div>
           </div>
           <div id="oa-sidebar-pinned-body" hidden={!pinnedExpanded}>
-            <div className="oa-session-list">{pinnedSessions.map(session => {
-              const node = conductorSidebarTreeByID.get(String(session.id || ''))
-              if (!node?.workers?.length) return renderSidebarSession(session)
-              return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
-            })}</div>
+            <div className="oa-session-list">{pinnedSessions.map(renderSidebarTree)}</div>
             <div className="oa-session-list oa-project-list">{pinnedProjectGroups.map(renderSidebarProject)}</div>
+          </div>
+        </section>}
+        {sidebarSections.conductors.length > 0 && <section className="oa-sidebar-section oa-sidebar-conductors">
+          <div className="oa-sidebar-section-head">
+            <button type="button" className="oa-sidebar-section-toggle" aria-expanded={conductorsExpanded} aria-controls="oa-sidebar-conductors-body" onClick={()=>setConductorsExpanded(value => !value)}>
+              <span aria-hidden="true">{conductorsExpanded ? '\u2304' : '\u203a'}</span>{ct('指挥家', 'Conductors')}
+            </button>
+            <div className="oa-sidebar-view-actions">
+              <ProjectActionsMenu label={ct('指挥家更多', 'More conductor options')}>{sidebarPreferenceMenu}</ProjectActionsMenu>
+              <button type="button" className="oa-session-manage-open" onClick={newConductorSession} disabled={batchDeleting} title={ct('新建指挥家', 'New Conductor')} aria-label={ct('新建指挥家', 'New Conductor')}><Plus size={16} aria-hidden="true"/></button>
+            </div>
+          </div>
+          <div id="oa-sidebar-conductors-body" hidden={!conductorsExpanded}>
+            <div className="oa-session-list">{sidebarSections.conductors.map(renderSidebarTree)}</div>
           </div>
         </section>}
         <section className="oa-sidebar-section" hidden={sidebarPreferences.layout === 'list'}>
@@ -7625,11 +7632,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
         <div className="oa-session-list">
-          {recentSessions.filter(session => !conductorNestedWorkerIDs.has(String(session.id || ''))).map(session => {
-            const node = conductorSidebarTreeByID.get(String(session.id || ''))
-            if (!node?.workers?.length) return renderSidebarSession(session)
-            return <ConductorSessionTree key={session.id} session={session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
-          })}
+          {recentSessions.map(renderSidebarTree)}
           {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
           </div>
