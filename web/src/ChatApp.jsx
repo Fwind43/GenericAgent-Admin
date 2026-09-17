@@ -1,5 +1,6 @@
 import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
 import './conductor.css'
+import './chatSidebar.css'
 import FileDownloadLink from './components/FileDownloadLink'
 import FilePreviewLink from './components/FilePreviewLink'
 import { fileDownloadTarget } from './lib/fileDownload.js'
@@ -7444,6 +7445,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   return <div ref={chatScope} className={`oa-chat ${collapsed ? 'is-collapsed' : ''}`}>
     <aside className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
+        <div className="oa-sidebar-brand">GenericAgent <span>Admin</span></div>
         <div className="oa-sidebar-search">
           <Search size={15}/>
           <input
@@ -7461,14 +7463,14 @@ export default function ChatApp({ onOpenSettings } = {}) {
           disabled={batchDeleting}
           title={ct('新对话', 'New chat')}
           aria-label={ct('新对话', 'New chat')}
-        ><MessageSquarePlus size={16}/></button>
+        ><MessageSquarePlus size={16}/><span>{ct('新对话', 'New chat')}</span></button>
         <button
           className="oa-icon-btn oa-new-conductor"
           onClick={newConductorSession}
           disabled={batchDeleting}
           title={ct('新建 Conductor', 'New Conductor')}
           aria-label={ct('新建 Conductor', 'New Conductor')}
-        ><span className="oa-conductor-new-mark" aria-hidden="true">C</span></button>
+        ><span className="oa-conductor-new-mark" aria-hidden="true">C</span><span>Conductor</span></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('收起侧栏', 'Collapse sidebar')} aria-label={ct('收起侧栏', 'Collapse sidebar')}><PanelLeftClose size={18} aria-hidden="true"/></button>
       </div>
       <div className="oa-session-manager-head">
