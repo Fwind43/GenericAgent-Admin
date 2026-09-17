@@ -75,11 +75,11 @@
 .oa-chat .oa-sidebar .oa-recent-group { margin-bottom: 8px; }
 .oa-chat .oa-sidebar .oa-recent-group-head { min-height: 22px; padding: 6px 10px 3px; font-size: 10px; font-weight: 400; color: var(--muted); opacity: .7; }
 .oa-chat .oa-sidebar .oa-recent-group-head small { display: none; }
-.oa-chat .oa-sidebar .oa-session-row .oa-session { min-height: 34px; padding-top: 7px; padding-bottom: 7px; padding-left: 10px; gap: 8px; }
+.oa-chat .oa-sidebar .oa-session-row .oa-session { min-height: 34px; padding-top: 7px; padding-bottom: 7px; padding-left: 10px; gap: 4px; }
 /* Keep relative ages in one stable trailing column, independent of title length. */
 .oa-chat .oa-sidebar .oa-session > small {
-  flex: 0 0 64px;
-  width: 64px;
+  flex: 0 0 56px;
+  width: 56px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
