@@ -64,5 +64,5 @@ test('projects can be pinned, and the pin is read back from the sessions payload
   assert.match(source, /onClick=\{\(\)=>toggleProjectPinned\(projectKey, !group\.pinned\)\}/)
   assert.match(source, /aria-pressed=\{group\.pinned\}/)
   assert.match(source, /setPinnedProjects\(previous => reconcileScalarList\(previous, d\.pinned_projects\)\)/)
-  assert.match(source, /groupProjectSessions\(projects, sortedSidebarSessions, pinnedProjects, projectOrder\)/)
+  assert.match(source, /groupProjectSessions\(projects, sortedSidebarSessions\.filter\(session => !isConductorParent\(session\) && !isConductorWorker\(session\)\), pinnedProjects, projectOrder\)/)
 })

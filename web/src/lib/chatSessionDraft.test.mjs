@@ -40,14 +40,14 @@ test('project new chat is always available outside the actions menu', () => {
   assert.doesNotMatch(main, /No chats yet\. Start one from the/)
 })
 
-test('pinned projects expose a persistent status outside the menu and collapsed body', () => {
+test('pinned projects expose a persistent group style outside the collapsed body', () => {
   const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
-  const header = functionBlock(main, '<div className="oa-project-head">', '<ProjectActionsMenu')
-  assert.match(header, /group\.pinned && <span className="oa-project-pinned-badge"/)
-  assert.match(header, /<Pin size=\{11\} aria-hidden="true"/)
-  assert.match(header, /'Pinned'/)
+  const group = functionBlock(main, '<section data-project-name={projectKey}', '<div className="oa-project-body"')
+  assert.ok(group.includes("${group.pinned ? 'is-pinned' : ''}"))
+  assert.match(group, /aria-pressed=\{group\.pinned\}/)
+  assert.match(group, /toggleProjectPinned\(projectKey, !group\.pinned\)/)
   const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
-  assert.match(css, /\.oa-sidebar \.oa-project-pinned-badge\s*\{[^}]*display:inline-flex;[^}]*flex:0 0 auto;/)
+  assert.match(css, /\.oa-project-group\.is-pinned\s*\{/)
 })
 
 test('new chat stays out of the session list until its first send', () => {
@@ -168,11 +168,10 @@ test('main chat wires reactive draft badges into persistence, sending, and delet
 test('project drag handles are opt-in from the new-project toolbar', () => {
   const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
   assert.match(main, /\[projectSortMode, setProjectSortMode\] = useState\(false\)/)
-  const toolbar = functionBlock(main, '<div className="oa-session-manager-head">', "{sidebarTab === 'history' ? <>")
+  const toolbar = functionBlock(main, '<div className="oa-sidebar-view-actions">', '{(showAllProjects || sidebarSearch')
   assert.match(toolbar, /aria-pressed=\{projectSortMode\}/)
   assert.match(toolbar, /setProjectSortMode\(current => !current\)/)
-  assert.match(toolbar, /onClick=\{openProjectDraft\}/)
-  assert.match(toolbar, /setProjectSortMode\(false\)/)
+  assert.match(toolbar, /setProjectsExpanded\(true\); openProjectDraft\(\)/)
   const header = functionBlock(main, '<div className="oa-project-head">', '<div className="oa-project-body"')
   assert.match(header, /\{projectSortMode && <ProjectDragHandle/)
   assert.match(header, /onReorder=\{saveProjectOrder\}/)
