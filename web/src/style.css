@@ -19038,12 +19038,13 @@ html[data-color-scheme="dark"] .oa-chat .oa-composer:focus-within {
 /* Desktop top-edge resize; the existing bottom-anchored composer stays in place. */
 .oa-composer { position:relative; }
 .oa-composer .oa-composer-resize {
-  position:absolute; top:-12px; right:12px; z-index:2;
-  width:30px; height:24px; padding:0; border:1px solid var(--border);
-  border-radius:7px; background:var(--surface-strong); color:var(--muted);
-  display:flex; align-items:center; justify-content:center;
+  position:absolute; top:-6px; left:8px; right:8px; z-index:2;
+  width:auto; height:10px; min-height:0; padding:0; border:0;
+  grid-column:1 / -1 !important; justify-self:stretch !important;
+  border-radius:0; background:transparent; box-shadow:none;
   cursor:ns-resize; touch-action:none; user-select:none;
 }
-.oa-composer .oa-composer-resize:hover,
-.oa-composer .oa-composer-resize:focus-visible { color:var(--text); outline:2px solid var(--muted); }
+.oa-composer .oa-composer-resize:focus-visible {
+  outline:2px solid var(--muted); outline-offset:1px;
+}
 @media (max-width:680px) { .oa-composer .oa-composer-resize { display:none; } }

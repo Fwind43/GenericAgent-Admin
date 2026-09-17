@@ -8144,7 +8144,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
               event.preventDefault()
               composerManualHeightRef.current = composerDragHeight(promptRef.current.getBoundingClientRect().height, 0, event.key === 'ArrowUp' ? -20 : 20, window.innerHeight)
               applyComposerHeight()
-            }}><span aria-hidden="true">↕</span></button>
+            }}/>
           <textarea ref={promptRef} value={prompt} onPaste={onPaste} onChange={handlePromptChange} onKeyDown={handlePromptKeyDown} placeholder={ct('向 GenericAgent 发送消息，可选择/粘贴/拖拽任意文件…', 'Message GenericAgent; select, paste, or drag any file…')} rows={1}/>
           <div className="oa-composer-bar">
             <ComposerActions
