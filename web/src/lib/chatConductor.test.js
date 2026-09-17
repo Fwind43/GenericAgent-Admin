@@ -48,3 +48,7 @@ assert.deepEqual(conductorSessionTree([workerA]), [
   { session:workerA, workers:[] },
 ])
 console.log('chatConductor tests passed')
+
+assert.equal(workerStatus({ status:'running', recovery:'pending_confirmation' }), 'recovery_pending')
+assert.equal(canStopConductorWorker({ status:'running', recovery:'pending_confirmation' }), false)
+assert.equal(shouldPollConductorSessions([{ ...workerA, conductor:{ ...workerA.conductor, recovery:'pending_confirmation' } }]), true)

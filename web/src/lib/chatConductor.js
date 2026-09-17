@@ -13,7 +13,7 @@ export const conductorChildren = session => Array.isArray(session?.conductor_chi
   ? session.conductor_children
   : []
 
-export const workerStatus = worker => String(worker?.conductor?.status || worker?.status || '').toLowerCase()
+export const workerStatus = worker => (worker?.conductor?.recovery || worker?.recovery) ? 'recovery_pending' : String(worker?.conductor?.status || worker?.status || '').toLowerCase()
 export const isActiveConductorWorker = worker => ACTIVE_WORKER_STATUSES.has(workerStatus(worker))
 export const isTerminalConductorWorker = worker => TERMINAL_WORKER_STATUSES.has(workerStatus(worker))
 export const canStopConductorWorker = worker => isActiveConductorWorker(worker)
@@ -32,7 +32,7 @@ export const conductorPollActions = (session, { streamAttached = false, runAttac
 
 export const shouldPollConductorSessions = sessions => (Array.isArray(sessions) ? sessions : []).some(session => (
   (isConductorParent(session) && conductorChildren(session).some(isActiveConductorWorker))
-  || (isConductorWorker(session) && isActiveConductorWorker(session))
+  || (isConductorWorker(session) && (isActiveConductorWorker(session) || Boolean(session?.conductor?.recovery)))
 ))
 
 export const conductorSessionTree = sessions => {

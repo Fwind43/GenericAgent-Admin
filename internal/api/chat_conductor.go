@@ -28,6 +28,7 @@ const (
 )
 
 type chatConductorState struct {
+    Recovery string `json:"recovery,omitempty"` // response-only; never persisted
     Defaults conductorDispatchOptions `json:"subtask_defaults,omitempty"`
     Role            string `json:"role"`
     ParentSessionID string `json:"parent_session_id,omitempty"`
@@ -41,6 +42,7 @@ type chatConductorState struct {
 }
 
 type chatConductorChild struct {
+    Recovery string `json:"recovery,omitempty"` // response-only; never persisted
     DispatchID string `json:"dispatch_id"`
     SessionID  string `json:"session_id"`
     Objective  string `json:"objective"`
@@ -386,6 +388,7 @@ func (s *Server) chatConductorChildren(w http.ResponseWriter, _ *http.Request, s
         bad(w, http.StatusNotFound, "Conductor parent not found")
         return
     }
+    cs = s.conductorRecoveryView(cs)
     children := append([]chatConductorChild(nil), cs.ConductorChildren...)
     if children == nil {
         children = []chatConductorChild{}
@@ -464,7 +467,7 @@ func conductorTaskOverview(children []chatConductorChild) []map[string]interface
         done := child.Status == conductorSucceeded && review == "verified"
         item := map[string]interface{}{
             "dispatch_id": child.DispatchID, "session_id": child.SessionID,
-            "status": child.Status, "review_status": review, "resolved": done,
+            "status": child.Status, "recovery": child.Recovery, "review_status": review, "resolved": done && child.Recovery == "",
             "reusable": conductorTerminal(latest[child.SessionID]),
             "previous_session_dispatch_id": predecessors[child.DispatchID],
             "objective": boundedConductorText(child.Objective, 512),
@@ -656,6 +659,10 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
         s.SessionMu.Unlock()
         return chatConductorChild{}, err
     }
+    if s.ChatRuntime != nil {
+        if s.ChatRuntime.conductorOwned == nil { s.ChatRuntime.conductorOwned = make(map[string]bool) }
+        s.ChatRuntime.conductorOwned[conductorOwnershipKey(parentID, child.SessionID, child.DispatchID)] = true
+    }
     s.SessionMu.Unlock()
 
     s.publishChatRun(parentID, map[string]interface{}{"type": "conductor_child", "child": child})
@@ -676,6 +683,18 @@ func (s *Server) scheduleConductorChildren(parentID string) {
     if s.chatRunCanceled(parentID) {
         s.SessionMu.Unlock()
         return
+    }
+    // Unknown dispatches may belong to another live process. Neither replay
+    // their queues nor assume their concurrency slots are free.
+    for _, child := range parent.ConductorChildren {
+        if conductorTerminal(child.Status) { continue }
+        worker, workerErr := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
+        if !s.ownsConductorDispatch(parentID, child.SessionID, child.DispatchID) || workerErr != nil ||
+            worker.Conductor == nil || worker.Conductor.Role != conductorRoleWorker ||
+            worker.Conductor.ParentSessionID != parentID || worker.Conductor.DispatchID != child.DispatchID || worker.Conductor.Status != child.Status {
+            s.SessionMu.Unlock()
+            return
+        }
     }
     active := 0
     for _, child := range parent.ConductorChildren {

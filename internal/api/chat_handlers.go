@@ -38,7 +38,7 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 			"updated_at": summary.UpdatedAt, "count": summary.Count, "running": running, "taskbar_state": taskbarState,
 			"workspace": summary.Workspace, "project_mode": summary.ProjectMode, "project_provider": summary.ProjectProvider, "project_id": summary.ProjectID,
 			"hub_enabled": summary.HubEnabled, "pinned": summary.Pinned, "loop": summary.Loop, "autorun": summary.Autorun,
-			"result": summary.Result, "conductor": summary.Conductor,
+			"result": summary.Result, "conductor": s.conductorRecoveryView(chatSession{ID: summary.ID, Conductor: summary.Conductor}).Conductor,
 			"unread": summary.Result != nil && !chatResultRead(readState[summary.ID], *summary.Result),
 		})
 	}
@@ -478,6 +478,7 @@ func (s *Server) chatGetSession(w http.ResponseWriter, r *http.Request, sid stri
 		bad(w, 500, err.Error())
 		return
 	}
+	cs = s.conductorRecoveryView(cs)
 	view, status, err := chatSessionView(cs, r)
 	if err != nil {
 		bad(w, status, err.Error())
@@ -1009,7 +1010,8 @@ func (s *Server) chatState(w http.ResponseWriter, r *http.Request, sid string) {
 		backend["diagnosis"] = payload
 	}
 	running, pendingAssistantID, runStartedAtMS := s.chatRunState(sid)
-	writeJSON(w, map[string]interface{}{"settings": cs.Settings, "extra_sys_prompts": cs.ExtraSysPrompts, "extra_sys_prompt_preset_id": cs.ExtraSysPromptPresetID, "llm_no": cs.Settings.LLMNo, "llms": llms, "backend": backend, "running": running, "pending_assistant_id": pendingAssistantID, "run_started_at_ms": runStartedAtMS, "workspace": cs.Workspace, "project_mode": cs.ProjectMode, "project_provider": cs.ProjectProvider, "project_id": cs.ProjectID, "loop": cs.Loop, "autorun": cs.Autorun})
+	cs = s.conductorRecoveryView(cs)
+	writeJSON(w, map[string]interface{}{"conductor": cs.Conductor, "conductor_children": cs.ConductorChildren, "settings": cs.Settings, "extra_sys_prompts": cs.ExtraSysPrompts, "extra_sys_prompt_preset_id": cs.ExtraSysPromptPresetID, "llm_no": cs.Settings.LLMNo, "llms": llms, "backend": backend, "running": running, "pending_assistant_id": pendingAssistantID, "run_started_at_ms": runStartedAtMS, "workspace": cs.Workspace, "project_mode": cs.ProjectMode, "project_provider": cs.ProjectProvider, "project_id": cs.ProjectID, "loop": cs.Loop, "autorun": cs.Autorun})
 }
 
 func (s *Server) maybeHandleWorkspaceCommand(w http.ResponseWriter, r *http.Request, sid string, cs *chatSession, prompt string) bool {

@@ -318,11 +318,12 @@ const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, 
           const active = canStopConductorWorker(worker) || status === 'cancelling'
           const objective = String(worker?.objective || '')
           const taskName = worker?.task_name || worker?.title || objective.split('\n')[0] || ct('未命名任务', 'Untitled task')
-          const statusLabel = ct(({ queued: '排队中', running: '执行中', cancelling: '停止中', succeeded: '执行结束', failed: '失败', cancelled: '已取消' })[status] || '未知', status === 'succeeded' ? 'Execution finished' : status || 'unknown')
+          const statusLabel = ct(({ recovery_pending: '恢复待确认', queued: '排队中', running: '执行中', cancelling: '停止中', succeeded: '执行结束', failed: '失败', cancelled: '已取消' })[status] || '未知', status === 'recovery_pending' ? 'Recovery pending confirmation' : status === 'succeeded' ? 'Execution finished' : status || 'unknown')
           return <article className="oa-conductor-agent" key={id}>
             <div className="oa-conductor-agent-head"><button type="button" onClick={()=>onOpen(id)} title={id}>Subagent {index + 1}<ExternalLink size={13}/></button><span><i className={`oa-conductor-status-dot is-${status}`} aria-hidden="true"/>{statusLabel}</span></div>
             <small>{active ? ct('当前任务', 'Current task') : ct('最近任务', 'Latest task')}</small>
             <h3 title={taskName}>{taskName}</h3>
+            {status === 'recovery_pending' && <p role="status">{ct('本实例无法确认任务归属或运行状态；保留原记录，不自动重跑，也不释放可能仍占用的槽位。', 'This instance cannot confirm ownership or runtime. Records and possible occupied slots are preserved; no automatic replay.')}</p>}
             {status === 'succeeded' && <p>{worker.review?.status === 'verified' ? ct('已核验（父代理审查）', 'Verified (parent review)') : worker.review?.status === 'needs_work' ? ct('需补充', 'Needs work') : ct('待核验', 'Pending review')}</p>}
             {worker.evidence?.length > 0 && <details><summary>{ct('工具记录', 'Tool records')} ({worker.evidence.length})</summary>{worker.evidence.map(item => <p key={item.id}><code>{item.id} · {item.tool}</code><br/>{item.result}</p>)}</details>}
             {worker.review?.unverified && <p>{worker.review.unverified}</p>}
@@ -7693,6 +7694,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
       <div className={`oa-workspace ${loopRailOpen ? 'has-loop' : ''} ${btwRailOpen && btwMessages.length > 0 ? 'has-btw' : ''} ${btwMessages.length > 0 && !btwRailOpen ? 'has-launchers' : ''}`}>
         <section className="oa-thread" ref={threadRef} aria-busy={sessionLoading} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) pauseFollow() }} onTouchMove={()=>{ if (!isNearBottom(threadRef.current)) pauseFollow() }}>
           {isConductorWorker(activeSessionDetail) && conductorParentID(activeSessionDetail) && <button type="button" className="oa-conductor-back" onClick={()=>openSession(conductorParentID(activeSessionDetail))}>← {ct('返回 Conductor', 'Back to Conductor')}</button>}
+          {activeSessionDetail?.conductor?.recovery && <div className="oa-banner" role="status">{ct('恢复待确认：本实例无法确认该任务是否仍在运行，保留原记录且不自动重跑。', 'Recovery pending confirmation: this instance cannot confirm whether the task is still running. Records are preserved without automatic replay.')}</div>}
           {sessionLoading && messages.length === 0 && <div className="oa-session-load" role="status" aria-live="polite">
             <RotateCw size={20} className="oa-session-load-spinner" aria-hidden="true"/>
             <span>{ct('对话加载中…', 'Loading conversation…')}</span>

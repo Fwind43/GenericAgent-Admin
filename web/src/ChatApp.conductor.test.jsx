@@ -356,3 +356,31 @@ test.each(['light', 'dark', 'warm'])('review conflict is actionable without cons
  expect(posts).toEqual(['/api/chat/conductor/review-parent/disable'])
  delete document.documentElement.dataset.theme
 })
+
+// Recovery is a response projection, not evidence of failure or completion.
+test.each(['light', 'dark', 'warm'])('recovery pending remains explicit (%s)', async theme => {
+  document.documentElement.dataset.theme = theme
+  localStorage.setItem('ga-admin-lang', 'en')
+  localStorage.setItem('ga-chat-last-session', 'recovery-parent')
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+  vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} })
+  Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
+  const child = { session_id: 'recovery-child', dispatch_id: 'r1', title: 'Unconfirmed worker', status: 'running', recovery: 'pending_confirmation' }
+  const parent = session('recovery-parent', 'Recovery parent', { conductor: { role: 'parent' }, conductor_children: [child] })
+  vi.stubGlobal('fetch', vi.fn(async input => {
+    const path = new URL(String(input), 'http://localhost').pathname
+    let data = {}
+    if (path === '/api/chat/sessions') data = { sessions: [parent, session('recovery-child', 'Unconfirmed worker', { conductor: { role: 'worker', parent_session_id: parent.id, dispatch_id: 'r1', status: 'running', recovery: 'pending_confirmation' } })] }
+    else if (path === '/api/chat/session/recovery-parent') data = { ...parent, messages: [], queue: [] }
+    else if (path === '/api/chat/conductor/recovery-parent/children') data = { children: [child] }
+    return new Response(JSON.stringify({ ok: true, ...data, data }), { headers: { 'Content-Type': 'application/json' } })
+  }))
+  render(<ChatApp />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Subagents' }))
+  const workspace = within(await screen.findByRole('complementary', { name: 'Subagents' }))
+  expect(await workspace.findByText('Recovery pending confirmation')).toBeTruthy()
+  expect(workspace.getByText(/no automatic replay/)).toBeTruthy()
+  expect(workspace.queryByText('Execution finished')).toBeNull()
+  delete document.documentElement.dataset.theme
+})

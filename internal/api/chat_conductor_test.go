@@ -279,7 +279,8 @@ func TestConductorScheduleRejectsParentAsWorker(t *testing.T) {
  if worker.Conductor.Status != conductorQueued || worker.Conductor.StartedAt != 0 || worker.Conductor.FinishedAt != 0 { t.Fatalf("invalid worker mutated: %+v", worker.Conductor) }
  parent, err := loadChatSession(s.CfgStore.Snapshot(), "parent")
  if err != nil { t.Fatal(err) }
- if parent.ConductorChildren[0].Status != conductorFailed { t.Fatal("invalid worker was not rejected") }
+ if parent.ConductorChildren[0].Status != conductorQueued { t.Fatal("unowned invalid relationship was rewritten") }
+ if s.conductorRecoveryView(parent).ConductorChildren[0].Recovery != "pending_confirmation" { t.Fatal("invalid relationship not flagged") }
  if s.chatRunActive("wrong-role") { t.Fatal("invalid worker launched") }
 }
 

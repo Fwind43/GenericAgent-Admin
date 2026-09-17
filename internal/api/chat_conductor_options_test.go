@@ -116,6 +116,11 @@ func TestConductorDispatchReuseProjectIsolation(t *testing.T) {
 			worker.ID = "worker"
 			worker.Conductor = &chatConductorState{Role: conductorRoleWorker, ParentSessionID: "parent", DispatchID: "old", Status: conductorSucceeded}
 			parent.ConductorChildren = []chatConductorChild{{DispatchID: "old", SessionID: "worker", Status: conductorSucceeded}}
+			// This tests project reuse, not worker execution. Occupy all slots so
+			// dispatch cannot launch an asynchronous worker into t.TempDir().
+			for i := 0; i < conductorMaxRunning; i++ {
+				parent.ConductorChildren = append(parent.ConductorChildren, chatConductorChild{DispatchID: fmt.Sprint("busy-", i), Status: conductorRunning})
+			}
 			switch scenario {
 			case "project":
 				worker.ProjectID, worker.ProjectMode = "other", "other"
