@@ -1,6 +1,8 @@
 /* Quiet, vertical navigation; scoped away from the admin sidebar. */
 .oa-chat .oa-sidebar .oa-side-head {
-  display: flex; flex-wrap: wrap; gap: 6px; padding: 16px 12px 12px;
+  display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  height: auto; min-height: 0; flex: 0 0 auto;
+  gap: 6px; padding: 16px 12px 12px;
   border-bottom: 0; position: relative;
 }
 .oa-chat .oa-sidebar .oa-sidebar-brand {
@@ -11,7 +13,7 @@
 .oa-chat .oa-sidebar .oa-side-head > .oa-icon-btn:last-child {
   position: absolute; right: 12px; top: 12px;
 }
-.oa-chat .oa-sidebar .oa-sidebar-search { order: 4; flex: 1 0 100%; margin-top: 8px; border-color: transparent; background: transparent; box-shadow: none; }
+.oa-chat .oa-sidebar .oa-sidebar-search { order: 4; flex: 0 0 32px; width: 100%; min-height: 32px; margin-top: 8px; border-color: transparent; background: transparent; box-shadow: none; }
 .oa-chat .oa-sidebar .oa-side-head > .oa-new-chat,
 .oa-chat .oa-sidebar .oa-side-head > .oa-new-conductor {
   display: flex; align-items: center; justify-content: flex-start; gap: 10px;
@@ -20,13 +22,16 @@
 }
 .oa-chat .oa-sidebar .oa-side-head > .oa-new-chat:hover,
 .oa-chat .oa-sidebar .oa-side-head > .oa-new-conductor:hover { background: var(--oa-side-hover); }
-.oa-chat .oa-sidebar .oa-session-manager-head { padding: 4px 12px 8px; border: 0; }
+.oa-chat .oa-sidebar .oa-session-manager-head { height: auto; flex: 0 0 auto; flex-direction: column; align-items: stretch; gap: 0; padding: 4px 12px 8px; border: 0; }
 .oa-chat .oa-sidebar .oa-sidebar-view-tabs { display: flex; flex-direction: column-reverse; gap: 4px; background: transparent; border: 0; padding: 0; box-shadow: none; }
 .oa-chat .oa-sidebar .oa-sidebar-view-tabs button { text-align: left; justify-content: flex-start; min-height: 34px; padding: 7px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); box-shadow: none; }
 .oa-chat .oa-sidebar .oa-sidebar-view-tabs button.is-active { background: var(--oa-side-hover); color: var(--text); font-weight: 550; }
-.oa-chat .oa-sidebar .oa-sidebar-view-actions { margin-top: 6px; }
+.oa-chat .oa-sidebar .oa-sidebar-view-actions { margin-top: 6px; justify-content: flex-end; }
 .oa-chat .oa-sidebar .oa-session { border-color: transparent; box-shadow: none; border-radius: 6px; }
 .oa-chat .oa-sidebar .oa-sidebar-foot { margin-top: auto; border-top: 0; padding: 12px; background: transparent; }
 .oa-chat .oa-sidebar .oa-sidebar-foot button { justify-content: flex-start; border-color: transparent; box-shadow: none; }
 .oa-chat .oa-sidebar button:disabled { opacity: .45; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { .oa-chat .oa-sidebar * { transition: none; } }
+
+/* Vertical navigation does not use the old horizontal tab underline. */
+.oa-chat .oa-sidebar .oa-sidebar-view-tabs button::after { display: none; }
