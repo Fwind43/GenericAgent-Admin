@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -28,9 +29,39 @@ func TestConductorDefaultsLifecycle(t *testing.T) {
 	saveChatLoopTestSession(t, s, chatSession{ID: "other", Conductor: &chatConductorState{Role: conductorRoleParent}})
 	token := s.beginChatRun("parent")
 	defer s.endChatRunOwned("parent", token)
+	sequence := 0
+	brokerCall := func(kind string, args map[string]interface{}) map[string]interface{} {
+		t.Helper()
+		sequence++
+		id := fmt.Sprintf("settings-%d", sequence)
+		broker := chatConductorBrokerDirForSession(chatSessionDir(cfg), "parent")
+		s.handleConductorSettingsEvent("parent", map[string]interface{}{"type": kind, "request_id": id, "broker_dir": broker, "args": args})
+		data, err := os.ReadFile(filepath.Join(broker, id+".response.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var reply map[string]interface{}
+		if err := json.Unmarshal(data, &reply); err != nil {
+			t.Fatal(err)
+		}
+		if reply["request_id"] != id {
+			t.Fatal("uncorrelated receipt", reply)
+		}
+		return reply
+	}
+	defaults := func(args map[string]interface{}) (conductorDispatchOptions, error) {
+		reply := brokerCall("conductor_defaults", args)
+		var value conductorDispatchOptions
+		if reply["ok"] != true {
+			return value, fmt.Errorf("%v", reply["error"])
+		}
+		data, _ := json.Marshal(reply["defaults"])
+		err := json.Unmarshal(data, &value)
+		return value, err
+	}
 	call := func(args map[string]interface{}) conductorDispatchOptions {
 		t.Helper()
-		v, e := s.conductorDefaults("parent", args)
+		v, e := defaults(args)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -45,7 +76,11 @@ func TestConductorDefaultsLifecycle(t *testing.T) {
 	if e != nil || other.LLMNo != nil {
 		t.Fatal("isolation")
 	}
-	rows, e := s.conductorModels()
+	reply := brokerCall("conductor_models", map[string]interface{}{})
+	rows, ok := reply["models"].([]interface{})
+	if reply["ok"] != true || !ok {
+		t.Fatal(reply)
+	}
 	blob, _ := json.Marshal(rows)
 	if e != nil || strings.Contains(string(blob), "SECRET") || strings.Contains(string(blob), "private") || len(rows) != 1 {
 		t.Fatalf("projection %s %v", blob, e)
@@ -54,7 +89,7 @@ func TestConductorDefaultsLifecycle(t *testing.T) {
 	for _, raw := range []string{`{"action":"set","llm_no":99}`, `{"action":"set","llm_no":true}`, `{"action":"set","llm_no":1.5}`, `{"action":"set","llm_no":-1}`, `{"action":"set","reasoning_effort":"bogus"}`, `{"action":"set","reasoning_effort":""}`, `{"action":"get","llm_no":null}`, `{"action":"bogus"}`} {
 		var a map[string]interface{}
 		json.Unmarshal([]byte(raw), &a)
-		if _, e = s.conductorDefaults("parent", a); e == nil {
+		if _, e = defaults(a); e == nil {
 			t.Fatal(raw)
 		}
 	}
