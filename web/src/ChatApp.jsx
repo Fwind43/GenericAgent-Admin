@@ -254,7 +254,7 @@ export const SessionAutorunBadge = memo(function SessionAutorunBadge({ enabled =
 })
 
 function ConductorSessionTree({ session, workers, renderSession, activeSessionId }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const activeWorkerId = workers.find(worker => worker.id === activeSessionId)?.id
   useEffect(() => {
     if (activeWorkerId) setExpanded(true)
@@ -4767,7 +4767,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }
   const [historyExpanded, setHistoryExpanded] = useState(true)
   const [pinnedExpanded, setPinnedExpanded] = useState(true)
-  const [conductorsExpanded, setConductorsExpanded] = useState(true)
+  const [conductorsExpanded, setConductorsExpanded] = useState(false)
   const [projectsExpanded, setProjectsExpanded] = useState(true)
   const [projectSortMode, setProjectSortMode] = useState(false)
   const [sidebarSearch, setSidebarSearch] = useState('')
