@@ -7341,6 +7341,13 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }, { scope: chatScope, dependencies: [messages.length] })
 
   const sortedSidebarSessions = useMemo(() => sortSidebarSessions(sessions, sidebarPreferences.sort), [sessions, sidebarPreferences.sort])
+  const sidebarPreferenceMenu = <>
+            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('整理侧边栏', 'Organize sidebar')}</div>
+            {[['projects', '按项目', 'By project'], ['list', '按列表', 'As list']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.layout === value} onClick={()=>updateSidebarPreference('layout', value)}><Check size={14} style={{ visibility:sidebarPreferences.layout === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
+            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('聊天排序方式', 'Chat sort order')}</div>
+            {[['priority', '优先级', 'Priority'], ['updated', '最近更新', 'Recently updated']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.sort === value} onClick={()=>updateSidebarPreference('sort', value)}><Check size={14} style={{ visibility:sidebarPreferences.sort === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
+  </>
+
   const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions, pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
   const filteredSessions = useMemo(() => {
     if (!sidebarSearch.trim()) return sortedSidebarSessions
@@ -7487,15 +7494,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
           />
           {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
         </div>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'4px 12px' }}>
-          <span>{ct('整理侧边栏', 'Organize sidebar')}</span>
-          <ProjectActionsMenu label={ct('整理侧边栏', 'Organize sidebar')}>
-            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('整理侧边栏', 'Organize sidebar')}</div>
-            {[['projects', '按项目', 'By project'], ['list', '按列表', 'As list']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.layout === value} onClick={()=>updateSidebarPreference('layout', value)}><Check size={14} style={{ visibility:sidebarPreferences.layout === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
-            <div style={{ padding:'6px 10px', opacity:0.6 }}>{ct('聊天排序方式', 'Chat sort order')}</div>
-            {[['priority', '优先级', 'Priority'], ['updated', '最近更新', 'Recently updated']].map(([value, zh, en]) => <button key={value} type="button" aria-pressed={sidebarPreferences.sort === value} onClick={()=>updateSidebarPreference('sort', value)}><Check size={14} style={{ visibility:sidebarPreferences.sort === value ? 'visible' : 'hidden' }}/>{ct(zh, en)}</button>)}
-          </ProjectActionsMenu>
-        </div>
         </div>
         <section className="oa-sidebar-section" hidden={sidebarPreferences.layout === 'list'}>
           <div className="oa-sidebar-section-head">
@@ -7503,11 +7501,14 @@ export default function ChatApp({ onOpenSettings } = {}) {
             <span aria-hidden="true">{projectsExpanded ? '\u2304' : '\u203a'}</span>{ct('项目', 'Projects')}
           </button>
           <div className="oa-sidebar-view-actions">
+            <ProjectActionsMenu label={ct('项目更多', 'More project options')}>
+              {sidebarPreferenceMenu}
             <button className="oa-session-manage-open" type="button" aria-pressed={projectSortMode} aria-label={ct('项目排序', 'Sort projects')}
               onClick={()=>setProjectSortMode(current => !current)} disabled={batchDeleting || projectOrderSaving || (!projectSortMode && projectSessionGroups.length < 2)}
               title={ct('开启后长按项目手柄拖动，顺序自动保存', 'Enable, then hold a project handle to drag. Order saves automatically.')}>
-              {projectSortMode ? ct('完成', 'Done') : <MoreHorizontal size={16}/>}
+              {projectSortMode ? ct('完成项目排序', 'Finish sorting projects') : ct('项目排序', 'Sort projects')}
             </button>
+            </ProjectActionsMenu>
             <button className="oa-session-manage-open" type="button" onClick={()=>{ setProjectsExpanded(true); openProjectDraft() }} disabled={projectCreating || projectDraftOpen} title={ct("\u65b0\u5efa\u9879\u76ee", "New project")} aria-label={ct("\u65b0\u5efa\u9879\u76ee", "New project")}>
               <Plus size={16}/>
             </button>
@@ -7589,7 +7590,10 @@ export default function ChatApp({ onOpenSettings } = {}) {
               title={ct('一键已读', 'Mark all as read')}
               aria-label={ct('一键已读', 'Mark all as read')}
             ><CheckCheck size={16}/></button>
-            <button className="oa-session-manage-open" type="button" onClick={openSessionManager} disabled={!sessions.length} title={ct('管理', 'Manage')} aria-label={ct('管理', 'Manage')}><MoreHorizontal size={16}/></button>
+            <ProjectActionsMenu label={ct('最近对话更多', 'More recent chat options')}>
+              {sidebarPreferenceMenu}
+              <button type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理会话', 'Manage sessions')}</button>
+            </ProjectActionsMenu>
           </div>
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
