@@ -115,8 +115,8 @@
 .oa-chat .oa-sidebar .oa-project-group.is-expanded,
 .oa-chat .oa-sidebar .oa-project-group.is-pinned { margin: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .oa-chat .oa-sidebar .oa-project-head { position: relative; min-height: 32px; padding: 0; gap: 0; border-radius: 6px; }
-.oa-chat .oa-sidebar .oa-project-head:hover,
-.oa-chat .oa-sidebar .oa-project-head:focus-within { background: var(--oa-side-hover); }
+.oa-chat .oa-sidebar .oa-project-head:not(:hover) { background: transparent; }
+.oa-chat .oa-sidebar .oa-project-head:hover { background: var(--oa-side-hover); }
 .oa-chat .oa-sidebar .oa-project-toggle { min-height: 32px; padding: 0 10px; gap: 11px; color: var(--text); border-radius: 6px; }
 .oa-chat .oa-sidebar .oa-project-toggle:hover { background: transparent; }
 .oa-chat .oa-sidebar .oa-project-toggle b { font-size: 13px; font-weight: 400; line-height: 20px; letter-spacing: 0; }
