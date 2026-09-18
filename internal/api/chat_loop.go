@@ -629,8 +629,6 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 	var terminalLoop *chatLoopState
 	conductorReq := map[string]interface{}{}
 	owned, saveErr := s.saveChatRunPending(sid, token, pendingMsg.ID, runStartedAtMS, func() error {
-		s.SessionMu.Lock()
-		defer s.SessionMu.Unlock()
 		latest, err := loadChatSession(s.CfgStore.Snapshot(), sid)
 		if err != nil {
 			return err
@@ -880,9 +878,8 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 	queuedItem := cs.QueuedMessages[queueIndex]
 	s.SessionMu.Unlock()
 
-	// Publish the queue identity before removing it from persisted state. Do not
-	// take ChatMu while holding SessionMu: saveChatRunPending uses the opposite
-	// lock order while atomically publishing the pending assistant identity.
+	// Publish the queue identity before removing it from persisted state.
+	// Revalidate the run because cancellation may have occurred since unlock.
 	s.ChatMu.Lock()
 	if current := s.ChatRuns[sid]; current != token || current.Done || current.Canceled {
 		s.ChatMu.Unlock()
@@ -987,8 +984,6 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 	// without them a guided queue run only appears after the final session reload.
 	s.SessionMu.Unlock()
 	owned, saveErr := s.saveChatRunPending(sid, token, pendingID, runStartedAtMS, func() error {
-		s.SessionMu.Lock()
-		defer s.SessionMu.Unlock()
 		return saveChatSessionLocked(s.CfgStore.Snapshot(), cs)
 	})
 	if !owned || saveErr != nil {

@@ -1145,7 +1145,11 @@ func (s *Server) beginChatRun(sid string) *chatRun {
 	return token
 }
 
+// saveChatRunPending holds SessionMu before ChatMu, matching conductor operations.
+// The save callback must use session-locked helpers and must not acquire either lock.
 func (s *Server) saveChatRunPending(sid string, token *chatRun, pendingID string, startedAtMS int64, save func() error) (bool, error) {
+	s.SessionMu.Lock()
+	defer s.SessionMu.Unlock()
 	sid = safeChatID(sid)
 	s.ChatMu.Lock()
 	defer s.ChatMu.Unlock()
@@ -2177,6 +2181,10 @@ func replacePendingChatMessage(messages []chatMessage, pendingID string, final c
 func (s *Server) saveChatSessionMerged(cs chatSession) error {
 	s.SessionMu.Lock()
 	defer s.SessionMu.Unlock()
+	return s.saveChatSessionMergedLocked(cs)
+}
+
+func (s *Server) saveChatSessionMergedLocked(cs chatSession) error {
 	latest, err := loadChatSession(s.CfgStore.Snapshot(), cs.ID)
 	if err != nil {
 		return err
@@ -2187,13 +2195,17 @@ func (s *Server) saveChatSessionMerged(cs chatSession) error {
 }
 
 func (s *Server) saveChatSessionExact(cs chatSession) error {
+	s.SessionMu.Lock()
+	defer s.SessionMu.Unlock()
+	return s.saveChatSessionExactLocked(cs)
+}
+
+func (s *Server) saveChatSessionExactLocked(cs chatSession) error {
 	if s.chatExactSaveHook != nil {
 		if err := s.chatExactSaveHook(cs); err != nil {
 			return err
 		}
 	}
-	s.SessionMu.Lock()
-	defer s.SessionMu.Unlock()
 	if latest, err := loadChatSession(s.CfgStore.Snapshot(), cs.ID); err == nil {
 		preserveLatestChatUserMetadata(&cs, latest)
 	}

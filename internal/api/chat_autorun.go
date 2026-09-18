@@ -214,8 +214,6 @@ func (s *Server) dispatchChatAutorun(sid string, now int64) bool {
 	// without them a guided queue run only appears after the final session reload.
 	s.SessionMu.Unlock()
 	owned, saveErr := s.saveChatRunPending(sid, token, pendingID, runStartedAtMS, func() error {
-		s.SessionMu.Lock()
-		defer s.SessionMu.Unlock()
 		latest, err := loadChatSession(s.CfgStore.Snapshot(), sid)
 		if err != nil {
 			return err

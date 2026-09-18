@@ -1308,9 +1308,9 @@ func (s *Server) chatPostWithSender(w http.ResponseWriter, r *http.Request, sid 
 	updateChatTitle(&cs)
 	owned, saveErr := s.saveChatRunPending(sid, token, pendingMsg.ID, runStartedAtMS, func() error {
 		if strings.TrimSpace(req.SourceUserMessageID) != "" {
-			return s.saveChatSessionExact(cs)
+			return s.saveChatSessionExactLocked(cs)
 		}
-		return s.saveChatSessionMerged(cs)
+		return s.saveChatSessionMergedLocked(cs)
 	})
 	if !owned {
 		s.endChatRunOwned(sid, token)
