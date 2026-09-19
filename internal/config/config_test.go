@@ -478,3 +478,50 @@ func TestStorePersistsUITheme(t *testing.T) {
 		t.Fatalf("reloaded UITheme=%q want dark", got)
 	}
 }
+
+func TestValidUIThemeAcceptsGreen(t *testing.T) {
+	if !ValidUITheme("green") {
+		t.Fatal("ValidUITheme(\"green\")=false")
+	}
+	cfg := Default()
+	cfg.UITheme = "green"
+	if err := Validate(cfg); err != nil {
+		t.Fatalf("Validate(green)=%v", err)
+	}
+}
+
+func TestNormalizeUICustomColorsKeepsOnlyWhitelistedSafeValues(t *testing.T) {
+	got := NormalizeUICustomColors(map[string]string{
+		"--bg":           "#F4FAF3",
+		"accent":         "rgba(47, 125, 79, .5)",
+		"oa-bg":          "red; } html{display:none} /*",
+		"accent-hover":   "url(evil)",
+		"no-such-token":  "#000000",
+		"surface":        "expression(alert(1))",
+		"text-on-accent": "not-a-color",
+		"accent-text":    "#fff",
+	})
+	want := map[string]string{"bg": "#F4FAF3", "accent": "rgba(47, 125, 79, .5)", "accent-text": "#fff"}
+	if len(got) != len(want) {
+		t.Fatalf("NormalizeUICustomColors=%v want %v", got, want)
+	}
+	for token, value := range want {
+		if got[token] != value {
+			t.Fatalf("token %s=%q want %q (got %v)", token, got[token], value, got)
+		}
+	}
+	if NormalizeUICustomColors(nil) != nil || NormalizeUICustomColors(map[string]string{}) != nil {
+		t.Fatal("empty input must normalize to nil")
+	}
+	// A stored palette is normalized (and thus sanitized) when the config loads.
+	cfg := Default()
+	cfg.UICustomColors = map[string]string{"bg": "javascript:alert(1)", "accent": "#2F7D4F"}
+	store := NewStore(t.TempDir())
+	if err := store.Save(cfg); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+	reloaded := NewStore(t.TempDir())
+	if snap := reloaded.Snapshot().UICustomColors; len(snap) != 0 && snap["bg"] == "javascript:alert(1)" {
+		t.Fatalf("unsafe value survived reload: %v", snap)
+	}
+}

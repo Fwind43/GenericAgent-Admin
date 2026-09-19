@@ -307,6 +307,43 @@ test('theme IDs only select token scopes while color schemes own shared compatib
   assert.ok((css.match(/\[data-color-scheme="dark"\]/g) || []).length > 1)
 })
 
+test('green palette exists and covers every token the other light themes define', () => {
+  const collectTokens = selector => {
+    const tokens = new Map()
+    for (const body of ruleBodies(selector)) {
+      for (const declaration of body.replace(/\/\*[\s\S]*?\*\//g, '').split(';')) {
+        const trimmed = declaration.trim()
+        if (!trimmed.startsWith('--')) continue
+        const [name, value] = trimmed.split(':')
+        if (value?.trim()) tokens.set(name.trim(), trimmed)
+      }
+    }
+    return tokens
+  }
+
+  const green = collectTokens('html[data-theme="green"]')
+  assert.ok(green.size >= 40, `green palette looks incomplete: ${green.size} tokens`)
+  assert.ok((css.match(/\[data-theme="green"\]/g) || []).length >= 1, 'missing green theme scope')
+
+  for (const selector of ['html[data-theme="light"]', 'html[data-theme="warm"]']) {
+    for (const [name] of collectTokens(selector)) {
+      assert.ok(green.has(name), `green is missing ${name} from ${selector}`)
+    }
+  }
+
+  const greenChat = collectTokens('html[data-theme="green"] .oa-chat')
+  for (const name of collectTokens('html[data-theme="light"] .oa-chat').keys()) {
+    assert.ok(greenChat.has(name), `green chat scope is missing ${name}`)
+  }
+
+  // A palette scope must only carry tokens, never structural declarations.
+  for (const body of ruleBodies('html[data-theme="green"]')) {
+    for (const declaration of body.split(';').map(value => value.trim()).filter(Boolean)) {
+      assert.ok(declaration.startsWith('--'), `green scope contains: ${declaration}`)
+    }
+  }
+})
+
 test('chat layout is shared instead of being coupled to the light palette', () => {
   const lightChatRule = ruleBodies('html[data-theme="light"] .oa-chat').join('\n')
   assert.doesNotMatch(lightChatRule, /(?:height|display|grid-template-columns|overflow|transition)\s*:/i)

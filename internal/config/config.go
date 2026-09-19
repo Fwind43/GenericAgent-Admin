@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -22,11 +23,63 @@ const DefaultUITheme = "warm"
 
 func ValidUITheme(theme string) bool {
 	switch strings.TrimSpace(theme) {
-	case "light", "warm", "dark":
+	case "light", "warm", "dark", "green":
 		return true
 	default:
 		return false
 	}
+}
+
+// UIColorTokenScopes lists the appearance tokens a user may override, mapping
+// the token name to the block that consumes it ("chat" tokens live on .oa-chat).
+// Keep in sync with web/src/themes.js CUSTOM_COLOR_TOKENS.
+var UIColorTokenScopes = map[string]string{
+	"bg":             "global",
+	"bg-soft":        "global",
+	"surface":        "global",
+	"surface-strong": "global",
+	"surface-muted":  "global",
+	"border":         "global",
+	"border-strong":  "global",
+	"text":           "global",
+	"muted":          "global",
+	"accent":         "global",
+	"accent-hover":   "global",
+	"accent-text":    "global",
+	"oa-bg":          "chat",
+	"oa-panel":       "chat",
+	"oa-text":        "chat",
+	"oa-muted":       "chat",
+	"oa-line":        "chat",
+	"oa-green":       "chat",
+	"oa-hover":       "chat",
+	"oa-user":        "chat",
+}
+
+var uiColorValuePattern = regexp.MustCompile(`^(#[0-9a-fA-F]{3,8}|rgb\(\s*[0-9]{1,3}(\s*,\s*[0-9]{1,3}){2}\s*\)|rgba\(\s*[0-9]{1,3}(\s*,\s*[0-9]{1,3}){2}\s*,\s*(0|1|0?\.[0-9]+)\s*\))$`)
+
+// NormalizeUICustomColors drops unknown tokens and values that are not literal
+// colors, so a stored palette can never inject arbitrary CSS declarations.
+func NormalizeUICustomColors(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(input))
+	for rawToken, rawValue := range input {
+		token := strings.TrimPrefix(strings.TrimSpace(rawToken), "--")
+		if _, ok := UIColorTokenScopes[token]; !ok {
+			continue
+		}
+		value := strings.TrimSpace(rawValue)
+		if len(value) == 0 || len(value) > 32 || !uiColorValuePattern.MatchString(value) {
+			continue
+		}
+		out[token] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 type SlashCommandItem struct {
@@ -104,6 +157,9 @@ type AppConfig struct {
 	SlashCommands            []SlashCommandItem        `json:"slash_commands,omitempty"`
 	ExtraSystemPromptPresets []ExtraSystemPromptPreset `json:"extra_system_prompt_presets,omitempty"`
 	UITheme                  string                    `json:"ui_theme,omitempty"`
+	// UICustomColors overrides individual appearance tokens on top of the
+	// selected palette. Keys are token names without the leading "--".
+	UICustomColors map[string]string `json:"ui_custom_colors,omitempty"`
 	// ChatDefaultLLMNo is the llm_no seeded into freshly created chat sessions.
 	// It tracks the model last picked in Admin Chat so a new conversation keeps
 	// using it instead of silently falling back to the first configured model.
@@ -208,7 +264,10 @@ func Validate(cfg AppConfig) error {
 		return fmt.Errorf("buffer_lines must be positive")
 	}
 	if theme := strings.TrimSpace(cfg.UITheme); theme != "" && !ValidUITheme(theme) {
-		return fmt.Errorf("ui_theme must be one of light, warm, dark")
+		return fmt.Errorf("ui_theme must be one of light, warm, dark, green")
+	}
+	if len(cfg.UICustomColors) > 0 && len(cfg.UICustomColors) > len(UIColorTokenScopes) {
+		return fmt.Errorf("ui_custom_colors has too many entries")
 	}
 	if p := cfg.DefaultProjectProvider; p != "" && p != "admin" && p != "official" {
 		return fmt.Errorf("default_project_provider must be admin or official")
@@ -533,6 +592,7 @@ func effectiveInstancePython(instance InstanceConfig) string {
 
 func normalize(cfg AppConfig, root string) AppConfig {
 	cfg.UITheme = strings.TrimSpace(cfg.UITheme)
+	cfg.UICustomColors = NormalizeUICustomColors(cfg.UICustomColors)
 	if strings.TrimSpace(cfg.ChatDataDir) == "" {
 		cfg.ChatDataDir = defaultChatDataDir(root)
 	}

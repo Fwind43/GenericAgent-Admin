@@ -9,7 +9,7 @@ import './style.css'
 import { RouteFallback, ErrorBoundary } from './components/feedback.jsx'
 import { AppDialogHost } from './components/AppDialogHost.jsx'
 import { GlobalImagePreview } from './components/GlobalImagePreview.jsx'
-import { applyThemeToDocument, getInitialTheme, getTheme, isThemeId } from './themes'
+import { applyThemeToDocument, getInitialTheme, getTheme, hydrateCustomColors, isThemeId } from './themes'
 
 // Chat is the primary interface: it owns "/" (and legacy "/chat").
 // The admin console lives under "/admin" and acts as the settings area.
@@ -69,6 +69,11 @@ function LocalizedRoot() {
     const activeTheme = applyThemeToDocument(colorMode)
     localStorage.setItem('ga-admin-theme', activeTheme.id)
   }, [colorMode])
+  // Saved custom colors must be live on the very first paint; the injected
+  // boot script covers the same-origin index.html case, this covers the rest.
+  useEffect(() => {
+    void hydrateCustomColors()
+  }, [])
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
   }, [lang])

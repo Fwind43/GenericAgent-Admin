@@ -828,7 +828,7 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) serveStaticData(w http.ResponseWriter, r *http.Request, name string, data []byte) {
 	if name == "index.html" {
-		data = injectUITheme(data, s.storedUITheme())
+		data = injectUIPalette(data, s.storedUITheme(), s.storedUICustomColors(), true)
 	}
 	if strings.HasPrefix(name, "assets/") {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")

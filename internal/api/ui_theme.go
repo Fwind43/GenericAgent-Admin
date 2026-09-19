@@ -12,22 +12,26 @@ import (
 func (s *Server) uiTheme(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, map[string]string{"theme": effectiveUITheme(s.storedUITheme())})
+		writeJSON(w, map[string]any{
+			"theme":  effectiveUITheme(s.storedUITheme()),
+			"custom": s.storedUICustomColors(),
+		})
 		return
 	case http.MethodPut:
 		if !requireDangerousHeader(w, r) {
 			return
 		}
 		var req struct {
-			Theme string `json:"theme"`
+			Theme  string             `json:"theme"`
+			Custom *map[string]string `json:"custom"`
 		}
 		if err := decode(r, &req); err != nil {
 			bad(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		theme := canonicalUITheme(req.Theme)
-		if theme == "" {
-			bad(w, http.StatusBadRequest, "ui_theme must be one of light, warm, dark")
+		if strings.TrimSpace(req.Theme) != "" && theme == "" {
+			bad(w, http.StatusBadRequest, "ui_theme must be one of light, warm, dark, green")
 			return
 		}
 		if s.ConfigMu != nil {
@@ -35,12 +39,22 @@ func (s *Server) uiTheme(w http.ResponseWriter, r *http.Request) {
 			defer s.ConfigMu.Unlock()
 		}
 		cfg := s.CfgStore.Snapshot()
-		cfg.UITheme = theme
+		if theme != "" {
+			cfg.UITheme = theme
+		}
+		if req.Custom != nil {
+			// An explicit object replaces the palette; an empty object clears it.
+			cfg.UICustomColors = config.NormalizeUICustomColors(*req.Custom)
+		}
 		if err := s.CfgStore.Save(cfg); err != nil {
 			bad(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		writeJSON(w, map[string]string{"theme": s.CfgStore.Snapshot().UITheme})
+		saved := s.CfgStore.Snapshot()
+		writeJSON(w, map[string]any{
+			"theme":  effectiveUITheme(saved.UITheme),
+			"custom": sanitizeUICustomColors(saved.UICustomColors),
+		})
 		return
 	default:
 		bad(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -52,6 +66,23 @@ func (s *Server) storedUITheme() string {
 		return ""
 	}
 	return canonicalUITheme(s.CfgStore.Snapshot().UITheme)
+}
+
+func (s *Server) storedUICustomColors() map[string]string {
+	if s == nil || s.CfgStore == nil {
+		return map[string]string{}
+	}
+	return sanitizeUICustomColors(s.CfgStore.Snapshot().UICustomColors)
+}
+
+// sanitizeUICustomColors returns a non-nil map so the JSON payload always
+// carries a `custom` object the client can render without extra guards.
+func sanitizeUICustomColors(value map[string]string) map[string]string {
+	out := config.NormalizeUICustomColors(value)
+	if out == nil {
+		return map[string]string{}
+	}
+	return out
 }
 
 func canonicalUITheme(value string) string {
@@ -70,15 +101,36 @@ func effectiveUITheme(value string) string {
 }
 
 func injectUITheme(data []byte, theme string) []byte {
-	theme = canonicalUITheme(theme)
-	if theme == "" || len(data) == 0 {
+	return injectUIPalette(data, theme, nil, false)
+}
+
+func injectUIPalette(data []byte, theme string, custom map[string]string, withCustom bool) []byte {
+	if len(data) == 0 {
 		return data
 	}
-	encoded, err := json.Marshal(theme)
-	if err != nil {
+	snippet := []byte{}
+	if canonicalTheme := canonicalUITheme(theme); canonicalTheme != "" {
+		if encoded, err := json.Marshal(canonicalTheme); err == nil {
+			snippet = append(snippet, []byte(`<script>window.__GA_UI_THEME__=`)...)
+			snippet = append(snippet, encoded...)
+			snippet = append(snippet, []byte(`;</script>`)...)
+		}
+	}
+	if withCustom {
+		// The boot script paints custom tokens before React mounts so the first
+		// frame already matches the persisted palette. An empty palette leaves
+		// the HTML untouched.
+		if colors := sanitizeUICustomColors(custom); len(colors) > 0 {
+			if encoded, err := json.Marshal(colors); err == nil {
+				snippet = append(snippet, []byte(`<script>window.__GA_UI_CUSTOM_COLORS__=`)...)
+				snippet = append(snippet, encoded...)
+				snippet = append(snippet, []byte(`;</script>`)...)
+			}
+		}
+	}
+	if len(snippet) == 0 {
 		return data
 	}
-	snippet := append(append([]byte(`<script>window.__GA_UI_THEME__=`), encoded...), []byte(`;</script>`)...)
 	if i := bytes.Index(data, []byte("</head>")); i >= 0 {
 		out := make([]byte, 0, len(data)+len(snippet))
 		out = append(out, data[:i]...)

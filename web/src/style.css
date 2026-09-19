@@ -19048,3 +19048,101 @@ html[data-color-scheme="dark"] .oa-chat .oa-composer:focus-within {
   outline:2px solid var(--muted); outline-offset:1px;
 }
 @media (max-width:680px) { .oa-composer .oa-composer-resize { display:none; } }
+
+/* Green palette (registry id "green"): moss/mist light theme.
+   Kept at the end of the sheet so equal-specificity overrides win by order. */
+html[data-theme="green"] {
+  --bg: #F4FAF3;
+  --bg-soft: #ECF5EA;
+  --surface: #E3F0E0;
+  --surface-strong: #FFFFFF;
+  --surface-muted: #ECF5EA;
+  --surface-subtle: rgba(15, 60, 35, .028);
+  --surface-subtle-hover: rgba(15, 60, 35, .05);
+  --surface-hover: rgba(15, 60, 35, .04);
+  --border: #C6DDC8;
+  --border-strong: #A9CBAD;
+  --border-subtle: rgba(15, 60, 35, .09);
+  --border-muted: rgba(15, 60, 35, .14);
+  --text: #14201A;
+  --muted: #4A6152;
+  --muted-2: #5F7A69;
+  --strong: #0B1610;
+  --em: #4A6152;
+  --blue: #0F7291;
+  --cyan: #0D7A6C;
+  --violet: #5F55C4;
+  --green: #2F7D4F;
+  --orange: #8A5B00;
+  --red: #C0392B;
+  --gold: #2F7D4F;
+  --accent: #2F7D4F;
+  --accent-hover: #26653F;
+  --accent-bg: rgba(47, 125, 79, .08);
+  --accent-bg-strong: rgba(47, 125, 79, .16);
+  --accent-text: #22603C;
+  --text-on-accent: #FFFFFF;
+  --success: #2F7D4F;
+  --warning: #8A5B00;
+  --error: #C0392B;
+  --info: #0F7291;
+  --focus-ring: rgba(47, 125, 79, .38);
+  --focus-glow: rgba(47, 125, 79, .12);
+  --input-bg: rgba(15, 60, 35, .035);
+  --hover-bg: rgba(15, 60, 35, .06);
+  --code-bg: #E7F2E4;
+  --code-text: #1F5C3A;
+  --code-inline-bg: rgba(15, 60, 35, .07);
+  --chat-table-border: #C6DDC8;
+  --chat-table-header-bg: #ECF5EA;
+  --chat-table-row-alt: rgba(74, 97, 82, .035);
+  --chat-table-row-hover: rgba(47, 125, 79, .1);
+  --chat-table-scrollbar: rgba(74, 97, 82, .28);
+  --pre-text: #14201A;
+  --sidebar: #ECF5EA;
+  --topbar-bg: rgba(244, 250, 243, .98);
+  --main-bg: rgba(244, 250, 243, .55);
+  --shadow: 0 24px 70px rgba(11, 22, 16, .08);
+  --shadow-soft: 0 14px 42px rgba(11, 22, 16, .055);
+  --shadow-tiny: 0 1px 2px rgba(11, 22, 16, .04);
+  --radius-sm: 4px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-card: 8px;
+  --radius-pill: 999px;
+}
+html[data-theme="green"] .oa-chat {
+  --oa-bg: #F4FAF3;
+  --oa-panel: rgba(255, 255, 255, .82);
+  --oa-sidebar: #ECF5EA;
+  --oa-sidebar-2: #E3F0E0;
+  --oa-text: #14201A;
+  --oa-muted: #4A6152;
+  --oa-faint: #5F7A69;
+  --oa-line: rgba(15, 60, 35, .12);
+  --oa-line-strong: rgba(15, 60, 35, .2);
+  --oa-hover: rgba(47, 125, 79, .1);
+  --oa-active: rgba(47, 125, 79, .14);
+  --oa-user: #E3F0E0;
+  --oa-green: #2F7D4F;
+}
+html[data-theme="green"] .overview-page {
+  --overview-accent: #22603C;
+  --overview-accent-soft: rgba(47, 125, 79, .13);
+  --overview-code: #1F5C3A;
+}
+html[data-theme="green"] .models-page {
+  --model-ink: #2A5540;
+  --model-ink-strong: #1C4030;
+  --model-wash: #E7F2E4;
+  --model-wash-strong: #D8EAD5;
+  --model-paper: rgba(255, 255, 255, .94);
+  --model-panel: rgba(236, 245, 234, .84);
+  --model-line: rgba(15, 60, 35, .13);
+  --model-line-strong: rgba(15, 60, 35, .22);
+  --model-focus: #2F7D4F;
+  --model-ok: #2F7D4F;
+  --model-warn: #8A5B00;
+  --model-error: #C0392B;
+}
