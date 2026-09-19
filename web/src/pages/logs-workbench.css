@@ -8,7 +8,10 @@
 .app .logs-page .log-output-empty { overflow-wrap:anywhere; }
 @media(max-width:760px) { .app .logs-page button, .app .logs-page input { min-height:44px; } .app .logs-page .log-icon-button, .app .logs-page .log-filter-clear { min-width:44px; } .app .logs-page .log-console-bar { align-items:stretch; } .app .logs-page .log-filter { flex:1 1 100%; min-width:0; } .app .logs-page .log-console-actions { flex-wrap:wrap; gap:6px; } .app .logs-page .log-tail input { width:90px; } }
 
-.app .logs-page .log-view { padding-bottom:70px; scroll-padding-bottom:70px; }
+.app .logs-page .log-view { padding-bottom:12px; }
 .app .logs-page .log-tail span { display:inline; color:var(--text); }
 .app .logs-page .log-count, .app .logs-page .log-rail-meta { color:var(--text); }
 .app .logs-page .log-line { line-height:1.65; }
+
+/* Normal flow: the jump control never occupies the log viewport. */
+.app .logs-page .log-jump { position:static; display:flex; margin:8px 0 0 auto; box-shadow:none; backdrop-filter:none; }
