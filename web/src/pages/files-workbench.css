@@ -12,3 +12,27 @@
  .app .file-workflow-page .file-workflow-steps { flex-wrap: wrap; }
  .app .file-workflow-page .file-editor { min-height: 320px; }
 }
+
+/* A bounded browser beside a flexible editing surface, not two equal cards. */
+.app .file-workflow-page .file-workbench { display:grid; grid-template-columns:minmax(280px, 340px) minmax(0,1fr); gap:16px; align-items:stretch; }
+.app .file-workflow-page .file-workbench > .panel { min-width:0; height:clamp(560px, calc(100dvh - 240px), 820px); display:flex; flex-direction:column; overflow:hidden; }
+.app .file-workflow-page .file-workbench .inline-form { flex-wrap:wrap; gap:8px; flex-shrink:0; }
+.app .file-workflow-page .file-workbench .inline-form input:not([type="number"]) { flex:1 1 100%; width:100%; }
+.app .file-workflow-page .file-browser-switch { display:flex; gap:6px; margin-block:12px; flex-shrink:0; }
+.app .file-workflow-page .file-browser-switch button { flex:1; padding:8px; }
+.app .file-workflow-page .file-browser-switch [aria-pressed="true"] { background:var(--surface); border-color:var(--accent); color:var(--text); }
+.app .file-workflow-page .file-list, .app .file-workflow-page .file-search-results { flex:1; min-height:0; max-height:none; overflow:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:4px; }
+.app .file-workflow-page [hidden] { display:none !important; }
+.app .file-workflow-page .file-list button, .app .file-workflow-page .hit { flex-shrink:0; width:100%; min-height:36px; padding:8px 10px; border-radius:6px; }
+.app .file-workflow-page .file-editor-panel .file-editor { flex:1; min-height:160px; height:auto; resize:none; width:100%; overflow:auto; }
+.app .file-workflow-page .file-editor-actions { margin-bottom:8px; padding-block:8px; flex-shrink:0; }
+.app .file-workflow-page .file-save-review { margin-block:6px; }
+.app .file-workflow-page .file-editor-panel .operation-note { font-size:12px; margin-block:6px; }
+.app .file-workflow-page :is(button,input,textarea,[tabindex]):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media(max-width:760px) {
+ .app .file-workflow-page .file-workbench { grid-template-columns:minmax(0,1fr); }
+ .app .file-workflow-page .file-workbench > .panel { height:520px; }
+ .app .file-workflow-page .file-workbench > .file-editor-panel { height:auto; min-height:680px; overflow:visible; }
+ .app .file-workflow-page .file-editor-panel .file-editor { min-height:320px; }
+ .app .file-workflow-page .file-list button, .app .file-workflow-page .hit { min-height:44px; }
+}

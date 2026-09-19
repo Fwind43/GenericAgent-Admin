@@ -22,3 +22,18 @@ it('preserves save guards and directory/file selection callbacks',()=>{
  fireEvent.click(screen.getByRole('button',{name:/folder/}));expect(p.loadFiles).toHaveBeenCalledWith('/fixture/folder')
  fireEvent.click(screen.getByRole('button',{name:/a.txt/}));expect(p.readFile).toHaveBeenCalledWith('/fixture/a.txt')
 })
+
+it('switches browser results without losing the editor draft or moving its actions',()=>{
+ const p=props();p.searchHits=[{path:'/fixture/match.txt',line:4,preview:'fixture match'}];render(<FilesPage {...p}/>);
+ const editor=screen.getByLabelText(t.files.editorLabel);
+ fireEvent.click(screen.getByRole('button',{name:t.search,exact:true}));
+ // Empty search remains disabled; selecting the results view is local only.
+ fireEvent.click(screen.getByRole('button',{name:new RegExp(t.lists.searchResults)}));
+ expect(screen.getByRole('region',{name:t.lists.searchResults})).toBeTruthy();
+ expect(editor.value).toBe('draft');
+ fireEvent.click(screen.getByRole('button',{name:/match.txt/}));expect(p.readFile).toHaveBeenCalledWith('/fixture/match.txt');
+ expect(screen.getByRole('button',{name:t.delete}).closest('.file-editor-panel')).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:`${t.lists.fileList} · ${p.fileList.length}`,exact:true}));
+ expect(screen.getByRole('region',{name:t.lists.fileList})).toBeTruthy();expect(editor.value).toBe('draft');
+ expect(p.saveFile).not.toHaveBeenCalled();expect(p.deleteFile).not.toHaveBeenCalled();
+})

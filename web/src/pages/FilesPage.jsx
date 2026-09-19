@@ -1,4 +1,5 @@
 import './files-workbench.css'
+import { useState } from 'react'
 import { Download, RotateCcw, Save, Search, Trash2 } from 'lucide-react'
 import { Panel } from '../components/common'
 import { StatusNotice } from '../components/feedback'
@@ -30,6 +31,7 @@ export function FilesPage({
   dismissFileStatus,
   busy = false,
 }) {
+  const [browserMode, setBrowserMode] = useState('files')
   const dirty = fileEditorDirty(fileContent, loadedFileContent)
   const text = t.files
   const retargeted = Boolean(loadedFilePath && filePath && loadedFilePath !== filePath)
@@ -67,7 +69,7 @@ export function FilesPage({
         onDismiss={dismissFileStatus}
         retryLabel={text.retryAction}
       />
-      <div className="workspace">
+      <div className="workspace file-workbench">
         <Panel title={t.lists.fileList}>
           <div className="inline-form">
             <input aria-label={t.hints.filePath} value={filePath} onChange={e => setFilePath(e.target.value)} placeholder={t.hints.filePath}/>
@@ -75,8 +77,24 @@ export function FilesPage({
           </div>
           <div className="inline-form">
             <input aria-label={t.hints.searchText} value={fileSearch} onChange={e => setFileSearch(e.target.value)} placeholder={t.hints.searchText}/>
-            <button onClick={runSearch} disabled={busy || !String(fileSearch || '').trim()}><Search size={14} aria-hidden="true"/>{t.search}</button>
+            <button onClick={() => { setBrowserMode('search'); runSearch() }} disabled={busy || !String(fileSearch || '').trim()}><Search size={14} aria-hidden="true"/>{t.search}</button>
           </div>
+          <div className="file-browser-switch" role="group" aria-label={t.lists.fileList}>
+            <button type="button" aria-pressed={browserMode === 'files'} onClick={() => setBrowserMode('files')}>{t.lists.fileList} · {fileList.length}</button>
+            <button type="button" aria-pressed={browserMode === 'search'} onClick={() => setBrowserMode('search')}>{t.lists.searchResults} · {searchHits.length}</button>
+          </div>
+          <div className="file-list" hidden={browserMode !== 'files'} role="region" aria-label={t.lists.fileList} tabIndex={0}>
+            {fileListEmpty && <div className="empty-card" role="status"><b>{hasFilePath ? text.folderEmpty : text.chooseRoot}</b><span>{t.hints?.fileListEmpty || fileListHint}</span></div>}
+            {fileList.map(e => <button aria-current={loadedFilePath === e.path ? 'true' : undefined} title={e.path} key={e.path} onClick={() => e.kind === 'dir' ? loadFiles(e.path) : readFile(e.path)}>{e.kind === 'dir' ? '📁' : '📄'} {e.path}</button>)}
+          </div>
+          <div className="file-search-results" hidden={browserMode !== 'search'} role="region" aria-label={t.lists.searchResults} tabIndex={0}>
+          {searchEmpty && (searchAttempted
+            ? <div className="empty-card file-search-empty" role="status"><b>{text.noMatches}</b><span>{text.broaderSearch}</span></div>
+            : <p className="muted">{t.hints?.searchEmpty || searchHint}</p>)}
+          {searchHits.map(h => <button className="hit" key={`${h.path}:${h.line}`} onClick={() => readFile(h.path)}>{h.path}:{h.line} · {h.preview}</button>)}
+          </div>
+        </Panel>
+        <Panel title={t.lists.filePreview} className="log-panel file-editor-panel">
           <div className="inline-form">
             <input aria-label={t.hints.tailLines} type="number" value={tailLines} onChange={e => setTailLines(Number(e.target.value))}/>
             <span>{t.hints.tailLines}</span>
@@ -85,17 +103,6 @@ export function FilesPage({
             <button className="danger" onClick={() => deleteFile(filePath)} disabled={!filePath || busy} title={text.destructiveDelete}><Trash2 size={14} aria-hidden="true"/>{t.delete}</button>
           </div>
           <p className="operation-note" role="note">{text.safetyNote}</p>
-          <div className="file-list">
-            {fileListEmpty && <div className="empty-card" role="status"><b>{hasFilePath ? text.folderEmpty : text.chooseRoot}</b><span>{t.hints?.fileListEmpty || fileListHint}</span></div>}
-            {fileList.map(e => <button aria-current={loadedFilePath === e.path ? 'true' : undefined} title={e.path} key={e.path} onClick={() => e.kind === 'dir' ? loadFiles(e.path) : readFile(e.path)}>{e.kind === 'dir' ? '📁' : '📄'} {e.path}</button>)}
-          </div>
-          <h4>{t.lists.searchResults}</h4>
-          {searchEmpty && (searchAttempted
-            ? <div className="empty-card file-search-empty" role="status"><b>{text.noMatches}</b><span>{text.broaderSearch}</span></div>
-            : <p className="muted">{t.hints?.searchEmpty || searchHint}</p>)}
-          {searchHits.map(h => <button className="hit" key={`${h.path}:${h.line}`} onClick={() => readFile(h.path)}>{h.path}:{h.line} · {h.preview}</button>)}
-        </Panel>
-        <Panel title={t.lists.filePreview} className="log-panel">
           <div className="file-editor-toolbar">
             <span className={dirty ? 'status-pill warn' : 'status-pill ok'}>{dirty ? text.dirty : text.clean}</span>
             {loadedFilePath && <span className="muted">{text.loaded}: {loadedFilePath}</span>}
