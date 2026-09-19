@@ -64,7 +64,28 @@ export default function App({ embedded = false, active = true, onClose }) {
   const settingsBackRef = useRef(null)
   const settingsNavRef = useRef(null)
   const initialRoute = useMemo(() => embedded ? { tab: 'settings', taskSubTab: 'schedule' } : parseRoute(), [embedded])
-  const [tab, setTab] = useState(initialRoute.tab)
+  const [tab, commitTab] = useState(initialRoute.tab)
+  const pageDraft = useRef({ dirty: false, busy: false })
+  const onPageDraft = useMemo(() => state => { pageDraft.current = state }, [])
+  const setTab = async next => {
+    if (next === tab) return true
+    if (!await canLeavePage()) return false
+    pageDraft.current = { dirty: false, busy: false }
+    commitTab(next)
+    return true
+  }
+  const canLeavePage = async () => {
+    if (pageDraft.current.busy) return false
+    if (pageDraft.current.dirty && !await confirmDanger('admin-leave-draft', lang === 'zh' ? '离开将放弃此页未保存的修改，继续？' : 'Leave and discard unsaved changes on this page?')) return false
+    return true
+  }
+  useEffect(() => {
+    const warn = event => {
+      if (pageDraft.current.dirty || pageDraft.current.busy) { event.preventDefault(); event.returnValue = '' }
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [])
   const [taskSection, setTaskSection] = useState(initialRoute.taskSubTab)
   const [cfg, setCfg] = useState(null)
   const [savedCfg, setSavedCfg] = useState(null)
@@ -120,9 +141,9 @@ export default function App({ embedded = false, active = true, onClose }) {
     if (window.location.pathname !== url) window.history.replaceState(null, '', url)
   }, [tab, taskSection, embedded])
 
-  const openTab = (next) => {
+  const openTab = async (next) => {
+    if (!await setTab(next)) return
     setAdminSidebarOpen(false)
-    setTab(next)
     if (embedded) setSettingsDetail(true)
   }
   useEffect(() => {
@@ -291,7 +312,7 @@ export default function App({ embedded = false, active = true, onClose }) {
           <div className="brand"><img className="brand-logo" src="/icon.png" alt=""/><div><h1>{t.appName}</h1><p>{t.tagline}</p></div></div>
           <button type="button" className="admin-sidebar-close" aria-label={lang === 'zh' ? '收起管理导航' : 'Collapse admin navigation'} onClick={()=>setAdminSidebarOpen(false)}><PanelLeftClose size={20} aria-hidden="true"/></button>
         </div>
-        <button type="button" className="admin-back-to-chat" onClick={()=>{ if (onClose) onClose(); else window.location.href = '/chat' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
+        <button type="button" className="admin-back-to-chat" onClick={async ()=>{ if (!await canLeavePage()) return; pageDraft.current = { dirty: false, busy: false }; if (onClose) onClose(); else window.location.href = '/chat' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
         <nav ref={settingsNavRef} aria-label={t.mainNavigation}>
           {(embedded ? SETTINGS_GROUPS : ADMIN_GROUPS).map(group => <div className="set-nav-group" key={group.id}>
             <span className="set-nav-group-title">{!embedded && group.label ? group.label[lang] : t.navGroups[group.id]}</span>
@@ -356,7 +377,7 @@ export default function App({ embedded = false, active = true, onClose }) {
             {tab==='keychain' && <KeychainPage text={text}/>}
             {tab==='models' && <Models officialSlots={models.officialSlots} t={t} profiles={models.profiles} setProfiles={models.setProfiles} patchProfile={models.patchProfile} addModelProfiles={models.addProfiles} removeModelProfile={models.removeProfile} importModels={models.importModels} previewModels={models.previewModels} failoverGroups={models.failoverGroups} setFailoverGroups={models.setFailoverGroups} discoverModels={models.discoverModels} modelPreview={models.preview} changes={models.changes} saveState={models.saveState} saveAll={models.saveAll} discardDraft={models.discardDraft} importLoading={models.importLoading} riskCatalog={observability?.riskItems || []} riskCatalogError={observabilityError} revealedKeys={models.revealedKeys} revealBusy={models.keyBusy} getProfileKey={models.getProfileKey} onRevealKey={models.revealKey} onClearRevealedKey={models.clearRevealedKey} modelInstance={models.instance} modelInstanceLabel={lang === 'zh' ? '当前实例' : 'Current instance'}/>}
             {tab==='instances' && <InstancesPage lang={lang} onConfigureModels={openModels}/>}
-            {tab==='channels' && <ChannelsPage frontendSvcs={services.frontendSvcs} t={t} actionStates={services.actionStates} onStart={startService} onStop={stopService} onLogs={viewServiceLogs} onAutostart={services.toggleAutostart} onReflectStart={services.startReflectService} onOpenHub={()=>window.open('http://127.0.0.1:19737', '_blank', 'noopener,noreferrer')}/>}
+            {tab==='channels' && <ChannelsPage onDraftState={onPageDraft} frontendSvcs={services.frontendSvcs} t={t} actionStates={services.actionStates} onStart={startService} onStop={stopService} onLogs={viewServiceLogs} onAutostart={services.toggleAutostart} onReflectStart={services.startReflectService} onOpenHub={()=>window.open('http://127.0.0.1:19737', '_blank', 'noopener,noreferrer')}/>}
             {tab==='tasks' && <TasksPage
               t={t}
               lang={lang}

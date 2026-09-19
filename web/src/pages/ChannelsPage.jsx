@@ -13,7 +13,7 @@ const fieldFilled = field => Boolean(field.has_value) || String(field.value || '
 // values currently in the form; that is enough to flag unsaved channels.
 const fingerprint = profiles => Object.fromEntries((profiles || []).map(p => [p.id, (p.fields || []).map(f => String(f.value ?? '')).join('\u001f')]))
 
-export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onStop, onLogs, onAutostart, onReflectStart, onOpenHub }) {
+export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onStop, onLogs, onAutostart, onReflectStart, onOpenHub, onDraftState }) {
   const [config, setConfig] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -23,6 +23,10 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
   const [selectedId, setSelectedId] = useState('')
   const tabRefs = useRef({})
   const baseline = useRef({})
+  const savedConfig = useRef(null)
+  const [query, setQuery] = useState('')
+  const zh = t.save !== 'Save'
+  const labels = zh ? { search: '筛选通道', connection: '连接与行为', access: '访问范围', secrets: '凭据', discard: '放弃修改', confirm: '放弃所有未保存的通道修改？' } : { search: 'Filter channels', connection: 'Connection & behavior', access: 'Access scope', secrets: 'Credentials', discard: 'Discard changes', confirm: 'Discard all unsaved channel changes?' }
   const text = t.channels
   const selectView = view => {
     setActiveView(view)
@@ -43,6 +47,7 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
     setLoading(true)
     try {
       const d = await api('/api/channels')
+      savedConfig.current = d
       baseline.current = fingerprint(d?.profiles)
       setConfig(d)
       return d
@@ -67,6 +72,7 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
     setSaving(true); setMsg({ kind: 'pending', text: text.saving })
     try {
       const d = await api('/api/channels', { dangerous:true, method:'PUT', body: JSON.stringify({ profiles: config?.profiles || [] }) })
+      savedConfig.current = d
       baseline.current = fingerprint(d?.profiles)
       setConfig(d)
       setMsg({ kind: 'success', text: text.saved(d.path) })
@@ -81,6 +87,15 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
       setMsg({ kind: d.ok ? 'success' : 'error', text: d.ok ? `${text.testPassed(name)}${detail ? ` · ${detail}` : ''}` : text.testFailed(name, detail) })
     } catch (e) { setMsg({ kind: 'error', text: text.testFailed(name, e.message) }) } finally { setTesting('') }
   }
+  const refresh = async () => {
+    if (dirtyIds.size && !await confirmDanger('channels-discard', labels.confirm)) return
+    await load()
+  }
+  const discard = async () => {
+    if (!await confirmDanger('channels-discard', labels.confirm)) return
+    setConfig(savedConfig.current)
+    setMsg(null)
+  }
   const runningCount = frontendSvcs.filter(s => s.running).length
   const profiles = config?.profiles || []
   const configuredCount = profiles.filter(profile => (profile.fields || []).some(fieldFilled)).length
@@ -88,6 +103,10 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
     const current = fingerprint(config?.profiles)
     return new Set(Object.keys(current).filter(id => baseline.current[id] !== current[id]))
   }, [config])
+  useEffect(() => {
+    onDraftState?.({ dirty: dirtyIds.size > 0, busy: saving || !!testing })
+    return () => onDraftState?.({ dirty: false, busy: false })
+  }, [dirtyIds.size, saving, testing, onDraftState])
   const selected = profiles.find(p => p.id === selectedId) || profiles[0] || null
   const selectedFields = selected?.fields || []
   const tone = profile => CHANNEL_TONES[profile.id] || 'var(--ch-accent)'
@@ -127,10 +146,28 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
         aria-labelledby="channel-tab-config"
         hidden={activeView !== 'config'}
       >
+        <p className="channel-save-scope">{text.saveConfirm}</p>
+        {dirtyIds.size > 0 && msg && <p className="channel-commit-msg is-dirty" role="status">{text.pendingChanges(dirtyIds.size)}</p>}
+        <div className="channel-commit">
+          <span className="channel-commit-path">
+            <i className={config?.path ? 'is-ready' : ''}/>
+            <b>{config?.path ? text.configFile : (loading ? text.loadingConfig : text.noConfigPath)}</b>
+            {config?.path && <code title={config.path}>{config.path}</code>}
+          </span>
+          {msg
+            ? <p className={`channel-commit-msg ${msg.kind === 'error' ? 'is-error' : msg.kind === 'success' ? 'is-success' : ''}`} role={msg.kind === 'error' ? 'alert' : 'status'}>{msg.text}</p>
+            : dirtyIds.size > 0 && <p className="channel-commit-msg is-dirty" role="status">{text.pendingChanges(dirtyIds.size)}</p>}
+          <span className="channel-commit-actions">
+            <button type="button" onClick={discard} disabled={!dirtyIds.size || saving || loading}>{labels.discard}</button>
+            <button type="button" className="channel-icon-button" onClick={refresh} disabled={loading || saving} title={t.refresh} aria-label={t.refresh}><RefreshCw size={15} className={loading ? 'spin' : ''}/></button>
+            <button type="button" className="primary" onClick={save} disabled={saving || loading || !config}><Save size={15}/>{saving ? t.busy : t.save}</button>
+          </span>
+        </div>
+        <label className="channel-filter">{labels.search}<input value={query} onChange={e => setQuery(e.target.value)}/></label>
         <div className="channel-workbench">
           <div className="channel-rail" role="group" aria-label={text.channelList}>
             <div className="channel-rail-head"><span>{text.keyConfig}</span><em>{configuredCount}/{profiles.length || 0}</em></div>
-            {profiles.map(profile => {
+            {profiles.filter(profile => `${profileName(profile)} ${profile.id}`.toLowerCase().includes(query.toLowerCase())).map(profile => {
               const done = (profile.fields || []).filter(fieldFilled).length
               const total = (profile.fields || []).length
               const isSet = done > 0 || !total
@@ -157,7 +194,9 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
                 {selected.testable && <button type="button" onClick={()=>testProfile(selected)} disabled={saving || testing === selected.id}>{testing === selected.id ? text.testingButton : text.testConnection}</button>}
               </div>
               {selectedFields.length ? <div className="channel-detail-fields">
-                {selectedFields.map(field => <label key={field.name}>
+                {['connection', 'access', 'secrets'].map(group => {
+                  const fields = selectedFields.filter(field => (field.secret ? 'secrets' : field.name?.endsWith('_allowed_users') ? 'access' : 'connection') === group)
+                  return fields.length > 0 && <fieldset className="channel-field-group" key={group}><legend>{labels[group]}</legend>{fields.map(field => <label key={field.name}>
                   <span>{fieldLabel(field)}{field.secret && field.has_value && <em>{text.savedField}</em>}</span>
                   {field.secret
                     ? <SecretInput value={field.value || ''} label={fieldLabel(field)} onChange={v=>patchField(selected.id, field.name, v)} t={t}/>
@@ -165,27 +204,13 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
                       ? <select aria-label={fieldLabel(field)} value={String(field.value || 'false').toLowerCase()} onChange={e=>patchField(selected.id, field.name, e.target.value)}><option value="false">False</option><option value="true">True</option></select>
                       : <input aria-label={fieldLabel(field)} value={field.value || ''} placeholder={fieldPlaceholder(field)} onChange={e=>patchField(selected.id, field.name, e.target.value)}/>}
                   <small>{field.name}</small>
-                </label>)}
+                </label>)}</fieldset>
+                })}
               </div> : <p className="channel-detail-note">{text.noFields}</p>}
             </> : <p className="channel-detail-note">{loading ? text.loadingConfig : t.empty}</p>}
           </div>
         </div>
-        <p className="channel-save-scope">{text.saveConfirm}</p>
-        {dirtyIds.size > 0 && msg && <p className="channel-commit-msg is-dirty" role="status">{text.pendingChanges(dirtyIds.size)}</p>}
-        <div className="channel-commit">
-          <span className="channel-commit-path">
-            <i className={config?.path ? 'is-ready' : ''}/>
-            <b>{config?.path ? text.configFile : (loading ? text.loadingConfig : text.noConfigPath)}</b>
-            {config?.path && <code title={config.path}>{config.path}</code>}
-          </span>
-          {msg
-            ? <p className={`channel-commit-msg ${msg.kind === 'error' ? 'is-error' : msg.kind === 'success' ? 'is-success' : ''}`} role={msg.kind === 'error' ? 'alert' : 'status'}>{msg.text}</p>
-            : dirtyIds.size > 0 && <p className="channel-commit-msg is-dirty" role="status">{text.pendingChanges(dirtyIds.size)}</p>}
-          <span className="channel-commit-actions">
-            <button type="button" className="channel-icon-button" onClick={load} disabled={loading || saving} title={t.refresh} aria-label={t.refresh}><RefreshCw size={15} className={loading ? 'spin' : ''}/></button>
-            <button type="button" className="primary" onClick={save} disabled={saving || loading || !config}><Save size={15}/>{saving ? t.busy : t.save}</button>
-          </span>
-        </div>
+
       </div>
       <div
         id="channel-panel-services"
