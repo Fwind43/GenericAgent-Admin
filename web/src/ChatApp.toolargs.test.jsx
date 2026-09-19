@@ -1,7 +1,7 @@
 import React from 'react'
 import { afterEach, describe, expect, test } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { ChatMessage, parseToolReceiptArgs, parseToolResultDetails } from './ChatApp.jsx'
+import { ChatMessage, normalizeFileToolText, parseToolReceiptArgs, parseToolResultDetails } from './ChatApp.jsx'
 
 afterEach(() => cleanup())
 
@@ -170,5 +170,73 @@ describe('tool receipt result parsing', () => {
     expect(parseToolResultDetails('plain tool output')).toBeNull()
     expect(parseToolResultDetails('[Stdout]\nonly output')).toBeNull()
     expect(parseToolResultDetails('prefix\n[Status] ok')).toBeNull()
+  })
+})
+
+
+describe('poisoned file tool arguments', () => {
+  const toolText = (name, args) => ['\u{1F6E0}\uFE0F Tool: `' + name + '`', '```text', args, '```'].join('\n')
+
+  const renderAssistant = (content) => render(
+    <ChatMessage
+      message={{ id: 'm1', role: 'assistant', content, files: [], created_at: 0 }}
+      pending={false}
+      onAskReply={() => {}}
+    />
+  ).container
+
+  test('normalizes arrays, objects, scalars and empties to text', () => {
+    expect(normalizeFileToolText(['a', 'b'])).toBe('a\nb')
+    expect(normalizeFileToolText(['a', { k: 1 }, null])).toBe('a\n{"k":1}\n')
+    expect(normalizeFileToolText({ a: 1 })).toBe('{\n  "a": 1\n}')
+    expect(normalizeFileToolText(12)).toBe('12')
+    expect(normalizeFileToolText(null)).toBe('')
+    expect(normalizeFileToolText(undefined)).toBe('')
+    expect(normalizeFileToolText('plain')).toBe('plain')
+  })
+
+  test('renders a file_write whose content is a JSON array without crashing', () => {
+    const poison = JSON.stringify({ path: 'src/poison.js', content: ['line one', 'line two', 'line three'] })
+    const container = renderAssistant(toolText('file_write', poison))
+
+    const summary = container.querySelector('.oa-file-summary-item')
+    expect(summary).toBeTruthy()
+    expect(summary.querySelector('.oa-file-name').textContent).toBe('poison.js')
+    expect(container.querySelector('.oa-file-summary-header .stat-added').textContent).toBe('+3')
+
+    fireEvent.click(summary)
+    const card = container.querySelector('.oa-file-summary')
+    expect(card.querySelectorAll('.oa-diff-add').length).toBe(3)
+    expect(card.querySelector('.oa-diff-add .oa-diff-text').textContent).toBe('line one')
+
+    const panel = container.querySelector('.oa-file-tool-args.is-write')
+    expect(panel).toBeTruthy()
+    expect(panel.querySelector('.oa-diff-stats-add').textContent).toBe('+3')
+  })
+
+  test('renders a file_write whose content is a JSON object without crashing', () => {
+    const poison = JSON.stringify({ path: 'src/config.json', content: { enabled: true, retries: 3 } })
+    const container = renderAssistant(toolText('file_write', poison))
+
+    expect(container.querySelector('.oa-file-summary-header .stat-added').textContent).toBe('+4')
+    const summary = container.querySelector('.oa-file-summary-item')
+    fireEvent.click(summary)
+    const card = container.querySelector('.oa-file-summary')
+    expect(card.querySelectorAll('.oa-diff-add').length).toBe(4)
+    expect(card.querySelector('.oa-diff-add .oa-diff-text').textContent).toBe('{')
+  })
+
+  test('renders a file_patch whose old/new content are arrays without crashing', () => {
+    const poison = JSON.stringify({
+      path: 'src/poison.js',
+      old_content: ['const a = 1'],
+      new_content: ['const a = 2', 'const b = 3'],
+    })
+    const container = renderAssistant(toolText('file_patch', poison))
+
+    const panel = container.querySelector('.oa-file-tool-args.is-patch')
+    expect(panel).toBeTruthy()
+    expect(panel.querySelector('.oa-diff-stats-add').textContent).toBe('+2')
+    expect(panel.querySelector('.oa-diff-stats-del').textContent).toBe('\u22121')
   })
 })

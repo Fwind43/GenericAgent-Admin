@@ -2434,6 +2434,29 @@ function reescapeControlChars(text) {
 }
 
 // Parse file_write/file_patch tool arguments
+// GA occasionally streams a JSON array/object where `content` should be a
+// string, and the poisoned payload is already persisted inside session files.
+// Rendering must therefore never assume a string: normalise to text while
+// keeping every meaningful piece, instead of crashing on `.split`.
+export function normalizeFileToolText(value) {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (item == null) return ''
+      if (typeof item === 'string') return item
+      if (typeof item === 'object') {
+        try { return JSON.stringify(item) } catch { return String(item) }
+      }
+      return String(item)
+    }).join('\n')
+  }
+  if (typeof value === 'object') {
+    try { return JSON.stringify(value, null, 2) } catch { return String(value) }
+  }
+  return String(value)
+}
+
 function parseFileToolArgs(toolName, argsText) {
   const isFileWrite = /file_write$/i.test(toolName)
   const isFilePatch = /file_patch$/i.test(toolName)
@@ -2477,17 +2500,17 @@ function parseFileToolArgs(toolName, argsText) {
   if (isFileWrite && parsed?.path) {
     return {
       type: 'file_write',
-      path: parsed.path,
-      content: parsed.content || '',
-      mode: parsed.mode || 'overwrite'
+      path: normalizeFileToolText(parsed.path),
+      content: normalizeFileToolText(parsed.content),
+      mode: normalizeFileToolText(parsed.mode) || 'overwrite'
     }
   }
   if (isFilePatch && parsed?.path) {
     return {
       type: 'file_patch',
-      path: parsed.path,
-      old_content: parsed.old_content || '',
-      new_content: parsed.new_content || ''
+      path: normalizeFileToolText(parsed.path),
+      old_content: normalizeFileToolText(parsed.old_content),
+      new_content: normalizeFileToolText(parsed.new_content)
     }
   }
   return null
