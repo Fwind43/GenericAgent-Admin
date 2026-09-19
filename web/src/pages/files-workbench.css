@@ -1,0 +1,14 @@
+.app .file-workflow-page { min-width: 0; }
+.app .file-workflow-page .workspace > *, .app .file-workflow-page .inline-form > input { min-width: 0; }
+.app .file-workflow-page .file-list button, .app .file-workflow-page .hit { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.app .file-workflow-page button[aria-current="true"] { border-color: var(--accent); background: var(--surface); font-weight: 600; }
+.app .file-workflow-page .file-editor-toolbar, .app .file-workflow-page .file-save-review, .app .file-workflow-page .file-save-reason { overflow-wrap: anywhere; }
+.app .file-workflow-page .file-editor-actions { padding-block: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+@media (max-width: 760px) {
+ .app .file-workflow-page .workspace { grid-template-columns: minmax(0,1fr); }
+ .app .file-workflow-page .inline-form { flex-wrap: wrap; }
+ .app .file-workflow-page .inline-form > input { flex: 1 1 100%; width: 100%; }
+ .app .file-workflow-page button, .app .file-workflow-page input { min-height: 44px; }
+ .app .file-workflow-page .file-workflow-steps { flex-wrap: wrap; }
+ .app .file-workflow-page .file-editor { min-height: 320px; }
+}

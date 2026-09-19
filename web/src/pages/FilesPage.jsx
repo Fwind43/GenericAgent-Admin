@@ -1,3 +1,4 @@
+import './files-workbench.css'
 import { Download, RotateCcw, Save, Search, Trash2 } from 'lucide-react'
 import { Panel } from '../components/common'
 import { StatusNotice } from '../components/feedback'
@@ -51,7 +52,7 @@ export function FilesPage({
     ? text.noFilesPath
     : text.noRootPath
   return (
-    <section className="file-workflow-page">
+    <section className="file-workflow-page" aria-busy={busy}>
       <ol className="file-workflow-steps" aria-label={text.workflow}>
         <li><b>1</b><span>{text.chooseFile}</span></li>
         <li><b>2</b><span>{text.readFile}</span></li>
@@ -69,24 +70,24 @@ export function FilesPage({
       <div className="workspace">
         <Panel title={t.lists.fileList}>
           <div className="inline-form">
-            <input value={filePath} onChange={e => setFilePath(e.target.value)} placeholder={t.hints.filePath}/>
+            <input aria-label={t.hints.filePath} value={filePath} onChange={e => setFilePath(e.target.value)} placeholder={t.hints.filePath}/>
             <button onClick={() => loadFiles(filePath)} disabled={busy || !hasFilePath}>{t.read}</button>
           </div>
           <div className="inline-form">
-            <input value={fileSearch} onChange={e => setFileSearch(e.target.value)} placeholder={t.hints.searchText}/>
+            <input aria-label={t.hints.searchText} value={fileSearch} onChange={e => setFileSearch(e.target.value)} placeholder={t.hints.searchText}/>
             <button onClick={runSearch} disabled={busy || !String(fileSearch || '').trim()}><Search size={14} aria-hidden="true"/>{t.search}</button>
           </div>
           <div className="inline-form">
-            <input type="number" value={tailLines} onChange={e => setTailLines(Number(e.target.value))}/>
+            <input aria-label={t.hints.tailLines} type="number" value={tailLines} onChange={e => setTailLines(Number(e.target.value))}/>
             <span>{t.hints.tailLines}</span>
             <button onClick={() => tailFile(filePath)} disabled={!filePath || busy}>{t.tail}</button>
             <button onClick={() => downloadFile(filePath)} disabled={!filePath || busy} title={text.readOnlyDownload}><Download size={14} aria-hidden="true"/>{t.download}</button>
-            <button onClick={() => deleteFile(filePath)} disabled={!filePath || busy} title={text.destructiveDelete}><Trash2 size={14} aria-hidden="true"/>{t.delete}</button>
+            <button className="danger" onClick={() => deleteFile(filePath)} disabled={!filePath || busy} title={text.destructiveDelete}><Trash2 size={14} aria-hidden="true"/>{t.delete}</button>
           </div>
           <p className="operation-note" role="note">{text.safetyNote}</p>
           <div className="file-list">
             {fileListEmpty && <div className="empty-card" role="status"><b>{hasFilePath ? text.folderEmpty : text.chooseRoot}</b><span>{t.hints?.fileListEmpty || fileListHint}</span></div>}
-            {fileList.map(e => <button key={e.path} onClick={() => e.kind === 'dir' ? loadFiles(e.path) : readFile(e.path)}>{e.kind === 'dir' ? '📁' : '📄'} {e.path}</button>)}
+            {fileList.map(e => <button aria-current={loadedFilePath === e.path ? 'true' : undefined} title={e.path} key={e.path} onClick={() => e.kind === 'dir' ? loadFiles(e.path) : readFile(e.path)}>{e.kind === 'dir' ? '📁' : '📄'} {e.path}</button>)}
           </div>
           <h4>{t.lists.searchResults}</h4>
           {searchEmpty && (searchAttempted
