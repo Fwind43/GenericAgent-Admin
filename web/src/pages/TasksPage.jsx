@@ -4,6 +4,8 @@ import { Panel, ServiceRow } from '../components/common'
 import { TaskRow } from '../components/schedule'
 import { normalizeScheduleTasksPayload } from '../lib/schedule'
 
+import './tasks-workbench.css'
+
 const KNOWN_TASK_FIELDS = ['enabled','max_delay_hours','repeat','schedule','prompt']
 
 export function TaskFormEditor({ value, onChange, t }) {
@@ -28,22 +30,22 @@ export function TaskFormEditor({ value, onChange, t }) {
     </div>
     <div className="form-field">
       <label>{text.maxDelay}</label>
-      <input type="number" value={data.max_delay_hours ?? ''} onChange={e => updateField('max_delay_hours', e.target.value ? parseInt(e.target.value, 10) : 0)} />
+      <input type="number" aria-label={text.maxDelay} value={data.max_delay_hours ?? ''} onChange={e => updateField('max_delay_hours', e.target.value ? parseInt(e.target.value, 10) : 0)} />
     </div>
     <div className="form-field">
       <label>{text.repeat}</label>
-      <select value={data.repeat || ''} onChange={e => updateField('repeat', e.target.value)}>
+      <select aria-label={text.repeat} value={data.repeat || ''} onChange={e => updateField('repeat', e.target.value)}>
         <option value="">{text.choose}</option>
         {repeatOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
       </select>
     </div>
     <div className="form-field">
       <label>{text.schedule}</label>
-      <input type="text" value={data.schedule || ''} onChange={e => updateField('schedule', e.target.value)} placeholder={text.schedulePlaceholder}/>
+      <input type="text" aria-label={text.schedule} value={data.schedule || ''} onChange={e => updateField('schedule', e.target.value)} placeholder={text.schedulePlaceholder}/>
     </div>
     <div className="form-field">
       <label>{text.prompt}</label>
-      <textarea value={data.prompt || ''} onChange={e => updateField('prompt', e.target.value)} placeholder={text.promptPlaceholder}/>
+      <textarea aria-label={text.prompt} value={data.prompt || ''} onChange={e => updateField('prompt', e.target.value)} placeholder={text.promptPlaceholder}/>
     </div>
     {extraKeys.length > 0 && <details className="extra-fields">
       <summary>{text.extraFields} ({extraKeys.length})</summary>
@@ -94,7 +96,7 @@ export function TasksPage({
       <Panel title={t.lists.scheduledTasks}>
         <div className="task-create">
           <div className="task-create-input-row">
-            <input value={scheduleState.newTaskId} onChange={e=>scheduleState.setNewTaskId(e.target.value)} placeholder={t.hints.newTaskId}/>
+            <input aria-label={t.hints.newTaskId} value={scheduleState.newTaskId} onChange={e=>scheduleState.setNewTaskId(e.target.value)} placeholder={t.hints.newTaskId}/>
           </div>
           <div className="task-create-btn-row">
             <button onClick={scheduleState.createTask} disabled={busy || !scheduleState.newTaskId.trim()}><FileCode2 size={14}/>{t.create}</button>
@@ -102,10 +104,10 @@ export function TasksPage({
             {schedule.log?.exists && <button onClick={()=>scheduleState.readArtifact('sche_tasks/scheduler.log')}><Terminal size={14}/>{t.nav.logs}</button>}
           </div>
         </div>
-        {scheduleState.error && <p className="err-text">{scheduleState.error}</p>}
+        {scheduleState.error && <p className="err-text" role="alert">{scheduleState.error}</p>}
         <div className="task-list clean-list" aria-busy={scheduleState.loading}>
           {scheduleState.loading
-            ? <p className="muted">{t.busy}</p>
+            ? <p className="muted" role="status">{t.busy}</p>
             : tasks.length
               ? tasks.map((task, idx) => <TaskRow key={task.id || task.name || idx} task={task} t={t} onToggle={scheduleState.toggleTask} onEdit={scheduleState.loadTask} onArtifact={scheduleState.readArtifact}/>)
               : <p className="muted">{t.hints.noTasks}</p>}
@@ -113,16 +115,16 @@ export function TasksPage({
       </Panel>
       <Panel title={`${t.lists.editor} · ${scheduleState.taskId || t.empty}`}>
         <div className="editor-mode-toggle">
-          <button className={scheduleState.editorMode==='form' ? 'active' : ''} onClick={()=>scheduleState.setEditorMode('form')}><SlidersHorizontal size={14}/>{t.tasks.form}</button>
-          <button className={scheduleState.editorMode==='json' ? 'active' : ''} onClick={()=>scheduleState.setEditorMode('json')}><Code2 size={14}/>{t.tasks.json}</button>
+          <button aria-pressed={scheduleState.editorMode==='form'} className={scheduleState.editorMode==='form' ? 'active' : ''} onClick={()=>scheduleState.setEditorMode('form')}><SlidersHorizontal size={14}/>{t.tasks.form}</button>
+          <button aria-pressed={scheduleState.editorMode==='json'} className={scheduleState.editorMode==='json' ? 'active' : ''} onClick={()=>scheduleState.setEditorMode('json')}><Code2 size={14}/>{t.tasks.json}</button>
         </div>
         <p className="muted">{scheduleState.editorMode==='json' ? t.hints.jsonHelp : t.tasks.formHelp}</p>
         {scheduleState.editorMode==='json'
           ? <textarea className="json-editor compact-editor" value={scheduleState.editor} onChange={e=>scheduleState.setEditor(e.target.value)}/>
           : <TaskFormEditor value={scheduleState.editor} onChange={scheduleState.setEditor} t={t}/>}
         <div className="actions">
-          <button onClick={scheduleState.saveTask} disabled={!scheduleState.taskId && !scheduleState.newTaskId}><Save size={14}/>{t.save}</button>
-          <button onClick={scheduleState.deleteTask} disabled={!scheduleState.taskId}><XCircle size={14}/>{t.remove}</button>
+          <button className="primary" onClick={scheduleState.saveTask} disabled={!scheduleState.taskId && !scheduleState.newTaskId}><Save size={14}/>{t.save}</button>
+          <button className="danger" onClick={scheduleState.deleteTask} disabled={!scheduleState.taskId}><XCircle size={14}/>{t.remove}</button>
         </div>
       </Panel>
     </div>}

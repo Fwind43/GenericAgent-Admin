@@ -1,0 +1,10 @@
+.tasks-page .tasks-workspace > *, .tasks-page .panel, .tasks-page .goal-row > div { min-width:0; }
+.tasks-page .report-list button { text-align:left; overflow-wrap:anywhere; white-space:normal; gap:8px; }
+.tasks-page .goal-row b, .tasks-page .panel h2, .tasks-page .panel h3 { overflow-wrap:anywhere; }
+.tasks-page .artifact-view { white-space:pre-wrap; overflow-wrap:anywhere; }
+.tasks-page .actions { gap:8px; flex-wrap:wrap; }
+.tasks-page .schedule-form-editor { display:grid; gap:16px; }
+.tasks-page .form-field { min-width:0; }
+.tasks-page .form-field > label:first-child { display:block; margin-bottom:6px; }
+.tasks-page .task-subtabs { flex-wrap:wrap; }
+@media(max-width:700px) { .tasks-page .tasks-workspace { grid-template-columns:minmax(0,1fr); } .tasks-page button, .tasks-page input:not([type=checkbox]), .tasks-page select, .tasks-page summary { min-height:44px; } .tasks-page .schedule-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .tasks-page .task-subtabs button { flex:1 1 45%; white-space:normal; } .tasks-page .task-create-btn-row { flex-wrap:wrap; } .tasks-page .goal-row { flex-wrap:wrap; gap:8px; } }
