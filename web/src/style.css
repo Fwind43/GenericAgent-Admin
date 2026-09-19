@@ -3663,10 +3663,14 @@ html[data-color-scheme="dark"] .setup-console-step.is-done .setup-console-step-m
 
 html, body, #root { min-height: 100%; }
 /* Chat owns the viewport and scrolls only inside its session/message panes.
-   Scope the root lock so narrow admin pages can keep their natural page scroll. */
-html:has(.oa-chat),
-body:has(.oa-chat),
-#root:has(> .oa-chat) {
+   Scope the root lock so narrow admin pages can keep their natural page scroll.
+   The chat host stays mounted after switching to /admin (drafts/scroll are kept),
+   so the lock must not apply while the standalone admin shell (.app, i.e. not the
+   embedded settings modal .app-embedded) is the visible view - otherwise the root
+   keeps overflow:hidden and narrow admin pages cannot be scrolled. */
+html:has(.oa-chat):not(:has(.app:not(.app-embedded))),
+body:has(.oa-chat):not(:has(.app:not(.app-embedded))),
+#root:has(> .oa-chat):not(:has(.app:not(.app-embedded))) {
   height: 100%;
   min-height: 100%;
   overflow: hidden;
