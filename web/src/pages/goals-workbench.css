@@ -18,3 +18,29 @@
 .app .goals-page .goal-row-title b { white-space: normal; overflow-wrap: anywhere; }
 .app .goals-page .goal-row-actions .danger { color: var(--red); border-color: currentColor; }
 @media (max-width:760px) { .app .goals-page .goal-row-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); } .app .goals-page .goal-row-actions .danger { margin-left: 0; } }
+
+/* Runs are a scan-first list; metadata and lifecycle controls are secondary. */
+.app .goals-page .goal-list-toolbar { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:12px; }
+.app .goals-page .goal-search { display:grid; gap:6px; flex:1 1 260px; font-size:12px; min-width:0; }
+.app .goals-page .goal-search input { width:100%; min-width:0; }
+.app .goals-page .goal-filter-group { display:flex; flex-wrap:wrap; gap:6px; }
+.app .goals-page .goal-filter-group button { display:flex; align-items:center; gap:8px; min-height:44px; }
+.app .goals-page .goal-filter-group button[aria-pressed="true"] { color:var(--text); border-color:var(--text); background:var(--surface-strong); }
+.app .goals-page .goal-filter-group span { font-variant-numeric:tabular-nums; }
+.app .goals-page .goal-filter-summary, .app .goals-page .goal-detail-nav { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:12px 0; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.app .goals-page .goal-row { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
+.app .goals-page .goal-scan-metrics { display:flex; flex-wrap:wrap; gap:8px 20px; margin:10px 0; font-size:12px; font-variant-numeric:tabular-nums; }
+.app .goals-page .goal-run-metadata { min-width:0; }
+.app .goals-page .goal-run-metadata summary { cursor:pointer; color:var(--muted); font-size:12px; padding:8px 0; }
+.app .goals-page .goal-row-actions { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:12px; }
+.app .goals-page .goal-inspect-actions, .app .goals-page .goal-lifecycle-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.app .goals-page .goal-row-actions .danger { margin-left:0; }
+.app .goals-page .goal-row-actions button { min-height:40px; }
+@media(max-width:760px) {
+ .app .goals-page .goal-row-actions { display:flex; flex-direction:column; }
+ .app .goals-page .goal-inspect-actions, .app .goals-page .goal-lifecycle-actions { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .app .goals-page .goal-row-actions button { min-height:44px; white-space:normal; }
+ .app .goals-page .goal-filter-group { flex:1 1 100%; }
+ .app .goals-page .goal-filter-group button { flex:1 1 auto; }
+ .app .goals-page .goal-detail-nav span { width:100%; }
+}

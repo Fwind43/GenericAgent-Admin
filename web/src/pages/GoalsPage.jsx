@@ -10,6 +10,13 @@ export function GoalsPage({ t, goals, objective, setObjective, budget, setBudget
   const running = goalList.filter(g => g.running).length
   const selectedGoal = goalList.find(g => g.id === selected) || outputMeta?.goal || null
   const [goalTab, setGoalTab] = useState('runs')
+  const [query, setQuery] = useState('')
+  const [runFilter, setRunFilter] = useState('all')
+  const zh = t.search === '搜索'
+  const visibleGoals = goalList.filter(g => (runFilter === 'all' || (runFilter === 'running' ? g.running : !g.running)) && `${g.id || ''} ${g.objective || ''} ${g.status || ''}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+  const listTrigger = useRef(null)
+  const returnToRuns = () => { setGoalTab('runs'); requestAnimationFrame(() => listTrigger.current?.focus()) }
+
   const outputBadges = []
   if (outputMeta?.error) outputBadges.push(`${t.error}: ${outputMeta.error}`)
   if (outputMeta?.truncated) outputBadges.push(`${t.hints.goalOutputTruncated}: ${formatBytes(outputMeta.bytesReturned)}/${formatBytes(outputMeta.totalBytes)}`)
@@ -41,7 +48,7 @@ export function GoalsPage({ t, goals, objective, setObjective, budget, setBudget
     </div>
 
     <div className="goal-tabs" role="tablist" aria-label={t.nav.goals}>
-      <button role="tab" aria-selected={goalTab==='runs'} className={goalTab==='runs' ? 'active' : ''} onClick={()=>setGoalTab('runs')}>{t.fields.goalRuns}<span>{goalList.length}</span></button>
+      <button ref={listTrigger} role="tab" aria-selected={goalTab==='runs'} className={goalTab==='runs' ? 'active' : ''} onClick={()=>setGoalTab('runs')}>{t.fields.goalRuns}<span>{goalList.length}</span></button>
       <button role="tab" aria-selected={goalTab==='start'} className={goalTab==='start' ? 'active' : ''} onClick={()=>setGoalTab('start')}>{t.fields.startGoalMode}</button>
       <button role="tab" aria-selected={goalTab==='output'} className={goalTab==='output' ? 'active' : ''} onClick={()=>setGoalTab('output')}>{t.fields.outputTail}<span>{selected || '-'}</span></button>
     </div>
@@ -68,13 +75,21 @@ export function GoalsPage({ t, goals, objective, setObjective, budget, setBudget
     </Panel>}
 
     {goalTab==='runs' && <Panel title={t.fields.goalRuns} className="goals-list-panel goal-tab-panel">
-      <div className="actions goal-list-toolbar"><button disabled={busy} onClick={onRefresh}><RefreshCw size={14}/>{t.refresh}</button></div>
+      <div className="goal-list-toolbar">
+        <label className="goal-search">{t.search}<input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder={zh ? '目标 ID / 目标内容' : 'Goal ID / objective'}/></label>
+        <div className="goal-filter-group" role="group" aria-label={zh ? '运行状态' : 'Run status'}>
+          {[['all', zh ? '全部' : 'All', goalList.length], ['running', t.running, running], ['idle', t.fields.notRunning, goalList.length-running]].map(([value,label,count])=><button key={value} aria-pressed={runFilter===value} onClick={()=>setRunFilter(value)}>{label}<span>{count}</span></button>)}
+        </div>
+        <button disabled={busy} onClick={onRefresh}><RefreshCw size={14}/>{t.refresh}</button>
+      </div>
+      {goalList.length > 0 && <div className="goal-filter-summary" role="status"><span>{visibleGoals.length} / {goalList.length} {t.fields.goalRuns}</span>{(query || runFilter!=='all') && <button onClick={()=>{setQuery('');setRunFilter('all')}}>{t.clear}</button>}</div>}
       <div className="goal-list clean-list goal-list-tabbed">
-        {goalList.length ? goalList.map(g => <GoalRunCard key={g.id} g={g} t={t} selected={selected} onOutput={openOutput} onState={showStatePath} onStop={onStop} onDelete={onDelete}/>) : <p className="empty-card" role="status">{t.empty}</p>}
+        {visibleGoals.length ? visibleGoals.map(g => <GoalRunCard key={g.id} g={g} t={t} selected={selected} onOutput={openOutput} onState={showStatePath} onStop={onStop} onDelete={onDelete}/>) : <p className="empty-card" role={goalList.length ? undefined : 'status'}>{goalList.length ? (zh ? '\u65e0\u5339\u914d\u76ee\u6807\uff0c\u8bf7\u8c03\u6574\u7b5b\u9009' : 'No matching goals. Adjust your filters.') : t.empty}</p>}
       </div>
     </Panel>}
 
     {goalTab==='output' && <Panel title={`${t.fields.outputTail} · ${selected || '-'}`} className="log-panel goal-output-panel goal-tab-panel">
+      <div className="goal-detail-nav"><button onClick={returnToRuns}>{zh ? '\u8fd4\u56de\u76ee\u6807\u5217\u8868' : 'Back to runs'}</button><span>{t.fields.outputTail} / {selected || '-'}</span></div>
       {selectedGoal ? <div className="goal-focus-card">
         <div className="goal-focus-main">
           <div className="goal-summary-head"><b>{selectedGoal.id}</b><span className={selectedGoal.running ? 'ok' : ''}>{selectedGoal.status || (selectedGoal.running ? t.running : t.fields.notRunning)}</span></div>
@@ -193,6 +208,13 @@ function GoalRunCard({ g, t, selected, onOutput, onState, onStop, onDelete }) {
   return <div className={`goal-row ${g.running ? 'running' : ''} ${g.origin === 'external' ? 'external' : ''} ${selected===g.id ? 'selected' : ''}`}>
     <button className="goal-row-main" onClick={()=>onOutput(g.id)}>
       <div className="goal-row-title"><b>{g.id}</b><span className={statusClass} title={statusTitle}>{g.status || '-'}</span></div>
+      <div className="goal-scan-metrics"><span>{t.fields.turn} {g.turns_used || 0}/{g.max_turns || '-'}</span><span>{t.fields.elapsed} {formatDuration(g.elapsed_seconds)}</span>{g.error_class && <span className="err-text">{g.error_class}</span>}</div>
+      <div className="goal-progress"><span title={`${t.fields.turn} ${Math.round(turnPct)}%`}><i style={{width: `${turnPct}%`}} /></span><span title={`${t.fields.elapsed} ${Math.round(budgetPct)}%`}><i style={{width: `${budgetPct}%`}} /></span></div>
+      <p>{g.objective || t.empty}</p>
+      <small>{t.fields.started} {formatGoalTime(g.start_time ? g.start_time * 1000 : 0)} · {t.fields.updated} {formatGoalTime(g.mod_time)}{g.end_time ? ` · ${t.fields.ended} ${formatGoalTime(g.end_time * 1000)}` : ''}</small>
+      <em><span className={g.missing_log ? 'err-text' : 'ok'}>{g.missing_log ? t.fields.logMissing : t.fields.logReady}</span></em>
+    </button>
+    <details className="goal-run-metadata"><summary>{t.fields.rawStatus} / {t.fields.pid}</summary>
       <div className="goal-row-meta">
         <span>{pidLabel}</span>
         <span>{t.fields.source} {originLabel}</span>
@@ -210,17 +232,16 @@ function GoalRunCard({ g, t, selected, onOutput, onState, onStop, onDelete }) {
         {g.hive?.cwd ? <span>{t.fields.hiveCwd} {g.hive.cwd}</span> : null}
         {g.python_path ? <span>Python {g.python_path}</span> : null}
       </div>
-      <div className="goal-progress"><span title={`${t.fields.turn} ${Math.round(turnPct)}%`}><i style={{width: `${turnPct}%`}} /></span><span title={`${t.fields.elapsed} ${Math.round(budgetPct)}%`}><i style={{width: `${budgetPct}%`}} /></span></div>
-      <p>{g.objective || t.empty}</p>
-      <small>{t.fields.started} {formatGoalTime(g.start_time ? g.start_time * 1000 : 0)} · {t.fields.updated} {formatGoalTime(g.mod_time)}{g.end_time ? ` · ${t.fields.ended} ${formatGoalTime(g.end_time * 1000)}` : ''}</small>
-      <em><span className={g.missing_log ? 'err-text' : 'ok'}>{g.missing_log ? t.fields.logMissing : t.fields.logReady}</span></em>
-    </button>
+    </details>
     <div className="actions goal-row-actions">
+      <div className="goal-inspect-actions">
       <button onClick={()=>onOutput(g.id)}><Eye size={14}/>{t.read}</button>
       <button disabled={!g.state_file} onClick={()=>onState(g.state_file)}>{t.fields.stateFile}</button>
       <button disabled={!g.id || g.missing_log} onClick={()=>onOutput(g.id)}>{t.fields.logFile}</button>
+      </div><div className="goal-lifecycle-actions">
       <button disabled={!canStop} title={g.managed ? (g.pid_trusted ? t.goalStopLevels?.exact_pid : t.goalTrust?.untrusted) : t.goalStopLevels?.soft_state} onClick={()=>onStop(g)}><Square size={14}/>{t.stop}</button>
       <button className="danger" disabled={!canDelete} title={!canDelete ? t.hints.goalDeleteRunning : t.hints.goalDeleteConfirm.replace('{id}', g.id || '-')} onClick={()=>onDelete?.(g)}><Trash2 size={14}/>{t.delete}</button>
+      </div>
     </div>
   </div>
 }
