@@ -15,3 +15,22 @@
 .app > .main .keychain-page .keychain-submit { min-height: 44px; }
 
 .app > .main .keychain-page .keychain-list code { overflow: visible; height: auto; flex: 1 1 0%; }
+
+/* Admin only; the chat keychain dialog keeps its existing workflow. */
+.app > .main .keychain-admin .keychain-workspace { display: grid; grid-template-columns: minmax(280px, 1.15fr) minmax(320px, 1fr); align-items: start; }
+.app > .main .keychain-admin .keychain-view-switch { display: none; }
+.app > .main .keychain-admin .keychain-list-area { max-height: 56vh; overflow-y: auto; overscroll-behavior: contain; }
+.app > .main .keychain-admin .keychain-list-tools { display: flex; align-items: end; gap: 10px; padding: 0 20px 12px; }
+.app > .main .keychain-admin .keychain-list-tools label { min-width: 0; flex: 1; display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+.app > .main .keychain-admin .keychain-list-tools input { min-width: 0; width: 100%; }
+.app > .main .keychain-admin .keychain-select { display: flex; min-width: 0; flex: 1; text-align: left; background: transparent; border: 0; padding: 10px; color: var(--text); }
+.app > .main .keychain-admin .keychain-list li { padding: 2px 8px 2px 0; gap: 4px; }
+.app > .main .keychain-admin .keychain-list li.is-selected { background: color-mix(in srgb, var(--accent) 10%, var(--panel)); box-shadow: inset 3px 0 var(--accent); }
+.app > .main .keychain-admin .keychain-selection { display: flex; flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; }
+.app > .main .keychain-admin .keychain-selection em { color: var(--accent); font-size: 12px; }
+.app > .main .keychain-admin .keychain-form-footer { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 900px) {
+  .app > .main .keychain-admin .keychain-workspace { grid-template-columns: minmax(0, 1fr); }
+  .app > .main .keychain-admin .keychain-view-switch { display: flex; }
+  .app > .main .keychain-admin .keychain-list-area { max-height: 52vh; }
+}

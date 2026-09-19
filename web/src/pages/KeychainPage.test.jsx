@@ -13,7 +13,7 @@ const reply = payload => Promise.resolve({
   text: async () => JSON.stringify(payload),
 })
 
-const setup = (initial = ['ALPHA_KEY', 'BETA_KEY']) => {
+const setup = (initial = ['ALPHA_KEY', 'BETA_KEY'], props = {}) => {
   let keys = [...initial]
   const calls = []
   globalThis.fetch = vi.fn((url, options = {}) => {
@@ -23,7 +23,7 @@ const setup = (initial = ['ALPHA_KEY', 'BETA_KEY']) => {
     if (options.method === 'DELETE') keys = keys.filter(key => key !== body.name)
     return reply({ keys })
   })
-  render(<KeychainPage text={SETTINGS_TEXT.en}/>)
+  render(<KeychainPage text={SETTINGS_TEXT.en} {...props}/>)
   return calls
 }
 
@@ -100,3 +100,31 @@ describe('KeychainPage', () => {
     expect(screen.getByLabelText('Secret value').value).toBe('fixture-only')
     expect(screen.getByRole('status').closest('.keychain-editor')).toBeNull()
   })
+
+it('admin selection guards drafts, cancels replacement, and retries failed writes without reading values', async () => {
+ const state = vi.fn()
+ const calls = setup(['ALPHA_KEY', 'BETA_KEY'], { adminWorkspace: true, onDraftState: state })
+ const dialog = mockDialog()
+ const user = userEvent.setup()
+ await user.click(await screen.findByRole('button', { name: 'ALPHA_KEY' }))
+ expect(screen.getByLabelText('Name').readOnly).toBe(true)
+ expect(screen.getByLabelText('Secret value').value).toBe('')
+ await user.type(screen.getByLabelText('Secret value'), 'fixture-only')
+ dialog.mockReturnValueOnce(false)
+ await user.click(screen.getByRole('button', { name: 'BETA_KEY' }))
+ expect(screen.getByLabelText('Name').value).toBe('ALPHA_KEY')
+ expect(screen.getByLabelText('Secret value').value).toBe('fixture-only')
+ globalThis.fetch.mockImplementationOnce(() => Promise.reject(new Error('fixture rejected')))
+ await user.click(screen.getByRole('button', { name: 'Save key' }))
+ await waitFor(() => expect(screen.getByRole('status').textContent).toBe('fixture rejected'))
+ expect(screen.getByLabelText('Secret value').value).toBe('fixture-only')
+ await user.click(screen.getByRole('button', { name: 'Cancel editing' }))
+ expect(screen.getByLabelText('Secret value').value).toBe('')
+ expect(screen.getByRole('button', { name: 'ALPHA_KEY' }).getAttribute('aria-pressed')).toBe('true')
+ await user.type(screen.getByLabelText('Secret value'), 'fixture-retry')
+ await user.click(screen.getByRole('button', { name: 'Save key' }))
+ await waitFor(() => expect(screen.getByLabelText('Secret value').value).toBe(''))
+ expect(state).toHaveBeenLastCalledWith({ dirty: false, busy: false })
+ expect(calls.filter(([, o]) => !o.method || o.method === 'GET')).toHaveLength(1)
+ expect(calls.every(([url]) => url === '/api/keychain')).toBe(true)
+})
