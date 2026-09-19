@@ -8,7 +8,7 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
   const [autoCollapseProcess, setAutoCollapseProcess] = useAutoCollapseProcess()
   return <SettingsPage>
     <ProjectModeSetting value={projectProvider} onSave={onSaveProjectProvider} lang={lang} disabled={projectSettingsDisabled}/>
-    <SettingsSection title={text.chat.processDisplay} icon={<FoldVertical size={17}/>}>
+    <SettingsSection title={text.chat.processDisplay} description={lang === 'en' ? 'Changes apply immediately on this device; no save required.' : '更改立即在此设备生效，无需保存。'} icon={<FoldVertical size={17}/>}>
       <SettingToggle
         id="settings-auto-collapse-process"
         checked={autoCollapseProcess}
@@ -40,6 +40,7 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
         </select>
       </SettingRow>
       <SettingFooter>
+        <p className="set-save-scope">{lang === 'en' ? 'Save applies only to automatic titles, including the switch above.' : '保存仅应用于自动标题设置，包括上方开关。'}</p>
         <button className="primary" type="button" disabled={titleModel.saving} onClick={titleModel.submit}>
           <Save size={15}/>{text.chat.save}
         </button>

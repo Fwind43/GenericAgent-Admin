@@ -140,7 +140,7 @@ export function GeneralPage({
   const proxyHelp = { off: text.network.offHelp, system: text.network.systemHelp, custom: text.network.customHelp }[proxyMode]
 
   return <SettingsPage>
-    <SettingsSection title={text.appearance.title} description={text.appearance.desc} icon={<Palette size={17}/>}>
+    <SettingsSection title={text.appearance.title} description={`${text.appearance.desc} ${lang === 'en' ? 'Changes apply immediately.' : '更改立即生效。'}`} icon={<Palette size={17}/>}>
       <SettingRow label={text.appearance.language} hint={text.appearance.languageHelp}>
         <div className="set-segmented" role="group" aria-label={t.language}>
           <button type="button" aria-pressed={lang === 'zh'} className={lang === 'zh' ? 'is-active' : ''} onClick={()=>onLanguage('zh')}>中文</button>

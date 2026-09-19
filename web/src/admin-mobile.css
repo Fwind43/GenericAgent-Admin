@@ -241,3 +241,11 @@
 @media (max-width: 420px) {
   .app > #admin-sidebar { width: min(91vw, 316px) !important; }
 }
+
+/* Admin-only touch targets; preserve the existing mobile scroll contract. */
+@media (max-width: 900px) {
+  .app :is(button, select, input:not([type="checkbox"]):not([type="radio"])) { min-height: 44px; }
+  .app > #admin-sidebar nav button { min-height: 44px; }
+  .app > .main :is(.admin-sidebar-toggle, .settings-back) { min-width: 44px; min-height: 44px; }
+  .app > .main :is(.set-card-copy, .set-row-copy, .set-card-footer) { min-width: 0; }
+}

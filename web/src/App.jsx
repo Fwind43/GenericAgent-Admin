@@ -309,7 +309,7 @@ export default function App({ embedded = false, active = true, onClose }) {
       <main className="main">
         <div className="admin-mobile-bar">
           <button type="button" className="admin-sidebar-toggle" aria-label={lang === 'zh' ? '展开管理导航' : 'Open admin navigation'} aria-expanded={adminSidebarOpen} aria-controls="admin-sidebar" onClick={()=>setAdminSidebarOpen(true)}><Menu size={21} aria-hidden="true"/></button>
-          <span>{t.appName}</span>
+          <span>{t.nav[tab]}</span>
           {serviceStatus}
         </div>
         {embedded && <button ref={settingsBackRef} type="button" className="settings-back" onClick={()=>setSettingsDetail(false)}><ArrowLeft size={18} aria-hidden="true"/>{lang === 'zh' ? '返回分类' : 'All categories'}</button>}
