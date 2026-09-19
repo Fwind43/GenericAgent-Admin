@@ -161,12 +161,17 @@ export function TasksPage({
           : <p className="muted">{t.hints.noReflect}</p>}
       </Panel>
       <Panel title={`${t.nav.autonomous} · ${t.lists.recentReports}`}>
+        <div className="runtime-report-detail">
         <div className="report-list">
           {autonomousReports.length
-            ? autonomousReports.map(r=><button key={r.path} className={scheduleState.artifactTitle===r.path ? 'active' : ''} onClick={()=>scheduleState.readArtifact(r.path, { section: null })}>{r.name}<small>{new Date(r.mod_time).toLocaleString()}</small></button>)
+            ? autonomousReports.map(r=><button type="button" key={r.path} aria-pressed={scheduleState.artifactTitle===r.path} className={scheduleState.artifactTitle===r.path ? 'active' : ''} onClick={()=>scheduleState.readArtifact(r.path, { section: null })}>{r.name}<small>{new Date(r.mod_time).toLocaleString()}</small></button>)
             : <p className="muted">{t.empty}</p>}
         </div>
-        <pre className="artifact-view">{scheduleState.artifactTitle?.includes('autonomous_reports') ? (scheduleState.artifact || t.empty) : t.empty}</pre>
+        <div className="runtime-report-preview">
+          <h3>{scheduleState.artifactTitle?.includes('autonomous_reports') ? scheduleState.artifactTitle : t.lists.generatedPreview}</h3>
+          <pre className="artifact-view">{scheduleState.artifactTitle?.includes('autonomous_reports') ? (scheduleState.artifact || t.empty) : t.empty}</pre>
+        </div>
+        </div>
       </Panel>
     </div>}
 

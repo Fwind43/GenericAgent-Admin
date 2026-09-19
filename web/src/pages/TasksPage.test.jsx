@@ -4,6 +4,16 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TaskFormEditor, TasksPage } from './TasksPage'
 import { I18N } from '../lib/i18n'
 afterEach(cleanup)
+it('organizes runtime reports into a selectable list and in-place detail without changing its action', () => {
+ const readArtifact = vi.fn()
+ const report = { path: 'autonomous_reports/fixture.txt', name: 'Fixture report', mod_time: '2026-09-19T00:00:00Z' }
+ const { container } = render(<TasksPage t={I18N.en} section="runs" schedule={{ tasks: [] }} taskSvcs={[]} goals={[]} reflectSvcs={[]} autonomousReports={[report]} scheduleState={{ artifactTitle: report.path, artifact: 'Fixture body', readArtifact }} />)
+ fireEvent.click(screen.getByRole('button', { name: /Fixture report/ }))
+ expect(readArtifact).toHaveBeenCalledWith(report.path, { section: null })
+ expect(screen.getByRole('button', { name: /Fixture report/ }).getAttribute('aria-pressed')).toBe('true')
+ expect(container.querySelector('.runtime-report-detail .runtime-report-preview pre').textContent).toBe('Fixture body')
+ expect(container.querySelector('.runtime-report-preview h3').textContent).toBe(report.path)
+})
 it('preserves unknown task fields while editing the prompt', () => {
  const onChange=vi.fn()
  render(<TaskFormEditor t={I18N.en} value={JSON.stringify({prompt:'draft',custom:{keep:true}})} onChange={onChange}/> )

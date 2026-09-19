@@ -39,7 +39,12 @@
 .app .tasks-page .service-index small { color: var(--muted); }
 .app .tasks-page .service-selected { min-width: 0; }
 .app .tasks-page .actions { flex-wrap: wrap; }
+.app .tasks-page .runtime-report-detail { display: grid; grid-template-columns: minmax(220px, .7fr) minmax(0, 1.5fr); gap: 20px; align-items: start; }
+.app .tasks-page .runtime-report-preview { min-width: 0; }
+.app .tasks-page .runtime-report-preview h3 { margin: 0 0 12px; overflow-wrap: anywhere; font-size: 13px; }
+.app .tasks-page .runtime-report-detail .report-list { margin: 0; }
 @media (max-width: 1100px) {
+ .app .tasks-page .runtime-report-detail { grid-template-columns: minmax(0, 1fr); }
  .app .tasks-page .tasks-workspace { grid-template-columns: minmax(0,1fr); }
 }
 @media (max-width: 600px) {
