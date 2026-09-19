@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { groupProjectSessions, moveProjectOrder } from './chatProjectSessions.js'
+import { filterRecentNodes, excludeProjectSessions, groupProjectSessions, isProjectSession, moveProjectOrder, projectSessionKeys } from './chatProjectSessions.js'
 
 test('qualified ordering isolates names and supports legacy official order', () => {
   const projects = [
@@ -94,4 +94,54 @@ test('one project combines both origins and retains legacy pin and order', () =>
  assert.equal(groups[0].key,'A')
  assert.equal(groups[0].pinned,true)
  assert.deepEqual(groups[0].sessions,sessions)
+})
+
+test('isProjectSession matches project ids and legacy project_mode names', () => {
+  const projects = [
+    { provider: 'admin', id: 'alpha-id', name: 'Alpha' },
+    { provider: 'official', id: 'Alpha', name: 'Alpha' },
+    'Beta',
+  ]
+  assert.equal(isProjectSession({ project_id: 'alpha-id' }, projects), true)
+  assert.equal(isProjectSession({ project_mode: 'Alpha' }, projects), true)
+  assert.equal(isProjectSession({ project_mode: 'Beta' }, projects), true)
+  assert.equal(isProjectSession({ project_mode: 'Unknown' }, projects), false)
+  assert.equal(isProjectSession({ id: 'plain' }, projects), false)
+  assert.equal(isProjectSession(null, projects), false)
+})
+
+test('excludeProjectSessions keeps unknown-project and general chats', () => {
+  const projects = ['Alpha', { provider: 'admin', id: 'beta-id', name: 'Beta' }]
+  const sessions = [
+    { id: 'general' },
+    { id: 'alpha', project_mode: 'Alpha' },
+    { id: 'beta', project_id: 'beta-id' },
+    { id: 'orphan', project_mode: 'Removed' },
+  ]
+  assert.deepEqual(excludeProjectSessions(sessions, projects).map(s => s.id), ['general', 'orphan'])
+  assert.deepEqual(excludeProjectSessions(sessions, []).map(s => s.id), ['general', 'alpha', 'beta', 'orphan'])
+  assert.deepEqual(excludeProjectSessions(null, projects), [])
+  assert.deepEqual(excludeProjectSessions(sessions, ['Alpha']).map(s => s.id), ['general', 'beta', 'orphan'])
+})
+
+test('projectSessionKeys ignores blanks and tolerates malformed input', () => {
+  assert.deepEqual([...projectSessionKeys(null)], [])
+  assert.deepEqual([...projectSessionKeys(['', '  ', null, 'Alpha'])], ['Alpha'])
+})
+
+test('filterRecentNodes drops project sessions only while the project sections are on', () => {
+  const projects = [{ provider: 'admin', id: 'p1', name: 'Alpha' }]
+  const nodes = [
+    { session: { id: 'general' } },
+    { session: { id: 'alpha', project_id: 'p1' } },
+    { session: { id: 'legacy', project_mode: 'Alpha' } },
+    { session: { id: 'orphan', project_id: 'p9' } },
+  ]
+  assert.deepEqual(filterRecentNodes(nodes, projects, false).map(n => n.session.id), ['general', 'alpha', 'legacy', 'orphan'])
+  assert.deepEqual(filterRecentNodes(nodes, projects, true).map(n => n.session.id), ['general', 'orphan'])
+})
+
+test('filterRecentNodes tolerates malformed input', () => {
+  assert.deepEqual(filterRecentNodes(null, null, true), [])
+  assert.deepEqual(filterRecentNodes([{ session: null }], [], true).length, 1)
 })

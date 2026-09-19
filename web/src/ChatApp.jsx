@@ -53,7 +53,7 @@ import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ult
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
 import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
-import { groupProjectSessions } from './lib/chatProjectSessions.js'
+import { filterRecentNodes, groupProjectSessions } from './lib/chatProjectSessions.js'
 import { useRuntimeModelRefresh } from './lib/useRuntimeModelRefresh.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
@@ -7524,7 +7524,10 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const pinnedProjectGroups = filteredProjectGroups.filter(group => group.pinned)
   const regularProjectGroups = filteredProjectGroups.filter(group => !group.pinned)
   const pinnedSessions = sidebarSections.pinned
-  const recentSessions = sidebarSections.recent
+  // With project sections visible, project sessions live under their project
+  // folder; keep only non-project chats in the plain recent list. Sessions whose
+  // project is unknown to the sidebar stay visible so nothing silently disappears.
+  const recentSessions = filterRecentNodes(sidebarSections.recent, projects, sidebarPreferences.showProjects)
   const renderSidebarTree = node => node.workers.length
     ? <ConductorSessionTree key={node.session.id} session={node.session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
     : renderSidebarSession(node.session)
