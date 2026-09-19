@@ -1,3 +1,4 @@
+import './keychain-workbench.css'
 import React, { useCallback, useEffect, useState } from 'react'
 import { LockKeyhole, Plus, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import { api } from '../lib/api'
@@ -70,9 +71,10 @@ export function KeychainPage({ text }) {
   }
 
   const loading = status?.kind === 'loading'
-  const feedback = status && !loading && !(status.kind === 'error' && keys.length === 0) ? status : null
+  const feedback = status && !loading ? status : null
 
   return <div className="keychain-page">
+    <div className={`keychain-feedback keychain-page-feedback${feedback ? ` is-${feedback.kind}` : ''}`} role="status" aria-live="polite">{feedback?.message || ''}</div>
     <div className="keychain-workspace" data-active-panel={activePanel}>
       <div className="keychain-view-switch" role="group" aria-label={copy.title}>
         <button type="button" className={activePanel === 'inventory' ? 'is-active' : ''}
@@ -135,7 +137,6 @@ export function KeychainPage({ text }) {
           </label>
           <p className="keychain-form-note"><LockKeyhole size={13}/><span>{copy.valueHelp}</span></p>
           <div className="keychain-form-footer">
-            <div className={`keychain-feedback${feedback ? ` is-${feedback.kind}` : ''}`} role="status" aria-live="polite">{feedback?.message || ''}</div>
             <button type="submit" className="primary keychain-submit" disabled={busy || !name.trim() || !value}><Plus size={15}/>{busy ? copy.saving : copy.add}</button>
           </div>
         </form>

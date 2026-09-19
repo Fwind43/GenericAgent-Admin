@@ -85,3 +85,18 @@ describe('KeychainPage', () => {
     expect(JSON.parse(remove[1].body)).toEqual({ name: 'REMOVE_ME' })
   })
 })
+
+ it('keeps failed writes visible and preserves the draft for retry', async () => {
+    setup([])
+    mockDialog()
+    const user = userEvent.setup()
+    await screen.findByText('No keys saved')
+    await user.type(screen.getByLabelText('Name'), 'RETRY_KEY')
+    await user.type(screen.getByLabelText('Secret value'), 'fixture-only')
+    globalThis.fetch.mockImplementationOnce(() => Promise.reject(new Error('fixture write failed')))
+    await user.click(screen.getByRole('button', { name: 'Save key' }))
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('fixture write failed'))
+    expect(screen.getByLabelText('Name').value).toBe('RETRY_KEY')
+    expect(screen.getByLabelText('Secret value').value).toBe('fixture-only')
+    expect(screen.getByRole('status').closest('.keychain-editor')).toBeNull()
+  })

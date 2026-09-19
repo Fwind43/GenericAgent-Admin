@@ -1,0 +1,17 @@
+.app > .main .keychain-page .keychain-list code { white-space: normal; overflow-wrap: anywhere; min-width: 0; line-height: 1.6; font-size: 13px; }
+.app > .main .keychain-page .keychain-list li { gap: 16px; padding-top: 12px; padding-bottom: 12px; }
+.app > .main .keychain-page .keychain-delete { flex-shrink: 0; color: var(--danger, #b43d3d); }
+.app > .main .keychain-page :is(.keychain-section-head p, .keychain-form-note, .keychain-privacy) { font-size: 13px; line-height: 1.6; color: var(--text); opacity: .8; }
+.keychain-page-feedback:empty { display: none; }
+.keychain-page-feedback:not(:empty) { padding: 12px 16px; margin-bottom: 12px; border: 1px solid currentColor; border-radius: 8px; overflow-wrap: anywhere; }
+.app > .main .keychain-page .keychain-form-footer { justify-content: flex-end; }
+@media (max-width: 900px) {
+  .app > .main .keychain-page :is(button, input) { min-height: 44px; }
+  .app > .main .keychain-page .keychain-submit { width: 100%; justify-content: center; }
+}
+
+.app > .main .keychain-list code { max-height: none; -webkit-line-clamp: unset; display: block; line-height: 1.6; padding-block: 4px; }
+.app > .main .keychain-delete { opacity: 1; color: var(--danger, #b43d3d); }
+.app > .main .keychain-page .keychain-submit { min-height: 44px; }
+
+.app > .main .keychain-page .keychain-list code { overflow: visible; height: auto; flex: 1 1 0%; }
