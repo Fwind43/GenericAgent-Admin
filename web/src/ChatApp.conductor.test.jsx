@@ -309,7 +309,9 @@ for (const theme of ['light', 'dark', 'warm']) {
     return new Response(JSON.stringify({ ok: true, ...data, data }), { status: 200, headers: { 'Content-Type': 'application/json' } })
    }))
    render(<ChatApp />)
-   fireEvent.click(await screen.findByRole('tab', { name: 'Projects', exact: true }))
+   const projectsSection = await screen.findByRole('button', { name: 'Projects', exact: true })
+   if (projectsSection.getAttribute('aria-expanded') !== 'true') fireEvent.click(projectsSection)
+   await waitFor(() => expect(projectsSection.getAttribute('aria-expanded')).toBe('true'))
    fireEvent.click(await screen.findByRole('button', { name: 'Project actions' }))
    fireEvent.click(await screen.findByRole('button', { name: 'New project Conductor' }))
    await waitFor(() => expect(posts).toEqual([typeof project === 'string'
