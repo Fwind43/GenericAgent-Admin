@@ -1957,32 +1957,59 @@ describe('operator shell feedback', () => {
   test('refresh shows pending, success, and a recoverable error', async () => {
     installBrowserPolyfills()
     let configCalls = 0
-    let releaseRefresh
+    let settleRetry
     globalThis.fetch = vi.fn((url) => {
       const path = new URL(url, 'http://localhost').pathname
       if (path === '/api/config') {
         configCalls += 1
-        if (configCalls === 2) return new Promise(resolve => { releaseRefresh = () => resolve(shellPayload(url)) })
-        if (configCalls === 3) return Promise.reject(new Error('network offline'))
+        if (configCalls === 1) return Promise.reject(new Error('network offline'))
+        if (configCalls === 2) return new Promise((resolve, reject) => {
+          settleRetry = { resolve: () => resolve(shellPayload(url)), reject }
+        })
       }
       return Promise.resolve(shellPayload(url))
     })
     render(<App />)
-    await screen.findByText(/运行状态已刷新/)
-    const refresh = document.querySelector('button.refresh')
-    expect(refresh).toBeTruthy()
 
-    fireEvent.click(refresh)
-    expect(await screen.findByText(/正在刷新运行状态/)).toBeTruthy()
-    expect(refresh.disabled).toBe(true)
-    releaseRefresh()
-    expect(await screen.findByText(/运行状态已刷新/)).toBeTruthy()
-    await waitFor(() => expect(refresh.disabled).toBe(false))
+    const notice = () => document.querySelector('.ga-status-notice')
+    // The retry entry is rendered only while the notice sits in its error state,
+    // so it doubles as the observable "recovery available" signal.
+    const retryEntry = () => {
+      const node = notice()
+      if (!node) return null
+      return [...node.querySelectorAll('button')].find(button => /\u91cd\u8bd5|Retry/.test(button.textContent)) || null
+    }
 
-    fireEvent.click(refresh)
-    const alert = await screen.findByRole('alert')
-    expect(alert.textContent).toMatch(/刷新失败.*network offline/i)
-    expect(screen.getByRole('button', { name: /重试|Retry/ }).disabled).toBe(false)
+    // 1. The boot load fails: the shell reports it in place and offers a usable retry.
+    expect(await screen.findByText(/\u5237\u65b0\u5931\u8d25\uff1anetwork offline/)).toBeTruthy()
+    expect(configCalls).toBe(1)
+    expect(notice().getAttribute('role')).toBe('alert')
+    expect(notice().getAttribute('aria-busy')).toBeNull()
+    expect(retryEntry()).toBeTruthy()
+    expect(retryEntry().disabled).toBe(false)
+
+    // 2. A hanging retry shows pending feedback and withdraws the retry entry.
+    fireEvent.click(retryEntry())
+    expect(configCalls).toBe(2)
+    expect(await screen.findByText(/\u6b63\u5728\u5237\u65b0\u8fd0\u884c\u72b6\u6001/)).toBeTruthy()
+    expect(notice().getAttribute('aria-busy')).toBe('true')
+    expect(screen.queryByText(/\u5237\u65b0\u5931\u8d25/)).toBeNull()
+    expect(retryEntry()).toBeNull()
+
+    // 3. Failing again keeps a usable retry entry instead of stranding the shell.
+    settleRetry.reject(new Error('network offline'))
+    expect(await screen.findByText(/\u5237\u65b0\u5931\u8d25\uff1anetwork offline/)).toBeTruthy()
+    expect(notice().getAttribute('role')).toBe('alert')
+    expect(retryEntry()).toBeTruthy()
+    expect(retryEntry().disabled).toBe(false)
+
+    // 4. A successful retry recovers the shell and removes the retry entry.
+    fireEvent.click(retryEntry())
+    expect(configCalls).toBe(3)
+    expect(await screen.findByText(/\u8fd0\u884c\u72b6\u6001\u5df2\u5237\u65b0/)).toBeTruthy()
+    await waitFor(() => expect(notice().getAttribute('aria-busy')).toBeNull())
+    expect(screen.queryByText(/\u5237\u65b0\u5931\u8d25/)).toBeNull()
+    expect(retryEntry()).toBeNull()
   })
 
   test('service actions stay local to one card and expose failure recovery', async () => {
