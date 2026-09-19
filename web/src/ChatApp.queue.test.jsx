@@ -148,8 +148,8 @@ describe('session-scoped guided-message queue wiring', () => {
   test('does not replace an optimistic guided turn with a heartbeat snapshot', () => {
     const refreshStart = source.indexOf('const refreshList = async')
     const attach = source.indexOf('void attachRunningStream(activeID, { waitForRun:true })', refreshStart)
-    const guardedSnapshot = source.indexOf('} else if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {', attach)
-    const refreshSnapshot = source.indexOf('void refreshActiveSessionSnapshot(activeID)', guardedSnapshot)
+    const guardedSnapshot = source.indexOf('if (!guidingQueueRef.current && shouldRefreshChatSnapshot(before, after)) {', attach)
+    const refreshSnapshot = source.indexOf('await refreshActiveSessionSnapshot(activeID).catch(() => {})', guardedSnapshot)
     expect(refreshStart).toBeGreaterThan(-1)
     expect(attach).toBeGreaterThan(refreshStart)
     expect(guardedSnapshot).toBeGreaterThan(attach)
