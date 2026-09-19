@@ -10,3 +10,5 @@
 .app .usage-page button { min-height:44px; }
 .app .usage-page .usage-card th, .app .usage-page .usage-metric span, .app .usage-page .usage-card-head p { color:var(--text); }
 .app .usage-page .usage-scroll-hint { color:var(--text); font-size:12px; margin:8px 0; }
+
+.app .usage-page .usage-months, .app .usage-page .usage-weekdays, .app .usage-page .usage-heat-legend, .app .usage-page .usage-section-head p { color:var(--text); }
