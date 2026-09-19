@@ -89,15 +89,21 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
             <input type="number" min="20" max="2000" step="20" aria-label={t.hints.tailLines} value={stream.tailLines} onChange={e => stream.setTailLines(Number(e.target.value) || 200)}/>
           </label>
           <span className="log-console-actions">
+            <span className="log-action-group">
             <button type="button" className={stream.follow ? 'is-on' : ''} aria-pressed={stream.follow} disabled={!stream.selected} onClick={() => stream.setFollow(value => !value)}><ArrowDownToLine size={14}/>{text.follow}</button>
             <button type="button" className={wrap ? 'is-on' : ''} aria-pressed={wrap} onClick={() => setWrap(value => !value)}><WrapText size={14}/>{text.wrap}</button>
+            </span>
+            <span className="log-action-group">
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={copy} title={copied ? text.copied : t.copy} aria-label={copied ? text.copied : t.copy}>{copied ? <Check size={14}/> : <Copy size={14}/>}</button>
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={download} title={t.download} aria-label={t.download}><Download size={14}/></button>
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={stream.clear} title={t.clear} aria-label={t.clear}><Trash2 size={14}/></button>
+            </span>
+            <span className="log-action-group">
             <button type="button" className="log-icon-button" disabled={!stream.selected} onClick={stream.retry} title={text.reconnect} aria-label={text.reconnect}><RefreshCw size={14}/><span>{text.reconnect}</span></button>
             {selectedService?.running
               ? <button type="button" disabled={!stream.selected} onClick={() => onStop(stream.selected)}><Square size={14}/>{t.stop}</button>
               : <button type="button" disabled={!stream.selected} onClick={() => onStart(stream.selected)}><Play size={14}/>{t.start}</button>}
+            </span>
           </span>
         </div>
 

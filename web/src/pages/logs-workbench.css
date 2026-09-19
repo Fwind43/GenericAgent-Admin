@@ -13,5 +13,15 @@
 .app .logs-page .log-count, .app .logs-page .log-rail-meta { color:var(--text); }
 .app .logs-page .log-line { line-height:1.65; }
 
+/* Keep reading controls, export actions and connection actions together. */
+.app .logs-page .log-action-group { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.app .logs-page .log-console-actions { gap:12px; }
 /* Normal flow: the jump control never occupies the log viewport. */
 .app .logs-page .log-jump { position:static; display:flex; margin:8px 0 0 auto; box-shadow:none; backdrop-filter:none; }
+@media(max-width:760px) {
+  .app .logs-page .log-console-bar { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+  .app .logs-page .log-tail { justify-content:space-between; }
+  .app .logs-page .log-console-actions { display:flex; gap:8px; }
+  .app .logs-page .log-action-group { flex:1 0 auto; }
+  .app .logs-page .log-action-group:last-child { flex-basis:100%; padding-top:8px; border-top:1px solid var(--log-line); }
+}
