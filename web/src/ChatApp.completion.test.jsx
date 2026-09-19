@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import vm from 'node:vm'
 import { describe, expect, test } from 'vitest'
 import { reconcileHistoryPage } from './lib/chatHistoryPages.js'
+import { normalizeChatAttachments } from './lib/chatAttachments.js'
 
 const source = readFileSync('src/ChatApp.jsx', 'utf8').replace(/\r\n/g, '\n')
 const between = (start, end) => {
@@ -38,7 +39,7 @@ function harness() {
     followChatStream: () => gates.stream.promise,
     loadSessions: () => { calls.push(['list']); return gates.list.promise },
     chatApi: url => { calls.push(['api', url]); return url.includes('/state/') ? gates.state.promise : gates.detail.promise },
-    addChatInstanceToURL: url => url, normalizeReasoningEffort: value => value || '',
+    addChatInstanceToURL: url => url, normalizeReasoningEffort: value => value || '', normalizeChatAttachments,
     applyQueueSnapshot: value => calls.push(['queue', value]),
     shouldPollGeneratedTitle: () => false, loadWorldline: async () => {},
     attachRunningStream: id => calls.push(['attach', id]),
