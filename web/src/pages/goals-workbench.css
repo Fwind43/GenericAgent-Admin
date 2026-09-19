@@ -1,0 +1,20 @@
+.app .goals-page, .app .goals-page .goal-tab-panel { min-width: 0; }
+.app .goals-page .goal-tabs { flex-wrap: wrap; }
+.app .goals-page .goal-tabs button, .app .goals-page .goal-summary-head, .app .goals-page .goal-summary-files, .app .goals-page .goal-row-main { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+.app .goals-page .goal-row p, .app .goals-page .goal-focus-card p, .app .goals-page .goal-output-meta, .app .goals-page .panel h3 { overflow-wrap: anywhere; }
+.app .goals-page .goal-list-toolbar { justify-content: flex-end; margin-bottom: 12px; }
+.app .goals-page .goal-row-actions { padding-top: 10px; border-top: 1px solid var(--border); }
+.app .goals-page .goal-row-actions .danger { margin-left: auto; }
+@media (max-width: 760px) {
+ .app .goals-page button, .app .goals-page input:not([type="checkbox"]), .app .goals-page select, .app .goals-page summary { min-height: 44px; }
+ .app .goals-page .goal-params, .app .goals-page .goal-focus-grid { grid-template-columns: minmax(0,1fr); }
+ .app .goals-page .goal-tabs button { flex: 1 1 auto; }
+ .app .goals-page .goal-row-actions { flex-wrap: wrap; }
+ .app .goals-page .goal-toolbar { flex-wrap: wrap; }
+}
+
+.app .goals-page .goal-row { opacity: 1; }
+.app .goals-page .goal-row-main p { display: block; -webkit-line-clamp: unset; line-clamp: unset; color: var(--text); }
+.app .goals-page .goal-row-title b { white-space: normal; overflow-wrap: anywhere; }
+.app .goals-page .goal-row-actions .danger { color: var(--red); border-color: currentColor; }
+@media (max-width:760px) { .app .goals-page .goal-row-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); } .app .goals-page .goal-row-actions .danger { margin-left: 0; } }

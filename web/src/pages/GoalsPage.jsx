@@ -1,3 +1,4 @@
+import './goals-workbench.css'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, Copy, Eye, Play, RefreshCw, Square, Target, Terminal, Trash2, XCircle } from 'lucide-react'
 import { copyText, formatBytes, formatDuration, formatGoalTime, goalBudgetPercent, goalTurnPercent, modelLabel, outputLineCount } from '../lib/format'
@@ -32,7 +33,7 @@ export function GoalsPage({ t, goals, objective, setObjective, budget, setBudget
   const openOutput = (id) => { onOutput(id); setGoalTab('output') }
   const showStatePath = (path) => { if (path) setMsg(`${t.fields.stateFile}: ${path}`) }
 
-  return <section className="goals-page">
+  return <section className="goals-page" aria-busy={busy}>
     <div className="stats schedule-stats goal-stats">
       <div className="stat"><Target/><span>{t.nav.goals}</span><b>{goalList.length}</b></div>
       <div className="stat"><Activity/><span>{t.running}</span><b>{running}</b></div>
@@ -67,8 +68,9 @@ export function GoalsPage({ t, goals, objective, setObjective, budget, setBudget
     </Panel>}
 
     {goalTab==='runs' && <Panel title={t.fields.goalRuns} className="goals-list-panel goal-tab-panel">
+      <div className="actions goal-list-toolbar"><button disabled={busy} onClick={onRefresh}><RefreshCw size={14}/>{t.refresh}</button></div>
       <div className="goal-list clean-list goal-list-tabbed">
-        {goalList.length ? goalList.map(g => <GoalRunCard key={g.id} g={g} t={t} selected={selected} onOutput={openOutput} onState={showStatePath} onStop={onStop} onDelete={onDelete}/>) : <p className="muted">{t.empty}</p>}
+        {goalList.length ? goalList.map(g => <GoalRunCard key={g.id} g={g} t={t} selected={selected} onOutput={openOutput} onState={showStatePath} onStop={onStop} onDelete={onDelete}/>) : <p className="empty-card" role="status">{t.empty}</p>}
       </div>
     </Panel>}
 
@@ -111,7 +113,7 @@ export function GoalsPage({ t, goals, objective, setObjective, budget, setBudget
         <span>{t.fields.outputShown}: {formatBytes(outputBytesShown)} / {formatBytes(outputTotalBytes)}</span>
         <span>{t.fields.outputLines}: {outputLinesShown}{outputTotalLines !== outputLinesShown ? ` / ${outputTotalLines}` : ''}</span>
       </div>
-      {outputBadges.length > 0 && <div className="goal-output-meta">{outputBadges.map(m => <span key={m}>{m}</span>)}</div>}
+      {outputBadges.length > 0 && <div className="goal-output-meta" role={outputMeta?.error ? 'alert' : 'status'}>{outputBadges.map(m => <span key={m}>{m}</span>)}</div>}
       <GoalChatView output={output} empty={t.empty} />
     </Panel>}
   </section>
