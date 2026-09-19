@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Activity, CalendarClock, Code2, FileCode2, FolderCog, RefreshCw, Save, Server, ShieldAlert, SlidersHorizontal, Target, Terminal, XCircle } from 'lucide-react'
 import { Panel, ServiceRow } from '../components/common'
 import { TaskRow } from '../components/schedule'
@@ -60,6 +60,15 @@ export function TasksPage({
   goals, onRefreshGoals, onOpenGoal, autonomousReports, busy,
 }) {
   const tasks = normalizeScheduleTasksPayload(schedule).tasks
+  const [serviceId, setServiceId] = useState('')
+  const [runtimeId, setRuntimeId] = useState('')
+  const selectedTask = tasks.find(task => task.id === scheduleState.taskId)
+  const serviceIndex = (items, selected, select) => <div className="service-master-detail">
+    <div className="service-index" aria-label={t.lists.taskServices}>
+      {items.map(svc => <button type="button" key={svc.name} aria-pressed={(selected || items[0]?.name) === svc.name} onClick={() => select(svc.name)}><strong>{svc.name}</strong><small>{svc.running ? t.running : t.stopped}</small></button>)}
+    </div>
+    <div className="service-selected">{items.filter(svc => svc.name === (items.some(item => item.name === selected) ? selected : items[0]?.name)).map(svc => <ServiceRow key={svc.name} svc={svc} t={t} llms={llms} actionState={actionStates[svc.name]} onStart={onStart} onStop={onStop} onLogs={onLogs} onAutostart={onAutostart} onModel={onServiceModel} onReflectStart={onReflectStart}/>)}</div>
+  </div>
   const runningGoals = goals.filter(g => g.running).length
   const sections = [
     ['services', <Server key="i" size={14}/>, t.lists.taskServices],
@@ -68,7 +77,7 @@ export function TasksPage({
     ['reports', <FolderCog key="i" size={14}/>, t.lists.recentReports],
   ]
 
-  return <section className="tasks-page">
+  return <section className="tasks-page tasks-desktop-workbench">
     <div className="stats schedule-stats">
       <div className="stat"><Activity/><span>{t.lists.taskServices}</span><b>{taskSvcs.length}</b></div>
       <div className="stat"><CalendarClock/><span>{t.cards.enabledTasks || t.enabled}</span><b>{schedule.enabled || 0}</b></div>
@@ -83,10 +92,9 @@ export function TasksPage({
 
     {section==='services' && <div className="single-panel">
       <Panel title={t.lists.taskServices}>
-        <p className="muted">{t.desc.tasks}</p>
         <div className="service-list clean-list">
           {taskSvcs.length
-            ? taskSvcs.map(svc => <ServiceRow key={svc.name} svc={svc} t={t} llms={llms} actionState={actionStates[svc.name]} onStart={onStart} onStop={onStop} onLogs={onLogs} onAutostart={onAutostart} onModel={onServiceModel} onReflectStart={onReflectStart}/>)
+            ? serviceIndex(taskSvcs, serviceId, setServiceId)
             : <p className="muted">{t.hints.noTasks}</p>}
         </div>
       </Panel>
@@ -109,11 +117,20 @@ export function TasksPage({
           {scheduleState.loading
             ? <p className="muted" role="status">{t.busy}</p>
             : tasks.length
-              ? tasks.map((task, idx) => <TaskRow key={task.id || task.name || idx} task={task} t={t} onToggle={scheduleState.toggleTask} onEdit={scheduleState.loadTask} onArtifact={scheduleState.readArtifact}/>)
+              ? tasks.map((task, idx) => <TaskRow key={task.id || task.name || idx} task={task} t={t} selected={task.id === scheduleState.taskId} disabled={busy} onEdit={scheduleState.loadTask}/>)
               : <p className="muted">{t.hints.noTasks}</p>}
         </div>
       </Panel>
       <Panel title={`${t.lists.editor} · ${scheduleState.taskId || t.empty}`}>
+        {selectedTask && <>
+          <div className="task-detail-meta"><code>{selectedTask.path}</code><span>{selectedTask.next_run || selectedTask.schedule}</span></div>
+          <div className="task-report-links">
+            {selectedTask.result_file && <button onClick={() => scheduleState.readArtifact(selectedTask.result_file)}>{t.tasks.result}</button>}
+            {(selectedTask.reports || []).map((r, i) => <button key={r.path || i} disabled={!r.path} onClick={() => scheduleState.readArtifact(r.path)}>{r.name || r.path || t.tasks.report}</button>)}
+            <button disabled={busy} onClick={() => scheduleState.toggleTask(selectedTask.id, !selectedTask.enabled)}>{selectedTask.enabled ? t.disabled : t.enabled}</button>
+          </div>
+        </>}
+        {scheduleState.dirty && <p role="status" className="task-draft-status">{lang === 'zh' ? '未保存草稿' : 'Unsaved draft'}</p>}
         <div className="editor-mode-toggle">
           <button aria-pressed={scheduleState.editorMode==='form'} className={scheduleState.editorMode==='form' ? 'active' : ''} onClick={()=>scheduleState.setEditorMode('form')}><SlidersHorizontal size={14}/>{t.tasks.form}</button>
           <button aria-pressed={scheduleState.editorMode==='json'} className={scheduleState.editorMode==='json' ? 'active' : ''} onClick={()=>scheduleState.setEditorMode('json')}><Code2 size={14}/>{t.tasks.json}</button>
@@ -123,8 +140,8 @@ export function TasksPage({
           ? <textarea className="json-editor compact-editor" value={scheduleState.editor} onChange={e=>scheduleState.setEditor(e.target.value)}/>
           : <TaskFormEditor value={scheduleState.editor} onChange={scheduleState.setEditor} t={t}/>}
         <div className="actions">
-          <button className="primary" onClick={scheduleState.saveTask} disabled={!scheduleState.taskId && !scheduleState.newTaskId}><Save size={14}/>{t.save}</button>
-          <button className="danger" onClick={scheduleState.deleteTask} disabled={!scheduleState.taskId}><XCircle size={14}/>{t.remove}</button>
+          <button className="primary" onClick={scheduleState.saveTask} disabled={busy || (!scheduleState.taskId && !scheduleState.newTaskId)}><Save size={14}/>{t.save}</button>
+          <button className="danger" onClick={scheduleState.deleteTask} disabled={busy || !scheduleState.taskId}><XCircle size={14}/>{t.remove}</button>
         </div>
       </Panel>
     </div>}
@@ -140,7 +157,7 @@ export function TasksPage({
       </Panel>
       <Panel title={t.lists.reflectServices}>
         {reflectSvcs.length
-          ? reflectSvcs.map(s=><ServiceRow key={s.name} svc={s} t={t} llms={llms} actionState={actionStates[s.name]} onStart={onStart} onStop={onStop} onLogs={onLogs} onAutostart={onAutostart} onModel={onServiceModel} onReflectStart={onReflectStart}/>)
+          ? serviceIndex(reflectSvcs, runtimeId, setRuntimeId)
           : <p className="muted">{t.hints.noReflect}</p>}
       </Panel>
       <Panel title={`${t.nav.autonomous} · ${t.lists.recentReports}`}>

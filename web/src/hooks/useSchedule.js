@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { confirmDanger } from '../lib/danger'
 import { safeJson } from '../lib/format'
@@ -12,6 +12,17 @@ export function useSchedule({ t, lang, setMsg, setBusy, onOpenSection }) {
   const [error, setError] = useState('')
   const [taskId, setTaskId] = useState('')
   const [editor, setEditor] = useState('{}')
+  const [savedEditor, setSavedEditor] = useState('')
+  const editorRef = useRef(editor)
+  editorRef.current = editor
+  const dirty = !!taskId && editor !== savedEditor
+  const discardDraft = () => !dirty || window.confirm(lang === 'zh' ? '切换将放弃未保存的任务草稿，继续？' : 'Discard unsaved task edits and continue?')
+  useEffect(() => {
+    if (!dirty) return
+    const warn = event => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
   const [newTaskId, setNewTaskId] = useState('new_task')
   const [editorMode, setEditorMode] = useState('form')
   const [artifactTitle, setArtifactTitle] = useState('')
@@ -46,11 +57,15 @@ export function useSchedule({ t, lang, setMsg, setBusy, onOpenSection }) {
   }
 
   const loadTask = async (id) => {
+    if (id === taskId || !discardDraft()) return
+    const previousEditor = editorRef.current
     setBusy(true)
     try {
       const d = await api(`/api/schedule/task?id=${encodeURIComponent(id)}`)
+      if (editorRef.current !== previousEditor) return
       setTaskId(d.id || id)
       setEditor(safeJson(d.raw))
+      setSavedEditor(safeJson(d.raw))
       onOpenSection?.('scheduled')
     } catch (e) { setMsg(e.message) } finally { setBusy(false) }
   }
@@ -60,14 +75,10 @@ export function useSchedule({ t, lang, setMsg, setBusy, onOpenSection }) {
     if (!await confirmDanger('schedule-save', lang === 'zh' ? `保存定时任务 ${id}？后端会写入 JSON 并生成备份。` : `Save scheduled task ${id}? The backend writes JSON and creates a backup.`)) return
     setBusy(true)
     try {
-      let raw = JSON.parse(editor)
-      if (editorMode === 'form') {
-        const known = ['enabled','max_delay_hours','repeat','schedule','prompt']
-        const filtered = {}
-        for (const k of known) if (k in raw && raw[k] !== undefined && raw[k] !== null && raw[k] !== '') filtered[k] = raw[k]
-        raw = filtered
-      }
+      const submittedEditor = editor
+      const raw = JSON.parse(submittedEditor)
       await api('/api/schedule/task', { dangerous:true, method:'PUT', body: JSON.stringify({ id, raw }) })
+      setSavedEditor(submittedEditor)
       setMsg(t.hints.taskSaved)
       await loadScheduleTasks({ quiet: true })
       onOpenSection?.('scheduled')
@@ -75,6 +86,7 @@ export function useSchedule({ t, lang, setMsg, setBusy, onOpenSection }) {
   }
 
   const createTask = async () => {
+    if (!discardDraft()) return
     const id = newTaskId.trim()
     if (!id) { setMsg('Schedule task id is required'); return }
     if (!await confirmDanger('schedule-create', `Create schedule task ${id}? This writes a sche_tasks JSON file.`)) return
@@ -85,6 +97,7 @@ export function useSchedule({ t, lang, setMsg, setBusy, onOpenSection }) {
       const created = d.task || DEFAULT_SCHEDULE_TASK
       setTaskId(created.id || id)
       setEditor(safeJson(created.raw || payload.task))
+      setSavedEditor(safeJson(created.raw || payload.task))
       setMsg(t.hints.taskSaved)
       await loadScheduleTasks()
       onOpenSection?.('scheduled')
@@ -119,7 +132,7 @@ export function useSchedule({ t, lang, setMsg, setBusy, onOpenSection }) {
 
   return {
     data, setData, loading, error,
-    taskId, editor, setEditor, newTaskId, setNewTaskId, editorMode, setEditorMode,
+    taskId, editor, setEditor, dirty, newTaskId, setNewTaskId, editorMode, setEditorMode,
     artifact, artifactTitle,
     loadScheduleTasks, toggleTask, loadTask, saveTask, createTask, deleteTask, readArtifact,
   }

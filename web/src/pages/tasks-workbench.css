@@ -1,10 +1,50 @@
-.tasks-page .tasks-workspace > *, .tasks-page .panel, .tasks-page .goal-row > div { min-width:0; }
-.tasks-page .report-list button { text-align:left; overflow-wrap:anywhere; white-space:normal; gap:8px; }
-.tasks-page .goal-row b, .tasks-page .panel h2, .tasks-page .panel h3 { overflow-wrap:anywhere; }
-.tasks-page .artifact-view { white-space:pre-wrap; overflow-wrap:anywhere; }
-.tasks-page .actions { gap:8px; flex-wrap:wrap; }
-.tasks-page .schedule-form-editor { display:grid; gap:16px; }
-.tasks-page .form-field { min-width:0; }
-.tasks-page .form-field > label:first-child { display:block; margin-bottom:6px; }
-.tasks-page .task-subtabs { flex-wrap:wrap; }
-@media(max-width:700px) { .tasks-page .tasks-workspace { grid-template-columns:minmax(0,1fr); } .tasks-page button, .tasks-page input:not([type=checkbox]), .tasks-page select, .tasks-page summary { min-height:44px; } .tasks-page .schedule-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .tasks-page .task-subtabs button { flex:1 1 45%; white-space:normal; } .tasks-page .task-create-btn-row { flex-wrap:wrap; } .tasks-page .goal-row { flex-wrap:wrap; gap:8px; } }
+/* Tasks owns its desktop-first summary/detail layout inside Admin only. */
+.app .tasks-page { display: flex; flex-direction: column; gap: 14px; }
+.app .tasks-page .schedule-stats { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.app .tasks-page .schedule-stats .stat { display: flex; flex: 0 1 auto; align-items: center; gap: 8px; padding: 0; min-height: 28px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.app .tasks-page .schedule-stats .stat svg { width: 15px; height: 15px; padding: 0; background: none; }
+.app .tasks-page .schedule-stats .stat span { font-size: 12px; }
+.app .tasks-page .schedule-stats .stat b { margin: 0; font-size: 16px; }
+.app .tasks-page .task-subtabs { margin: 0; padding: 0 0 10px; border-bottom: 1px solid var(--border); }
+.app .tasks-page .tasks-workspace { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(0, 1.4fr); gap: 20px; align-items: start; }
+.app .tasks-page .panel { margin: 0; min-width: 0; }
+.app .tasks-page .panel > h2, .app .tasks-page .panel > h3 { margin: 0 0 12px; }
+.app .tasks-page .task-create-row { display: flex; gap: 8px; margin: 0 0 12px; }
+.app .tasks-page .task-create-row input { flex: 1 1 120px; min-width: 0; }
+.app .tasks-page .task-create-row button { white-space: nowrap; }
+.app .tasks-page .task-list { display: flex; flex-direction: column; gap: 0; }
+.app .tasks-page .task-summary { display: flex; flex-direction: column; gap: 7px; width: 100%; min-width: 0; padding: 14px 12px; background: transparent; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; text-align: left; color: var(--text); }
+.app .tasks-page .task-summary:hover, .app .tasks-page .task-summary.is-selected { background: var(--accent-soft); }
+.app .tasks-page .task-summary.is-selected { box-shadow: inset 3px 0 var(--accent); }
+.app .tasks-page .task-summary-heading { display: flex; align-items: start; justify-content: space-between; gap: 10px; width: 100%; }
+.app .tasks-page .task-summary-heading strong { overflow-wrap: anywhere; }
+.app .tasks-page .task-summary-meta { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.app .tasks-page .task-summary-prompt { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; font-weight: 400; overflow-wrap: anywhere; }
+.app .tasks-page .schedule-form-editor { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+.app .tasks-page .schedule-form-editor .form-field { min-width: 0; margin: 0; }
+.app .tasks-page .schedule-form-editor .form-field:nth-child(5), .app .tasks-page .schedule-form-editor .extra-fields { grid-column: 1 / -1; }
+.app .tasks-page .schedule-form-editor textarea { width: 100%; min-height: 190px; resize: vertical; box-sizing: border-box; }
+.app .tasks-page .compact-tabs { margin: 12px 0; }
+.app .tasks-page .task-detail-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); }
+.app .tasks-page .task-detail-meta code { overflow-wrap: anywhere; }
+.app .tasks-page .task-report-links { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.app .tasks-page .task-report-links button { max-width: 100%; overflow-wrap: anywhere; }
+.app .tasks-page .task-draft-status { color: var(--accent); font-size: 12px; }
+.app .tasks-page .report-list button { text-align: left; overflow-wrap: anywhere; width: 100%; }
+.app .tasks-page .artifact-view { min-height: 280px; max-height: 65vh; white-space: pre-wrap; overflow: auto; overflow-wrap: anywhere; }
+.app .tasks-page .service-master-detail { display: grid; grid-template-columns: minmax(180px,.7fr) minmax(0,1.5fr); gap: 20px; }
+.app .tasks-page .service-index { display: flex; flex-direction: column; gap: 4px; }
+.app .tasks-page .service-index button { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 12px; border: 0; background: transparent; }
+.app .tasks-page .service-index button[aria-pressed=true] { background: var(--accent-soft); }
+.app .tasks-page .service-index small { color: var(--muted); }
+.app .tasks-page .service-selected { min-width: 0; }
+.app .tasks-page .actions { flex-wrap: wrap; }
+@media (max-width: 1100px) {
+ .app .tasks-page .tasks-workspace { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 600px) {
+ .app .tasks-page .service-master-detail { grid-template-columns: minmax(0,1fr); }
+ .app .tasks-page .schedule-form-editor { grid-template-columns: minmax(0,1fr); }
+ .app .tasks-page .task-create-row { flex-wrap: wrap; }
+ .app .tasks-page .task-subtabs button { min-height: 44px; }
+}
