@@ -14,6 +14,7 @@ for (const theme of ['light', 'dark', 'warm']) {
     ['legacy long', undefined, long, true, true],
     ['manual', 'user', '', true, false],
     ['manual copied instruction', 'user', short, true, false],
+    ['manual copied legacy instruction', 'user', long, true, false],
     ['legacy manual', undefined, '', true, false],
     ['non-worker legacy', undefined, long, false, false],
   ]) {
