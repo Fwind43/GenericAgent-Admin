@@ -12,3 +12,26 @@
 .app .usage-page .usage-scroll-hint { color:var(--text); font-size:12px; margin:8px 0; }
 
 .app .usage-page .usage-months, .app .usage-page .usage-weekdays, .app .usage-page .usage-heat-legend, .app .usage-page .usage-section-head p { color:var(--text); }
+
+/* Cumulative metrics -> time-window activity -> model accounting. */
+.app .usage-page .usage-section-nav { display:flex; flex-wrap:wrap; gap:8px; }
+.app .usage-page .usage-section-nav a { display:inline-flex; align-items:center; min-height:44px; padding:8px 14px; border:1px solid var(--border); border-radius:10px; color:var(--text); text-decoration:none; }
+.app .usage-page [id^="usage-"] { scroll-margin-top:16px; }
+.app .usage-page .usage-time-filter { display:grid; gap:6px; margin:16px 0 8px; font-size:12px; }
+.app .usage-page .usage-time-filter select { width:100%; min-height:44px; }
+.app .usage-page .usage-section-head small { display:block; color:var(--muted); line-height:1.6; }
+.app .usage-page .usage-heat-legend { width:auto; }
+.app .usage-page .usage-model-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:18px; border-bottom:1px solid var(--border); }
+.app .usage-page .usage-model-head h3 { padding:0; border:0; font-size:16px; }
+.app .usage-page .usage-model-head p { margin:6px 0 0; font-size:12px; color:var(--muted); line-height:1.6; }
+.app .usage-page .usage-model-head label { display:grid; gap:6px; min-width:0; font-size:12px; }
+.app .usage-page .usage-model-head input { min-height:44px; min-width:0; width:100%; }
+.app .usage-page .usage-model-count { margin:12px 18px; font-size:12px; color:var(--muted); }
+.app .usage-page .usage-panel th { font-size:12px; }
+.app .usage-page .usage-panel td strong, .app .usage-page .usage-panel td small { white-space:normal; overflow-wrap:anywhere; min-width:140px; overflow:visible; }
+.app .usage-page .usage-table-wrap { max-width:100%; }
+@media(max-width:760px) {
+ .app .usage-page .usage-model-head { align-items:stretch; flex-direction:column; }
+ .app .usage-page .usage-section-nav a { flex:1 1 auto; justify-content:center; }
+ .app .usage-page .usage-heatmap-card { grid-template-columns:minmax(0,1fr); }
+}

@@ -43,10 +43,11 @@ function Metric({ label, value, title, accent }) {
   return <div className={`usage-metric${accent ? ' usage-metric-accent' : ''}`} title={title}><span>{label}</span><strong>{value}</strong></div>
 }
 
-function UsageHeatmap({ daily = [], lang, copy }) {
+function UsageHeatmap({ daily = [], lang, copy, weeks, onWeeksChange }) {
+  const hint = lang === 'zh' ? `过去 ${weeks} 周 · 按每日 Token 用量着色` : `Past ${weeks} weeks · colored by daily token usage`
   const values = new Map(daily.map(day => [day.date, day]))
   const end = new Date(); end.setHours(0, 0, 0, 0)
-  const start = new Date(end); start.setDate(end.getDate() - (51 * 7 + end.getDay()))
+  const start = new Date(end); start.setDate(end.getDate() - ((weeks - 1) * 7 + end.getDay()))
   const cells = []
   for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
     const date = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
@@ -72,14 +73,14 @@ function UsageHeatmap({ daily = [], lang, copy }) {
     }
   })
   const weekdays = lang === 'zh' ? ['一', '三', '五'] : ['Mon', 'Wed', 'Fri']
-  return <section className="usage-card usage-heatmap-card" aria-labelledby="usage-heatmap-title">
-    <div className="usage-section-head"><div><h2 id="usage-heatmap-title">{copy.heatmap}</h2><p>{copy.heatmapHint}</p></div></div>
-    <div className="usage-heatmap-scroll" tabIndex={0} role="region" aria-label={copy.heatmapHint}>
+  return <section id="usage-activity" className="usage-card usage-heatmap-card" aria-labelledby="usage-heatmap-title">
+    <div className="usage-section-head"><div><h2 id="usage-heatmap-title">{copy.heatmap}</h2><p>{hint}</p></div><label className="usage-time-filter">{lang === 'zh' ? '热图时间窗' : 'Heatmap window'}<select value={weeks} onChange={e=>onWeeksChange(Number(e.target.value))}>{[13,26,52].map(w=><option key={w} value={w}>{lang === 'zh' ? `过去 ${w} 周` : `Past ${w} weeks`}</option>)}</select></label><small>{lang === 'zh' ? '仅改变热图；指标和模型表仍为累计用量' : 'Heatmap only; metrics and model totals remain cumulative'}</small></div>
+    <div className="usage-heatmap-scroll" tabIndex={0} role="region" aria-label={hint}>
       <div className="usage-heatmap-frame">
-        <div className="usage-months" aria-hidden="true">{months.map(month => <span key={month.key} style={{ gridColumn: month.column }}>{month.label}</span>)}</div>
+        <div className="usage-months" style={{gridTemplateColumns:`repeat(${weeks},11px)`}} aria-hidden="true">{months.map(month => <span key={month.key} style={{ gridColumn: month.column }}>{month.label}</span>)}</div>
         <div className="usage-heatmap-body">
           <div className="usage-weekdays" aria-hidden="true"><span>{weekdays[0]}</span><span>{weekdays[1]}</span><span>{weekdays[2]}</span></div>
-          <div className="usage-heatmap" role="img" aria-label={copy.heatmapHint}>
+          <div className="usage-heatmap" role="img" aria-label={hint}>
             {cells.map(day => { const tokens = Number(day.totals?.total_tokens) || 0; const label = `${dateFormat.format(new Date(`${day.date}T00:00:00`))}: ${formatNumber(tokens, lang)} Token, ${formatNumber(day.assistant_replies, lang)} ${copy.replies}`; return <span key={day.date} className="usage-heat-cell" data-level={level(tokens)} title={label} aria-label={label} /> })}
           </div>
         </div>
@@ -94,6 +95,8 @@ export function UsagePage({ lang = 'zh' }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [weeks, setWeeks] = useState(52)
+  const [modelQuery, setModelQuery] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -103,12 +106,13 @@ export function UsagePage({ lang = 'zh' }) {
   }, [])
 
   useEffect(() => { load() }, [load])
+  const filteredModels = (data?.models || []).filter(item => `${item.name || ''} ${item.id || ''}`.toLocaleLowerCase().includes(modelQuery.trim().toLocaleLowerCase()))
   const n = value => formatNumber(value, lang)
   const tok = value => formatTokens(value, lang)
 
   return <section className="usage-page" aria-busy={loading}>
     <div className="usage-intro">
-      <div><span className="usage-eyebrow"><BarChart3 size={15}/>{c.title}</span><p>{c.intro}</p><small>{lang === 'zh' ? '累计全部已记录用量 · 热图仅展示过去 52 周' : 'All recorded usage · heatmap shows the past 52 weeks only'}</small></div>
+      <div><span className="usage-eyebrow"><BarChart3 size={15}/>{c.title}</span><p>{c.intro}</p><small>{lang === 'zh' ? `累计全部已记录用量 · 热图仅展示过去 ${weeks} 周` : `All recorded usage · heatmap shows the past ${weeks} weeks only`}</small></div>
       <button type="button" onClick={load} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''}/>{c.refresh}</button>
     </div>
 
@@ -116,7 +120,8 @@ export function UsagePage({ lang = 'zh' }) {
     {error && <div className="usage-state usage-error" role="alert"><strong>{c.failed}</strong><span>{error}</span><button type="button" onClick={load} disabled={loading}>{c.retry}</button></div>}
     {!error && data && <>
       {data.skipped_sessions > 0 && <div className="usage-warning"><AlertTriangle size={16}/><span>{n(data.skipped_sessions)} {c.skipped}</span></div>}
-      <div className="usage-metrics">
+      <nav className="usage-section-nav" aria-label={c.title}><a href="#usage-totals">{c.total}</a>{data.assistant_replies !== 0 && <><a href="#usage-activity">{c.heatmap}</a><a href="#usage-models">{c.models}</a></>}</nav>
+      <div id="usage-totals" className="usage-metrics" role="group" aria-label={lang === 'zh' ? '累计用量' : 'Cumulative usage'}>
         <Metric label={c.total} value={tok(data.totals?.total_tokens).short} title={tok(data.totals?.total_tokens).full} accent/>
         <Metric label={c.input} value={tok(data.totals?.input_tokens).short} title={tok(data.totals?.input_tokens).full}/>
         <Metric label={c.output} value={tok(data.totals?.output_tokens).short} title={tok(data.totals?.output_tokens).full}/>
@@ -124,8 +129,8 @@ export function UsagePage({ lang = 'zh' }) {
         <Metric label={c.replies} value={n(data.assistant_replies)}/>
       </div>
       {data.assistant_replies === 0 ? <div className="usage-state">{c.empty}</div> : <>
-        <UsageHeatmap daily={data.daily} lang={lang} copy={c}/>
-        <section className="usage-panel"><h3>{c.models}</h3><p className="usage-scroll-hint">{lang === 'zh' ? '横向滚动查看全部列 · Token 缩写可悬停查看精确值' : 'Scroll horizontally for all columns · hover token values for exact counts'}</p><div className="usage-table-wrap" tabIndex={0} role="region" aria-label={c.models}><table><thead><tr><th>{c.model}</th><th>{c.replies}</th><th>{c.input}</th><th>{c.output}</th><th>{c.total}</th></tr></thead><tbody>{(data.models || []).map(item => <tr key={item.id}><td><strong>{item.name || c.unknown}</strong><small>{item.id}</small></td><td>{n(item.assistant_replies)}</td><td title={tok(item.totals?.input_tokens).full}>{tok(item.totals?.input_tokens).short}</td><td title={tok(item.totals?.output_tokens).full}>{tok(item.totals?.output_tokens).short}</td><td title={tok(item.totals?.total_tokens).full}><b>{tok(item.totals?.total_tokens).short}</b></td></tr>)}</tbody></table></div></section></>}
+        <UsageHeatmap daily={data.daily} lang={lang} copy={c} weeks={weeks} onWeeksChange={setWeeks}/>
+        <section id="usage-models" className="usage-panel"><div className="usage-model-head"><div><h3>{c.models}</h3><p>{lang === 'zh' ? '累计用量 · 与上方指标同一口径' : 'All recorded usage · same scope as the metrics above'}</p></div><label>{lang === 'zh' ? '筛选模型' : 'Filter models'}<input type="search" value={modelQuery} onChange={e=>setModelQuery(e.target.value)}/></label></div><p className="usage-model-count" aria-live="polite">{filteredModels.length} / {(data.models || []).length} {c.models}</p><p className="usage-scroll-hint">{lang === 'zh' ? '横向滚动查看全部列 · Token 缩写可悬停查看精确值' : 'Scroll horizontally for all columns · hover token values for exact counts'}</p><div className="usage-table-wrap" tabIndex={0} role="region" aria-label={c.models}><table><thead><tr><th>{c.model}</th><th>{c.replies}</th><th>{c.input}</th><th>{c.output}</th><th>{c.total}</th></tr></thead><tbody>{filteredModels.map(item => <tr key={item.id}><td><strong>{item.name || c.unknown}</strong><small>{item.id}</small></td><td>{n(item.assistant_replies)}</td><td title={tok(item.totals?.input_tokens).full}>{tok(item.totals?.input_tokens).short}</td><td title={tok(item.totals?.output_tokens).full}>{tok(item.totals?.output_tokens).short}</td><td title={tok(item.totals?.total_tokens).full}><b>{tok(item.totals?.total_tokens).short}</b></td></tr>)}{filteredModels.length === 0 && <tr><td colSpan={5}>{lang === 'zh' ? '无匹配模型' : 'No matching models'}</td></tr>}</tbody></table></div></section></>}
     </>}
   </section>
 }
