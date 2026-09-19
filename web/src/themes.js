@@ -88,6 +88,20 @@ export const CUSTOM_COLOR_TOKENS = Object.freeze([
   { token: 'accent', scope: 'global' },
   { token: 'accent-hover', scope: 'global' },
   { token: 'accent-text', scope: 'global' },
+  { token: 'on-accent', scope: 'global' },
+  { token: 'hover', scope: 'global' },
+  { token: 'selected', scope: 'global' },
+  { token: 'selected-text', scope: 'global' },
+  { token: 'disabled-bg', scope: 'global' },
+  { token: 'disabled-text', scope: 'global' },
+  { token: 'focus', scope: 'global' },
+  { token: 'success', scope: 'global' },
+  { token: 'warning', scope: 'global' },
+  { token: 'error', scope: 'global' },
+  { token: 'info', scope: 'global' },
+  { token: 'scrollbar-track', scope: 'global' },
+  { token: 'scrollbar-thumb', scope: 'global' },
+  { token: 'scrollbar-hover', scope: 'global' },
   { token: 'oa-bg', scope: 'chat' },
   { token: 'oa-panel', scope: 'chat' },
   { token: 'oa-text', scope: 'chat' },
@@ -108,14 +122,16 @@ export const sanitizeColorValue = value => {
   if (typeof value !== 'string') return ''
   const trimmed = value.trim()
   if (!trimmed || trimmed.length > 32) return ''
-  return COLOR_VALUE_RE.test(trimmed) ? trimmed : ''
+  if (!COLOR_VALUE_RE.test(trimmed)) return ''
+  if (trimmed.startsWith('rgb') && trimmed.match(/[\d.]+/g).slice(0, 3).some(n => Number(n) > 255)) return ''
+  return trimmed
 }
 
 export const normalizeCustomColors = (input) => {
   const source = input && typeof input === 'object' ? input : {}
   const out = {}
   for (const [rawToken, rawValue] of Object.entries(source)) {
-    const token = String(rawToken).replace(/^--/, '')
+    const token = String(rawToken).trim().replace(/^--/, '')
     if (!CUSTOM_COLOR_TOKEN_SET.has(token)) continue
     const value = sanitizeColorValue(rawValue)
     if (value) out[token] = value
@@ -146,12 +162,11 @@ export const applyCustomColorsToDocument = (input, documentRef = globalThis.docu
   }
   if (element) {
     const rules = []
-    if (globalDeclarations.length) rules.push(`html[data-custom-colors="1"]{${globalDeclarations.join('')}}`)
-    if (chatDeclarations.length) rules.push(`html[data-custom-colors="1"] .oa-chat{${chatDeclarations.join('')}}`)
+    if (globalDeclarations.length) rules.push(`html:root[data-custom-colors="1"]{${globalDeclarations.join('')}}`)
+    if (chatDeclarations.length) rules.push(`html:root[data-custom-colors="1"] .oa-chat{${chatDeclarations.join('')}}`)
     element.textContent = rules.join('')
-    // Keep the override sheet last in <head>: it shares specificity with the
-    // theme token scopes, so document order decides who wins — including
-    // stylesheets a dev server or a lazy route appends after boot.
+    // :root raises specificity above preset root and chat token scopes.
+    // Keep the sheet last as well for equally specific late-loaded rules.
     documentRef.head?.appendChild(element)
   }
   if (root) root.dataset.customColors = '1'
@@ -161,7 +176,7 @@ export const applyCustomColorsToDocument = (input, documentRef = globalThis.docu
 export const getInitialCustomColors = () => {
   if (typeof window === 'undefined') return {}
   const injected = normalizeCustomColors(window.__GA_UI_CUSTOM_COLORS__)
-  if (Object.keys(injected).length) return injected
+  if (window.__GA_UI_CUSTOM_COLORS__ !== undefined) return injected
   try {
     return normalizeCustomColors(JSON.parse(window.localStorage.getItem(CUSTOM_COLORS_STORAGE_KEY) || '{}'))
   } catch {
@@ -182,44 +197,91 @@ export const persistCustomColorsLocal = (input) => {
   return colors
 }
 
-// Reads the palette the server persisted. Used only as a fallback when this
-// browser has no local copy (fresh profile, cleared storage, other machine).
-export const fetchStoredCustomColors = async () => {
-  if (typeof window === 'undefined') return {}
-  try {
-    const { api } = await import('./lib/api.js')
-    const body = await api('/api/ui/theme')
-    return normalizeCustomColors(body?.custom)
-  } catch {
-    return {}
-  }
+// Preview is intentionally memory-only; revision guards late hydration responses.
+let paletteRevision = 0
+export const previewCustomColors = input => {
+  paletteRevision += 1
+  const colors = applyCustomColorsToDocument(input)
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('ga-admin-custom-colors-change', { detail: colors }))
+  return colors
 }
 
-// Local storage stays authoritative while it holds a palette; the server copy
-// only repaints an empty client. Resolves to the palette in effect afterwards.
+export const fetchStoredCustomColors = async () => {
+  const { api } = await import('./lib/api.js')
+  const body = await api('/api/ui/theme')
+  return normalizeCustomColors(body?.custom)
+}
+
+// Server (including an empty palette) wins. Local/injected values are only an
+// offline/first-paint fallback, never a reason to skip server reconciliation.
 export const hydrateCustomColors = async () => {
   if (typeof window === 'undefined') return {}
-  const local = getInitialCustomColors()
-  if (Object.keys(local).length) {
-    applyCustomColorsToDocument(local)
-    return local
+  const revision = paletteRevision
+  const initial = getInitialCustomColors()
+  applyCustomColorsToDocument(initial)
+  try {
+    const stored = await fetchStoredCustomColors()
+    if (revision !== paletteRevision) return initial
+    window.__GA_UI_CUSTOM_COLORS__ = stored
+    return persistCustomColorsLocal(stored)
+  } catch {
+    return initial
   }
-  const stored = await fetchStoredCustomColors()
-  if (!Object.keys(stored).length) return {}
-  return persistCustomColorsLocal(stored)
 }
 
-export const persistCustomColors = (input, themeId = DEFAULT_THEME_ID) => {
-  const colors = persistCustomColorsLocal(input)
+export const persistCustomColors = async (input, themeId = DEFAULT_THEME_ID) => {
+  const colors = normalizeCustomColors(input)
   if (typeof window === 'undefined') return colors
-  window.__GA_UI_CUSTOM_COLORS__ = colors
-  const theme = getTheme(themeId).id
-  void import('./lib/api.js').then(({ api }) => api('/api/ui/theme', {
+  const { api } = await import('./lib/api.js')
+  await api('/api/ui/theme', {
     method: 'PUT',
     dangerous: true,
-    body: JSON.stringify({ theme, custom: colors }),
-  })).catch(() => {})
-  return colors
+    body: JSON.stringify({ theme: getTheme(themeId).id, custom: colors }),
+  })
+  // No local mutation until the server acknowledged the write. Errors propagate.
+  paletteRevision += 1
+  window.__GA_UI_CUSTOM_COLORS__ = colors
+  return persistCustomColorsLocal(colors)
+}
+
+// Ant Design consumes literal colors, not CSS vars (its palette algorithm parses
+// them). The same change event drives draft previews and persisted palettes.
+export const customColorsToAntd = input => {
+  const colors = normalizeCustomColors(input)
+  const mapping = {
+    bg: ['colorBgLayout'], surface: ['colorBgContainer', 'colorBgElevated'],
+    'surface-strong': ['colorBgBase'], 'surface-muted': ['colorFillTertiary'],
+    text: ['colorText', 'colorTextBase'], muted: ['colorTextSecondary'],
+    border: ['colorBorder', 'colorBorderSecondary'], 'border-strong': ['colorSplit'],
+    accent: ['colorPrimary', 'colorInfo'], 'accent-hover': ['colorPrimaryHover'],
+    'accent-text': ['colorLink'], 'on-accent': ['colorTextLightSolid'],
+    hover: ['controlItemBgHover'], selected: ['controlItemBgActive', 'controlItemBgActiveHover'],
+    'selected-text': ['colorPrimaryText'], 'disabled-bg': ['colorBgContainerDisabled'],
+    'disabled-text': ['colorTextDisabled'], focus: ['controlOutline'],
+    success: ['colorSuccess'], warning: ['colorWarning'], error: ['colorError'], info: ['colorInfo'],
+  }
+  return Object.fromEntries(Object.entries(mapping).flatMap(([key, targets]) =>
+    colors[key] ? targets.map(target => [target, colors[key]]) : []))
+}
+
+// Keep unfilled states derived from the preset, not from explicit state colors.
+// AntD removes seed overrides in formatToken, but regenerates alias tokens there.
+// Apply all explicit colors after derivation, and repeat only non-seed overrides
+// in token so alias formatting also preserves explicitly supplied state colors.
+export const createAntdTheme = (preset, antd, input) => {
+  const baseAlgorithm = antd[`${preset.antdAlgorithm}Algorithm`] || antd.defaultAlgorithm
+  const explicit = customColorsToAntd(input)
+  const aliases = Object.fromEntries(Object.entries(explicit).filter(([key]) =>
+    !Object.prototype.hasOwnProperty.call(antd.defaultSeed, key)))
+  return {
+    algorithm: Object.keys(explicit).length
+      ? seed => ({ ...baseAlgorithm(seed), ...explicit })
+      : baseAlgorithm,
+    token: {
+      colorPrimary: '#10a37f', borderRadius: 10, fontFamily: 'var(--font)',
+      ...preset.antdToken, ...aliases,
+    },
+  }
 }
 
 // Clearing sends an explicit empty object so the server drops the palette

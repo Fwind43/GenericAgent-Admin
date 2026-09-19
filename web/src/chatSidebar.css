@@ -90,25 +90,25 @@
 
 /* Style the actual scrolling container, not the non-scrolling lists. */
 .oa-chat .oa-sidebar .oa-sidebar-sections {
-  --sidebar-scroll-thumb: color-mix(in srgb, var(--text) 18%, transparent);
+  --sidebar-scroll-thumb: var(--scrollbar-thumb);
   overflow-x: hidden;
   overscroll-behavior-y: contain;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
-  scrollbar-color: var(--sidebar-scroll-thumb) transparent;
+  scrollbar-color: var(--sidebar-scroll-thumb) var(--scrollbar-track);
 }
 .oa-chat .oa-sidebar .oa-sidebar-sections:hover,
 .oa-chat .oa-sidebar .oa-sidebar-sections:focus-within {
-  --sidebar-scroll-thumb: color-mix(in srgb, var(--text) 32%, transparent);
+  --sidebar-scroll-thumb: var(--scrollbar-hover);
 }
 @supports selector(::-webkit-scrollbar) {
   .oa-chat .oa-sidebar .oa-sidebar-sections { scrollbar-width: auto; scrollbar-color: auto; }
   .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar { width: 6px; height: 6px; }
-  .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-track { background: transparent; }
+  .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-track { background: var(--scrollbar-track); }
   .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-thumb {
-    background: var(--sidebar-scroll-thumb); border-radius: 999px; min-height: 32px;
+    background: var(--scrollbar-thumb); border-radius: 999px; min-height: 32px;
   }
-  .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text) 45%, transparent); }
+  .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
   .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
   .oa-chat .oa-sidebar .oa-sidebar-sections::-webkit-scrollbar-corner { background: transparent; }
 }

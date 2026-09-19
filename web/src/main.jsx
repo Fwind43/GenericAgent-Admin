@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useMemo, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
@@ -9,7 +9,8 @@ import './style.css'
 import { RouteFallback, ErrorBoundary } from './components/feedback.jsx'
 import { AppDialogHost } from './components/AppDialogHost.jsx'
 import { GlobalImagePreview } from './components/GlobalImagePreview.jsx'
-import { applyThemeToDocument, getInitialTheme, getTheme, hydrateCustomColors, isThemeId } from './themes'
+import './theme-tokens.css'
+import { applyThemeToDocument, createAntdTheme, getInitialCustomColors, getInitialTheme, getTheme, hydrateCustomColors, isThemeId } from './themes'
 
 // Chat is the primary interface: it owns "/" (and legacy "/chat").
 // The admin console lives under "/admin" and acts as the settings area.
@@ -55,6 +56,12 @@ const storedLanguage = () => localStorage.getItem('ga-admin-lang-explicit') === 
 function LocalizedRoot() {
   const [lang, setLang] = useState(storedLanguage)
   const [colorMode, setColorMode] = useState(getInitialTheme)
+  const [customColors, setCustomColors] = useState(getInitialCustomColors)
+  useEffect(() => {
+    const update = event => setCustomColors(event.detail || {})
+    window.addEventListener('ga-admin-custom-colors-change', update)
+    return () => window.removeEventListener('ga-admin-custom-colors-change', update)
+  }, [])
   useEffect(() => {
     const onLanguageChange = event => setLang(event.detail === 'en' ? 'en' : 'zh')
     window.addEventListener('ga-admin-language-change', onLanguageChange)
@@ -79,16 +86,8 @@ function LocalizedRoot() {
   }, [lang])
   const loading = lang === 'en' ? 'Loading interface…' : '正在加载界面…'
   const activeTheme = getTheme(colorMode)
-  const algorithm = antdTheme[`${activeTheme.antdAlgorithm}Algorithm`] || antdTheme.defaultAlgorithm
-  return <ConfigProvider locale={lang === 'en' ? enUS : zhCN} theme={{
-    algorithm,
-    token: {
-      colorPrimary: '#10a37f',
-      borderRadius: 10,
-      fontFamily: 'var(--font)',
-      ...activeTheme.antdToken,
-    },
-  }}>
+  const componentTheme = useMemo(() => createAntdTheme(activeTheme, antdTheme, customColors), [activeTheme, customColors])
+  return <ConfigProvider locale={lang === 'en' ? enUS : zhCN} theme={componentTheme}>
     <AppDialogHost />
     <GlobalImagePreview />
     <ErrorBoundary>

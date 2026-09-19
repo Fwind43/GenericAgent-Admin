@@ -35,7 +35,7 @@
 .oa-message-nav[data-expanded="true"] .oa-message-nav-track {
   width: min(260px, calc(100vw - 64px));
   scrollbar-width: thin;
-  scrollbar-color: var(--muted) var(--surface-strong);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   scrollbar-gutter: stable;
   border-color: var(--border);
   background: var(--surface-strong);
@@ -46,9 +46,16 @@
   width: 8px;
 }
 .oa-message-nav-track::-webkit-scrollbar-thumb {
-  background: var(--muted);
-  border: 2px solid var(--surface-strong);
+  background: var(--scrollbar-thumb);
+  border: 2px solid var(--scrollbar-track);
   border-radius: 8px;
+}
+.oa-message-nav-track::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+.oa-message-nav-track::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+@supports selector(::-webkit-scrollbar) {
+  .oa-message-nav[data-expanded="true"] .oa-message-nav-track {
+    scrollbar-color: auto; scrollbar-width: auto;
+  }
 }
 .oa-message-nav-popup { max-width: min(480px, calc(100vw - 32px)); }
 .oa-message-nav-tooltip {

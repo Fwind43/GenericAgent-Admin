@@ -34,29 +34,61 @@ func ValidUITheme(theme string) bool {
 // the token name to the block that consumes it ("chat" tokens live on .oa-chat).
 // Keep in sync with web/src/themes.js CUSTOM_COLOR_TOKENS.
 var UIColorTokenScopes = map[string]string{
-	"bg":             "global",
-	"bg-soft":        "global",
-	"surface":        "global",
-	"surface-strong": "global",
-	"surface-muted":  "global",
-	"border":         "global",
-	"border-strong":  "global",
-	"text":           "global",
-	"muted":          "global",
-	"accent":         "global",
-	"accent-hover":   "global",
-	"accent-text":    "global",
-	"oa-bg":          "chat",
-	"oa-panel":       "chat",
-	"oa-text":        "chat",
-	"oa-muted":       "chat",
-	"oa-line":        "chat",
-	"oa-green":       "chat",
-	"oa-hover":       "chat",
-	"oa-user":        "chat",
+	"bg":              "global",
+	"bg-soft":         "global",
+	"surface":         "global",
+	"surface-strong":  "global",
+	"surface-muted":   "global",
+	"border":          "global",
+	"border-strong":   "global",
+	"text":            "global",
+	"muted":           "global",
+	"accent":          "global",
+	"accent-hover":    "global",
+	"accent-text":     "global",
+	"on-accent":       "global",
+	"hover":           "global",
+	"selected":        "global",
+	"selected-text":   "global",
+	"disabled-bg":     "global",
+	"disabled-text":   "global",
+	"focus":           "global",
+	"success":         "global",
+	"warning":         "global",
+	"error":           "global",
+	"info":            "global",
+	"scrollbar-track": "global",
+	"scrollbar-thumb": "global",
+	"scrollbar-hover": "global",
+	"oa-bg":           "chat",
+	"oa-panel":        "chat",
+	"oa-text":         "chat",
+	"oa-muted":        "chat",
+	"oa-line":         "chat",
+	"oa-green":        "chat",
+	"oa-hover":        "chat",
+	"oa-user":         "chat",
 }
 
-var uiColorValuePattern = regexp.MustCompile(`^(#[0-9a-fA-F]{3,8}|rgb\(\s*[0-9]{1,3}(\s*,\s*[0-9]{1,3}){2}\s*\)|rgba\(\s*[0-9]{1,3}(\s*,\s*[0-9]{1,3}){2}\s*,\s*(0|1|0?\.[0-9]+)\s*\))$`)
+var uiColorValuePattern = regexp.MustCompile(`^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgb\(\s*[0-9]{1,3}(\s*,\s*[0-9]{1,3}){2}\s*\)|rgba\(\s*[0-9]{1,3}(\s*,\s*[0-9]{1,3}){2}\s*,\s*(0|1|0?\.[0-9]+)\s*\))$`)
+
+// ValidUIColor mirrors sanitizeColorValue: literal hex/rgb/rgba only.
+func ValidUIColor(value string) bool {
+	if len(value) > 32 || !uiColorValuePattern.MatchString(value) {
+		return false
+	}
+	if strings.HasPrefix(value, "rgb") {
+		start := strings.Index(value, "(")
+		parts := strings.Split(value[start+1:len(value)-1], ",")
+		for _, part := range parts[:3] {
+			n, err := strconv.Atoi(strings.TrimSpace(part))
+			if err != nil || n > 255 {
+				return false
+			}
+		}
+	}
+	return true
+}
 
 // NormalizeUICustomColors drops unknown tokens and values that are not literal
 // colors, so a stored palette can never inject arbitrary CSS declarations.
@@ -71,7 +103,7 @@ func NormalizeUICustomColors(input map[string]string) map[string]string {
 			continue
 		}
 		value := strings.TrimSpace(rawValue)
-		if len(value) == 0 || len(value) > 32 || !uiColorValuePattern.MatchString(value) {
+		if len(value) == 0 || len(value) > 32 || !ValidUIColor(value) {
 			continue
 		}
 		out[token] = value

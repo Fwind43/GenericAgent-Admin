@@ -1,0 +1,25 @@
+.theme-editor { min-width: 0; padding: 20px 0; border-top: 1px solid var(--border); }
+.theme-editor header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; }
+.theme-editor h3 { margin: 0 0 8px; font-size: 15px; }
+.theme-editor p { color: var(--muted); line-height: 1.65; margin: 0 0 16px; overflow-wrap: anywhere; }
+.theme-editor header button { flex-shrink: 0; }
+.theme-editor-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.theme-editor-fields > fieldset { border: 1px solid var(--border); padding: 16px; margin: 0 0 16px; border-radius: 10px; min-width: 0; background: var(--surface); }
+.theme-editor legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
+.theme-color-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 16px; }
+.theme-color-field { min-width: 0; }
+.theme-color-field label { display: block; margin-bottom: 6px; font-size: 12px; overflow-wrap: anywhere; }
+.theme-color-inputs { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.theme-color-inputs input:not([type=color]) { min-width: 0; width: 100%; font-family: var(--font); }
+.theme-color-inputs input[type=color] { flex: 0 0 40px; width: 40px; height: 40px; padding: 4px; cursor: pointer; }
+.theme-color-field small { color: var(--error); }
+.theme-color-inputs input[aria-invalid=true] { border-color: var(--error); }
+.theme-editor-sample { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px; margin-bottom: 16px; background: var(--surface-muted); border-radius: 10px; }
+.theme-editor-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 0; }
+.theme-editor-actions span { flex: 1; }
+@media (max-width: 600px) {
+  .theme-editor header { flex-direction: column; }
+  .theme-editor-fields > fieldset { padding: 12px; }
+  .theme-editor-actions span { display: none; }
+  .theme-editor-actions button { flex: 1 1 140px; min-height: 44px; white-space: normal; }
+}

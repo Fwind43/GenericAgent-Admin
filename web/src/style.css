@@ -172,7 +172,7 @@ button { user-select: none; }
   box-shadow: inset -1px 0 var(--g-ffffffa72);
 }
 .sidebar::-webkit-scrollbar, .main::-webkit-scrollbar, pre::-webkit-scrollbar, textarea::-webkit-scrollbar, .file-list::-webkit-scrollbar, .oa-session-list::-webkit-scrollbar, .oa-thread::-webkit-scrollbar { width: 8px; height: 8px; }
-.sidebar::-webkit-scrollbar-thumb, .main::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb, textarea::-webkit-scrollbar-thumb, .file-list::-webkit-scrollbar-thumb, .oa-session-list::-webkit-scrollbar-thumb, .oa-thread::-webkit-scrollbar-thumb { background: rgba(23,23,23,.14); border-radius: 99px; }
+.sidebar::-webkit-scrollbar-thumb, .main::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb, textarea::-webkit-scrollbar-thumb, .file-list::-webkit-scrollbar-thumb, .oa-session-list::-webkit-scrollbar-thumb, .oa-thread::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; }
 
 .brand {
   display: flex;
@@ -1767,12 +1767,12 @@ html[data-color-scheme="dark"] .oa-cselect > ul li:hover{background:rgba(255,255
   border-radius:10px;
   background:var(--surface-strong);
   scrollbar-width:thin;
-  scrollbar-color:var(--chat-table-scrollbar) transparent;
+  scrollbar-color: var(--scrollbar-colors);
   overscroll-behavior-inline:contain;
 }
 .oa-table-wrap::-webkit-scrollbar{height:8px}
-.oa-table-wrap::-webkit-scrollbar-track{background:transparent}
-.oa-table-wrap::-webkit-scrollbar-thumb{background:var(--chat-table-scrollbar);border:2px solid transparent;border-radius:999px;background-clip:padding-box}
+.oa-table-wrap::-webkit-scrollbar-track{background: var(--scrollbar-track)}
+.oa-table-wrap::-webkit-scrollbar-thumb{background: var(--scrollbar-thumb);border:2px solid transparent;border-radius:999px;background-clip:padding-box}
 .oa-prose a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
 .oa-prose a:hover { color: var(--primary-hover, var(--primary)); }
 .oa-md-file-link-wrap {
@@ -3680,9 +3680,9 @@ body:has(.oa-chat):not(:has(.app:not(.app-embedded))),
    暗色主题下亮字压深底会明显发虚发糊;后者会让 YaHei 的字距在小字号上变得不均。
    保持默认即可。 */
 .app { width: 100%; min-width: 0; }
-.sidebar { scrollbar-width: thin; scrollbar-color: #d7d7d7 transparent; }
+.sidebar { scrollbar-width: thin; scrollbar-color: var(--scrollbar-colors); }
 .sidebar::-webkit-scrollbar, .main::-webkit-scrollbar, .entry-list::-webkit-scrollbar, .profiles::-webkit-scrollbar, .json-editor::-webkit-scrollbar, .file-editor::-webkit-scrollbar, .artifact-view::-webkit-scrollbar, .preview pre::-webkit-scrollbar { width: 10px; height: 10px; }
-.sidebar::-webkit-scrollbar-thumb, .main::-webkit-scrollbar-thumb, .entry-list::-webkit-scrollbar-thumb, .profiles::-webkit-scrollbar-thumb, .json-editor::-webkit-scrollbar-thumb, .file-editor::-webkit-scrollbar-thumb, .artifact-view::-webkit-scrollbar-thumb, .preview pre::-webkit-scrollbar-thumb { background: var(--n-d7d7d7); border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
+.sidebar::-webkit-scrollbar-thumb, .main::-webkit-scrollbar-thumb, .entry-list::-webkit-scrollbar-thumb, .profiles::-webkit-scrollbar-thumb, .json-editor::-webkit-scrollbar-thumb, .file-editor::-webkit-scrollbar-thumb, .artifact-view::-webkit-scrollbar-thumb, .preview pre::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border: 3px solid transparent; border-radius: 999px; background-clip: padding-box; }
 .main { min-width: 0; height: 100vh; }
 .main > section { min-width: 0; }
 
@@ -4962,7 +4962,7 @@ html[data-color-scheme="dark"] .primary {
   color: var(--i-08130f) !important;
 }
 /* subtle dark scrollbars */
-html[data-color-scheme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); }
+/* Scrollbar colors (including dark defaults) come from theme-tokens.css. */
 
 /* Explicit appearance picker: a separate control, never a theme-cycle button. */
 .theme-picker {
@@ -6603,8 +6603,8 @@ html[data-color-scheme="dark"] .oa-tools-act:hover:not(:disabled) { background: 
   padding: 4px 0;
 }
 .oa-cmd-drawer::-webkit-scrollbar { width: 6px; }
-.oa-cmd-drawer::-webkit-scrollbar-thumb { background: rgba(23,23,23,.12); border-radius: 99px; }
-.oa-cmd-drawer::-webkit-scrollbar-track { background: transparent; }
+.oa-cmd-drawer::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 99px; }
+.oa-cmd-drawer::-webkit-scrollbar-track { background: var(--scrollbar-track); }
 .oa-cmd-item {
   display: flex;
   align-items: center;
@@ -7087,22 +7087,22 @@ html[data-color-scheme="dark"] .oa-cascade-reasoning button:hover { background: 
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior-y: contain;
-  scrollbar-color: color-mix(in srgb, var(--muted) 34%, transparent) transparent;
+  scrollbar-color: var(--scrollbar-colors);
   scrollbar-width: thin;
   scrollbar-gutter: stable;
   padding: 2px 8px 4px 2px;
 }
 .oa-cascade-catalog::-webkit-scrollbar { width: 8px; }
-.oa-cascade-catalog::-webkit-scrollbar-track { background: transparent; }
+.oa-cascade-catalog::-webkit-scrollbar-track { background: var(--scrollbar-track); }
 .oa-cascade-catalog::-webkit-scrollbar-thumb {
   min-height: 36px;
   border: 2px solid transparent;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--muted) 32%, transparent);
+  background: var(--scrollbar-thumb);
   background-clip: padding-box;
 }
 .oa-cascade-catalog::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--muted) 50%, transparent);
+  background: var(--scrollbar-hover);
   background-clip: padding-box;
 }
 .oa-cascade-group + .oa-cascade-group {
@@ -15793,7 +15793,7 @@ html[data-color-scheme="dark"] .channels-page {
   font-size: 12.5px;
   line-height: 1.65;
   tab-size: 2;
-  scrollbar-color: #3b434f var(--log-surface);
+  scrollbar-color: var(--scrollbar-colors);
 }
 .log-line { display: flex; gap: 14px; padding: 0 14px; }
 /* The gutter is unselectable so copying the output does not drag line numbers
@@ -16067,12 +16067,17 @@ html[data-color-scheme="dark"] .logs-page {
   scrollbar-gutter: stable;
 }
 
+#admin-sidebar { scrollbar-color: var(--scrollbar-colors); }
+@supports selector(::-webkit-scrollbar) {
+  #admin-sidebar { scrollbar-color: var(--scrollbar-colors); scrollbar-width: auto; }
+}
 #admin-sidebar::-webkit-scrollbar { width: 6px; }
-#admin-sidebar::-webkit-scrollbar-track { background: transparent; }
+#admin-sidebar::-webkit-scrollbar-track { background: var(--scrollbar-track); }
 #admin-sidebar::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--muted) 24%, transparent);
+  background: var(--scrollbar-thumb);
   border-radius: 999px;
 }
+#admin-sidebar::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
 #admin-sidebar .admin-sidebar-heading {
   display: grid;
@@ -17712,7 +17717,7 @@ html[data-color-scheme="dark"] .oa-turn-stack-head > .oa-run-status { color: var
   font-weight: 410;
   line-height: 1.58;
   letter-spacing: .08px;
-  scrollbar-color: color-mix(in srgb, var(--muted) 30%, transparent) transparent;
+  scrollbar-color: var(--scrollbar-colors);
   scrollbar-width: thin;
 }
 
@@ -17782,7 +17787,7 @@ html[data-color-scheme="dark"] .oa-turn-stack-head > .oa-run-status { color: var
   border-radius: 7px;
   background: color-mix(in srgb, var(--surface-muted) 62%, transparent);
   line-height: 1.58;
-  scrollbar-color: color-mix(in srgb, var(--muted) 30%, transparent) transparent;
+  scrollbar-color: var(--scrollbar-colors);
   scrollbar-width: thin;
 }
 
@@ -17799,7 +17804,7 @@ html[data-color-scheme="dark"] .oa-turn-stack-head > .oa-run-status { color: var
   font-weight: 410;
   line-height: 1.58;
   letter-spacing: 0.08px;
-  scrollbar-color: color-mix(in srgb, var(--muted) 30%, transparent) transparent;
+  scrollbar-color: var(--scrollbar-colors);
   scrollbar-width: thin;
 }
 

@@ -215,14 +215,14 @@ test('applying custom colors writes one last stylesheet covering both scopes', (
   assert.equal(element.id, 'ga-custom-colors')
   assert.equal(doc.documentElement.dataset.customColors, '1')
   assert.deepEqual(head.children.map(child => child.id), ['ga-custom-colors'])
-  assert.match(element.textContent, /html\[data-custom-colors="1"\]\{--accent:#2F7D4F;\}/)
-  assert.match(element.textContent, /html\[data-custom-colors="1"\] \.oa-chat\{--oa-bg:#F4FAF3;\}/)
+  assert.match(element.textContent, /html:root\[data-custom-colors="1"\]\{--accent:#2F7D4F;\}/)
+  assert.match(element.textContent, /html:root\[data-custom-colors="1"\] \.oa-chat\{--oa-bg:#F4FAF3;\}/)
   assert.doesNotMatch(element.textContent, /bogus/)
 
   // Repainting keeps a single sheet and moves it behind later stylesheets.
   applyCustomColorsToDocument({ text: '#14201A' }, doc)
   assert.equal(head.children.length, 1)
-  assert.equal(element.textContent, 'html[data-custom-colors="1"]{--text:#14201A;}')
+  assert.equal(element.textContent, 'html:root[data-custom-colors="1"]{--text:#14201A;}')
 
   // Clearing drops both the sheet and the attribute.
   assert.deepEqual(applyCustomColorsToDocument({}, doc), {})
@@ -256,7 +256,7 @@ test('storing a palette applies it locally and clearing removes the stored copy'
   }
 })
 
-test('hydrate prefers the local palette and falls back to the stored server copy', async () => {
+test('hydrate reconciles stale local palette with the authoritative server copy', async () => {
   const previousWindow = globalThis.window
   const previousFetch = globalThis.fetch
   const { doc, head } = fakeDocument()
@@ -276,16 +276,16 @@ test('hydrate prefers the local palette and falls back to the stored server copy
     return { ok: true, status: 200, text: async () => JSON.stringify({ theme: 'green', custom: { accent: '#26653F' } }) }
   }
   try {
-    // Local palette present: applies, and never asks the server.
+    // A stale local palette must not shadow the server.
     stored[CUSTOM_COLORS_STORAGE_KEY] = JSON.stringify({ accent: '#2F7D4F' })
-    assert.deepEqual(await hydrateCustomColors(), { accent: '#2F7D4F' })
-    assert.equal(calls.length, 0)
-    assert.match(head.children[0].textContent, /--accent:#2F7D4F/)
+    assert.deepEqual(await hydrateCustomColors(), { accent: '#26653F' })
+    assert.equal(calls.length, 1)
+    assert.match(head.children[0].textContent, /--accent:#26653F/)
 
     // Empty client: pulls the persisted palette and caches it locally.
     delete stored[CUSTOM_COLORS_STORAGE_KEY]
     assert.deepEqual(await hydrateCustomColors(), { accent: '#26653F' })
-    assert.equal(calls.length, 1)
+    assert.equal(calls.length, 2)
     assert.equal(calls[0].url, '/api/ui/theme')
     assert.equal(stored[CUSTOM_COLORS_STORAGE_KEY], JSON.stringify({ accent: '#26653F' }))
   } finally {
@@ -316,7 +316,7 @@ test('persistCustomColors PUTs the palette with the active theme and reset clear
     await new Promise(resolve => setTimeout(resolve, 30))
   }
   try {
-    persistCustomColors({ accent: '#F4FAF3', 'oa-text': '#14201A' }, 'green')
+    await persistCustomColors({ accent: '#F4FAF3', 'oa-text': '#14201A' }, 'green')
     await settle()
     assert.equal(calls.length, 1)
     assert.equal(calls[0].url, '/api/ui/theme')
@@ -324,7 +324,7 @@ test('persistCustomColors PUTs the palette with the active theme and reset clear
     assert.equal(calls[0].headers['X-GA-Confirm'], 'dangerous')
     assert.deepEqual(JSON.parse(calls[0].body), { theme: 'green', custom: { accent: '#F4FAF3', 'oa-text': '#14201A' } })
 
-    resetCustomColors('green')
+    await resetCustomColors('green')
     await settle()
     assert.equal(calls.length, 2)
     assert.deepEqual(JSON.parse(calls[1].body), { theme: 'green', custom: {} })
@@ -334,5 +334,44 @@ test('persistCustomColors PUTs the palette with the active theme and reset clear
     else globalThis.window = previousWindow
     if (previousFetch === undefined) delete globalThis.fetch
     else globalThis.fetch = previousFetch
+  }
+})
+
+
+test('component scrollbars consume custom tokens and release standard rendering in WebKit', async () => {
+  const { readFileSync } = await import('node:fs')
+  for (const [file, selector] of [
+    ['../style.css', '#admin-sidebar'],
+    ['../chatSidebar.css', '.oa-chat .oa-sidebar .oa-sidebar-sections'],
+    ['../components/MessageNavigator.css', '.oa-message-nav-track'],
+  ]) {
+    const css = readFileSync(new URL(file, import.meta.url), 'utf8')
+    const block = (suffix) => {
+      const key = selector + suffix
+      const start = css.indexOf(key)
+      assert.notEqual(start, -1, key)
+      return css.slice(start, css.indexOf('}', start) + 1)
+    }
+    assert.match(block('::-webkit-scrollbar-track {'), /background: var\(--scrollbar-track\)/)
+    assert.match(block('::-webkit-scrollbar-thumb {'), /background: var\(--scrollbar-thumb\)/)
+    assert.match(block('::-webkit-scrollbar-thumb:hover {'), /background: var\(--scrollbar-hover\)/)
+    assert.match(css, /@supports selector\(::-webkit-scrollbar\)\s*\{[^}]*scrollbar-(?:color|width): auto;[^}]*scrollbar-(?:color|width): auto;/)
+  }
+})
+
+
+test('explicit state colors survive real AntD algorithms and alias formatting; blanks inherit preset', async () => {
+  const { default: antd } = await import('antd')
+  const { createAntdTheme, customColorsToAntd } = await import('../themes.js')
+  const custom = { accent: '#123456', 'accent-hover': '#345678', 'on-accent': '#fedcba', text: '#abcdef', success: '#246810' }
+  for (const preset of THEMES) {
+    const baseline = antd.theme.getDesignToken(createAntdTheme(preset, antd.theme, {}))
+    const configured = createAntdTheme(preset, antd.theme, custom)
+    const actual = antd.theme.getDesignToken(configured)
+    for (const [key, value] of Object.entries(customColorsToAntd(custom))) assert.equal(actual[key], value, `${preset.id}: ${key}`)
+    for (const key of ['colorPrimaryActive', 'colorPrimaryBg', 'colorBgContainer', 'colorError']) assert.equal(actual[key], baseline[key], `${preset.id}: unfilled ${key}`)
+    const blank = antd.theme.getDesignToken(createAntdTheme(preset, antd.theme, { accent: '', 'accent-hover': '  ', 'on-accent': '' }))
+    assert.deepEqual(blank, baseline, `${preset.id}: cleared palette`)
+    assert.equal(configured.token.colorPrimary, preset.antdToken.colorPrimary || '#10a37f', 'custom primary is not reintroduced as a seed')
   }
 })

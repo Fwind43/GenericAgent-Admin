@@ -1,0 +1,48 @@
+/* Editable color contract. Base palettes remain the source of inherited colors. */
+:root {
+  --scrollbar-colors: var(--scrollbar-thumb) var(--scrollbar-track);
+  --on-accent: #fff;
+  --hover: var(--surface-muted);
+  --selected: var(--accent);
+  --selected-text: var(--accent-text);
+  --disabled-bg: var(--surface-muted);
+  --disabled-text: var(--muted);
+  --focus: var(--accent-text);
+  --success: #16865b;
+  --warning: #b87512;
+  --error: #cf4545;
+  --info: #377fba;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(23,23,23,0.24);
+  --scrollbar-hover: rgba(23,23,23,0.4);
+}
+:root[data-color-scheme="dark"] {
+  --scrollbar-thumb: rgba(255,255,255,0.26);
+  --scrollbar-hover: rgba(255,255,255,0.44);
+  --success: #56c69a;
+  --warning: #e2b265;
+  --error: #f08080;
+  --info: #80b4e6;
+}
+/* Unify existing hard-coded scrollbar styles; standard and WebKit paths. */
+html, html body, html body * {
+  scrollbar-color: var(--scrollbar-colors);
+}
+html::-webkit-scrollbar-track, html body::-webkit-scrollbar-track, html body *::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+html::-webkit-scrollbar-thumb, html body::-webkit-scrollbar-thumb, html body *::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+html::-webkit-scrollbar-thumb:hover, html body::-webkit-scrollbar-thumb:hover, html body *::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+/* Chromium supports both APIs; auto lets the hover-capable WebKit path render. */
+@supports selector(::-webkit-scrollbar) {
+  :root { --scrollbar-colors: auto; }
+  html, html body, html body * { scrollbar-color: var(--scrollbar-colors); }
+}
+html[data-custom-colors] body button.primary:not(.ant-btn) { background: var(--accent-text); border-color: var(--accent-text); color: var(--on-accent); }
+html[data-custom-colors] body button.primary:not(.ant-btn):hover:not(:disabled) { background: var(--accent-hover); }
+html[data-custom-colors] body button:not(.primary):not(.ant-btn):hover:not(:disabled) { background-color: var(--hover); }
+html[data-custom-colors] body button[aria-pressed=true]:not(.ant-btn),
+html[data-custom-colors] body .settings-view-switch button.is-active,
+html[data-custom-colors] body .settings-segmented button.is-active { background: var(--selected); color: var(--selected-text); }
+html[data-custom-colors] body button:disabled:not(.ant-btn), html[data-custom-colors] body input:disabled { background: var(--disabled-bg); color: var(--disabled-text); opacity: 1; }
+html[data-custom-colors] body :is(button,a,input,textarea,select,[tabindex]):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+html[data-custom-colors] ::selection { background: var(--selected); color: var(--selected-text); }
+html[data-custom-colors] body .theme-editor-sample { border: 1px solid var(--border-strong); }

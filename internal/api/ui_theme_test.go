@@ -3,8 +3,10 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"genericagent-admin-go/internal/config"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -164,5 +166,36 @@ func TestInjectUIPaletteEmitsEscapedBootScript(t *testing.T) {
 	// An empty palette leaves the document untouched.
 	if plain := string(injectUIPalette(data, "green", nil, true)); strings.Contains(plain, "__GA_UI_CUSTOM_COLORS__") {
 		t.Fatalf("empty palette injected a script: %s", plain)
+	}
+}
+
+func TestUIThemeCustomReloadAndResetIsolated(t *testing.T) {
+	s := newConfigTestServer(t)
+	put := func(body string) {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/api/ui/theme", strings.NewReader(body))
+		req.Header.Set("X-GA-Confirm", "dangerous")
+		s.Routes().ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+		}
+	}
+	put(`{"theme":"dark","custom":{"success":"#123456","scrollbar-thumb":"rgba(1,2,3,.5)","focus":"#abcd","error":"rgb(999,0,0)","bg":"#12345","unknown":"#fff"}}`)
+	saved := config.NewStore(s.CfgStore.Root).Snapshot()
+	want := map[string]string{"success": "#123456", "scrollbar-thumb": "rgba(1,2,3,.5)", "focus": "#abcd"}
+	if saved.UITheme != "dark" || !reflect.DeepEqual(saved.UICustomColors, want) {
+		t.Fatalf("reload theme=%s colors=%v", saved.UITheme, saved.UICustomColors)
+	}
+	put(`{"theme":"warm"}`)
+	if got := config.NewStore(s.CfgStore.Root).Snapshot(); got.UITheme != "warm" || !reflect.DeepEqual(got.UICustomColors, want) {
+		t.Fatal("preset switch lost overrides")
+	}
+	put(`{"custom":{}}`)
+	first := config.NewStore(s.CfgStore.Root).Snapshot()
+	put(`{"custom":{}}`)
+	second := config.NewStore(s.CfgStore.Root).Snapshot()
+	if first.UITheme != "warm" || len(first.UICustomColors) != 0 || !reflect.DeepEqual(first, second) {
+		t.Fatal("reset not stable or changed preset")
 	}
 }

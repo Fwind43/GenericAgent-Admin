@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { FolderCog, Globe2, KeyRound, Palette, Power, Save, ShieldAlert, Wifi } from 'lucide-react'
 import './general-workbench.css'
+import ThemeColorEditor from '../ThemeColorEditor'
 import ThemePicker from '../ThemePicker'
 import { api } from '../lib/api'
 import { confirmDanger } from '../lib/danger'
@@ -158,6 +159,7 @@ export function GeneralPage({
       <SettingRow label={text.appearance.theme} hint={text.appearance.themeHelp}>
         <ThemePicker value={theme} onChange={setTheme} lang={lang}/>
       </SettingRow>
+      <ThemeColorEditor theme={theme} lang={lang} active={group === 'appearance'} />
       <SettingFooter>
         <SettingNote tone="muted">
           {text.appearance.fontAttribution}{' '}
