@@ -20,3 +20,14 @@ it('preserves filter, wrap, source and jump callbacks',()=>{
  fireEvent.click(screen.getByRole('button',{name:/fixture-source/}));expect(p.stream.select).toHaveBeenCalledWith('fixture-source')
  fireEvent.scroll(document.querySelector('.log-view'));expect(p.stream.handleScroll).toHaveBeenCalledTimes(1)
 })
+
+it('filters sources without changing selected output and separates service actions from reading tools',()=>{
+ const p=props();p.services.push({name:'other-source',kind:'fixture',running:true});render(<LogsPage {...p}/>);
+ fireEvent.change(screen.getByLabelText(`${t.search}: ${t.logsPage.serviceList}`),{target:{value:'other'}});
+ expect(screen.queryByRole('button',{name:/fixture-source/})).toBeNull();expect(screen.getByRole('button',{name:/other-source/})).toBeTruthy();
+ expect(screen.getByLabelText(t.logsPage.output('fixture-source')).textContent).toContain('fixture needle');
+ expect(p.stream.select).not.toHaveBeenCalled();expect(p.onStart).not.toHaveBeenCalled();expect(p.onStop).not.toHaveBeenCalled();
+ expect(screen.getByRole('button',{name:t.logsPage.reconnect}).closest('.log-console-head')).toBeTruthy();
+ expect(screen.getByRole('button',{name:t.logsPage.wrap}).closest('.log-console-bar')).toBeTruthy();
+ fireEvent.change(screen.getByLabelText(`${t.search}: ${t.logsPage.serviceList}`),{target:{value:'missing'}});expect(screen.getByText(t.empty)).toBeTruthy();
+})

@@ -8,6 +8,8 @@ const COPIED_FOR_MS = 1400
 
 export function LogsPage({ t, services, stream, onStart, onStop }) {
   const text = t.logsPage
+  const [sourceFilter, setSourceFilter] = useState('')
+  const visibleServices = services.filter(service => service.name.toLowerCase().includes(sourceFilter.trim().toLowerCase()))
   const [wrap, setWrap] = useState(true)
   const [copied, setCopied] = useState(false)
   const copyTimer = useRef(0)
@@ -42,8 +44,10 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
           <span>{t.lists.processes}</span>
           <em>{runningCount}/{services.length}</em>
         </div>
-        <div className="log-rail-list">
-          {services.map(s => <button
+        <input className="log-source-search" type="search" aria-label={`${t.search}: ${text.serviceList}`} placeholder={t.search} value={sourceFilter} onChange={event => setSourceFilter(event.target.value)}/>
+        <div className="log-rail-list" tabIndex={0} aria-label={text.serviceList}>
+
+          {visibleServices.map(s => <button
             type="button"
             key={s.name}
             title={s.name}
@@ -54,6 +58,7 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
             <span className="log-rail-name">{s.name}</span>
             <small>{s.running && s.pid ? `PID ${s.pid}` : s.kind}</small>
           </button>)}
+          {services.length > 0 && !visibleServices.length && <p className="log-rail-empty" role="status">{t.empty}</p>}
           {!services.length && <p className="log-rail-empty">{t.empty}</p>}
         </div>
       </div>
@@ -68,6 +73,12 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
           <span className={`stream-state ${stream.streamState}`} role="status">
             <span aria-hidden="true"/>{text.streamLabels[stream.streamState] || text.streamLabels.idle}
           </span>
+            <span className="log-service-actions" role="group" aria-label={text.serviceList}>
+            <button type="button" className="log-icon-button" disabled={!stream.selected} onClick={stream.retry} title={text.reconnect} aria-label={text.reconnect}><RefreshCw size={14}/><span>{text.reconnect}</span></button>
+            {selectedService?.running
+              ? <button type="button" disabled={!stream.selected} onClick={() => onStop(stream.selected)}><Square size={14}/>{t.stop}</button>
+              : <button type="button" disabled={!stream.selected} onClick={() => onStart(stream.selected)}><Play size={14}/>{t.start}</button>}
+            </span>
           <span className="log-count">{filtering ? text.matchCount(rows.length, stream.lines.length) : text.lineCount(stream.lines.length)}</span>
         </div>
 
@@ -98,12 +109,7 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={download} title={t.download} aria-label={t.download}><Download size={14}/></button>
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={stream.clear} title={t.clear} aria-label={t.clear}><Trash2 size={14}/></button>
             </span>
-            <span className="log-action-group">
-            <button type="button" className="log-icon-button" disabled={!stream.selected} onClick={stream.retry} title={text.reconnect} aria-label={text.reconnect}><RefreshCw size={14}/><span>{text.reconnect}</span></button>
-            {selectedService?.running
-              ? <button type="button" disabled={!stream.selected} onClick={() => onStop(stream.selected)}><Square size={14}/>{t.stop}</button>
-              : <button type="button" disabled={!stream.selected} onClick={() => onStart(stream.selected)}><Play size={14}/>{t.start}</button>}
-            </span>
+
           </span>
         </div>
 

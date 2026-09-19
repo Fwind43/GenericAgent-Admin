@@ -25,3 +25,31 @@
   .app .logs-page .log-action-group { flex:1 0 auto; }
   .app .logs-page .log-action-group:last-child { flex-basis:100%; padding-top:8px; border-top:1px solid var(--log-line); }
 }
+
+/* Source selection, service control, then reading tools: independent work zones. */
+.app .logs-page .log-workbench { max-width:none; grid-template-columns:240px minmax(0,1fr); align-items:stretch; height:clamp(540px, calc(100dvh - 180px), 880px); }
+.app .logs-page .log-rail { max-height:none; min-height:0; display:flex; flex-direction:column; }
+.app .logs-page .log-rail-head, .app .logs-page .log-source-search { flex-shrink:0; }
+.app .logs-page .log-source-search { width:100%; min-width:0; margin-block:6px; }
+.app .logs-page .log-rail-list { flex:1; display:flex; flex-direction:column; overflow:auto; overscroll-behavior:contain; }
+.app .logs-page .log-rail-list button { flex-shrink:0; min-height:46px; }
+.app .logs-page .log-console { display:flex; flex-direction:column; min-height:0; }
+.app .logs-page .log-console-head { padding-bottom:10px; border-bottom:1px solid var(--log-line); }
+.app .logs-page .log-service-actions { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.app .logs-page .log-count { flex-basis:100%; }
+.app .logs-page .log-console-bar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.app .logs-page .log-filter { flex:1 1 240px; }
+.app .logs-page .log-console-actions { flex:1 1 100%; justify-content:space-between; }
+.app .logs-page .log-console-body { flex:1; min-height:0; display:flex; flex-direction:column; }
+.app .logs-page .log-view { flex:1; height:auto; min-height:0; max-height:none; overscroll-behavior:contain; }
+.app .logs-page .log-jump { flex-shrink:0; }
+.app .logs-page :is(button,input,[tabindex]):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media(max-width:760px) {
+ .app .logs-page .log-workbench { display:flex; flex-direction:column; height:auto; }
+ .app .logs-page .log-rail { height:240px; }
+ .app .logs-page .log-rail-list { flex-direction:column; }
+ .app .logs-page .log-rail-list button { min-height:44px; }
+ .app .logs-page .log-console { min-height:650px; }
+ .app .logs-page .log-console-body { flex:none; height:420px; }
+ .app .logs-page .log-console-actions .log-action-group { flex:0 1 auto; padding:0; border:0; }
+}
