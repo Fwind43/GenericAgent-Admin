@@ -95,6 +95,8 @@ class InstallationTest(unittest.TestCase):
                     def emit(event):
                         events.append(event)
                         args = event.get('args', {})
+                        for key in args:
+                            owner.assertFalse(str(key).startswith('_'), event)
                         if event['type'] == 'conductor_models':
                             reply = {'ok': True, 'models': [{'index': 7, 'model': 'fake'}]}
                         elif event['type'] == 'conductor_defaults':
@@ -106,7 +108,9 @@ class InstallationTest(unittest.TestCase):
                         reply['request_id'] = event['request_id']
                         (Path(broker) / (event['request_id'] + '.response.json')).write_text(json.dumps(reply))
                     scope['emit'] = emit
-                    calls = [('conductor_models', {}), ('conductor_defaults', {'action': 'set', 'llm_no': 7, 'reasoning_effort': 'low'}), ('conductor_dispatch', {'objective': 'isolated fake'})]
+                    # The last defaults call mirrors what core dispatch really sends: nullable fields as
+                    # explicit nulls plus the private transport keys _index/_tool_num injected upstream.
+                    calls = [('conductor_models', {}), ('conductor_defaults', {'action': 'set', 'llm_no': 7, 'reasoning_effort': 'low'}), ('conductor_defaults', {'action': 'get', 'llm_no': None, 'reasoning_effort': None, '_index': 0, '_tool_num': 1}), ('conductor_dispatch', {'objective': 'isolated fake'})]
                     class SettingsModel:
                         turn = 0
                         def chat(self, messages, tools):
@@ -124,11 +128,23 @@ class InstallationTest(unittest.TestCase):
                                 yield None
                             return types.SimpleNamespace(content='', tool_calls=tool_calls)
                     settings_model = SettingsModel()
-                    result = loop.exhaust(loop.agent_runner_loop(settings_model, 'test', 'test', Handler(), fake.TOOLS_SCHEMA, max_turns=5))
-                    self.assertEqual(settings_model.turn, 4)
+                    result = loop.exhaust(loop.agent_runner_loop(settings_model, 'test', 'test', Handler(), fake.TOOLS_SCHEMA, max_turns=6))
+                    self.assertEqual(settings_model.turn, 5)
                     self.assertEqual(defaults, {'llm_no': 7, 'reasoning_effort': 'low'})
-                    self.assertEqual(len(events), 3)
-                    print('settings schema/install/broker/continuation: 3 tool calls, 4 fake-model turns PASS')
+                    self.assertEqual(len(events), 4)
+                    private = [e for e in events if e['type'] == 'conductor_defaults'][-1]
+                    self.assertEqual(private['args'], {'action': 'get', 'llm_no': None, 'reasoning_effort': None})
+                    # Core dispatch mutates the args dict in place before calling the handler; the
+                    # broker payload must not contain those transport keys, and the caller's dict
+                    # must stay untouched.
+                    injected = {'action': 'get', 'llm_no': None, 'reasoning_effort': None, '_index': 0, '_tool_num': 1}
+                    stream = Handler().do_conductor_defaults(injected, None)
+                    next(stream)
+                    self.assertEqual(events[-1]['args'], {'action': 'get', 'llm_no': None, 'reasoning_effort': None})
+                    self.assertEqual(injected['_index'], 0)
+                    self.assertEqual(injected['_tool_num'], 1)
+                    self.assertEqual(len(events), 5)
+                    print('settings schema/install/broker/continuation: 4 tool calls + injected transport keys, 5 fake-model turns PASS')
                 finally:
                     restore()
                 self.assertIs(fake.TOOLS_SCHEMA, original)

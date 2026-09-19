@@ -37,15 +37,32 @@ func (s *Server) conductorDefaults(parentID string, args map[string]interface{})
 		return conductorDispatchOptions{}, errors.New("action must be get, set or reset")
 	}
 	var patch conductorDispatchOptions
-	for key := range args {
+	// Core dispatch injects private transport keys (_index/_tool_num) into the same args map
+	// before the handler runs; they are framework internals, not business fields. Unknown
+	// public fields still fail, and private keys never reach the type check or persistence.
+	filtered := make(map[string]interface{}, len(args))
+	for key, value := range args {
+		if strings.HasPrefix(key, "_") {
+			continue
+		}
 		if key != "action" && key != "llm_no" && key != "reasoning_effort" {
 			return patch, errors.New("unknown defaults field")
 		}
+		filtered[key] = value
 	}
-	if action != "set" && len(args) != 1 {
-		return patch, errors.New("only set accepts fields")
+	// The exposed schema marks llm_no/reasoning_effort nullable, so read/reset callers may send
+	// explicit nulls; for those actions null is the same as omitted. set keeps null as a clear.
+	if action != "set" {
+		for key, value := range filtered {
+			if key != "action" && value == nil {
+				delete(filtered, key)
+			}
+		}
+		if len(filtered) != 1 {
+			return patch, errors.New("only set accepts fields")
+		}
 	}
-	data, err := json.Marshal(args)
+	data, err := json.Marshal(filtered)
 	if err != nil {
 		return patch, errors.New("invalid defaults")
 	}

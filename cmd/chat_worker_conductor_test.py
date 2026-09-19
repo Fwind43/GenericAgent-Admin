@@ -238,7 +238,9 @@ class ConductorToolBoundaryTest(unittest.TestCase):
                 self.assertFalse(hasattr(Handler, 'do_conductor_dispatch'))
             restore = install(object(), {'role': 'parent', 'broker_dir': directory})
             try:
-                self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA}, {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel', 'conductor_review'})
+                self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA},
+                                 {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel', 'conductor_review',
+                                  'conductor_tasks', 'conductor_defaults', 'conductor_models'})
                 review_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_review')
                 self.assertEqual(set(review_schema['required']), {'dispatch_id', 'status', 'basis', 'evidence_ids'})
                 self.assertEqual(review_schema['properties']['status']['enum'], ['verified', 'needs_work'])

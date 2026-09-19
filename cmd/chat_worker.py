@@ -2672,8 +2672,11 @@ def _install_conductor_tools(agent, config):
     receipts = {}
 
     def settings_tool(kind, args):
+        # Core dispatch injects private transport keys (_index/_tool_num) into the same map the
+        # handler receives; never forward framework internals to the server as business fields.
+        outbound = {key: value for key, value in args.items() if not key.startswith('_')}
         request_id = uuid.uuid4().hex
-        emit({'type': kind, 'request_id': request_id, 'broker_dir': str(broker), 'args': args})
+        emit({'type': kind, 'request_id': request_id, 'broker_dir': str(broker), 'args': outbound})
         reply = read_reply(broker / (request_id + '.response.json'), 30)
         if not isinstance(reply, dict):
             reply = {'ok': False, 'error': 'Request timed out; query again before retrying a mutation.'}
