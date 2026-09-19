@@ -1,3 +1,4 @@
+import './models-workbench.css'
 import {
   AlertTriangle,
   ArrowDown,
@@ -1086,6 +1087,7 @@ export function Models({
 
   return (
     <section className="models-page">
+      <p className="model-workbench-scope">{/[\u3400-\u9fff]/.test(text.saveAll) ? '编辑仅更新当前草稿；发现模型会请求服务商，但不会保存配置。请检查校验提示，再使用页面保存统一提交。' : 'Edits update this draft only. Discovery queries the provider without saving configuration. Review validation messages, then save all changes from this page.'}</p>
       <header className="model-save-bar">
         <div className="model-toolbar-main">
           <nav className="model-workspace-tabs" aria-label={text.configSummary}>
@@ -1127,6 +1129,7 @@ export function Models({
           <Button className="model-utility-action" title={text.configPreview} aria-label={text.configPreview} icon={<FileCode2 size={14} />} onClick={async () => { setPreviewOpen(true); await previewModels() }} />
           <Button
             className="model-utility-action"
+            danger
             title={text.discard}
             aria-label={text.discard}
             icon={<RotateCcw size={14} />}

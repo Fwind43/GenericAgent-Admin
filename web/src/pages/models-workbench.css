@@ -1,0 +1,38 @@
+/* Independent Admin workbench only; dialog layout remains owned by its component. */
+.app > .main .models-page .model-connection-title,
+.app > .main .models-page .model-connection-base,
+.app > .main .models-page .model-call-title,
+.app > .main .models-page .model-call-sub,
+.app > .main .models-page .model-call-provider { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+.app > .main .models-page .model-connection-card { text-align: left; padding: 18px; gap: 10px; }
+.app > .main .models-page .model-connection-base { line-height: 1.6; color: var(--text); opacity: .8; }
+.app > .main .models-page .model-connection-title { font-weight: 650; line-height: 1.5; }
+.app > .main .models-page .model-call-row { padding-top: 14px; padding-bottom: 14px; }
+.app > .main .models-page .model-save-actions { gap: 10px; flex-wrap: wrap; }
+.app > .main .models-page .model-save-action { margin-left: 4px; }
+.app > .main .models-page .model-workspace-tabs button:focus-visible,
+.app > .main .models-page .model-connection-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 900px) {
+  .app > .main .models-page :is(button, .ant-input, .ant-select-selector) { min-height: 44px; }
+  .app > .main .models-page .model-save-actions { width: 100%; }
+  .app > .main .models-page .model-save-action { flex: 1; }
+  .app > .main .models-page .model-connection-grid { grid-template-columns: minmax(0, 1fr); }
+  .app > .main .models-page :is(.model-call-head, .model-connections-head) { flex-wrap: wrap; gap: 12px; }
+  .app > .main .models-page .model-call-actions { flex-wrap: wrap; }
+}
+
+.app > .main .models-page .model-workbench-scope { margin: 0 0 16px; color: var(--text); opacity: .85; font-size: 13px; line-height: 1.7; }
+
+.app > .main .models-page .model-call-title strong,
+.app > .main .models-page .model-call-provider span { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.app > .main .models-page .model-call-title { flex-wrap: wrap; }
+.app > .main .models-page .model-call-sub { color: var(--text); opacity: .8; }
+.app > .main .models-page .model-call-provider { min-height: 44px; }
+
+@media (max-width: 680px) { .app > .main .models-page .model-call-actions button { min-width: 44px; flex-shrink: 0; } .app > .main .models-page .model-call-actions { flex-wrap: wrap; } }
+
+@media (max-width: 680px) {
+  .app > .main .models-page .model-call-main { grid-template-columns: 18px 42px minmax(0, 1fr); }
+  .app > .main .models-page .model-call-main > .model-call-provider { grid-column: 2 / -1; justify-self: stretch; max-width: none; }
+  .app > .main .models-page .model-call-main > .model-call-actions { grid-column: 2 / -1; justify-self: end; }
+}
