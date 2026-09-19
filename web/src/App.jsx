@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
+import { useAdminDrawerFocus } from './hooks/useAdminDrawerFocus'
 import { useGSAP } from '@gsap/react'
 import { ArrowLeft, Activity, BarChart3, BrainCircuit, FileCode2, FolderCog, Globe2, KeyRound, Menu, MessageSquare, PanelLeftClose, Play, Server, SlidersHorizontal, Sparkles, Target, Terminal } from 'lucide-react'
 import './admin-mobile.css'
@@ -60,6 +61,11 @@ export default function App({ embedded = false, active = true, onClose }) {
   const [lang, setLang] = useState(() => localStorage.getItem('ga-admin-lang-explicit') === '1' ? (localStorage.getItem('ga-admin-lang') || defaultLang) : defaultLang)
   const [theme, setTheme] = useState(getInitialTheme)
   const [adminSidebarOpen, setAdminSidebarOpen] = useState(false)
+  const adminSidebarRef = useRef(null)
+  const adminToggleRef = useRef(null)
+  const adminMainRef = useRef(null)
+  const closeAdminSidebar = useMemo(() => () => setAdminSidebarOpen(false), [])
+  useAdminDrawerFocus({ open: adminSidebarOpen, embedded, sidebarRef: adminSidebarRef, toggleRef: adminToggleRef, mainRef: adminMainRef, close: closeAdminSidebar })
   const [settingsDetail, setSettingsDetail] = useState(false)
   const settingsBackRef = useRef(null)
   const settingsNavRef = useRef(null)
@@ -307,7 +313,7 @@ export default function App({ embedded = false, active = true, onClose }) {
     </div>}
     <div ref={appScope} className={`app app-tab-${tab} ${embedded ? `app-embedded ${settingsDetail ? 'settings-detail' : 'settings-list'}` : 'admin-workbench'} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
       <button type="button" className="admin-sidebar-scrim" aria-label={lang === 'zh' ? '关闭管理导航' : 'Close admin navigation'} onClick={()=>setAdminSidebarOpen(false)} />
-      <aside id="admin-sidebar" className="sidebar">
+      <aside id="admin-sidebar" ref={adminSidebarRef} className="sidebar">
         <div className="admin-sidebar-heading">
           <div className="brand"><img className="brand-logo" src="/icon.png" alt=""/><div><h1>{t.appName}</h1><p>{t.tagline}</p></div></div>
           <button type="button" className="admin-sidebar-close" aria-label={lang === 'zh' ? '收起管理导航' : 'Collapse admin navigation'} onClick={()=>setAdminSidebarOpen(false)}><PanelLeftClose size={20} aria-hidden="true"/></button>
@@ -328,9 +334,9 @@ export default function App({ embedded = false, active = true, onClose }) {
         {!embedded && <StatusNotice kind={notice?.kind} message={notice?.message} retryLabel={t.retry} dismissLabel={t.close} onRetry={notice?.kind === 'error' ? load : undefined} onDismiss={notice?.kind === 'success' ? ()=>setNotice(null) : undefined}/>}
         {serviceStatus}
       </aside>
-      <main className="main">
+      <main ref={adminMainRef} className="main">
         <div className="admin-mobile-bar">
-          <button type="button" className="admin-sidebar-toggle" aria-label={lang === 'zh' ? '展开管理导航' : 'Open admin navigation'} aria-expanded={adminSidebarOpen} aria-controls="admin-sidebar" onClick={()=>setAdminSidebarOpen(true)}><Menu size={21} aria-hidden="true"/></button>
+          <button type="button" ref={adminToggleRef} className="admin-sidebar-toggle" aria-label={lang === 'zh' ? '展开管理导航' : 'Open admin navigation'} aria-expanded={adminSidebarOpen} aria-controls="admin-sidebar" onClick={()=>setAdminSidebarOpen(true)}><Menu size={21} aria-hidden="true"/></button>
           <span>{t.nav[tab]}</span>
           {serviceStatus}
         </div>

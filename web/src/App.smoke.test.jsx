@@ -1845,25 +1845,36 @@ describe('operator shell feedback', () => {
 
   test('mobile admin navigation opens and closes without trapping off-screen controls', async () => {
     installBrowserPolyfills()
-    globalThis.fetch = vi.fn(async (url) => shellPayload(url))
-    render(<App />)
+    const defaultMatchMedia = window.matchMedia
+    const mediaSpy = vi.spyOn(window, 'matchMedia').mockImplementation(query => ({
+      ...defaultMatchMedia(query),
+      matches: query === '(max-width: 900px)',
+    }))
+    let view
+    try {
+      globalThis.fetch = vi.fn(async (url) => shellPayload(url))
+      view = render(<App />)
 
-    const files = await screen.findByRole('button', { name: /文件|Files/i })
-    const shell = document.querySelector('.app')
-    const open = screen.getByRole('button', { name: /展开管理导航|Open admin navigation/i })
-    expect(shell?.classList.contains('admin-sidebar-open')).toBe(false)
-    expect(open.getAttribute('aria-expanded')).toBe('false')
+      const files = await screen.findByRole('button', { name: /文件|Files/i })
+      const shell = document.querySelector('.app')
+      const open = screen.getByRole('button', { name: /展开管理导航|Open admin navigation/i })
+      expect(shell?.classList.contains('admin-sidebar-open')).toBe(false)
+      expect(open.getAttribute('aria-expanded')).toBe('false')
 
-    fireEvent.click(open)
-    expect(shell?.classList.contains('admin-sidebar-open')).toBe(true)
-    expect(open.getAttribute('aria-expanded')).toBe('true')
+      fireEvent.click(open)
+      expect(shell?.classList.contains('admin-sidebar-open')).toBe(true)
+      expect(open.getAttribute('aria-expanded')).toBe('true')
 
-    fireEvent.click(screen.getByRole('button', { name: /收起管理导航|Collapse admin navigation/i }))
-    expect(shell?.classList.contains('admin-sidebar-open')).toBe(false)
+      fireEvent.click(screen.getByRole('button', { name: /收起管理导航|Collapse admin navigation/i }))
+      expect(shell?.classList.contains('admin-sidebar-open')).toBe(false)
 
-    fireEvent.click(open)
-    fireEvent.click(files)
-    expect(shell?.classList.contains('admin-sidebar-open')).toBe(false)
+      fireEvent.click(open)
+      fireEvent.click(files)
+      await waitFor(() => expect(shell?.classList.contains('admin-sidebar-open')).toBe(false))
+    } finally {
+      view?.unmount()
+      mediaSpy.mockRestore()
+    }
   })
 
   test('explicitly selects each theme from the picker and recovers from an invalid stored id', async () => {
