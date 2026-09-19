@@ -1,0 +1,21 @@
+.app .general-workbench { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 24px; align-items: start; }
+.app .general-workbench [hidden] { display: none !important; }
+.app .general-index { display: flex; flex-direction: column; gap: 4px; position: sticky; top: 16px; }
+.app .general-index button { text-align: left; border: 0; background: transparent; padding: 10px 12px; min-height: 40px; color: var(--muted); }
+.app .general-index button[aria-current] { color: var(--text); background: var(--accent-soft); font-weight: 600; }
+.app .general-index p { padding: 10px 12px; font-size: 12px; color: var(--muted); }
+.app .general-detail { min-width: 0; }
+.app .general-detail .set-card { border-radius: 10px; }
+.app .general-detail .set-card-head { padding: 16px 20px; }
+.app .general-detail .set-row { min-height: 0; padding: 14px 20px; grid-template-columns: minmax(160px, .8fr) minmax(220px, 1.3fr); }
+.app .general-detail .set-card-footer { padding: 12px 20px; }
+.app .general-detail .theme-grid { max-width: 100%; }
+@media (max-width: 1100px) {
+ .app .general-workbench { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+ .app .general-index { position: static; flex-direction: row; flex-wrap: wrap; }
+ .app .general-index p { width: 100%; margin: 0; padding: 4px 12px; }
+}
+@media (max-width: 600px) {
+ .app .general-detail .set-row { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+ .app .general-index button { min-height: 44px; }
+}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { GeneralPage } from './GeneralPage'
 import { I18N, SETTINGS_TEXT } from '../lib/i18n'
@@ -77,6 +77,7 @@ describe('GeneralPage update mirror', () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
     render(<Harness onSave={onSave} />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     const input = screen.getByLabelText('GitHub mirror')
     await user.type(input, 'https://mirror.example')
@@ -91,6 +92,7 @@ describe('GeneralPage remote access', () => {
   it('shows the real listen address instead of the configured port', async () => {
     mockBackend()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     expect(await screen.findByText('127.0.0.1:52341')).not.toBeNull()
   })
@@ -98,6 +100,7 @@ describe('GeneralPage remote access', () => {
   it('keeps the port and password controls hidden while remote access is off', async () => {
     mockBackend()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await screen.findByText('127.0.0.1:52341')
     expect(screen.queryByLabelText('Fixed port')).toBeNull()
@@ -108,6 +111,7 @@ describe('GeneralPage remote access', () => {
     mockBackend()
     const user = userEvent.setup()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await screen.findByText('127.0.0.1:52341')
     await user.click(toggle('Allow remote access'))
@@ -122,6 +126,7 @@ describe('GeneralPage remote access', () => {
     mockBackend()
     const user = userEvent.setup()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await screen.findByText('127.0.0.1:52341')
     await user.click(toggle('Allow remote access'))
@@ -135,6 +140,7 @@ describe('GeneralPage remote access', () => {
     const onSave = vi.fn()
     const user = userEvent.setup()
     render(<Harness onSave={onSave} />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await screen.findByText('127.0.0.1:52341')
     await user.click(toggle('Allow remote access'))
@@ -150,6 +156,7 @@ describe('GeneralPage remote access', () => {
     mockDialog()
     const user = userEvent.setup()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await screen.findByText('127.0.0.1:52341')
     expect(screen.queryByPlaceholderText('Current password')).toBeNull()
@@ -172,6 +179,7 @@ describe('GeneralPage remote access', () => {
     const confirmSpy = mockDialog()
     const user = userEvent.setup()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await screen.findByText('127.0.0.1:52341')
     await user.type(screen.getByPlaceholderText('New password'), 'correct-horse')
@@ -187,6 +195,7 @@ describe('GeneralPage remote access', () => {
     mockBackend()
     const user = userEvent.setup()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await screen.findByText('127.0.0.1:52341')
     await user.type(screen.getByPlaceholderText('New password'), 'short')
@@ -200,6 +209,7 @@ describe('GeneralPage remote access', () => {
     mockBackend({ auth: { username: 'admin', passwordSet: true, managedByEnvironment: false } })
     const user = userEvent.setup()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     const change = await screen.findByRole('button', { name: /Change password/ })
     await user.type(screen.getByPlaceholderText('New password'), 'correct-horse')
@@ -216,6 +226,7 @@ describe('GeneralPage remote access', () => {
     mockDialog()
     const user = userEvent.setup()
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await user.click(await screen.findByRole('button', { name: /Remove password/ }))
 
@@ -235,6 +246,7 @@ describe('GeneralPage remote access', () => {
     mockDialog()
     const user = userEvent.setup()
     render(<Harness config={{ ...baseConfig, remote_access: true }} />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     await user.click(await screen.findByRole('button', { name: /Remove password/ }))
 
@@ -244,6 +256,7 @@ describe('GeneralPage remote access', () => {
   it('hides the password form when the credential comes from the environment', async () => {
     mockBackend({ auth: { username: 'operator', passwordSet: true, managedByEnvironment: true } })
     render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
 
     expect(await screen.findByText(/GA_ADMIN_AUTH_USER/)).not.toBeNull()
     expect(screen.queryByPlaceholderText('New password')).toBeNull()

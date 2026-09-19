@@ -10,8 +10,8 @@ export function SettingsPage({ children, className = '' }) {
   return <div className={`settings-page set-page ${className}`.trim()}>{children}</div>
 }
 
-export function SettingsSection({ title, description = '', icon = null, actions = null, children, className = '' }) {
-  return <section className={`set-card ${className}`.trim()}>
+export function SettingsSection({ title, description = '', icon = null, actions = null, children, className = '', id, hidden = false }) {
+  return <section id={id} hidden={hidden} className={`set-card ${className}`.trim()}>
     <header className="set-card-head">
       {icon && <span className="set-card-icon" aria-hidden="true">{icon}</span>}
       <div className="set-card-copy">

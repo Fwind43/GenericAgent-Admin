@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { FolderCog, Globe2, KeyRound, Palette, Power, Save, ShieldAlert, Wifi } from 'lucide-react'
+import './general-workbench.css'
 import ThemePicker from '../ThemePicker'
 import { api } from '../lib/api'
 import { confirmDanger } from '../lib/danger'
@@ -139,8 +140,15 @@ export function GeneralPage({
   const patch = (field, value) => setCfg({ ...(cfg || {}), [field]: value })
   const proxyHelp = { off: text.network.offHelp, system: text.network.systemHelp, custom: text.network.customHelp }[proxyMode]
 
-  return <SettingsPage>
-    <SettingsSection title={text.appearance.title} description={`${text.appearance.desc} ${lang === 'en' ? 'Changes apply immediately.' : '更改立即生效。'}`} icon={<Palette size={17}/>}>
+  const [group, setGroup] = useState('appearance')
+  const groups = ['appearance', 'paths', 'network', 'remote', 'startup']
+  return <SettingsPage className="general-workbench">
+    <nav className="general-index" aria-label={lang === 'zh' ? '设置分组' : 'Settings groups'}>
+      {groups.map(id => <button key={id} type="button" aria-current={group === id ? 'true' : undefined} aria-controls={`general-${id}`} onClick={() => setGroup(id)}>{text[id].title}</button>)}
+      <p role="status">{dirty ? text.unsaved : text.saved}</p>
+    </nav>
+    <div className="general-detail">
+    <SettingsSection id="general-appearance" hidden={group !== 'appearance'} title={text.appearance.title} description={`${text.appearance.desc} ${lang === 'en' ? 'Changes apply immediately.' : '更改立即生效。'}`} icon={<Palette size={17}/>}>
       <SettingRow label={text.appearance.language} hint={text.appearance.languageHelp}>
         <div className="set-segmented" role="group" aria-label={t.language}>
           <button type="button" aria-pressed={lang === 'zh'} className={lang === 'zh' ? 'is-active' : ''} onClick={()=>onLanguage('zh')}>中文</button>
@@ -158,7 +166,7 @@ export function GeneralPage({
       </SettingFooter>
     </SettingsSection>
 
-    <SettingsSection title={text.paths.title} description={text.paths.desc} icon={<FolderCog size={17}/>}>
+    <SettingsSection id="general-paths" hidden={group !== 'paths'} title={text.paths.title} description={text.paths.desc} icon={<FolderCog size={17}/>}>
       <SettingRow label={t.root} hint={text.paths.rootHelp} htmlFor="settings-ga-root" stacked>
         <input id="settings-ga-root" value={root} onChange={e=>setRoot(e.target.value)}/>
       </SettingRow>
@@ -170,7 +178,7 @@ export function GeneralPage({
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection title={text.network.title} description={text.network.desc} icon={<Globe2 size={17}/>}>
+    <SettingsSection id="general-network" hidden={group !== 'network'} title={text.network.title} description={text.network.desc} icon={<Globe2 size={17}/>}>
       <SettingRow label={text.network.mode} hint={proxyHelp} htmlFor="settings-proxy-mode">
         <select id="settings-proxy-mode" value={proxyMode} onChange={e=>patch('proxy_mode', e.target.value)}>
           {PROXY_MODES.map(mode => <option key={mode} value={mode}>{text.network[mode]}</option>)}
@@ -199,17 +207,13 @@ export function GeneralPage({
           placeholder={text.network.githubMirrorPlaceholder}
         />
       </SettingRow>
-      <SettingFooter>
-        <SettingNote tone="muted" icon={<ShieldAlert size={14}/>}>{text.confirmNote}</SettingNote>
-        <span role="status" aria-live="polite" className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
-        <button className="primary" type="button" onClick={onSave} disabled={busy || !cfg || !dirty}><Save size={15}/>{busy ? t.busy : text.saveChanges}</button>
-      </SettingFooter>
+
     </SettingsSection>
 
-    <RemoteAccessSection text={text} t={t} cfg={cfg} patch={patch} dirty={dirty} onSave={onSave} busy={busy}/>
+    <div id="general-remote" hidden={group !== 'remote'}><RemoteAccessSection text={text} t={t} cfg={cfg} patch={patch} dirty={dirty} onSave={onSave} busy={busy}/></div>
 
 
-    <SettingsSection title={text.startup.title} description={text.startup.desc} icon={<Power size={17}/>}>
+    <SettingsSection id="general-startup" hidden={group !== 'startup'} title={text.startup.title} description={text.startup.desc} icon={<Power size={17}/>}>
       <SettingToggle
         id="settings-autostart"
         checked={!!autostart?.enabled}
@@ -222,6 +226,12 @@ export function GeneralPage({
       />
       {autostart?.path && <p className="set-path"><code>{autostart.path}</code></p>}
     </SettingsSection>
+      <SettingFooter>
+        <SettingNote tone="muted" icon={<ShieldAlert size={14}/>}>{text.confirmNote}</SettingNote>
+        <span role="status" aria-live="polite" className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
+        <button className="primary" type="button" onClick={onSave} disabled={busy || !cfg || !dirty}><Save size={15}/>{busy ? t.busy : text.saveChanges}</button>
+      </SettingFooter>
+  </div>
   </SettingsPage>
 }
 
