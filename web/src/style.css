@@ -16707,7 +16707,7 @@ html[data-color-scheme="dark"] .logs-page {
 
 .set-row-toggle { align-items: flex-start; }
 .set-toggle { display: flex; align-items: flex-start; gap: 11px; cursor: pointer; }
-.set-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.set-toggle input[type="checkbox"] { position: absolute; width: 1px; min-width: 0; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
 .set-toggle-track {
   position: relative;
   width: 38px;
