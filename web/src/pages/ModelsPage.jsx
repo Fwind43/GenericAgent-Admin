@@ -451,7 +451,10 @@ function CallRow({ row, index, total, expanded, onToggle, moveRow, onOpenProvide
           <Button danger type="text" size="small" icon={<Trash2 size={14} />} aria-label={`${t.delete} ${label}`} title={failover ? text.removeGroup : text.removeModel} onClick={onRemove} />
         </div>
       </div>
-      {expanded && children}
+      <Drawer open={expanded} onClose={onToggle} width={720} title={row.displayName || label} rootClassName="model-row-detail-drawer">
+        <p className="model-detail-scope">{/[\u3400-\u9fff]/.test(text.configure) ? '\u4fee\u6539\u4fdd\u7559\u5728\u9875\u9762\u8349\u7a3f\uff0c\u5173\u95ed\u4e0d\u4f1a\u4fdd\u5b58\u5230 GA\u3002' : 'Changes stay in the page draft. Closing does not save to GA.'}</p>
+        {children}
+      </Drawer>
     </div>
   )
 }
@@ -916,10 +919,7 @@ export function Models({
   const saving = saveState.status === 'saving'
 
   const toggleRow = id => setExpanded(current => {
-    const next = new Set(current)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    return next
+    return current.has(id) ? new Set() : new Set([id])
   })
 
   const applyRowOrder = (nextProfiles, nextGroups, orderedRows) => {
@@ -973,7 +973,7 @@ export function Models({
     const group = { var_name: nextFailoverGroupName(failoverGroups), members: [], max_retries: 10, base_delay: 0.5 }
     const nextGroups = [...failoverGroups, group]
     appendRows(profiles, nextGroups)
-    setExpanded(current => new Set(current).add(`failover:${failoverGroups.length}`))
+    setExpanded(new Set([`failover:${failoverGroups.length}`]))
   }
   const patchGroup = (groupIndex, patch) => setFailoverGroups(current => current.map(
     (group, index) => index === groupIndex ? { ...group, ...patch } : group,
@@ -1010,6 +1010,12 @@ export function Models({
   const openProvider = index => {
     setProviderDrawer({ mode: 'edit', index })
     setProviderDraft(null)
+  }
+  const closeProvider = async () => {
+    if (providerDrawer?.mode === 'create' && providerDraft &&
+      [providerDraft.display_name, providerDraft.apibase, providerDraft.apikey].some(value => String(value || '').trim()) &&
+      !await confirmDanger('discard_new_provider', /[\u3400-\u9fff]/.test(text.saveAll) ? '\u653e\u5f03\u672a\u6dfb\u52a0\u7684\u670d\u52a1\u5546\uff1f' : 'Discard the new provider draft?')) return
+    setProviderDrawer(null)
   }
   const openNewProvider = () => {
     setWorkspace('providers')
@@ -1183,7 +1189,7 @@ export function Models({
         {rows.length ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragRow}>
             <SortableContext items={rows.map(row => row.id)} strategy={verticalListSortingStrategy}>
-              <div className="model-call-rows" role="list">
+              <div className="model-call-rows" role="list" tabIndex={0} aria-label={text.callListTitle}>
                 {rows.map((row, index) => (
                   <CallRow
                     key={row.id}
@@ -1253,7 +1259,7 @@ export function Models({
           </div>
           <Button icon={<Plus size={14} />} onClick={openNewProvider}>{text.addProvider}</Button>
         </header>
-        <div className="model-connection-grid">
+        <div className="model-connection-grid" tabIndex={0} aria-label={text.connections}>
           {profiles.map((profile, index) => {
             const state = providerState(validation[index])
             return (
@@ -1288,7 +1294,7 @@ export function Models({
         index={drawerIndex}
         profiles={profiles}
         result={drawerIndex === undefined ? null : validation[drawerIndex]}
-        onClose={() => setProviderDrawer(null)}
+        onClose={closeProvider}
         onChange={patch => shownDrawer?.mode === 'create'
           ? setProviderDraft(current => ({ ...current, ...patch }))
           : patchProfile(drawerIndex, patch)}

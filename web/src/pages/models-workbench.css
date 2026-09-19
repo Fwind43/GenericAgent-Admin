@@ -4,10 +4,10 @@
 .app > .main .models-page .model-call-title,
 .app > .main .models-page .model-call-sub,
 .app > .main .models-page .model-call-provider { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
-.app > .main .models-page .model-connection-card { text-align: left; padding: 18px; gap: 10px; }
+.app > .main .models-page .model-connection-card { text-align: left; padding: 12px 16px; gap: 6px; }
 .app > .main .models-page .model-connection-base { line-height: 1.6; color: var(--text); opacity: .8; }
 .app > .main .models-page .model-connection-title { font-weight: 650; line-height: 1.5; }
-.app > .main .models-page .model-call-row { padding-top: 14px; padding-bottom: 14px; }
+.app > .main .models-page .model-call-row { padding-top: 2px; padding-bottom: 2px; }
 .app > .main .models-page .model-save-actions { gap: 10px; flex-wrap: wrap; }
 .app > .main .models-page .model-save-action { margin-left: 4px; }
 .app > .main .models-page .model-workspace-tabs button:focus-visible,
@@ -36,3 +36,12 @@
   .app > .main .models-page .model-call-main > .model-call-provider { grid-column: 2 / -1; justify-self: stretch; max-width: none; }
   .app > .main .models-page .model-call-main > .model-call-actions { grid-column: 2 / -1; justify-self: end; }
 }
+
+/* Keep the queue compact; only one detail drawer is expanded at a time. */
+.models-page .model-call-rows { grid-auto-rows:max-content; align-content:start; gap:4px; max-height:calc(100dvh - 330px); overflow:auto; padding:4px; overscroll-behavior:contain; }
+.models-page .model-call-main { min-height:54px; padding:8px 12px; }
+.models-page .model-call-row { border-radius:8px; }
+.models-page .model-connection-grid { grid-template-columns:minmax(0,1fr); max-height:calc(100dvh - 330px); overflow:auto; padding:4px; gap:5px; }
+.models-page .model-connection-card { padding:12px 16px; }
+.models-page .model-call-rows:focus-visible,.models-page .model-connection-grid:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+@media (max-width:800px) { .models-page .model-call-rows,.models-page .model-connection-grid { max-height:none; overflow:visible; } }
