@@ -1,0 +1,21 @@
+.app > .main .overview-page { min-width: 0; }
+.app > .main .overview-page :is(.overview-panel,.overview-health,.overview-health-grid > div,.version-card) { min-width: 0; }
+.app > .main .overview-page :is(code,.overview-list li,.overview-health-state,.overview-kv,.muted,.warn,.err-text) { overflow-wrap: anywhere; white-space: normal; }
+.app > .main .overview-page .overview-panel { padding: 20px; }
+.app > .main .overview-page .overview-panel-actions { flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+.app > .main .overview-page .overview-mirror { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
+.app > .main .overview-page .overview-health-head { flex-wrap: wrap; gap: 12px; }
+.app > .main .overview-page .overview-health-head > div { min-width: 0; flex: 1 1 240px; }
+.app > .main .overview-page .overview-health-head > div > span { display: none; }
+.app > .main .overview-page .overview-health-state { max-width: 100%; }
+@media (max-width: 680px) {
+ .app > .main .overview-page :is(button,input) { min-height: 44px; }
+ .app > .main .overview-page button { min-width: 44px; white-space: normal; }
+ .app > .main .overview-page .overview-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .app > .main .overview-page :is(.overview-operations,.overview-health-grid) { grid-template-columns: minmax(0,1fr); }
+ .app > .main .overview-page .overview-mirror-control { flex-direction: column; align-items: stretch; }
+ .app > .main .overview-page .overview-panel { padding: 16px; }
+ .app > .main .overview-page .overview-kv { flex-wrap: wrap; gap: 8px; }
+}
+
+.app > .main .overview-page button:not(.primary):not(.danger) { color: var(--text); background: var(--surface); border: 1px solid var(--border); }

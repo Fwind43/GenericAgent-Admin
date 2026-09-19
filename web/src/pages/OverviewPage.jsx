@@ -1,3 +1,4 @@
+import './overview-workbench.css'
 import React, { useEffect, useState } from 'react'
 import { Activity, CalendarClock, Download, FileCode2, MessageSquare, Play, Power, RefreshCw, Server, ShieldAlert } from 'lucide-react'
 import { navigateToNewChat } from '../lib/chatLaunchIntent'
@@ -111,7 +112,8 @@ export function OverviewPage({
       </div>
 
       {observabilityError
-        ? <p className="err-text">{observabilityError}</p>
+        ? <p className="err-text" role="alert">{observabilityError}</p>
+        : !observability ? <p className="muted" role="status">{copy.awaitingSnapshot}</p>
         : <>
           <div className="overview-health-meta">
             {displayedRoot && <code>{displayedRoot}</code>}
@@ -197,7 +199,7 @@ export function OverviewPage({
             <button className="primary" type="button" onClick={version.updateVersion} disabled={busy || status?.running || !check?.update}>
               <Download size={14} aria-hidden="true"/>{status?.running ? `${copy.updateRunning}…` : copy.oneClickUpdate}
             </button>
-            {status?.stage === 'ready' && <button className="primary" type="button" onClick={version.restartVersion} disabled={busy}>
+            {status?.stage === 'ready' && <button className="danger" type="button" onClick={version.restartVersion} disabled={busy}>
               <Power size={14} aria-hidden="true"/>{copy.restartToApply}
             </button>}
           </div>

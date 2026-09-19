@@ -39,6 +39,12 @@ const renderOverview = ({ lang = 'zh', gitStatus, observability, services = [], 
 />)
 
 describe('OverviewPage', () => {
+  it('does not claim all clear before the first snapshot', () => {
+    renderOverview()
+    expect(screen.getByRole('status').textContent).toContain(I18N.zh.overview.awaitingSnapshot)
+    expect(screen.queryByText(I18N.zh.overview.allClear)).toBeNull()
+  })
+
   it('shows failed checks instead of a count-only health pill', () => {
     renderOverview({
       observability: {
@@ -107,7 +113,7 @@ describe('OverviewPage', () => {
 
     await waitFor(() => expect(onSaveGitHubMirror).toHaveBeenCalledWith('https://mirror.example.com/'))
     await waitFor(() => expect(input.value).toBe('https://mirror.example.com'))
-    expect(screen.getByRole('status').textContent).toContain('镜像配置已保存')
+    expect(screen.getAllByRole('status').some(node => node.textContent.includes('镜像配置已保存'))).toBe(true)
     expect(save.disabled).toBe(true)
   })
 
