@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Cpu, Download, Pencil, Plus, RefreshCw, Save, Server, Settings2, Star, Trash2, X } from 'lucide-react'
 import { api } from '../lib/api'
 import { confirmDanger } from '../lib/danger'
+import './instances-workbench.css'
 
 const EMPTY_FORM = { id: '', name: '', ga_root: '', python_path: '' }
 
@@ -263,7 +264,7 @@ export default function InstancesPage({ lang = 'zh', onConfigureModels }) {
       </div>
     </div>
 
-    {(error || notice) && <div className={`instances-message ${error ? 'error' : 'success'}`} role="status">
+    {(error || notice) && <div className={`instances-message ${error ? 'error' : 'success'}`} role={error ? 'alert' : 'status'}>
       {error ? <X size={16}/> : <CheckCircle2 size={16}/>}<span>{error || notice}</span>
     </div>}
 

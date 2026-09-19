@@ -349,3 +349,12 @@ describe('InstancesPage', () => {
     expect(screen.getByRole('heading', { name: 'Secondary' })).not.toBeNull()
   })
 })
+
+it('announces a load failure and allows a safe refresh retry', async () => {
+ globalThis.fetch = vi.fn().mockImplementationOnce(() => reply({error:'Fixture unavailable'}, false)).mockImplementation(() => reply(initialPayload))
+ const user=userEvent.setup()
+ render(<InstancesPage lang="en" />)
+ expect(await screen.findByRole('alert')).not.toBeNull()
+ await user.click(screen.getByRole('button', {name:'Refresh'}))
+ expect(await screen.findByRole('heading', {name:'Primary'})).not.toBeNull()
+})

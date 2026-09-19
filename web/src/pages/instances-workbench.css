@@ -1,0 +1,5 @@
+.instances-page .instance-card header > div, .instances-page .instance-card, .instances-page .instances-message span { min-width:0; overflow-wrap:anywhere; }
+.instances-page .instance-card dl dd { white-space:normal; overflow-wrap:anywhere; }
+.instances-page .instance-card footer { display:flex; flex-wrap:wrap; gap:8px; padding-top:16px; border-top:1px solid var(--border); }
+.instances-page .instance-card footer .danger { margin-left:auto; }
+@media(max-width:700px) { .instances-page .instances-toolbar, .instances-page .instance-card footer { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .instances-page button { min-height:44px; white-space:normal; } .instances-page .instance-card footer .danger { margin-left:0; } .instances-page .instances-grid { grid-template-columns:minmax(0,1fr); } }
