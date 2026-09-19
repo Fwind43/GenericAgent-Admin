@@ -1,3 +1,4 @@
+import './chat-settings-workbench.css'
 import React from 'react'
 import ProjectModeSetting from '../components/ProjectModeSetting'
 import { FoldVertical, Save, Sparkles } from 'lucide-react'
@@ -6,8 +7,19 @@ import { SettingFooter, SettingRow, SettingToggle, SettingsPage, SettingsSection
 
 export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, onSaveProjectProvider, projectSettingsDisabled }) {
   const [autoCollapseProcess, setAutoCollapseProcess] = useAutoCollapseProcess()
-  return <SettingsPage>
+  const en = lang === 'en'
+  return <SettingsPage className="chat-settings-workbench">
+    <nav className="chat-settings-nav" aria-label={en ? 'Chat settings sections' : '聊天设置分区'}>
+      <a href="#chat-project-mode">{en ? 'Project mode' : '项目模式'}<small>{en ? 'Save separately' : '单独保存'}</small></a>
+      <a href="#chat-process-display">{text.chat.processDisplay}<small>{en ? 'This device · immediate' : '此设备 · 即时生效'}</small></a>
+      <a href="#chat-auto-title">{text.chat.autoTitle}<small>{en ? 'Save separately' : '单独保存'}</small></a>
+    </nav>
+    <div className="chat-settings-content">
+    <div id="chat-project-mode" tabIndex={-1}>
+      <p className="chat-settings-scope">{en ? 'Project mode saves independently of display preferences and automatic titles.' : '项目模式独立保存，不影响显示偏好和自动标题设置。'}</p>
     <ProjectModeSetting value={projectProvider} onSave={onSaveProjectProvider} lang={lang} disabled={projectSettingsDisabled}/>
+    </div>
+    <div id="chat-process-display" tabIndex={-1}>
     <SettingsSection title={text.chat.processDisplay} description={lang === 'en' ? 'Changes apply immediately on this device; no save required.' : '更改立即在此设备生效，无需保存。'} icon={<FoldVertical size={17}/>}>
       <SettingToggle
         id="settings-auto-collapse-process"
@@ -18,6 +30,8 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
         offText={text.chat.off}
       />
     </SettingsSection>
+    </div>
+    <div id="chat-auto-title" tabIndex={-1}>
     <SettingsSection title={text.chat.autoTitle} description={text.chat.autoTitleDesc} icon={<Sparkles size={17}/>}>
       <SettingToggle
         id="settings-auto-title"
@@ -46,6 +60,8 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
         </button>
       </SettingFooter>
     </SettingsSection>
+    </div>
+    </div>
   </SettingsPage>
 }
 

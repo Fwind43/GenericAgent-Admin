@@ -1,0 +1,22 @@
+.app > .main .chat-settings-workbench { display: grid; grid-template-columns: minmax(180px,220px) minmax(0,1fr); gap: 24px; max-width: 1180px; align-items: start; }
+.app > .main .chat-settings-nav { display: grid; gap: 8px; }
+.app > .main .chat-settings-nav a { display: grid; gap: 4px; min-height: 44px; padding: 12px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; text-decoration: none; overflow-wrap: anywhere; }
+.app > .main .chat-settings-nav small { color: var(--muted); font-size: 11px; }
+.app > .main .chat-settings-content { display: grid; gap: 20px; min-width: 0; }
+.app > .main .chat-settings-content > div { min-width: 0; scroll-margin-top: 16px; }
+.app > .main .chat-settings-scope { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.app > .main .chat-settings-workbench :is(.set-note,.set-row-copy,.set-section-desc,p) { overflow-wrap: anywhere; }
+.app > .main .chat-settings-workbench :is(.set-row-control,select) { min-width: 0; max-width: 100%; }
+.app > .main .chat-settings-workbench :is(button,select) { min-height: 44px; }
+.app > .main .chat-settings-workbench .set-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.app > .main .chat-settings-workbench .set-card-footer :is(.set-note,.set-save-scope) { flex: 1 1 220px; padding: 0; margin: 0; }
+.app > .main .chat-settings-workbench :is(a,button,select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 820px) {
+ .app > .main .chat-settings-workbench { grid-template-columns: minmax(0,1fr); gap: 16px; }
+ .app > .main .chat-settings-nav { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+ .app > .main .chat-settings-nav a { padding: 10px 8px; font-size: 12px; }
+ .app > .main .chat-settings-workbench .set-row { flex-direction: column; align-items: stretch; gap: 12px; }
+ .app > .main .chat-settings-workbench .set-row-control { width: 100%; flex-wrap: wrap; }
+ .app > .main .chat-settings-workbench .set-row-control select { width: 100%; }
+ .app > .main .chat-settings-workbench .set-card-footer button { width: 100%; justify-content: center; }
+}
