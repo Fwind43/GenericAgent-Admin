@@ -1,0 +1,19 @@
+.app > .main .channels-page { min-width: 0; }
+.app > .main .channels-page .channel-save-scope { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 16px 0 8px; }
+.app > .main .channels-page .channel-detail-fields { gap: 20px; }
+.app > .main .channels-page .channel-detail-fields label { min-width: 0; }
+.app > .main .channels-page :is(.channel-detail-head p,.channel-detail-fields small,.channel-commit-path code,.channel-commit-msg,.channel-rail-name) { white-space: normal; overflow-wrap: anywhere; }
+.app > .main .channels-page .channel-commit { flex-wrap: wrap; gap: 12px; padding-block: 16px; border-top: 1px solid var(--border); }
+.app > .main .channels-page .channel-commit-path { min-width: 0; flex: 1 1 260px; flex-wrap: wrap; }
+.app > .main .channels-page .channel-commit-path code { max-width: 100%; }
+.app > .main .channels-page .channel-commit-actions { margin-left: auto; }
+@media (max-width: 680px) {
+ .app > .main .channels-page :is(button,input,select) { min-height: 44px; }
+ .app > .main .channels-page button { min-width: 44px; }
+ .app > .main .channels-page .channel-workbench { display: flex; flex-direction: column; }
+ .app > .main .channels-page .channel-rail { width: 100%; max-height: none; }
+ .app > .main .channels-page .channel-detail-fields { grid-template-columns: minmax(0,1fr); }
+ .app > .main .channels-page .channel-detail-head { flex-wrap: wrap; }
+ .app > .main .channels-page .channel-detail-head > div { min-width: 0; flex: 1 1 180px; }
+ .app > .main .channels-page .channel-commit-actions { width: 100%; justify-content: flex-end; }
+}

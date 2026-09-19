@@ -1,3 +1,4 @@
+import './channels-workbench.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Globe2, RefreshCw, Save, Server } from 'lucide-react'
 import { api } from '../lib/api'
@@ -169,6 +170,8 @@ export function ChannelsPage({ frontendSvcs, t, actionStates = {}, onStart, onSt
             </> : <p className="channel-detail-note">{loading ? text.loadingConfig : t.empty}</p>}
           </div>
         </div>
+        <p className="channel-save-scope">{text.saveConfirm}</p>
+        {dirtyIds.size > 0 && msg && <p className="channel-commit-msg is-dirty" role="status">{text.pendingChanges(dirtyIds.size)}</p>}
         <div className="channel-commit">
           <span className="channel-commit-path">
             <i className={config?.path ? 'is-ready' : ''}/>
