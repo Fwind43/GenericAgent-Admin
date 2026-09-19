@@ -5793,17 +5793,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
     return { extraSysPromptPresetID: nextExtraSysPromptPresetID, extraSysPrompts: nextExtraSysPrompts }
   }
 
-  // Saving provider configuration in the settings view dispatches this event.
-  // Refresh the runtime model list in place so the composer offers the new
-  // provider without reopening the session or reloading the page.
-  const fetchRuntimeState = useCallback(url => chatApi(url), [chatApi])
-  useRuntimeModelRefresh({
-    sidRef: activeSidRef,
-    fetchState: fetchRuntimeState,
-    setLlms,
-    setLlmNo,
-  })
-
   const openSession = async (id, refreshList = true) => {
     historyPages.begin()
     rememberRenderedSessionScroll()
@@ -5974,6 +5963,17 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }
 
   const worldlineForView = worldlineState && worldlineState.sessionID === sid ? worldlineState : null
+
+  // Saving provider configuration in the settings view dispatches this event.
+  // Refresh the runtime model list in place so the composer offers the new
+  // provider without reopening the session or reloading the page.
+  const fetchRuntimeState = useCallback(url => chatApi(url), [chatApi])
+  useRuntimeModelRefresh({
+    sidRef: activeSidRef,
+    fetchState: fetchRuntimeState,
+    setLlms,
+    setLlmNo,
+  })
 
   const loadSessions = async (prefer = sid, options = {}) => {
     const { open = false } = options
