@@ -19,3 +19,18 @@
 }
 
 .app > .main .overview-page button:not(.primary):not(.danger) { color: var(--text); background: var(--surface); border: 1px solid var(--border); }
+
+.app > .main .overview-page .overview-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.app > .main .overview-page .overview-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; color: var(--text); border: 1px solid var(--border); border-radius: 8px; text-decoration: none; background: var(--surface); }
+.app > .main .overview-page .overview-operations { grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-areas: "updates source" "autostart network"; }
+.app > .main .overview-page .overview-panel { border: 0; border-bottom: 1px solid var(--border); gap: 12px; }
+.app > .main .overview-page .overview-panel-network { grid-area: network; }
+.app > .main .overview-page .overview-save-scope { color: var(--muted); margin: 0; line-height: 1.6; }
+.app > .main .overview-page :is(button,input) { min-height: 44px; }
+.app > .main .overview-page :is(a,button,input):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.app > .main .overview-page [id] { scroll-margin-top: 16px; }
+@media (max-width: 820px) {
+ .app > .main .overview-page .overview-operations { grid-template-columns: minmax(0,1fr); grid-template-areas: "updates" "autostart" "source" "network"; }
+ .app > .main .overview-page .overview-panel-actions > button { flex: 1 1 140px; justify-content: center; }
+ .app > .main .overview-page .overview-health-head button { min-height: 44px; }
+}

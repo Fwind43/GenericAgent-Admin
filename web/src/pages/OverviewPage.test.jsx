@@ -141,3 +141,13 @@ describe('OverviewPage', () => {
     expect(screen.getByRole('button', { name: /Run \/update in chat/i })).toBeTruthy()
   })
 })
+
+ it('provides in-page destinations and an independently scoped network form', () => {
+   renderOverview({ lang: 'en' })
+   const nav = screen.getByRole('navigation', { name: 'Overview sections' })
+   for (const link of nav.querySelectorAll('a')) expect(document.querySelector(link.getAttribute('href'))).toBeTruthy()
+   const network = document.getElementById('overview-network')
+   expect(network.querySelector('form')).toBeTruthy()
+   expect(network.textContent).toContain('Saves only the GitHub mirror')
+   expect(document.getElementById('overview-source').querySelector('form')).toBeNull()
+ })
