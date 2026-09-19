@@ -154,9 +154,9 @@ func (w *darwinWindow) create(spec desktopWindowSpec, dark bool) error {
 
 	var iconPtr *C.uchar
 	iconLen := C.int(0)
-	if len(appicon.PNG) > 0 {
-		iconPtr = (*C.uchar)(unsafe.Pointer(&appicon.PNG[0]))
-		iconLen = C.int(len(appicon.PNG))
+	if len(appicon.MacPNG) > 0 {
+		iconPtr = (*C.uchar)(unsafe.Pointer(&appicon.MacPNG[0]))
+		iconLen = C.int(len(appicon.MacPNG))
 	}
 	flag := C.int(0)
 	if dark {

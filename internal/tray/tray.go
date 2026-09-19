@@ -23,12 +23,17 @@ func Run(app App) {
 	text := trayLanguage()
 
 	systray.Run(func() {
-		if runtime.GOOS == "windows" {
+		switch runtime.GOOS {
+		case "windows":
 			systray.SetIcon(appicon.ICO)
-		} else {
+		case "darwin":
+			// mac draws a title as text next to the menu bar item, and the mark
+			// itself carries no letters any more, so the icon stands alone.
+			systray.SetIcon(appicon.MacTrayPNG)
+		default:
 			systray.SetIcon(appicon.PNG)
+			systray.SetTitle("GA")
 		}
-		systray.SetTitle("GA")
 		systray.SetTooltip(text.AppName)
 
 		// A left click opens the primary interface; the menu stays on the right
