@@ -1,0 +1,12 @@
+.app .usage-page { min-width:0; }
+.app .usage-page .usage-intro small { display:block; margin-top:10px; color:var(--text); line-height:1.5; }
+.app .usage-page .usage-metric strong { overflow:visible; overflow-wrap:anywhere; }
+.app .usage-page .usage-card td strong, .app .usage-page .usage-card td small { white-space:normal; overflow-wrap:anywhere; min-width:140px; overflow:visible; }
+.app .usage-page .usage-card th { font-size:12px; }
+.app .usage-page .usage-table-wrap:focus-visible, .app .usage-page .usage-heatmap-scroll:focus-visible { outline:2px solid var(--text); outline-offset:-2px; }
+.app .usage-page .usage-error span { overflow-wrap:anywhere; max-width:100%; }
+@media(max-width:760px) { .app .usage-page button { min-height:44px; } .app .usage-page .usage-intro { flex-wrap:wrap; } .app .usage-page .usage-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .app .usage-page .usage-metric-accent { grid-column:1/-1; } }
+
+.app .usage-page button { min-height:44px; }
+.app .usage-page .usage-card th, .app .usage-page .usage-metric span, .app .usage-page .usage-card-head p { color:var(--text); }
+.app .usage-page .usage-scroll-hint { color:var(--text); font-size:12px; margin:8px 0; }

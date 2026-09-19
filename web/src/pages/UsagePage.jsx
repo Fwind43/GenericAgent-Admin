@@ -1,3 +1,4 @@
+import './usage-workbench.css'
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, BarChart3, RefreshCw } from 'lucide-react'
 import { api } from '../lib/api'
@@ -73,7 +74,7 @@ function UsageHeatmap({ daily = [], lang, copy }) {
   const weekdays = lang === 'zh' ? ['一', '三', '五'] : ['Mon', 'Wed', 'Fri']
   return <section className="usage-card usage-heatmap-card" aria-labelledby="usage-heatmap-title">
     <div className="usage-section-head"><div><h2 id="usage-heatmap-title">{copy.heatmap}</h2><p>{copy.heatmapHint}</p></div></div>
-    <div className="usage-heatmap-scroll">
+    <div className="usage-heatmap-scroll" tabIndex={0} role="region" aria-label={copy.heatmapHint}>
       <div className="usage-heatmap-frame">
         <div className="usage-months" aria-hidden="true">{months.map(month => <span key={month.key} style={{ gridColumn: month.column }}>{month.label}</span>)}</div>
         <div className="usage-heatmap-body">
@@ -107,12 +108,12 @@ export function UsagePage({ lang = 'zh' }) {
 
   return <section className="usage-page" aria-busy={loading}>
     <div className="usage-intro">
-      <div><span className="usage-eyebrow"><BarChart3 size={15}/>{c.title}</span><p>{c.intro}</p></div>
+      <div><span className="usage-eyebrow"><BarChart3 size={15}/>{c.title}</span><p>{c.intro}</p><small>{lang === 'zh' ? '累计全部已记录用量 · 热图仅展示过去 52 周' : 'All recorded usage · heatmap shows the past 52 weeks only'}</small></div>
       <button type="button" onClick={load} disabled={loading}><RefreshCw size={15} className={loading ? 'spin' : ''}/>{c.refresh}</button>
     </div>
 
-    {loading && !data && <div className="usage-state" role="status">{c.loading}</div>}
-    {error && <div className="usage-state usage-error" role="alert"><strong>{c.failed}</strong><span>{error}</span><button type="button" onClick={load}>{c.retry}</button></div>}
+    {loading && <div className="usage-state" role="status">{c.loading}</div>}
+    {error && <div className="usage-state usage-error" role="alert"><strong>{c.failed}</strong><span>{error}</span><button type="button" onClick={load} disabled={loading}>{c.retry}</button></div>}
     {!error && data && <>
       {data.skipped_sessions > 0 && <div className="usage-warning"><AlertTriangle size={16}/><span>{n(data.skipped_sessions)} {c.skipped}</span></div>}
       <div className="usage-metrics">
@@ -124,7 +125,7 @@ export function UsagePage({ lang = 'zh' }) {
       </div>
       {data.assistant_replies === 0 ? <div className="usage-state">{c.empty}</div> : <>
         <UsageHeatmap daily={data.daily} lang={lang} copy={c}/>
-        <section className="usage-panel"><h3>{c.models}</h3><div className="usage-table-wrap"><table><thead><tr><th>{c.model}</th><th>{c.replies}</th><th>{c.input}</th><th>{c.output}</th><th>{c.total}</th></tr></thead><tbody>{(data.models || []).map(item => <tr key={item.id}><td><strong>{item.name || c.unknown}</strong><small>{item.id}</small></td><td>{n(item.assistant_replies)}</td><td title={tok(item.totals?.input_tokens).full}>{tok(item.totals?.input_tokens).short}</td><td title={tok(item.totals?.output_tokens).full}>{tok(item.totals?.output_tokens).short}</td><td title={tok(item.totals?.total_tokens).full}><b>{tok(item.totals?.total_tokens).short}</b></td></tr>)}</tbody></table></div></section></>}
+        <section className="usage-panel"><h3>{c.models}</h3><p className="usage-scroll-hint">{lang === 'zh' ? '横向滚动查看全部列 · Token 缩写可悬停查看精确值' : 'Scroll horizontally for all columns · hover token values for exact counts'}</p><div className="usage-table-wrap" tabIndex={0} role="region" aria-label={c.models}><table><thead><tr><th>{c.model}</th><th>{c.replies}</th><th>{c.input}</th><th>{c.output}</th><th>{c.total}</th></tr></thead><tbody>{(data.models || []).map(item => <tr key={item.id}><td><strong>{item.name || c.unknown}</strong><small>{item.id}</small></td><td>{n(item.assistant_replies)}</td><td title={tok(item.totals?.input_tokens).full}>{tok(item.totals?.input_tokens).short}</td><td title={tok(item.totals?.output_tokens).full}>{tok(item.totals?.output_tokens).short}</td><td title={tok(item.totals?.total_tokens).full}><b>{tok(item.totals?.total_tokens).short}</b></td></tr>)}</tbody></table></div></section></>}
     </>}
   </section>
 }
