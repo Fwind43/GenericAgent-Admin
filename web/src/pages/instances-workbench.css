@@ -3,3 +3,17 @@
 .instances-page .instance-card footer { display:flex; flex-wrap:wrap; gap:8px; padding-top:16px; border-top:1px solid var(--border); }
 .instances-page .instance-card footer .danger { margin-left:auto; }
 @media(max-width:700px) { .instances-page .instances-toolbar, .instances-page .instance-card footer { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .instances-page button { min-height:44px; white-space:normal; } .instances-page .instance-card footer .danger { margin-left:0; } .instances-page .instances-grid { grid-template-columns:minmax(0,1fr); } }
+
+/* Desktop: one scannable index, one active runtime. */
+.instances-page .instances-workspace { display:grid; grid-template-columns:minmax(220px,290px) minmax(0,1fr); gap:18px; align-items:start; }
+.instances-page .instances-index { display:flex; flex-direction:column; gap:4px; max-height:calc(100dvh - 230px); overflow:auto; padding:5px; border:1px solid var(--border); border-radius:12px; background:var(--surface); }
+.instances-page .instances-index button { display:flex; flex-direction:column; align-items:stretch; flex-shrink:0; text-align:left; padding:11px 12px; gap:5px; height:auto; min-width:0; }
+.instances-page .instances-index button[aria-current="true"] { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 3px 0 var(--accent); }
+.instances-page .instances-index button strong,.instances-page .instances-index button small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.instances-page .instances-index button small { color:var(--text-muted); font-size:12px; }
+.instances-page .instances-detail { min-width:0; }
+.instances-page .instances-detail .instances-grid { grid-template-columns:minmax(0,1fr); }
+.instances-page .instances-detail .instance-editor { margin:0; }
+.instances-page .instances-detail .instance-card footer { flex-wrap:wrap; }
+@media (min-width:1000px) { .instances-page .instances-detail { max-height:calc(100dvh - 230px); overflow:auto; padding:3px; } }
+@media (max-width:800px) { .instances-page .instances-workspace { grid-template-columns:minmax(0,1fr); } .instances-page .instances-index { max-height:240px; } }

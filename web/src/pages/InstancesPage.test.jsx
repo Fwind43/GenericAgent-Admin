@@ -193,6 +193,7 @@ describe('InstancesPage', () => {
       return reply(listCalls === 1 ? initializing : failed)
     })
     render(<InstancesPage lang="en" />)
+    await userEvent.click(await screen.findByRole('button', { name: /^GenericAgent/ }))
 
     const installedHeading = await screen.findByRole('heading', { name: 'GenericAgent' })
     const installedCard = installedHeading.closest('article')
@@ -282,6 +283,7 @@ describe('InstancesPage', () => {
     const user = userEvent.setup()
     render(<InstancesPage lang="en" />)
 
+    await user.click(await screen.findByRole('button', { name: /^Default/ }))
     const defaultCard = (await screen.findByRole('heading', { name: 'Default' })).closest('article')
     const deleteButton = within(defaultCard).getByRole('button', { name: 'Delete' })
     expect(deleteButton.disabled).toBe(true)
@@ -296,6 +298,7 @@ describe('InstancesPage', () => {
     const user = userEvent.setup()
     render(<InstancesPage lang="en" />)
 
+    await user.click(await screen.findByRole('button', { name: /^Secondary/ }))
     const secondaryCard = (await screen.findByRole('heading', { name: 'Secondary' })).closest('article')
     await user.click(within(secondaryCard).getByRole('button', { name: 'Delete' }))
 
@@ -324,6 +327,7 @@ describe('InstancesPage', () => {
     const primaryHeading = await screen.findByRole('heading', { name: 'Primary' })
     const primaryCard = primaryHeading.closest('article')
     expect(within(primaryCard).getByRole('button', { name: 'Delete' }).disabled).toBe(true)
+    await user.click(screen.getByRole('button', { name: /^Secondary/ }))
     const secondaryCard = screen.getByRole('heading', { name: 'Secondary' }).closest('article')
     await user.click(within(secondaryCard).getByRole('button', { name: 'Set as default' }))
 
@@ -334,6 +338,7 @@ describe('InstancesPage', () => {
     expect(options.headers['X-GA-Confirm']).toBe('dangerous')
     expect(JSON.parse(options.body)).toEqual({ id: 'secondary' })
 
+    await user.click(screen.getByRole('button', { name: /^Primary/ }))
     await user.click(within(screen.getByRole('heading', { name: 'Primary' }).closest('article')).getByRole('button', { name: 'Delete' }))
     const dialog = screen.getByRole('dialog', { name: 'Confirm instance deletion' })
     expect(within(dialog).getByText(/Primary/)).not.toBeNull()
@@ -357,4 +362,30 @@ it('announces a load failure and allows a safe refresh retry', async () => {
  expect(await screen.findByRole('alert')).not.toBeNull()
  await user.click(screen.getByRole('button', {name:'Refresh'}))
  expect(await screen.findByRole('heading', {name:'Primary'})).not.toBeNull()
+})
+
+
+it('keeps a failed edit and blocks switching or cancelling until discard is accepted', async () => {
+  const payload = { ...initialPayload, items: [...initialPayload.items, {id:'secondary',name:'Secondary',ga_root:'C:/secondary'}] }
+  globalThis.fetch = vi.fn(url => url === '/api/instances' ? reply(payload) : reply({error:'Fixture save failed'}, false))
+  const confirm = mockDialog(false)
+  const user = userEvent.setup()
+  render(<InstancesPage lang="en" />)
+  await screen.findByRole('heading', {name:'Primary'})
+  await user.click(screen.getByRole('button', {name:'Edit'}))
+  await user.clear(screen.getByLabelText('Display name'))
+  await user.type(screen.getByLabelText('Display name'), 'Unsaved primary')
+  await user.click(screen.getByRole('button', {name:/^Secondary/}))
+  expect(screen.getByLabelText('Display name').value).toBe('Unsaved primary')
+  await user.click(screen.getByRole('button', {name:'Cancel'}))
+  expect(screen.getByLabelText('Display name').value).toBe('Unsaved primary')
+  expect(globalThis.fetch).toHaveBeenCalledTimes(1)
+  confirm.mockReturnValue(true)
+  await user.click(screen.getByRole('button', {name:'Save changes'}))
+  expect(await screen.findByRole('alert')).not.toBeNull()
+  expect(screen.getByLabelText('Display name').value).toBe('Unsaved primary')
+  expect(screen.getByRole('button', {name:'Save changes'}).disabled).toBe(false)
+  await user.click(screen.getByRole('button', {name:/^Secondary/}))
+  expect(await screen.findByRole('heading', {name:'Secondary'})).not.toBeNull()
+  expect(screen.queryByLabelText('Display name')).toBeNull()
 })
