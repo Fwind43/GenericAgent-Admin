@@ -1,3 +1,4 @@
+import './logs-workbench.css'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDownToLine, Check, Copy, Download, Play, RefreshCw, Search, Square, Trash2, WrapText, X } from 'lucide-react'
 import { copyText } from '../lib/format'
@@ -93,7 +94,7 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={copy} title={copied ? text.copied : t.copy} aria-label={copied ? text.copied : t.copy}>{copied ? <Check size={14}/> : <Copy size={14}/>}</button>
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={download} title={t.download} aria-label={t.download}><Download size={14}/></button>
             <button type="button" className="log-icon-button" disabled={!stream.lines.length} onClick={stream.clear} title={t.clear} aria-label={t.clear}><Trash2 size={14}/></button>
-            <button type="button" className="log-icon-button" disabled={!stream.selected} onClick={stream.retry} title={text.reconnect} aria-label={text.reconnect}><RefreshCw size={14}/></button>
+            <button type="button" className="log-icon-button" disabled={!stream.selected} onClick={stream.retry} title={text.reconnect} aria-label={text.reconnect}><RefreshCw size={14}/><span>{text.reconnect}</span></button>
             {selectedService?.running
               ? <button type="button" disabled={!stream.selected} onClick={() => onStop(stream.selected)}><Square size={14}/>{t.stop}</button>
               : <button type="button" disabled={!stream.selected} onClick={() => onStart(stream.selected)}><Play size={14}/>{t.start}</button>}
@@ -106,7 +107,7 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
         </div>}
 
         {!stream.selected
-          ? <p className="log-selection-empty">{text.selectPrompt}</p>
+          ? <p className="log-selection-empty" role="status">{text.selectPrompt}</p>
           : <div className="log-console-body">
             <pre
               ref={stream.viewRef}
@@ -123,7 +124,7 @@ export function LogsPage({ t, services, stream, onStart, onStop }) {
                   : <React.Fragment key={i}>{part.text}</React.Fragment>)}</span>
               </div>)}
             </pre>
-            {!rows.length && <p className="log-output-empty">{filtering ? text.noMatches(stream.filter.trim()) : text.noOutput}</p>}
+            {!rows.length && <p className="log-output-empty" role="status">{filtering ? text.noMatches(stream.filter.trim()) : text.noOutput}</p>}
             {!stream.follow && <button type="button" className="log-jump" onClick={jumpToLatest}><ArrowDownToLine size={14}/>{text.jumpLatest}</button>}
           </div>}
       </div>
