@@ -1,0 +1,57 @@
+/* Admin layout ownership: shared rules migrated intact from style.css; standalone refinements below. */
+/* Admin workbench: scoped rhythm and readable preferences, without changing
+   the standalone / embedded scroll owners or mounted page lifecycle. */
+.app > .main .admin-page-header { margin-bottom: 24px; }
+.app > .main .admin-page-header h2 { font-size: 24px; letter-spacing: -.025em; line-height: 1.25; }
+.app > .main .admin-page-header p { max-width: 72ch; line-height: 1.65; overflow-wrap: anywhere; }
+.app > .main .set-page { width: 100%; max-width: 960px; gap: 20px; }
+.app > .main .set-card { border-radius: 12px; box-shadow: none; }
+.app > .main .set-card-head { padding: 18px 20px; align-items: flex-start; background: transparent; }
+.app > .main .set-card-copy h3 { font-size: 15px; line-height: 1.5; }
+.app > .main .set-card-copy p { margin-top: 5px; font-size: 13px; line-height: 1.6; }
+.app > .main .set-row { padding: 16px 20px; gap: 24px; }
+.app > .main .set-row-copy { flex: 1 1 42%; overflow-wrap: anywhere; }
+.app > .main .set-row-copy :is(label, .set-row-label) { font-size: 14px; line-height: 1.5; }
+.app > .main .set-row-copy small { font-size: 12px; line-height: 1.6; }
+.app > .main .set-row-control { flex: 0 1 48%; min-width: 0; max-width: 100%; }
+.app > .main .set-row-control :is(input, select, textarea) { width: 100%; min-width: 0; max-width: 100%; }
+.app > .main .set-row.is-stacked .set-row-control { width: 100%; }
+.app > .main .set-card-footer { flex-wrap: wrap; gap: 12px; padding: 14px 20px; }
+.app > .main .set-card-footer > button { margin-left: auto; }
+.app > .main :is(.set-path, .set-note, .set-save-scope) { overflow-wrap: anywhere; }
+.app > .main .set-save-scope { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; flex: 1 1 220px; }
+.app > #admin-sidebar .set-nav-group-title { font-size: 11px; letter-spacing: .06em; }
+.app > #admin-sidebar nav button { position: relative; min-height: 42px; border-radius: 8px; }
+.app > #admin-sidebar nav button[aria-current="page"] { font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+.app :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.app .set-toggle:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+@media (max-width: 700px) {
+  .app > .main .admin-page-header { margin-bottom: 18px; }
+  .app > .main .admin-page-header h2 { font-size: 22px; }
+  .app > .main .set-page { gap: 16px; }
+  .app > .main :is(.set-card-head, .set-row, .set-card-footer) { padding: 16px; }
+  .app > .main .set-row:not(.set-row-toggle) { flex-direction: column; align-items: stretch; gap: 10px; }
+  .app > .main .set-row-control { flex-basis: auto; width: 100%; flex-wrap: wrap; }
+  .app > .main .set-row-toggle { flex-direction: row; gap: 12px; }
+  .app > .main .set-toggle { min-height: 44px; align-items: center; flex: 1; min-width: 0; }
+  .app > .main .set-card-footer > button { width: 100%; margin-left: 0; justify-content: center; }
+  .app > .main .set-card-actions { flex-wrap: wrap; }
+}
+
+/* One gutter for standalone page headings, toolbars and content. */
+.app.admin-workbench > .main { padding: 24px 28px; background: var(--surface-strong); }
+.app.admin-workbench > .main > .admin-page-header { margin: 0 0 20px; padding: 0 0 16px; gap: 6px 16px; }
+.app.admin-workbench > .main > .admin-page-header h2 { font-size: 23px; }
+.app.admin-workbench > .main > .admin-page-header p { line-height: 1.5; }
+.app.admin-workbench > #admin-sidebar .brand { border: 0; background: none; box-shadow: none; padding: 0; }
+.app.admin-workbench > #admin-sidebar nav { gap: 14px; }
+.app.admin-workbench > #admin-sidebar .set-nav-group-title { margin: 0 10px 5px; }
+.app.admin-workbench > #admin-sidebar nav button { min-height: 36px; padding: 7px 10px; }
+@media (min-width: 901px) {
+  .app.admin-workbench > #admin-sidebar { width: 232px; min-width: 232px; flex: 0 0 232px; padding: 22px 16px; box-sizing: border-box; }
+}
+@media (max-width: 900px) {
+  .app.admin-workbench > .main { padding: 14px 16px 28px; }
+  .app.admin-workbench > .main > .admin-page-header { margin: 12px 0 16px; }
+  .app.admin-workbench > #admin-sidebar nav button { min-height: 44px; }
+}

@@ -3,13 +3,14 @@ import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 import { ArrowLeft, Activity, BarChart3, BrainCircuit, FileCode2, FolderCog, Globe2, KeyRound, Menu, MessageSquare, PanelLeftClose, Play, Server, SlidersHorizontal, Sparkles, Target, Terminal } from 'lucide-react'
 import './admin-mobile.css'
+import './admin-workbench.css'
 import { applyThemeToDocument, getInitialTheme, persistTheme } from './themes'
 import { api } from './lib/api'
 import { buildObservabilitySnapshot, observabilityRequest } from './lib/observability'
 import { confirmDanger } from './lib/danger'
 import { I18N, SETTINGS_TEXT, SETUP_TEXT } from './lib/i18n'
 import { buildRoute, parseRoute } from './lib/routing'
-import { SETTINGS_GROUPS } from './lib/settingsNav'
+import { ADMIN_GROUPS, SETTINGS_GROUPS } from './lib/settingsNav'
 import { modelLabel } from './lib/format'
 import { ErrorBoundary, RouteFallback, StatusNotice } from './components/feedback'
 import SetupWizard from './components/SetupWizard.jsx'
@@ -283,7 +284,7 @@ export default function App({ embedded = false, active = true, onClose }) {
         </div>
       </div>
     </div>}
-    <div ref={appScope} className={`app app-tab-${tab} ${embedded ? `app-embedded ${settingsDetail ? 'settings-detail' : 'settings-list'}` : ''} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
+    <div ref={appScope} className={`app app-tab-${tab} ${embedded ? `app-embedded ${settingsDetail ? 'settings-detail' : 'settings-list'}` : 'admin-workbench'} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
       <button type="button" className="admin-sidebar-scrim" aria-label={lang === 'zh' ? '关闭管理导航' : 'Close admin navigation'} onClick={()=>setAdminSidebarOpen(false)} />
       <aside id="admin-sidebar" className="sidebar">
         <div className="admin-sidebar-heading">
@@ -292,8 +293,8 @@ export default function App({ embedded = false, active = true, onClose }) {
         </div>
         <button type="button" className="admin-back-to-chat" onClick={()=>{ if (onClose) onClose(); else window.location.href = '/chat' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
         <nav ref={settingsNavRef} aria-label={t.mainNavigation}>
-          {SETTINGS_GROUPS.map(group => <div className="set-nav-group" key={group.id}>
-            <span className="set-nav-group-title">{t.navGroups[group.id]}</span>
+          {(embedded ? SETTINGS_GROUPS : ADMIN_GROUPS).map(group => <div className="set-nav-group" key={group.id}>
+            <span className="set-nav-group-title">{!embedded && group.label ? group.label[lang] : t.navGroups[group.id]}</span>
             {group.items.map(item => <button
               key={item}
               type="button"
