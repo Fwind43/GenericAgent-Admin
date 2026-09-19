@@ -220,6 +220,98 @@ func TestModelsSaveInvalidatesChatLLMCache(t *testing.T) {
 	}
 }
 
+func TestModelsExportInvalidatesChatLLMCache(t *testing.T) {
+	root := t.TempDir()
+	s := newModelTestServer(t, root)
+	cfg := s.CfgStore.Snapshot()
+	key := chatLLMKey(cfg)
+	calls := 0
+	loader := func() ([]map[string]interface{}, error) {
+		calls++
+		return []map[string]interface{}{{"model": "cached"}}, nil
+	}
+	if _, err := s.ChatLLMCache.load(key, loader); err != nil {
+		t.Fatal(err)
+	}
+
+	payload := map[string]interface{}{
+		"overwrite_active": false,
+		"profiles": []modelconfig.Profile{{VarName: "api_config_main", Type: "openai",
+			Name: "main", APIBase: "https://api.example/v1", Model: "gpt", APIKey: "sk-****alue"}},
+	}
+	data, _ := json.Marshal(payload)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/models/export", bytes.NewReader(data))
+	markDangerous(req)
+	s.Routes().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("export status=%d want=200 body=%s", rr.Code, rr.Body.String())
+	}
+	if _, err := s.ChatLLMCache.load(key, loader); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("loader calls=%d want 2 after models export", calls)
+	}
+}
+
+func TestModelsExportInvalidatesChatLLMCacheEvenWhenReconcileFails(t *testing.T) {
+	root := t.TempDir()
+	s := newModelTestServer(t, root)
+	s.CfgStore = config.NewStore(t.TempDir())
+	s.BaseCfgStore = s.CfgStore
+	updateTestConfig(t, s.CfgStore, func(cfg *config.AppConfig) {
+		cfg.GARoot = root
+		// An unresolvable provider/model makes resolveChatTitleModel return nil, so reconcile
+		// really reaches config.Store.Save instead of short-circuiting on an unchanged ref.
+		cfg.ChatTitleModel = &config.ChatTitleModelRef{Enable: true, ProviderVarName: "ghost", Model: "ghost-model"}
+	})
+	// Occupying config.local.json with a directory makes the atomic rename inside
+	// config.Store.Save fail, so reconcileChatTitleModel really errors after export.
+	cfgRoot := s.CfgStore.Root
+	if err := os.MkdirAll(filepath.Join(cfgRoot, "config.local.json", "blocker"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	cfg := s.CfgStore.Snapshot()
+	key := chatLLMKey(cfg)
+	calls := 0
+	loader := func() ([]map[string]interface{}, error) {
+		calls++
+		return []map[string]interface{}{{"model": "cached"}}, nil
+	}
+	if _, err := s.ChatLLMCache.load(key, loader); err != nil {
+		t.Fatal(err)
+	}
+
+	payload := map[string]interface{}{
+		"overwrite_active": false,
+		"profiles": []modelconfig.Profile{{VarName: "api_config_main", Type: "openai",
+			Name: "main", APIBase: "https://api.example/v1", Model: "gpt", APIKey: "sk-****alue"}},
+	}
+	data, _ := json.Marshal(payload)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/models/export", bytes.NewReader(data))
+	markDangerous(req)
+	// Called directly on purpose: the HTTP route wraps the handler in withModelInstance,
+	// which swaps in a derived config store and makes reconcileChatTitleModel skip the
+	// Admin-wide write. This test pins the handler's own ordering guarantee instead.
+	s.modelsExport(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Fatalf("export status=%d want=500 body=%s", rr.Code, rr.Body.String())
+	}
+	// The export itself really happened before reconcile failed.
+	if _, err := os.Stat(filepath.Join(root, "mykey.py")); err != nil {
+		t.Fatalf("exported mykey.py missing: %v", err)
+	}
+	// Cache must have been dropped even though the handler returned early.
+	if _, err := s.ChatLLMCache.load(key, loader); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("loader calls=%d want 2: cached runtime models must not survive a failed-after-export request", calls)
+	}
+}
+
 func TestModelsRawWithDangerousConfirmReturnsUnmaskedSecret(t *testing.T) {
 	root := t.TempDir()
 	writeTestMyKey(t, root, "sk-raw-secret")

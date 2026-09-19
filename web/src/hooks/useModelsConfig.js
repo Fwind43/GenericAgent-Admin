@@ -150,6 +150,9 @@ export function useModelsConfig({ t, lang, setMsg, setBusy, active, onPersist })
       setMsg(t.hints.modelsSaved)
       await importModels({ quiet: true })
       onPersist?.()
+      // Admin and chat share a single document, so the chat composer can pick up
+      // a freshly saved provider without a page reload.
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('ga-admin-models-change'))
       return true
     } catch (e) {
       setMsg(e.message)

@@ -54,6 +54,7 @@ import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEf
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
 import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
 import { groupProjectSessions } from './lib/chatProjectSessions.js'
+import { useRuntimeModelRefresh } from './lib/useRuntimeModelRefresh.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
 import { equalSessionSummaryValue, reconcileScalarList, reconcileSessionSummaries } from './lib/chatSessionReconcile.js'
@@ -5768,6 +5769,17 @@ export default function ChatApp({ onOpenSettings } = {}) {
     }
     return { extraSysPromptPresetID: nextExtraSysPromptPresetID, extraSysPrompts: nextExtraSysPrompts }
   }
+
+  // Saving provider configuration in the settings view dispatches this event.
+  // Refresh the runtime model list in place so the composer offers the new
+  // provider without reopening the session or reloading the page.
+  const fetchRuntimeState = useCallback(url => chatApi(url), [chatApi])
+  useRuntimeModelRefresh({
+    sidRef: activeSidRef,
+    fetchState: fetchRuntimeState,
+    setLlms,
+    setLlmNo,
+  })
 
   const openSession = async (id, refreshList = true) => {
     historyPages.begin()
