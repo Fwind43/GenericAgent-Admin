@@ -287,8 +287,9 @@ describe('stream animation lifecycle', () => {
     expectClean(harness)
   })
 
-  test('read errors preserve queued content and release listeners, frames, and the reader', async () => {
+  test.each(['Error', 'AbortError'])('%s preserves queued content and releases stream resources', async name => {
     const failure = new Error('Disconnected')
+    failure.name = name
     const harness = streamLifecycle(events('done').slice(0, 2), { tail: () => { throw failure } })
     await expect(harness.run()).rejects.toBe(failure)
     expect(failure.chatStreamOutcome).toMatchObject({ eventCount: 1, terminal: false })
