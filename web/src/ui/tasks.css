@@ -1,0 +1,21 @@
+.tasks-content { min-width: 0; }
+.tasks-studio { display: grid; grid-template-columns: minmax(180px, 220px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.tasks-studio .tasks-navigation { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 12px; }
+.tasks-studio .tasks-navigation h2 { margin: 0; font-size: 20px; }
+.tasks-studio .task-subtabs, .tasks-studio .task-summary { display: flex; flex-direction: column; align-items: stretch; }
+.tasks-studio .task-subtabs button { justify-content: flex-start; }
+.tasks-studio .task-summary .stat { width: auto; }
+.tasks-studio .tasks-workspace { grid-template-columns: minmax(0, 1fr); }
+.tasks-service-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.tasks-service-cards > .service-row { border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.tasks-studio .task-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 10px; }
+.tasks-schedule-card { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 8px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.tasks-schedule-card[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: -2px; }
+.tasks-schedule-card p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tasks-studio .report-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 8px; }
+@media (max-width: 760px) {
+  .tasks-studio { grid-template-columns: minmax(0, 1fr); }
+  .tasks-studio .tasks-navigation { position: static; }
+  .tasks-studio .task-subtabs { flex-direction: row; flex-wrap: wrap; }
+  .tasks-studio .task-summary { flex-direction: row; flex-wrap: wrap; }
+}
