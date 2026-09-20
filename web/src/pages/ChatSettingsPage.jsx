@@ -1,14 +1,15 @@
 import './chat-settings-workbench.css'
-import React from 'react'
+import React, { useState } from 'react'
 import { UiSurface } from '../ui/UiHost'
 import { DefaultChatTitleSettings } from '../ui/chatTitleSettings'
 import ProjectModeSetting from '../components/ProjectModeSetting'
-import { FoldVertical } from 'lucide-react'
+import { DefaultProcessDisplaySettings } from '../ui/chatRuntimeSettings'
 import { useAutoCollapseProcess } from '../hooks/useAutoCollapseProcess.js'
-import { SettingToggle, SettingsPage, SettingsSection } from '../components/settings'
+import { SettingsPage } from '../components/settings'
 
 export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, onSaveProjectProvider, projectSettingsDisabled }) {
   const [autoCollapseProcess, setAutoCollapseProcess] = useAutoCollapseProcess()
+  const [processFeedback, setProcessFeedback] = useState('')
   const en = lang === 'en'
   const titleView = {
     model: {
@@ -28,6 +29,21 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
     },
     actions: { setEnabled: titleModel.setEnabled, selectModel: titleModel.setDraft, save: titleModel.submit },
   }
+  const processView = {
+    model: {
+      enabled: autoCollapseProcess, feedback: processFeedback,
+      labels: {
+        title: text.chat.processDisplay,
+        description: en ? 'Changes apply immediately on this device; no save required.' : '更改立即在此设备生效，无需保存。',
+        toggle: text.chat.autoCollapseProcess, on: text.chat.on, off: text.chat.off,
+      },
+    },
+    actions: { setEnabled: enabled => {
+      if (typeof enabled !== 'boolean') return
+      const persisted = setAutoCollapseProcess(enabled)
+      setProcessFeedback(persisted ? '' : (en ? 'Applied for this session only. Device storage is unavailable; retry to persist.' : '已在本次会话生效，但设备存储不可用；请重试以持久保存。'))
+    } },
+  }
   return <SettingsPage className="chat-settings-workbench">
     <nav className="chat-settings-nav" aria-label={en ? 'Chat settings sections' : '聊天设置分区'}>
       <a href="#chat-project-mode">{en ? 'Project mode' : '项目模式'}<small>{en ? 'Save separately' : '单独保存'}</small></a>
@@ -40,16 +56,7 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
     <ProjectModeSetting value={projectProvider} onSave={onSaveProjectProvider} lang={lang} disabled={projectSettingsDisabled}/>
     </div>
     <div id="chat-process-display" tabIndex={-1}>
-    <SettingsSection title={text.chat.processDisplay} description={lang === 'en' ? 'Changes apply immediately on this device; no save required.' : '更改立即在此设备生效，无需保存。'} icon={<FoldVertical size={17}/>}>
-      <SettingToggle
-        id="settings-auto-collapse-process"
-        checked={autoCollapseProcess}
-        onChange={setAutoCollapseProcess}
-        label={text.chat.autoCollapseProcess}
-        onText={text.chat.on}
-        offText={text.chat.off}
-      />
-    </SettingsSection>
+    <UiSurface name="admin.settings.chat.process" viewProps={processView} fallback={<DefaultProcessDisplaySettings {...processView}/>}/>
     </div>
     <div id="chat-auto-title" tabIndex={-1}>
     <UiSurface name="admin.settings.chat.title" viewProps={titleView} fallback={<DefaultChatTitleSettings {...titleView}/>}/>
