@@ -228,3 +228,10 @@ test('bounded parser reuse equals stateless parsing at every protocol prefix and
   assert.deepEqual(parse(large), parseAssistantContent(large))
   assert.deepEqual(parse(large + 'tail'), parseAssistantContent(large + 'tail'))
 })
+
+test('single-line shortcut preserves protocol fallbacks and arbitrary replacements', () => {
+  const parse = createAssistantContentParser()
+  for (const text of ['plain text ', ' changed ', '', '\tunicode \u4e2d\u6587 ', 'LLM Running (Turn 1)', '<summary>x</summary>body', '[Info] Final response to user.', '```x', 'a\rb', 'a\n\n\nb']) {
+    assert.deepEqual(parse(text), parseAssistantContent(text))
+  }
+})

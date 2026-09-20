@@ -187,7 +187,12 @@ export const assistantTurnFallbackTitle = (chunk = '', turn = '') => {
 }
 
 export const parseAssistantContent = (raw = '', runCache = null) => {
-  const full = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const source = String(raw || '')
+  // A single line without protocol introducers cannot contain turns, fences,
+  // summaries or newline normalization. Avoid splitting/scanning it repeatedly.
+  // No retained source or append-only assumption: replacements stay equivalent.
+  if (!/[\r\n`~<[(]/.test(source)) return { runs: [], summary: '', body: source.trim() }
+  const full = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const markers = findTopLevelAssistantMarkers(full)
   const finalMarker = markers.find((m) => m.type === 'final')
   const turnMarkers = markers.filter((m) => m.type === 'turn' && (!finalMarker || m.index < finalMarker.index))
