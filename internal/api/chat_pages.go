@@ -66,6 +66,7 @@ func chatSessionView(cs chatSession, r *http.Request) (interface{}, int, error) 
 		}
 		limit = n
 	}
+	history := q.Get("before") != ""
 	index := make([]chatMessageIndex, len(cs.Messages))
 	stats := make([]chatMessage, 0)
 	for i, m := range cs.Messages {
@@ -74,7 +75,7 @@ func chatSessionView(cs chatSession, r *http.Request) (interface{}, int, error) 
 			return nil, 500, err
 		}
 		index[i] = chatMessageIndex{ID: m.ID, Revision: fmt.Sprintf("%x", sha256.Sum256(b))}
-		if m.Role == "assistant" && m.Kind != "btw" {
+		if !history && m.Role == "assistant" && m.Kind != "btw" {
 			stats = append(stats, chatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Usage: m.Usage, Usages: m.Usages,
 				ElapsedMS: m.ElapsedMS, LLMElapsedMS: m.LLMElapsedMS, ToolElapsedMS: m.ToolElapsedMS,
 				FirstTokenMS: m.FirstTokenMS, RunStartedAtMS: m.RunStartedAtMS})
@@ -117,6 +118,10 @@ func chatSessionView(cs chatSession, r *http.Request) (interface{}, int, error) 
 		b, _ := json.Marshal(chatPageCursor{End: start, Prefix: chatPagePrefix(index[:start])})
 		before = base64.RawURLEncoding.EncodeToString(b)
 	}
+	// Earlier pages need no repeated whole-session metadata or statistics.
+	if history {
+		return map[string]interface{}{"id": cs.ID, "messages": page, "has_more": start > 0, "before": before}, http.StatusOK, nil
+	}
 	// Explicit metadata avoids accidentally adding future heavy session fields to the page.
 	result := map[string]interface{}{
 		"id": cs.ID, "title": cs.Title, "updated_at": cs.UpdatedAt, "settings": cs.Settings,
@@ -127,10 +132,6 @@ func chatSessionView(cs chatSession, r *http.Request) (interface{}, int, error) 
 		"conductor": cs.Conductor, "conductor_children": cs.ConductorChildren,
 		"messages": page, "total_messages": len(cs.Messages), "has_more": start > 0, "before": before,
 		"message_index": index, "stats_messages": stats, "context_count": len(cs.RawHistory),
-	}
-	// Earlier pages need no repeated whole-session metadata or statistics.
-	if q.Get("before") != "" {
-		result = map[string]interface{}{"id": cs.ID, "messages": page, "has_more": start > 0, "before": before}
 	}
 	return result, http.StatusOK, nil
 }
