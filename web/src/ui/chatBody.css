@@ -1,0 +1,21 @@
+/* Studio is a reading/workbench layout, not a color preset. All rules are scoped
+   to contracted body roots. Existing tokens and mobile controls remain intact. */
+.oa-sidebar[data-ui-layout="studio"] { width: 304px; flex-basis: 304px; }
+.oa-sidebar[data-ui-layout="studio"] .oa-side-head { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.oa-sidebar[data-ui-layout="studio"] .oa-sidebar-brand { grid-column: 1; }
+.oa-sidebar[data-ui-layout="studio"] .oa-sidebar-search { margin-top: 12px; }
+.oa-sidebar[data-ui-layout="studio"] .oa-sidebar-section-head { padding-block: 9px; border-bottom: 1px solid var(--border); }
+.oa-thread[data-ui-layout="studio"] .oa-message { max-width: 1100px; margin-inline: auto; }
+/* The legacy composer forces flex; this scoped override must win. */
+.oa-composer[data-ui-layout="studio"] { display: grid !important; grid-template-columns: minmax(0, 1fr) 210px; column-gap: 18px !important; max-width: 1100px; margin-inline: auto; }
+.oa-composer[data-ui-layout="studio"] > * { grid-column: 1 / -1; }
+.oa-composer[data-ui-layout="studio"] > textarea { grid-column: 1; grid-row: auto; min-width: 0; }
+.oa-composer[data-ui-layout="studio"] > .oa-composer-bar { grid-column: 2; align-self: stretch; display: flex; flex-direction: column; align-items: stretch; justify-content: space-between; border-inline-start: 1px solid var(--border); padding-inline-start: 16px; margin-top: 0; }
+.oa-composer[data-ui-layout="studio"] .oa-composer-primary-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 900px) {
+  .oa-composer[data-ui-layout="studio"] { grid-template-columns: minmax(0, 1fr); }
+  .oa-composer[data-ui-layout="studio"] > .oa-composer-bar { grid-column: 1; flex-direction: row; flex-wrap: wrap; border: 0; padding-inline-start: 0; margin-top: 8px; }
+}
+@media (max-width: 700px) {
+  .oa-sidebar[data-ui-layout="studio"] { width: min(304px, 86vw); flex-basis: auto; }
+}

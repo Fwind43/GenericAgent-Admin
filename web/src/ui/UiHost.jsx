@@ -62,22 +62,30 @@ export function UiHost({ children, disabled = false, preview = false, packageReg
   }
   const isDefaultSurface = name => failedSurfaces.includes(name) || surfaceView(pkg, name, defaults) === defaults.views[name]
   const committed = () => { if (pending.current) { pending.current = false; persist(pkg.manifest.id) } }
-  return <Context.Provider value={{ pkg, id: pkg.manifest.id, select, restore, committed, loading, message, safe, preview, failSurface, isDefaultSurface }}>{children}</Context.Provider>
+  return <Context.Provider value={{ pkg, id: pkg.manifest.id, select, restore, committed, loading, message, safe, preview, failSurface, isDefaultSurface, isFailedSurface: name => failedSurfaces.includes(name) }}>{children}</Context.Provider>
 }
 export const useUiPackage = () => useContext(Context)
 class SurfaceBoundary extends React.Component {
   state = { failed: false }
   static getDerivedStateFromError() { return { failed: true } }
   componentDidCatch(error) { this.props.restore(error.message) }
+  componentDidUpdate(previous) {
+    if (this.state.failed && previous.resetKey !== this.props.resetKey) this.setState({ failed: false })
+  }
   render() { return this.state.failed ? this.props.fallback : this.props.children }
 }
 function Commit({ children, committed }) { useEffect(() => { committed() }); return children }
-export function UiSurface({ name, viewProps, fallback = null }) {
+export function UiSurface({ name, viewProps, fallback = null, preserveMount = false }) {
   const ui = useUiPackage()
-  const View = ui.isDefaultSurface(name) ? defaults.views[name] : surfaceView(ui.pkg, name, defaults)
-  const isDefault = View === defaults.views[name]
-  return <SurfaceBoundary key={ui.id + name + isDefault} restore={() => ui.failSurface(name)} fallback={fallback}>
-    <Commit committed={ui.committed}><View {...viewProps} {...(isDefault ? { fallback } : {})}/></Commit>
+  const DefaultView = defaults.views[name]
+  if (!ui) return <DefaultView {...viewProps} fallback={fallback}/>
+  const failed = ui.isFailedSurface(name)
+  const View = failed ? DefaultView : surfaceView(ui.pkg, name, defaults)
+  const isDefault = View === DefaultView
+  const layout = failed ? 'default' : (ui.pkg.layouts?.[name] || 'default')
+  const recovery = fallback || (preserveMount ? <DefaultView {...viewProps}/> : null)
+  return <SurfaceBoundary key={preserveMount ? name : ui.id + name + isDefault} resetKey={ui.id} restore={() => ui.failSurface(name)} fallback={recovery}>
+    <Commit committed={ui.committed}><View {...viewProps} layout={layout} {...(isDefault ? { fallback } : {})}/></Commit>
   </SurfaceBoundary>
 }
 export function PackageControls({ allowed, guard }) {

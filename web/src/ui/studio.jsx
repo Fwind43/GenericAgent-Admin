@@ -1,4 +1,5 @@
 import { StudioChatChrome } from './chatChrome'
+import { ChatSidebar, ChatMessages, ChatComposer } from './chatBody'
 import React from 'react'
 import './studio.css'
 const copy = (lang, zh, en) => lang === 'zh' ? zh : en
@@ -23,4 +24,5 @@ export function StudioOverview({ overview, actions, presentation }) {
     <section><div className="studio-section-title"><h3>{c('需要留意','Attention')}</h3><span>{overview.health.toUpperCase()}</span></div><ul className="studio-rows">{overview.checks.map((item,i) => <li key={item.name+i}><span>{item.name}</span><small>{item.ok ? c('通过','OK') : c('待处理','Review')}</small></li>)}</ul>{!overview.checks.length && <p>{c('等待检查快照','Waiting for a check snapshot')}</p>}{overview.error && <p role="alert">{c('快照不可用，请重试。',overview.error)}</p>}<p className="studio-footnote">{c('仅查看状态，不启动或停止任务。','Read-only status. No tasks are started or stopped.')}<br/>{overview.updatedAt}</p></section></div>
   </section>
 }
-export const views = { 'admin.shell': StudioShell, 'admin.overview': StudioOverview, 'chat.chrome': StudioChatChrome }
+export const layouts = { 'chat.sidebar': 'studio', 'chat.messages': 'studio', 'chat.composer': 'studio' }
+export const views = { 'admin.shell': StudioShell, 'admin.overview': StudioOverview, 'chat.chrome': StudioChatChrome, 'chat.sidebar': ChatSidebar, 'chat.messages': ChatMessages, 'chat.composer': ChatComposer }
