@@ -7,6 +7,7 @@ import { createPluginStore } from './store'
 import { PluginManager } from './PluginManager'
 import { ChatReplacement, ExternalUiProvider, useExternalUi, dispatchChatAction } from './runtime'
 import { validateBundle } from './protocol'
+import { persistCustomColorsLocal, getInitialCustomColors } from '../../themes'
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 const fresh = () => structuredClone(example)
@@ -144,4 +145,49 @@ it('projects replacement state coherently and enforces every named-action guard'
   rerender(view('chat.followToolbar', {}))
   expect(screen.getByText('At latest message')).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Return to latest' }).disabled).toBe(true)
+})
+
+
+it('retains historical custom colors while external UI suppresses their selectors and restores them on default', async () => {
+  const previousStorage = { ...localStorage }
+  const previousInjected = window.__GA_UI_CUSTOM_COLORS__
+  delete window.__GA_UI_CUSTOM_COLORS__
+  try {
+    const colors = { 'oa-bg': '#112233', 'bg': '#445566' }
+    persistCustomColorsLocal(colors)
+    const stored = { ...localStorage }
+    const style = [...document.querySelectorAll('style')].find(el => el.textContent.includes('--oa-bg:#112233'))
+    expect(style).toBeTruthy()
+    const selector = style.sheet.cssRules[0].selectorText
+    expect(document.documentElement.matches(selector)).toBe(true)
+    // Keep one factory for persistence across every operation.
+    const db = new IDBFactory(), persistent = createPluginStore(() => db)
+    await persistent.install(fresh())
+    const mounted = render(<ManagerHost store={persistent}/>)
+    await screen.findByRole('option', { name: /Local Workshop/ })
+    fireEvent.change(screen.getByLabelText('Installed plugin'), { target: { value: 'local-workshop' } })
+    await screen.findByLabelText('Accent')
+    fireEvent.click(screen.getByRole('button', { name: 'Enable plugin' }))
+    await waitFor(() => expect(document.documentElement.dataset.externalUi).toBe('active'))
+    expect(document.documentElement.matches(selector)).toBe(false)
+    expect(getInitialCustomColors()).toEqual(colors)
+    expect({ ...localStorage }).toEqual(stored)
+    fireEvent.click(screen.getByRole('button', { name: 'Restore default' }))
+    await waitFor(() => expect(document.documentElement.dataset.externalUi).toBeUndefined())
+    expect(document.documentElement.matches(selector)).toBe(true)
+    expect(getInitialCustomColors()).toEqual(colors)
+    expect({ ...localStorage }).toEqual(stored)
+    mounted.unmount()
+  } finally {
+    persistCustomColorsLocal({})
+    localStorage.clear()
+    Object.entries(previousStorage).forEach(([key, value]) => localStorage.setItem(key, value))
+    if (previousInjected !== undefined) window.__GA_UI_CUSTOM_COLORS__ = previousInjected
+  }
+})
+
+it.each(['chat.navigation', 'chat.followToolbar'])('rejects incomplete required controls in %s', area => {
+  const bundle = fresh()
+  bundle.views[area].content = { type: 'text', text: 'No controls' }
+  expect(() => validateBundle(bundle)).toThrow('Missing required replacement action')
 })

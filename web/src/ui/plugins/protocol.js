@@ -76,7 +76,15 @@ export function validateBundle(input) {
     const replacement = ['chat.navigation', 'chat.followToolbar'].includes(area)
     fields(view, replacement ? ['content', 'layout'] : ['before', 'after', 'layout']); fields(view.layout, ['density', 'align', 'hostOrder'])
     choice(view.layout.density, ['comfortable', 'compact']); choice(view.layout.align, ['stretch', 'center']); choice(view.layout.hostOrder, ['first', 'last'])
-    if (replacement) { if (!view.content) fail('Missing replacement tree'); node(view.content, 0, area) }
+    if (replacement) {
+      if (!view.content) fail('Missing replacement tree')
+      node(view.content, 0, area)
+      const actions = new Set()
+      const collect = n => { if (n.type === 'button') actions.add(n.action); n.children?.forEach(collect) }
+      collect(view.content)
+      const required = area === 'chat.navigation' ? ['newChat', 'collapseSidebar'] : ['followLatest']
+      if (required.some(action => !actions.has(action))) fail('Missing required replacement action')
+    }
     else { if (!view.before) fail('Missing view tree'); node(view.before, 0, area); if (view.after) node(view.after, 0, area) }
   }
   const config = validateConfig(schema, input.config || {})
