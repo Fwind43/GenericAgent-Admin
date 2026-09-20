@@ -142,3 +142,22 @@ test('replayed content is immediate, and only subsequent live content is paced',
   assert.equal(chunks.join(''), backlog + 'live'.repeat(1000))
   assert.equal(frames.size, 0)
 })
+
+ test('large bursts flush once next frame and preserve subsequent tails and drains', async () => {
+  for (const size of [65536, 100000, 1048576]) {
+    const { batcher, chunks, frames, tick } = createClock()
+    const content = 'x'.repeat(size)
+    batcher.push(content)
+    const drained = batcher.drain()
+    assert.equal(chunks.length, 0)
+    tick()
+    await drained
+    assert.deepEqual(chunks, [content])
+    assert.equal(frames.size, 0)
+    batcher.push('tail')
+    batcher.flushNow()
+    batcher.flushNow()
+    assert.equal(chunks.join(''), content + 'tail')
+    assert.equal(frames.size, 0)
+  }
+})

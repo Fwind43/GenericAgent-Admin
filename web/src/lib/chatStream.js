@@ -136,7 +136,10 @@ export const createStreamDeltaBatcher = ({
   const flushFrame = () => {
     scheduled = null
     if (!pending) return
-    if (!shouldAnimate()) {
+    // Large bursts should not trigger repeated full-content parsing just to
+    // animate already available text. Keep the next-frame first paint and all
+    // existing drain/flush semantics; small interactive deltas remain paced.
+    if (!shouldAnimate() || pending.length >= 64 * 1024) {
       flushNow()
       return
     }
