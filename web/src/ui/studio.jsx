@@ -1,3 +1,4 @@
+import { StudioGeneralSettings } from './generalSettings.jsx'
 import { StudioChatChrome } from './chatChrome'
 import { ChatSidebar, ChatMessages, ChatComposer } from './chatBody'
 import React from 'react'
@@ -25,4 +26,4 @@ export function StudioOverview({ overview, actions, presentation }) {
   </section>
 }
 export const layouts = { 'chat.sidebar': 'studio', 'chat.messages': 'studio', 'chat.composer': 'studio' }
-export const views = { 'admin.shell': StudioShell, 'admin.overview': StudioOverview, 'chat.chrome': StudioChatChrome, 'chat.sidebar': ChatSidebar, 'chat.messages': ChatMessages, 'chat.composer': ChatComposer }
+export const views = { 'admin.shell': StudioShell, 'admin.overview': StudioOverview, 'admin.settings.paths': StudioGeneralSettings, 'admin.settings.network': StudioGeneralSettings, 'admin.settings.startup': StudioGeneralSettings, 'chat.chrome': StudioChatChrome, 'chat.sidebar': ChatSidebar, 'chat.messages': ChatMessages, 'chat.composer': ChatComposer }

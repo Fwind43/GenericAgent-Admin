@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { FolderCog, Globe2, KeyRound, Palette, Power, Save, ShieldAlert, Wifi } from 'lucide-react'
 import './general-workbench.css'
+import { UiSurface } from '../ui/UiHost'
+import { DefaultGeneralSettings } from '../ui/generalSettings.jsx'
+import { generalSettingsModels } from '../ui/generalSettings.js'
 import ThemeColorEditor from '../ThemeColorEditor'
 import ThemePicker from '../ThemePicker'
 import { api } from '../lib/api'
@@ -136,11 +139,17 @@ export function GeneralPage({
   t, lang, text, cfg, setCfg, root, setRoot, savedCfg, onSave, busy,
   theme, setTheme, onLanguage, autostart, onToggleAutostart,
 }) {
-  const proxyMode = cfg?.proxy_mode || 'off'
   const dirty = configDirty({ ...(cfg || {}), ga_root: root }, savedCfg)
   const patch = (field, value) => setCfg({ ...(cfg || {}), [field]: value })
-  const proxyHelp = { off: text.network.offHelp, system: text.network.systemHelp, custom: text.network.customHelp }[proxyMode]
 
+  const models = generalSettingsModels({ cfg, root, text, t, dirty, busy, autostart })
+  const edit = (field, value) => { if (!busy) patch(field, value) }
+  const save = () => { if (!busy && cfg && dirty) return onSave() }
+  const actions = {
+    paths: { save, changeRoot: value => { if (!busy) setRoot(value) }, changePython: value => edit('python_path', value), changeChatData: value => edit('chat_data_dir', value) },
+    network: { save, changeProxyMode: value => { if (['off', 'system', 'custom'].includes(value)) edit('proxy_mode', value) }, changeHttpProxy: value => edit('http_proxy', value), changeHttpsProxy: value => edit('https_proxy', value), changeAllProxy: value => edit('all_proxy', value), changeNoProxy: value => edit('no_proxy', value), changeMirror: value => edit('github_mirror', value) },
+    startup: { save, toggleAutostart: () => { if (!busy && autostart?.supported) return onToggleAutostart() } },
+  }
   const [group, setGroup] = useState('appearance')
   const groups = ['appearance', 'paths', 'network', 'remote', 'startup']
   return <SettingsPage className="general-workbench">
@@ -168,71 +177,21 @@ export function GeneralPage({
       </SettingFooter>
     </SettingsSection>
 
-    <SettingsSection id="general-paths" hidden={group !== 'paths'} title={text.paths.title} description={text.paths.desc} icon={<FolderCog size={17}/>}>
-      <SettingRow label={t.root} hint={text.paths.rootHelp} htmlFor="settings-ga-root" stacked>
-        <input id="settings-ga-root" value={root} onChange={e=>setRoot(e.target.value)}/>
-      </SettingRow>
-      <SettingRow label={t.fields.pythonPath} hint={text.paths.pythonHelp} htmlFor="settings-python-path" stacked>
-        <input id="settings-python-path" value={cfg?.python_path || ''} onChange={e=>patch('python_path', e.target.value)} placeholder={t.fields.pythonAuto}/>
-      </SettingRow>
-      <SettingRow label={t.fields.chatDataDir} hint={text.paths.dataHelp} htmlFor="settings-chat-data" stacked>
-        <input id="settings-chat-data" value={cfg?.chat_data_dir || ''} onChange={e=>patch('chat_data_dir', e.target.value)} placeholder={t.fields.chatDataAuto}/>
-      </SettingRow>
-    </SettingsSection>
-
-    <SettingsSection id="general-network" hidden={group !== 'network'} title={text.network.title} description={text.network.desc} icon={<Globe2 size={17}/>}>
-      <SettingRow label={text.network.mode} hint={proxyHelp} htmlFor="settings-proxy-mode">
-        <select id="settings-proxy-mode" value={proxyMode} onChange={e=>patch('proxy_mode', e.target.value)}>
-          {PROXY_MODES.map(mode => <option key={mode} value={mode}>{text.network[mode]}</option>)}
-        </select>
-      </SettingRow>
-      {proxyMode === 'custom' && <>
-        <SettingRow label="HTTP_PROXY" htmlFor="settings-http-proxy">
-          <input id="settings-http-proxy" value={cfg?.http_proxy || ''} onChange={e=>patch('http_proxy', e.target.value)} placeholder="http://127.0.0.1:7890"/>
-        </SettingRow>
-        <SettingRow label="HTTPS_PROXY" htmlFor="settings-https-proxy">
-          <input id="settings-https-proxy" value={cfg?.https_proxy || ''} onChange={e=>patch('https_proxy', e.target.value)} placeholder="http://127.0.0.1:7890"/>
-        </SettingRow>
-        <SettingRow label="ALL_PROXY" htmlFor="settings-all-proxy">
-          <input id="settings-all-proxy" value={cfg?.all_proxy || ''} onChange={e=>patch('all_proxy', e.target.value)} placeholder="socks5://127.0.0.1:7890"/>
-        </SettingRow>
-        <SettingRow label="NO_PROXY" htmlFor="settings-no-proxy">
-          <input id="settings-no-proxy" value={cfg?.no_proxy || ''} onChange={e=>patch('no_proxy', e.target.value)} placeholder="localhost,127.0.0.1"/>
-        </SettingRow>
-      </>}
-      <SettingRow label={text.network.githubMirror} hint={text.network.githubMirrorHelp} htmlFor="settings-github-mirror" stacked>
-        <input
-          id="settings-github-mirror"
-          type="url"
-          value={cfg?.github_mirror || ''}
-          onChange={e=>patch('github_mirror', e.target.value)}
-          placeholder={text.network.githubMirrorPlaceholder}
-        />
-      </SettingRow>
-
-    </SettingsSection>
+    {['paths', 'network', 'startup'].map(id => {
+      const viewProps = { model: models[id], actions: actions[id], hidden: group !== id }
+      return <UiSurface key={id} name={`admin.settings.${id}`} viewProps={viewProps} fallback={<DefaultGeneralSettings {...viewProps}/>}/>
+    })}
 
     <div id="general-remote" hidden={group !== 'remote'}><RemoteAccessSection text={text} t={t} cfg={cfg} patch={patch} dirty={dirty} onSave={onSave} busy={busy}/></div>
 
 
-    <SettingsSection id="general-startup" hidden={group !== 'startup'} title={text.startup.title} description={text.startup.desc} icon={<Power size={17}/>}>
-      <SettingToggle
-        id="settings-autostart"
-        checked={!!autostart?.enabled}
-        disabled={busy || !autostart?.supported}
-        onChange={onToggleAutostart}
-        label={t.autostart}
-        hint={!autostart?.supported ? t.hints.autostartUnsupported : text.startup.autostartHelp}
-        onText={t.enabled}
-        offText={autostart?.supported ? t.disabled : t.unsupported}
-      />
-      {autostart?.path && <p className="set-path"><code>{autostart.path}</code></p>}
-    </SettingsSection>
+    <div hidden={group !== 'appearance'}>
       <SettingFooter>
         <SettingNote tone="muted" icon={<ShieldAlert size={14}/>}>{text.confirmNote}</SettingNote>
         <span role="status" aria-live="polite" className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
         <button className="primary" type="button" onClick={onSave} disabled={busy || !cfg || !dirty}><Save size={15}/>{busy ? t.busy : text.saveChanges}</button>
       </SettingFooter>
+    </div>
   </div>
   </SettingsPage>
 }

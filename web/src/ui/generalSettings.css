@@ -1,0 +1,16 @@
+/* Scoped to the independent Studio settings forms; inherit all theme tokens. */
+.ui-studio-settings{min-width:0;color:var(--text);border-top:2px solid var(--accent);padding:24px 0}
+.ui-studio-settings[hidden]{display:none}
+.ui-studio-settings header h3{margin:0 0 8px}
+.ui-studio-settings header p,.ui-studio-settings small,.ui-studio-settings aside{color:var(--muted);line-height:1.6}
+.ui-studio-settings-workspace{display:grid;grid-template-columns:minmax(0,2fr) minmax(160px,1fr);gap:28px;margin-top:24px}
+.ui-studio-settings form,.ui-studio-settings aside{min-width:0}
+.ui-studio-settings aside{border-left:1px solid var(--border);padding-left:20px;overflow-wrap:anywhere}
+.ui-studio-settings-field{display:flex;flex-direction:column;gap:8px;margin-bottom:22px;min-width:0}
+.ui-studio-settings-field label{font-weight:600}
+.ui-studio-settings-field input:not([type=checkbox]),.ui-studio-settings-field select{width:100%;min-width:0;box-sizing:border-box;font:inherit}
+.ui-studio-settings-field input[type=checkbox]{align-self:flex-start;width:20px;height:20px;accent-color:var(--accent)}
+.ui-studio-settings-field code{white-space:pre-wrap;overflow-wrap:anywhere}
+.ui-studio-settings :is(input,select,button):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.ui-studio-settings :disabled{opacity:.55;cursor:not-allowed}
+@media(max-width:720px){.ui-studio-settings-workspace{grid-template-columns:minmax(0,1fr);gap:16px}.ui-studio-settings aside{border-left:0;border-top:1px solid var(--border);padding:12px 0 0}}
