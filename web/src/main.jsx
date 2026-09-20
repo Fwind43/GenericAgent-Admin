@@ -10,6 +10,7 @@ import { RouteFallback, ErrorBoundary } from './components/feedback.jsx'
 import { AppDialogHost } from './components/AppDialogHost.jsx'
 import { GlobalImagePreview } from './components/GlobalImagePreview.jsx'
 import './theme-tokens.css'
+import { UiHost } from './ui/UiHost'
 import { applyThemeToDocument, createAntdTheme, getInitialCustomColors, getInitialTheme, getTheme, hydrateCustomColors, isThemeId } from './themes'
 
 // Chat is the primary interface: it owns "/" (and legacy "/chat").
@@ -96,7 +97,7 @@ function LocalizedRoot() {
     <GlobalImagePreview />
     <ErrorBoundary>
       <Suspense fallback={<RouteFallback label={loading} />}>
-        {isolatedUiRoute ? (uiMode === 'safe' ? <UiRecovery/> : <UiPreview/>) : <RoutedRoot />}
+        {isolatedUiRoute ? (uiMode === 'safe' ? <UiRecovery/> : <UiPreview/>) : <UiHost><RoutedRoot /></UiHost>}
       </Suspense>
     </ErrorBoundary>
   </ConfigProvider>

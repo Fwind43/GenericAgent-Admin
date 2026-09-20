@@ -1,5 +1,5 @@
 export const UI_API = '1.0.0'
-export const SURFACES = ['admin.shell', 'admin.overview']
+export const SURFACES = ['admin.shell', 'admin.overview', 'chat.chrome']
 export const CAPABILITIES = ['navigation', 'overview.read', 'overview.refresh']
 export function validateManifest(m) {
   if (!m || m.manifestVersion !== 1 || !/^[a-z][a-z0-9-]*$/.test(m.id || '') || !/^\d+\.\d+\.\d+$/.test(m.version || '')) throw new Error('Invalid UI manifest')

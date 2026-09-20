@@ -60,7 +60,8 @@ const NAV_ICONS = {
 }
 
 export default function App(props) {
-  return <UiHost><AdminApp {...props}/></UiHost>
+  const host = useUiPackage()
+  return host ? <AdminApp {...props}/> : <UiHost><AdminApp {...props}/></UiHost>
 }
 
 function AdminApp({ embedded = false, active = true, onClose }) {

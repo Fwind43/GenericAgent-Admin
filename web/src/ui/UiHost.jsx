@@ -83,7 +83,7 @@ export function UiSurface({ name, viewProps, fallback = null }) {
 export function PackageControls({ allowed, guard }) {
   const ui = useUiPackage()
   return <section className="ui-package-controls" aria-label="Interface packages">
-    <div><strong>Interface / 界面包</strong><small>Shell + overview only / 仅管理外壳与概览；其余沿用默认</small></div>
+    <div><strong>Interface / 界面包</strong><small>Admin shell + overview + chat chrome / 管理外壳、概览与聊天展示；业务区域沿用默认</small></div>
     <div className="ui-package-actions">
       <a href="/admin/overview?ui=preview" target="_blank" rel="noreferrer">Preview Studio / 示例预览 ↗</a>
       <button type="button" disabled={ui.safe || ui.loading || !allowed || ui.id === 'studio'} onClick={() => ui.select('studio', guard)}>Enable Studio / 启用</button>

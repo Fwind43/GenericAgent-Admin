@@ -1,3 +1,5 @@
+import { ChatPackageBar } from './ui/chatChrome'
+import { useUiPackage } from './ui/UiHost'
 import { conductorSidebarSections } from './lib/chatConductor.js'
 import { readSidebarPreferences, sortSidebarSessions } from './lib/chatSidebarPreferences.js'
 import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
@@ -4736,6 +4738,7 @@ function CustomSelect({ value, onChange, options, disabled, ariaLabel }) {
 }
 
 export default function ChatApp({ onOpenSettings } = {}) {
+  const uiPackage = useUiPackage()
   // Theme state: sync with localStorage and system preference
   const [conductorEventsOpen, setConductorEventsOpen] = useState(false)
   const [conductorWorkersOpen, setConductorWorkersOpen] = useState(false)
@@ -7757,7 +7760,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
     </aside>
     <div className={`oa-sidebar-backdrop ${collapsed ? '' : 'is-visible'}`} aria-hidden={collapsed} onClick={()=>setCollapsed(true)} />
 
-    <main className="oa-main">
+    <main className="oa-main" data-ui-chat={uiPackage?.isDefaultSurface('chat.chrome') === false ? uiPackage.id : 'default'}>
+      <ChatPackageBar session={{ id: sid, title: current ? shortTitle(current) : ct('新对话', 'New chat'), busy }} presentation={{ lang: chatLanguage(), theme }} actions={{ openSettings: () => { if (onOpenSettings) onOpenSettings(); else window.location.href = '/admin' }, newSession, toggleContext: () => setContextOpen(v => !v), toggleTimeline: toggleWorldline }}/>
       <header className="oa-topbar">
         {collapsed && <div className="oa-collapsed-actions">
           <button className="oa-icon-btn oa-sidebar-toggle" onClick={()=>setCollapsed(false)} title={ct('展开侧栏', 'Expand sidebar')} aria-label={ct('展开侧栏', 'Expand sidebar')}><PanelLeftOpen size={18} aria-hidden="true"/></button>
