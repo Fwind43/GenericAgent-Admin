@@ -2,14 +2,16 @@
   "manifest": {
     "format": "gaui/1",
     "id": "local-workshop",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "name": "Local Workshop",
     "surfaces": [
       "admin.shell",
       "admin.overview",
       "chat.sidebar",
       "chat.messages",
-      "chat.composer"
+      "chat.composer",
+      "chat.navigation",
+      "chat.followToolbar"
     ]
   },
   "views": {
@@ -253,6 +255,91 @@
             "bind": "value"
           }
         ]
+      }
+    },
+    "chat.navigation": {
+      "layout": {
+        "density": "compact",
+        "align": "stretch",
+        "hostOrder": "first"
+      },
+      "content": {
+        "type": "stack",
+        "children": [
+          {
+            "type": "heading",
+            "text": "Workshop navigation"
+          },
+          {
+            "type": "badge",
+            "bind": "status"
+          },
+          {
+            "type": "row",
+            "children": [
+              {
+                "type": "button",
+                "text": "Start conversation",
+                "action": "newChat"
+              },
+              {
+                "type": "button",
+                "text": "Browse conversations",
+                "action": "manageSessions"
+              },
+              {
+                "type": "button",
+                "text": "Workspace settings",
+                "action": "openSettings"
+              },
+              {
+                "type": "button",
+                "text": "Collapse navigation",
+                "action": "collapseSidebar"
+              }
+            ]
+          }
+        ],
+        "style": {
+          "gap": 8,
+          "padding": 8,
+          "radius": 8
+        }
+      }
+    },
+    "chat.followToolbar": {
+      "layout": {
+        "density": "compact",
+        "align": "stretch",
+        "hostOrder": "first"
+      },
+      "content": {
+        "type": "stack",
+        "children": [
+          {
+            "type": "heading",
+            "text": "Reading controls"
+          },
+          {
+            "type": "badge",
+            "bind": "status"
+          },
+          {
+            "type": "row",
+            "children": [
+              {
+                "type": "button",
+                "text": "Return to latest",
+                "action": "followLatest"
+              }
+            ]
+          }
+        ],
+        "style": {
+          "gap": 8,
+          "padding": 8,
+          "radius": 8
+        }
       }
     }
   },

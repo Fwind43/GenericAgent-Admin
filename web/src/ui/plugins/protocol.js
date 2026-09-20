@@ -1,4 +1,4 @@
-export const AREAS = ['admin.shell', 'admin.overview', 'chat.sidebar', 'chat.messages', 'chat.composer']
+export const AREAS = ['admin.shell', 'admin.overview', 'chat.sidebar', 'chat.messages', 'chat.composer', 'chat.navigation', 'chat.followToolbar']
 export const LIMITS = { archive: 1048576, entries: 8, depth: 8, nodes: 160 }
 const bad = new Set(['__proto__', 'constructor', 'prototype'])
 const fail = message => { throw new Error(message) }
@@ -59,11 +59,11 @@ export function validateBundle(input) {
       if (!((area === 'admin.shell' && n.source === 'navigation') || (area === 'admin.overview' && ['services', 'metrics'].includes(n.source)))) fail('Data unavailable on this surface')
     } else if (n.source !== undefined) fail('Source only allowed on lists')
     if (n.type === 'button') {
-      choice(n.action, ['navigate', 'backToChat', 'refreshOverview', 'openSettings', 'manageSessions', 'followLatest', 'openCommands'])
+      choice(n.action, ['navigate', 'backToChat', 'refreshOverview', 'openSettings', 'manageSessions', 'followLatest', 'openCommands', 'newChat', 'collapseSidebar'])
       if (n.action === 'navigate') { if (area !== 'admin.shell' || n.target !== 'item.id' || !inEach) fail('Invalid navigation') }
       else if (n.target !== undefined) fail('Unexpected action parameter')
-      const chatActions = { openSettings: 'chat.sidebar', manageSessions: 'chat.sidebar', followLatest: 'chat.messages', openCommands: 'chat.composer' }
-      if (chatActions[n.action] && chatActions[n.action] !== area) fail('Action unavailable')
+      const chatActions = { openSettings: ['chat.sidebar', 'chat.navigation'], manageSessions: ['chat.sidebar', 'chat.navigation'], followLatest: ['chat.messages', 'chat.followToolbar'], openCommands: ['chat.composer'], newChat: ['chat.navigation'], collapseSidebar: ['chat.navigation'] }
+      if (chatActions[n.action] && !chatActions[n.action].includes(area)) fail('Action unavailable')
       if (n.action === 'backToChat' && area !== 'admin.shell') fail('Action unavailable')
       if (n.action === 'refreshOverview' && area !== 'admin.overview') fail('Action unavailable')
     } else if (n.action !== undefined || n.target !== undefined) fail('Action only allowed on buttons')
@@ -73,10 +73,11 @@ export function validateBundle(input) {
     }
   }
   for (const [area, view] of Object.entries(views)) {
-    fields(view, ['before', 'after', 'layout']); fields(view.layout, ['density', 'align', 'hostOrder'])
+    const replacement = ['chat.navigation', 'chat.followToolbar'].includes(area)
+    fields(view, replacement ? ['content', 'layout'] : ['before', 'after', 'layout']); fields(view.layout, ['density', 'align', 'hostOrder'])
     choice(view.layout.density, ['comfortable', 'compact']); choice(view.layout.align, ['stretch', 'center']); choice(view.layout.hostOrder, ['first', 'last'])
-    if (!view.before) fail('Missing view tree')
-    node(view.before, 0, area); if (view.after) node(view.after, 0, area)
+    if (replacement) { if (!view.content) fail('Missing replacement tree'); node(view.content, 0, area) }
+    else { if (!view.before) fail('Missing view tree'); node(view.before, 0, area); if (view.after) node(view.after, 0, area) }
   }
   const config = validateConfig(schema, input.config || {})
   return JSON.parse(JSON.stringify({ manifest: m, views, schema, config }))

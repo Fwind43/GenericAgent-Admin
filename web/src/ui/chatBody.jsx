@@ -1,7 +1,7 @@
 import React from 'react'
 import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
-import { ChatDecoration, useChatLayout } from './plugins/runtime'
+import { ChatDecoration, ChatReplacement, useChatLayout } from './plugins/runtime'
 
 // Stateless views; ChatApp owns all data, drafts, refs, actions and subscriptions.
 export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
@@ -9,6 +9,7 @@ export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDelet
   const decorationState = { blocked: batchDeleting || projectOrderSaving, managing: sessionManagerOpen, count: sessions.length }, decorationActions = { openSettings: onOpenSettings, manageSessions: openSessionManager }
   return (<aside data-ui-surface="chat.sidebar" {...externalLayout} data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
           <ChatDecoration area="chat.sidebar" position="before" state={decorationState} actions={decorationActions}/>
+      <ChatReplacement area="chat.navigation" state={decorationState} actions={{ ...decorationActions, newChat: newSession, collapseSidebar: () => setCollapsed(true) }}>
       <div className="oa-side-head">
         <div className="oa-sidebar-brand">GenericAgent <span>Admin</span></div>
         <button
@@ -20,6 +21,7 @@ export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDelet
         ><MessageSquarePlus size={16}/><span>{ct('新对话', 'New chat')}</span></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('收起侧栏', 'Collapse sidebar')} aria-label={ct('收起侧栏', 'Collapse sidebar')}><PanelLeftClose size={18} aria-hidden="true"/></button>
       </div>
+      </ChatReplacement>
       <div className="oa-sidebar-sections">
         <div className="oa-sidebar-scroll-tools">
         {sidebarSections.conductors.length === 0 && <button
@@ -217,9 +219,11 @@ export function ChatMessages({ layout = 'default', MessageList, activeSessionDet
             onSwitchVersion={switchWorldline}
             sessionKey={sid}
           />
+          <ChatReplacement area="chat.followToolbar" state={decorationState} actions={decorationActions}>
           {showFollow && <div className="oa-follow-row">
             {showFollow && <button className={`oa-follow-btn ${isCurrentRunning ? 'is-live' : ''}`} type="button" onClick={resumeFollow} title={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')} aria-label={isCurrentRunning ? ct('继续跟随', 'Resume following') : ct('回到最新', 'Jump to latest')}><ChevronDown size={16}/></button>}
           </div>}
+          </ChatReplacement>
           <ChatDecoration area="chat.messages" position="after" state={decorationState} actions={decorationActions}/>
         </section>)
 }

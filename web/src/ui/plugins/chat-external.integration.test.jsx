@@ -1,7 +1,7 @@
 import React from 'react'
 import { readFileSync } from 'node:fs'
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { IDBFactory } from 'fake-indexeddb'
 import ChatApp from '../../ChatApp'
 import { UiHost } from '../UiHost'
@@ -84,12 +84,40 @@ it('real ChatApp retains roots, message, draft, attachment, scroll and subscript
   await screen.findByText('Installed locally; not enabled')
   expect(container.querySelector('[data-chat-decoration]')).toBeNull()
   assertRetained()
+  const mountingCalls = [...calls], mountingSources = sources.length
+  fireEvent.click(screen.getByRole('button', { name: 'Preview', exact: true }))
+  const preview = await screen.findByRole('region', { name: 'Fictional plugin preview' })
+  within(preview).getAllByRole('button').forEach(button => fireEvent.click(button))
+  expect(calls).toEqual(mountingCalls)
+  expect(sources).toHaveLength(mountingSources)
+  expect(await store.active()).toBe('default')
+  assertRetained()
+  // Hide the fictional preview so all following queries address the real host.
+  fireEvent.change(screen.getByLabelText('Installed plugin'), { target: { value: 'local-workshop' } })
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Fictional plugin preview' })).toBeNull())
   fireEvent.click(screen.getByRole('button', { name: 'Enable plugin' }))
   await screen.findByRole('heading', { name: 'Workshop writing desk' })
   expect(container.querySelectorAll('[data-chat-decoration]')).toHaveLength(6)
   assertRetained()
-  fireEvent.click(screen.getByRole('button', { name: 'Workspace settings' }))
+  const navigation = container.querySelector('[data-chat-replacement="chat.navigation"]')
+  const toolbar = container.querySelector('[data-chat-replacement="chat.followToolbar"]')
+  expect(navigation).not.toBeNull()
+  expect(toolbar).not.toBeNull()
+  expect(container.querySelector('.oa-side-head')).toBeNull()
+  expect(container.querySelector('.oa-follow-row')).toBeNull()
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Collapse navigation' }))
+  expect(roots[0].classList.contains('collapsed')).toBe(true)
+  assertRetained()
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Workspace settings' }))
   expect(settings).toHaveBeenCalledOnce()
+  fireEvent.click(within(navigation).getByRole('button', { name: 'Browse conversations' }))
+  expect(within(navigation).getByRole('button', { name: 'Browse conversations' }).disabled).toBe(true)
+  assertRetained()
+  expect(within(toolbar).getByRole('button', { name: 'Return to latest' }).disabled).toBe(true)
+  container.querySelectorAll('[data-chat-replacement]').forEach(region => {
+    expect(region.textContent).not.toContain('private')
+    expect(region.textContent).not.toContain('Retained fixture message')
+  })
   container.querySelectorAll('[data-chat-decoration]').forEach(region => {
     expect(region.textContent).not.toContain('private')
     expect(region.textContent).not.toContain('Retained fixture message')

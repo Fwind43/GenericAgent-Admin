@@ -50,18 +50,18 @@ export function dispatchAction(area, node, item, data, props) {
   else if (area === 'admin.shell' && node.action === 'backToChat') props.navigation?.backToChat?.()
   else if (area === 'admin.overview' && node.action === 'refreshOverview' && !props.actions?.refreshing) props.actions?.refreshOverview?.()
 }
-export function NodeTree({ node, data = {}, item, invoke = () => {} }) {
+export function NodeTree({ node, data = {}, item, invoke = () => {}, canInvoke = () => true }) {
   if (!node) return null
-  if (node.type === 'each') return (data[node.source] || []).slice(0, 80).map((entry, i) => <NodeTree key={i} node={node.children[0]} data={data} item={entry} invoke={invoke}/> )
+  if (node.type === 'each') return (data[node.source] || []).slice(0, 80).map((entry, i) => <NodeTree key={i} node={node.children[0]} data={data} item={entry} invoke={invoke} canInvoke={canInvoke}/> )
   const s = node.style || {}, style = { gap: s.gap, padding: s.padding, borderRadius: s.radius, ...(node.type === 'grid' ? { gridTemplateColumns: `repeat(${s.columns || 2}, minmax(0, 1fr))` } : {}) }
   const value = node.bind?.startsWith('item.') ? item?.[node.bind.slice(5)] : data[node.bind]
   const content = node.bind ? String(value ?? '') : node.text
   const Tag = ({ heading: 'h3', text: 'p', badge: 'span', button: 'button' })[node.type] || 'div'
-  return <Tag className={`gaui-node gaui-${node.type} gaui-${s.tone || 'plain'}`} style={style} {...(node.type === 'button' ? { type: 'button', onClick: () => invoke(node, item) } : {})}>{content}{node.children?.map((n, i) => <NodeTree key={i} node={n} data={data} item={item} invoke={invoke}/>)}</Tag>
+  return <Tag className={`gaui-node gaui-${node.type} gaui-${s.tone || 'plain'}`} style={style} {...(node.type === 'button' ? { type: 'button', disabled: !canInvoke(node), onClick: () => invoke(node, item) } : {})}>{content}{node.children?.map((n, i) => <NodeTree key={i} node={n} data={data} item={item} invoke={invoke} canInvoke={canInvoke}/>)}</Tag>
 }
-export function ExternalView({ bundle, area, data, invoke }) {
+export function ExternalView({ bundle, area, data, invoke, canInvoke = () => true }) {
   const view = bundle.views[area]
-  return <section className="gaui-view" aria-label={bundle.manifest.name + ' ' + area} style={{ '--gaui-accent': bundle.config.accent || '#557766' }}><NodeTree node={view.before} data={data} invoke={invoke}/><NodeTree node={view.after} data={data} invoke={invoke}/></section>
+  return <section className="gaui-view" aria-label={bundle.manifest.name + ' ' + area} style={{ '--gaui-accent': bundle.config.accent || '#557766' }}><NodeTree node={view.content} data={data} invoke={invoke} canInvoke={canInvoke}/><NodeTree node={view.before} data={data} invoke={invoke} canInvoke={canInvoke}/><NodeTree node={view.after} data={data} invoke={invoke} canInvoke={canInvoke}/></section>
 }
 export class ExternalBoundary extends React.Component {
   state = { failed: false }
@@ -78,12 +78,29 @@ function chatView(bundle, area) {
     return validateBundle({ ...bundle, manifest: { ...bundle.manifest, surfaces: [area] }, views: { [area]: bundle.views[area] } }).views[area]
   } catch { return null }
 }
+export function canChatAction(area, node, state) {
+  if (node.target !== undefined) return false
+  const navigation = area === 'chat.sidebar' || area === 'chat.navigation'
+  if (navigation && node.action === 'openSettings') return !state.blocked
+  if (navigation && node.action === 'manageSessions') return !state.blocked && !state.managing
+  if (area === 'chat.navigation' && ['newChat', 'collapseSidebar'].includes(node.action)) return !state.blocked
+  if (['chat.messages', 'chat.followToolbar'].includes(area) && node.action === 'followLatest') return !!state.canFollow && !state.loading
+  if (area === 'chat.composer' && node.action === 'openCommands') return !state.loading && !state.commandsOpen
+  return false
+}
 export function dispatchChatAction(area, node, state, actions) {
-  if (node.target !== undefined) return
-  if (area === 'chat.sidebar' && node.action === 'openSettings' && !state.blocked) actions.openSettings?.()
-  if (area === 'chat.sidebar' && node.action === 'manageSessions' && !state.blocked && !state.managing) actions.manageSessions?.()
-  if (area === 'chat.messages' && node.action === 'followLatest' && state.canFollow && !state.loading) actions.followLatest?.()
-  if (area === 'chat.composer' && node.action === 'openCommands' && !state.loading && !state.commandsOpen) actions.openCommands?.()
+  if (canChatAction(area, node, state)) actions[node.action]?.()
+}
+// Only the selected presentation slot is replaced. Business siblings stay in the host tree.
+export function ChatReplacement({ area, state = {}, actions = {}, children }) {
+  const ui = useExternalUi(), view = chatView(ui?.bundle, area)
+  if (!view) return children
+  const data = { title: area === 'chat.navigation' ? 'Conversations' : 'Conversation navigation', status: state.loading ? 'Loading' : state.running ? 'Running' : 'Ready', value: Number.isSafeInteger(state.count) ? state.count : 0 }
+  return <ExternalBoundary key={ui.bundle.manifest.id + area} fallback={children} fail={() => {}}>
+    <div className="gaui-external" data-chat-replacement={area}>
+      <ExternalView bundle={ui.bundle} area={area} data={data} canInvoke={node => canChatAction(area, node, state)} invoke={node => dispatchChatAction(area, node, state, actions)}/>
+    </div>
+  </ExternalBoundary>
 }
 export function ChatDecoration({ area, position, state = {}, actions = {} }) {
   const ui = useExternalUi(), view = chatView(ui?.bundle, area)
