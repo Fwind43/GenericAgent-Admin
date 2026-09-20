@@ -235,3 +235,14 @@ test('single-line shortcut preserves protocol fallbacks and arbitrary replacemen
     assert.deepEqual(parse(text), parseAssistantContent(text))
   }
 })
+
+test('multiline shortcut preserves normalization through append and replacement', () => {
+  const parse = createAssistantContentParser()
+  for (const source of ['  first\nsecond\n\n\nlast  ', 'replacement\nbody', '', 'a\r\nb', '```js\nLLM Running (Turn 1)\n```\n[Info] Final response to user.\nbody']) {
+    for (let i = 0; i <= source.length; i++) {
+      const text = source.slice(0, i)
+      assert.deepEqual(parse(text), parseAssistantContent(text))
+      if (!/[\r`~<[(]/.test(text)) assert.deepEqual(parse(text), { runs: [], summary: '', body: text.replace(/\n{3,}/g, '\n\n').trim() })
+    }
+  }
+})

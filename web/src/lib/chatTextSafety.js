@@ -188,10 +188,10 @@ export const assistantTurnFallbackTitle = (chunk = '', turn = '') => {
 
 export const parseAssistantContent = (raw = '', runCache = null) => {
   const source = String(raw || '')
-  // A single line without protocol introducers cannot contain turns, fences,
-  // summaries or newline normalization. Avoid splitting/scanning it repeatedly.
+  // Text without protocol introducers cannot contain turns, fences or summaries.
+  // Preserve multiline whitespace normalization without splitting into marker lines.
   // No retained source or append-only assumption: replacements stay equivalent.
-  if (!/[\r\n`~<[(]/.test(source)) return { runs: [], summary: '', body: source.trim() }
+  if (!/[\r`~<[(]/.test(source)) return { runs: [], ...parseAssistantFinalBody(source) }
   const full = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const markers = findTopLevelAssistantMarkers(full)
   const finalMarker = markers.find((m) => m.type === 'final')
