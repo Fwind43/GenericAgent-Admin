@@ -104,3 +104,43 @@ test('cached loads need no structured clone, preserve empty bodies and recover a
     globalThis.structuredClone = original
   }
 })
+
+test('newer same-URL request supersedes delayed headers and body without stale writes', async () => {
+  for (const phase of ['headers', 'body', '304']) {
+    const cache = createChatSessionCache()
+    await cache.load('/a', { fetcher: async () => response(detail) })
+    let release
+    const gate = new Promise(resolve => { release = resolve })
+    const old = cache.load('/a', { fetcher: async () => {
+      if (phase !== 'body') await gate
+      if (phase === '304') return response(null, '"v1"', 304)
+      const res = response(detail)
+      if (phase === 'body') res.text = async () => { await gate; return JSON.stringify(detail) }
+      return res
+    } })
+    await Promise.resolve()
+    const fresh = { id: 'a', messages: [{ content: 'new', files: [{ name: 'safe' }] }] }
+    const view = await cache.load('/a', { fetcher: async () => response(fresh, '"v2"') })
+    view.messages[0].files[0].name = 'mutated'
+    release()
+    await assert.rejects(old, { name: 'AbortError' })
+    assert.deepEqual(await cache.load('/a', { fetcher: async (_, options) => {
+      assert.equal(options.headers['If-None-Match'], '"v2"')
+      return response(null, '"v2"', 304)
+    } }), fresh)
+  }
+})
+
+test('different URLs remain independent and a failed newer request still supersedes old work', async () => {
+  const cache = createChatSessionCache()
+  let release
+  const old = cache.load('/a', { fetcher: () => new Promise(resolve => { release = resolve }) })
+  assert.deepEqual(await cache.load('/b', { fetcher: async () => response(detail) }), detail)
+  await assert.rejects(cache.load('/a', { fetcher: async () => { throw new Error('offline') } }), /offline/)
+  release(response(detail))
+  await assert.rejects(old, { name: 'AbortError' })
+  await cache.load('/a', { fetcher: async (_, options) => {
+    assert.deepEqual(options.headers, {})
+    return response(detail)
+  } })
+})
