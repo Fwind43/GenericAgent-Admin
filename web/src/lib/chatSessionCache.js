@@ -28,7 +28,7 @@ export function createChatSessionCache({ maxBytes = 64 * 1024 * 1024, maxEntries
         entries.delete(url)
         entries.set(url, entry)
       }
-      return structuredClone(entry.data)
+      return entry.text ? JSON.parse(entry.text) : null
     }
     const text = await response.text()
     const data = await parseApiResponse({
@@ -41,9 +41,11 @@ export function createChatSessionCache({ maxBytes = 64 * 1024 * 1024, maxEntries
     remove(url)
     if (etag && maxEntries > 0 && size <= maxBytes) {
       while (entries.size && (entries.size >= maxEntries || bytes + size > maxBytes)) remove(entries.keys().next().value)
-      entries.set(url, { etag, data, bytes: size })
+      // Retain immutable wire text, not the mutable object handed to callers.
+      // A 200 already parsed a fresh view; cloning it again is redundant.
+      entries.set(url, { etag, text, bytes: size })
       bytes += size
-      return structuredClone(data)
+      return data
     }
     return data
   }

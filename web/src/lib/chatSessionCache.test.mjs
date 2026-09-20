@@ -88,3 +88,19 @@ test('HTTP failures surface normally and old servers without ETag stay compatibl
     return response(detail, '')
   } }), detail)
 })
+
+test('cached loads need no structured clone, preserve empty bodies and recover after failures', async () => {
+  const original = globalThis.structuredClone
+  globalThis.structuredClone = () => { throw new Error('unexpected clone') }
+  try {
+    const cache = createChatSessionCache()
+    const first = await cache.load('/a', { fetcher: async () => response(detail) })
+    first.messages[0].content = 'mutated'
+    await assert.rejects(cache.load('/a', { fetcher: async () => { throw new Error('offline') } }), /offline/)
+    assert.deepEqual(await cache.load('/a', { fetcher: async () => response(null, '"v1"', 304) }), detail)
+    assert.equal(await cache.load('/empty', { fetcher: async () => new Response('', { headers: { ETag: '"empty"' } }) }), null)
+    assert.equal(await cache.load('/empty', { fetcher: async () => response(null, '"empty"', 304) }), null)
+  } finally {
+    globalThis.structuredClone = original
+  }
+})
