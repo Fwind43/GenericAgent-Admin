@@ -15,10 +15,7 @@ import {
   Building2,
   Plus,
   RefreshCw,
-  RotateCcw,
-  Save,
   Trash2,
-  UploadCloud,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Collapse, Drawer, Input, Modal, Select, Space, Tag } from 'antd'
@@ -1050,33 +1047,25 @@ export function Models({
             <span className="model-save-source"><FileCode2 size={13} /><code>mykey.py</code></span>
           </div>
         </div>
-        <div className="model-save-actions">
-          <span className={`model-draft-state${changes.total ? ' is-dirty' : ''}`}>
-            {changes.total ? text.unsavedChanges(changes.total) : text.inSync}
-          </span>
-          <Button className="model-utility-action" title={text.rereadConfig} aria-label={text.rereadConfig} icon={<UploadCloud size={14} />} onClick={() => importModels()} loading={importLoading} />
-          <Button className="model-utility-action" title={text.configPreview} aria-label={text.configPreview} icon={<FileCode2 size={14} />} onClick={async () => { setPreviewOpen(true); await previewModels() }} />
-          <Button
-            className="model-utility-action"
-            danger
-            title={text.discard}
-            aria-label={text.discard}
-            icon={<RotateCcw size={14} />}
-            disabled={!changes.total || saving}
-            onClick={async () => { if (changes.total && await confirmDanger('models-discard', text.discardConfirm)) discardDraft() }}
-          />
-          <Button
-            className="model-save-action"
-            type="primary"
-            icon={<Save size={14} />}
-            loading={saving}
-            disabled={blocked || !changes.total}
-            title={blocked ? text.saveBlocked : text.saveAll}
-            onClick={() => saveAll()}
-          >
-            <span>{text.saveAll}</span>
-          </Button>
-        </div>
+        <UiSurface name="admin.models.transfer" viewProps={{
+          transfer: {
+            labels: { reread: text.rereadConfig, preview: text.configPreview, discard: text.discard, save: text.saveAll },
+            draftLabel: changes.total ? text.unsavedChanges(changes.total) : text.inSync,
+            dirty: Boolean(changes.total), importing: Boolean(importLoading), saving,
+            discardDisabled: !changes.total || saving,
+            saveDisabled: blocked || !changes.total,
+            saveTitle: blocked ? text.saveBlocked : text.saveAll,
+          },
+          actions: {
+            reread: () => { if (!importLoading) return importModels() },
+            openPreview: async () => { setPreviewOpen(true); await previewModels() },
+            discard: async () => {
+              if (!changes.total || saving) return
+              if (await confirmDanger('models-discard', text.discardConfirm)) discardDraft()
+            },
+            save: () => { if (!blocked && changes.total && !saving) return saveAll() },
+          },
+        }} />
       </header>
 
       {modelInstance && <Alert
@@ -1243,9 +1232,11 @@ export function Models({
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         className="model-preview-drawer"
-        extra={<Button icon={<RefreshCw size={14} />} onClick={previewModels}>{text.refreshPreview}</Button>}
       >
-        <Alert type="info" showIcon message={text.previewSecret} />
+        <UiSurface name="admin.models.preview.controls" viewProps={{
+          preview: { notice: text.previewSecret, refreshLabel: text.refreshPreview },
+          actions: { refresh: () => previewModels() },
+        }} />
         <pre className="model-preview-pre">{modelPreview || (profiles.length ? text.generatingPreview : text.previewNeedsProvider)}</pre>
       </Drawer>
     </section>

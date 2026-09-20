@@ -1,0 +1,15 @@
+.model-preview-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.model-preview-controls .ant-alert { flex: 1; min-width: 200px; }
+.studio-model-transfer { display: grid; gap: 10px; min-width: 260px; max-width: 100%; }
+.studio-model-transfer-read, .studio-model-transfer-commit, .studio-model-transfer-commit > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.studio-model-transfer-commit { border-top: 1px solid var(--border); padding-top: 10px; justify-content: space-between; }
+.studio-model-transfer output { color: var(--text-muted); font-size: 12px; }
+.studio-model-transfer output.is-dirty { color: var(--text); font-weight: 600; }
+.studio-model-transfer button, .studio-model-preview-controls button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; background: var(--bg-card); color: var(--text); cursor: pointer; }
+.studio-model-transfer button:disabled { opacity: .45; cursor: not-allowed; }
+.studio-model-transfer button:focus-visible, .studio-model-preview-controls button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.studio-model-transfer .is-save { font-weight: 600; border-color: currentColor; }
+.studio-model-transfer .is-discard { text-decoration: underline; text-underline-offset: 3px; }
+.studio-model-preview-controls { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 12px; padding: 14px; margin-bottom: 12px; border-inline-start: 3px solid currentColor; background: var(--bg-card); color: var(--text); }
+.studio-model-preview-controls p { margin: 0 0 10px; }
+@media (max-width: 640px) { .studio-model-transfer { min-width: 0; width: 100%; } }
