@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { confirmDanger } from '../lib/danger'
 import { orderedModelRows } from '../lib/modelsEditor'
@@ -15,7 +15,13 @@ export function useTitleModel({ t, lang, setMsg, active, fallbackProfiles = [] }
   const [choices, setChoices] = useState([])
   const [saving, setSaving] = useState(false)
   const [enabled, setEnabled] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [draft, updateDraft] = useState('')
+  const [feedback, setFeedback] = useState('')
+  const pending = useRef(false)
+  const setDraft = value => { if (!pending.current) { updateDraft(value); setFeedback('') } }
+  const changeEnabled = value => { if (!pending.current) { setEnabled(Boolean(value)); setFeedback('') } }
+  const savedDraft = model?.enable === true && (model.provider_var_name || model.model) ? titleModelKey(model) : ''
+  const dirty = enabled !== (model?.enable === true) || (enabled && draft !== savedDraft)
 
   const reload = async () => {
     const data = await api('/api/models/title-model')
@@ -54,35 +60,42 @@ export function useTitleModel({ t, lang, setMsg, active, fallbackProfiles = [] }
   useEffect(() => {
     const on = model?.enable === true
     setEnabled(on)
-    setDraft(!on || (!model.provider_var_name && !model.model) ? '' : titleModelKey(model))
+    updateDraft(!on || (!model.provider_var_name && !model.model) ? '' : titleModelKey(model))
   }, [model?.enable, model?.provider_var_name, model?.model])
 
   const submit = async () => {
-    let selected
-    if (!enabled) {
-      selected = { enable: false, provider_var_name: '', model: '', llm_no: 0 }
-    } else if (draft === '') {
-      selected = { enable: true, provider_var_name: '', model: '', llm_no: 0 }
-    } else {
-      const rowIndex = rows.findIndex(row => titleModelKey({ provider_var_name: row.providerVarName, model: row.model }) === draft)
-      selected = rowIndex < 0
-        ? { enable: true, provider_var_name: '', model: '', llm_no: 0 }
-        : { enable: true, provider_var_name: rows[rowIndex].providerVarName, model: rows[rowIndex].model, llm_no: rowIndex }
-    }
-    if (!await confirmDanger('models-title-model', lang === 'zh' ? '保存独立的对话标题模型设置？' : 'Save the independent chat title model setting?')) return false
+    // Lock before confirmation: React state alone cannot reject same-tick calls.
+    if (pending.current) return false
+    pending.current = true
     setSaving(true)
+    setFeedback('')
     try {
+      let selected
+      if (!enabled) {
+        selected = { enable: false, provider_var_name: '', model: '', llm_no: 0 }
+      } else if (draft === '') {
+        selected = { enable: true, provider_var_name: '', model: '', llm_no: 0 }
+      } else {
+        const rowIndex = rows.findIndex(row => titleModelKey({ provider_var_name: row.providerVarName, model: row.model }) === draft)
+        selected = rowIndex < 0
+          ? { enable: true, provider_var_name: '', model: '', llm_no: 0 }
+          : { enable: true, provider_var_name: rows[rowIndex].providerVarName, model: rows[rowIndex].model, llm_no: rowIndex }
+      }
+      if (!await confirmDanger('models-title-model', lang === 'zh' ? '保存独立的对话标题模型设置？' : 'Save the independent chat title model setting?')) return false
       const data = await api('/api/models/title-model', { dangerous: true, method: 'PUT', body: JSON.stringify({ model: selected }) })
       setModel(data?.model || null)
+      setFeedback(t.titleModelSaved)
       setMsg(t.titleModelSaved)
       return true
     } catch (error) {
+      setFeedback(error.message)
       setMsg(error.message)
       return false
     } finally {
+      pending.current = false
       setSaving(false)
     }
   }
 
-  return { model, options, enabled, setEnabled, draft, setDraft, saving, submit, reload }
+  return { model, options, enabled, setEnabled: changeEnabled, draft, setDraft, saving, dirty, feedback, submit, reload }
 }
