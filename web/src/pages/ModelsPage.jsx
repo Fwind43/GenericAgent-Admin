@@ -1,4 +1,5 @@
 import './models-workbench.css'
+import { modelRiskView } from './modelsRiskView'
 import { UiSurface } from '../ui/UiHost'
 import {
   AlertTriangle,
@@ -984,29 +985,24 @@ export function Models({
   const drawerProfile = shownDrawer?.mode === 'create' ? providerDraft : profiles[drawerIndex]
   const drawerKey = drawerProfile && drawerIndex !== undefined ? profileKeyId(drawerIndex, drawerProfile) : ''
 
+  const { view: riskView, retained: retainedRisks } = modelRiskView(risk, summary, text)
   const riskItems = [{
     key: 'risk',
     label: <Space size={7}><AlertTriangle size={14} />{text.riskTitle}</Space>,
     children: (
       <div className="model-risk-content">
-        <Alert
-          type={risk.status === 'error' ? 'error' : 'info'}
-          message={risk.status === 'ready' ? text.riskReady : risk.status === 'error' ? text.riskUnavailable : text.riskEmpty}
-          description={risk.status === 'error' ? risk.error : text.riskHelp}
-        />
-        {risk.items.length > 0 && (
-          <div className="model-risk-grid">
-            {risk.items.map(item => (
-              <div key={`${item.method}-${item.route}`}>
-                <b>{item.method} {item.route}</b>
-                <small>{item.action || item.reason}</small>
-              </div>
-            ))}
-          </div>
-        )}
-        {risk.missingConfirmedWriteRoutes.length > 0 && (
-          <Alert type="warning" message={text.missingGates(risk.missingConfirmedWriteRoutes.join(', '))} />
-        )}
+        <UiSurface name="admin.models.risks" viewProps={{ view: riskView }} />
+        {/* Dynamic catalog fields and server errors may contain credentials.
+            Keep them outside all UI-package props, including children/slots. */}
+        <div data-model-risk-host-details="">
+          {risk.error && <Alert type="error" showIcon message={text.riskUnavailable} description={risk.error} />}
+          {retainedRisks.map(({ index, item }) => (
+            <div className="model-risk-row" key={index}>
+              <div className="model-risk-route"><code>{item.method} {item.route}</code><Tag color={item.level === 'dangerous' ? 'red' : 'gold'}>{item.level}</Tag></div>
+              <strong>{item.action}</strong><p>{item.reason}</p>
+            </div>
+          ))}
+        </div>
       </div>
     ),
   }]
