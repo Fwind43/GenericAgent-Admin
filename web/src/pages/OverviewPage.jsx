@@ -46,7 +46,7 @@ function Panel({ area, title, children }) {
 
 export function OverviewPage({
   t, text, services, schedule, observability, observabilityError, onRefreshObservability, version, root,
-  githubMirror = '', onSaveGitHubMirror,
+  githubMirror = '', onSaveGitHubMirror, onDraftStateChange,
 }) {
   const copy = t.overview
   const [mirrorDraft, setMirrorDraft] = useState(githubMirror)
@@ -59,6 +59,8 @@ export function OverviewPage({
     setMirrorBaseline(nextMirror)
   }, [githubMirror])
   const mirrorDirty = mirrorDraft !== mirrorBaseline
+  useEffect(() => { onDraftStateChange?.({ dirty: mirrorDirty, busy: mirrorSaving }) }, [mirrorDirty, mirrorSaving, onDraftStateChange])
+  useEffect(() => () => onDraftStateChange?.({ dirty: false, busy: false }), [onDraftStateChange])
   const saveGitHubMirror = async () => {
     if (!mirrorDirty || typeof onSaveGitHubMirror !== 'function') return
     setMirrorSaving(true)

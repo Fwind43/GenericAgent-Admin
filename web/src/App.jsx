@@ -1,5 +1,8 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
+import { UiHost, UiSurface, PackageControls, useUiPackage } from './ui/UiHost'
+import { canActivate } from './ui/selection'
+import { overviewModel } from './ui/overview'
 import { useAdminDrawerFocus } from './hooks/useAdminDrawerFocus'
 import { useGSAP } from '@gsap/react'
 import { ArrowLeft, Activity, BarChart3, BrainCircuit, FileCode2, FolderCog, Globe2, KeyRound, Menu, MessageSquare, PanelLeftClose, Play, Server, SlidersHorizontal, Sparkles, Target, Terminal } from 'lucide-react'
@@ -56,7 +59,15 @@ const NAV_ICONS = {
   logs: <FolderCog size={16}/>,
 }
 
-export default function App({ embedded = false, active = true, onClose }) {
+export default function App(props) {
+  return <UiHost><AdminApp {...props}/></UiHost>
+}
+
+function AdminApp({ embedded = false, active = true, onClose }) {
+  const ui = useUiPackage()
+  const [overviewDraft, setOverviewDraft] = useState({ dirty: false, busy: false })
+  const [overviewRefreshing, setOverviewRefreshing] = useState(false)
+  const activationGuard = useRef(() => false)
   const defaultLang = 'zh'
   const [lang, setLang] = useState(() => localStorage.getItem('ga-admin-lang-explicit') === '1' ? (localStorage.getItem('ga-admin-lang') || defaultLang) : defaultLang)
   const [theme, setTheme] = useState(getInitialTheme)
@@ -278,6 +289,32 @@ export default function App({ embedded = false, active = true, onClose }) {
   const openModels = (instance = null) => { models.openFor(instance); openTab('models') }
   const openGoal = (id) => { if (id) goals.setSelected(id); setTab('goals') }
 
+  const activationState = {
+    tab,
+    dirty: JSON.stringify(cfg) !== JSON.stringify(savedCfg) || overviewDraft.dirty || schedule.dirty || pageDraft.current.dirty || files.content !== files.loadedContent,
+    busy: busy || pageDraft.current.busy || booting || overviewDraft.busy || overviewRefreshing || services.pickerOpen || !!version.status?.running || Object.values(services.actionStates || {}).some(action => action.status === 'pending'),
+  }
+  activationGuard.current = () => canActivate(activationState)
+  const packageNavigation = {
+    current: tab,
+    groups: ADMIN_GROUPS.map(group => ({ id: group.id, label: group.label[lang], items: group.items.map(id => ({ id, label: t.nav[id] })) })),
+    go: id => { if (ADMIN_GROUPS.some(group => group.items.includes(id))) openTab(id) },
+    backToChat: async () => {
+      if (overviewDraft.dirty || overviewDraft.busy) { setMsg(lang === 'zh' ? '请先保存或撤销概览修改' : 'Save or revert overview changes first'); return }
+      if (!await canLeavePage()) return
+      if (onClose) onClose()
+      else window.location.assign('/chat')
+    },
+  }
+  const refreshOverview = async () => {
+    if (overviewRefreshing) return
+    setOverviewRefreshing(true)
+    try { await Promise.all([services.refresh(), schedule.loadScheduleTasks(), readObservability()]) }
+    catch (error) { setObservabilityError(error.message) }
+    finally { setOverviewRefreshing(false) }
+  }
+  const packageOverview = overviewModel({ services: services.services, schedule: scheduleSummary, observability, observabilityError })
+
   if (health && !health.ok) {
     // /api/setup/complete answers with {root, config}, so the root comes from the
     // saved snapshot rather than the top level of the response.
@@ -311,9 +348,9 @@ export default function App({ embedded = false, active = true, onClose }) {
         </div>
       </div>
     </div>}
-    <div ref={appScope} className={`app app-tab-${tab} ${embedded ? `app-embedded ${settingsDetail ? 'settings-detail' : 'settings-list'}` : 'admin-workbench'} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
+    <div ref={appScope} data-ui-package={ui.isDefaultSurface('admin.shell') ? 'default' : ui.id} className={`app app-tab-${tab} ${embedded ? `app-embedded ${settingsDetail ? 'settings-detail' : 'settings-list'}` : 'admin-workbench'} ${adminSidebarOpen ? 'admin-sidebar-open' : ''}`}>
       <button type="button" className="admin-sidebar-scrim" aria-label={lang === 'zh' ? '关闭管理导航' : 'Close admin navigation'} onClick={()=>setAdminSidebarOpen(false)} />
-      <aside id="admin-sidebar" ref={adminSidebarRef} className="sidebar">
+      <UiSurface name="admin.shell" viewProps={{ navigation: packageNavigation, presentation: { lang, theme } }} fallback={<aside id="admin-sidebar" ref={adminSidebarRef} className="sidebar">
         <div className="admin-sidebar-heading">
           <div className="brand"><img className="brand-logo" src="/icon.png" alt=""/><div><h1>{t.appName}</h1><p>{t.tagline}</p></div></div>
           <button type="button" className="admin-sidebar-close" aria-label={lang === 'zh' ? '收起管理导航' : 'Collapse admin navigation'} onClick={()=>setAdminSidebarOpen(false)}><PanelLeftClose size={20} aria-hidden="true"/></button>
@@ -333,8 +370,9 @@ export default function App({ embedded = false, active = true, onClose }) {
         </nav>
         {!embedded && <StatusNotice kind={notice?.kind} message={notice?.message} retryLabel={t.retry} dismissLabel={t.close} onRetry={notice?.kind === 'error' ? load : undefined} onDismiss={notice?.kind === 'success' ? ()=>setNotice(null) : undefined}/>}
         {serviceStatus}
-      </aside>
+      </aside>}/>
       <main ref={adminMainRef} className="main">
+        <PackageControls allowed={canActivate(activationState)} guard={() => activationGuard.current()}/>
         <div className="admin-mobile-bar">
           <button type="button" ref={adminToggleRef} className="admin-sidebar-toggle" aria-label={lang === 'zh' ? '展开管理导航' : 'Open admin navigation'} aria-expanded={adminSidebarOpen} aria-controls="admin-sidebar" onClick={()=>setAdminSidebarOpen(true)}><Menu size={21} aria-hidden="true"/></button>
           <span>{t.nav[tab]}</span>
@@ -349,7 +387,7 @@ export default function App({ embedded = false, active = true, onClose }) {
         <div className={embedded ? "settings-content-scroll" : undefined} style={embedded ? undefined : { display: 'contents' }}>
         <ErrorBoundary resetKey={tab}>
           <Suspense fallback={<RouteFallback label={t.loading} />}>
-            {tab==='overview' && <OverviewPage
+            {tab==='overview' && <div hidden={!ui.isDefaultSurface('admin.overview') && !overviewDraft.dirty && !overviewDraft.busy}><OverviewPage
               t={t}
               text={text}
               services={services.services}
@@ -361,7 +399,9 @@ export default function App({ embedded = false, active = true, onClose }) {
               root={root}
               githubMirror={savedCfg?.github_mirror || ''}
               onSaveGitHubMirror={saveGitHubMirror}
-            />}
+              onDraftStateChange={setOverviewDraft}
+            /></div>}
+            {tab==='overview' && !ui.isDefaultSurface('admin.overview') && !overviewDraft.dirty && !overviewDraft.busy && <UiSurface name="admin.overview" viewProps={{ overview: packageOverview, presentation: { lang, theme }, actions: { refreshOverview, refreshing: overviewRefreshing } }}/>}
             {tab==='settings' && <GeneralPage
               t={t}
               lang={lang}

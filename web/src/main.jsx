@@ -14,6 +14,10 @@ import { applyThemeToDocument, createAntdTheme, getInitialCustomColors, getIniti
 
 // Chat is the primary interface: it owns "/" (and legacy "/chat").
 // The admin console lives under "/admin" and acts as the settings area.
+const uiMode = new URLSearchParams(window.location.search).get('ui')
+const isolatedUiRoute = /^\/admin(?:\/|$)/.test(window.location.pathname) && ['preview', 'safe'].includes(uiMode)
+const UiPreview = lazy(() => import('./ui/UiPreview.jsx'))
+const UiRecovery = lazy(() => import('./ui/UiRecovery.jsx'))
 const rootPath = window.location.pathname.replace(/\/+$/, '')
 const isAdmin = rootPath === '/admin' || rootPath.startsWith('/admin/')
 // Each route imports on its own line because the build pairs one dependency
@@ -79,7 +83,7 @@ function LocalizedRoot() {
   // Saved custom colors must be live on the very first paint; the injected
   // boot script covers the same-origin index.html case, this covers the rest.
   useEffect(() => {
-    void hydrateCustomColors()
+    if (!isolatedUiRoute) void hydrateCustomColors()
   }, [])
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
@@ -92,7 +96,7 @@ function LocalizedRoot() {
     <GlobalImagePreview />
     <ErrorBoundary>
       <Suspense fallback={<RouteFallback label={loading} />}>
-        <RoutedRoot />
+        {isolatedUiRoute ? (uiMode === 'safe' ? <UiRecovery/> : <UiPreview/>) : <RoutedRoot />}
       </Suspense>
     </ErrorBoundary>
   </ConfigProvider>
