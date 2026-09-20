@@ -2,7 +2,7 @@
   "manifest": {
     "format": "gaui/1",
     "id": "local-workshop",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "name": "Local Workshop",
     "surfaces": [
       "admin.shell",
@@ -278,6 +278,19 @@
             "type": "row",
             "children": [
               {
+                "type": "text",
+                "text": "Conversations"
+              },
+              {
+                "type": "badge",
+                "bind": "value"
+              }
+            ]
+          },
+          {
+            "type": "row",
+            "children": [
+              {
                 "type": "button",
                 "text": "Start conversation",
                 "action": "newChat"
@@ -323,6 +336,19 @@
           {
             "type": "badge",
             "bind": "status"
+          },
+          {
+            "type": "row",
+            "children": [
+              {
+                "type": "text",
+                "text": "Messages"
+              },
+              {
+                "type": "badge",
+                "bind": "value"
+              }
+            ]
           },
           {
             "type": "row",

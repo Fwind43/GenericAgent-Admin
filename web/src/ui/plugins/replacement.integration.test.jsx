@@ -110,3 +110,38 @@ it('wires replacement named actions and guards disabled controls plus direct dis
     expect(() => validateBundle(invalid)).toThrow()
   }
 })
+
+it('projects replacement state coherently and enforces every named-action guard', async () => {
+  const bundle = fresh(), actions = Object.fromEntries(['newChat', 'manageSessions', 'openSettings', 'collapseSidebar', 'followLatest'].map(name => [name, vi.fn()]))
+  const store = { active: async () => bundle.manifest.id, load: async () => bundle }
+  const view = (area, state) => <ExternalUiProvider store={store}><ChatReplacement area={area} state={state} actions={actions}/></ExternalUiProvider>
+  const { rerender } = render(view('chat.navigation', { blocked: true, count: -1 }))
+  await screen.findByText('Busy')
+  expect(screen.getByText('0')).toBeTruthy()
+  for (const name of ['Start conversation', 'Browse conversations', 'Workspace settings', 'Collapse navigation']) {
+    const button = screen.getByRole('button', { name }); expect(button.disabled).toBe(true); fireEvent.click(button)
+  }
+  expect(actions.newChat).not.toHaveBeenCalled(); expect(actions.manageSessions).not.toHaveBeenCalled()
+  expect(actions.openSettings).not.toHaveBeenCalled(); expect(actions.collapseSidebar).not.toHaveBeenCalled()
+  rerender(view('chat.navigation', { managing: true, count: 2 }))
+  expect(screen.getByText('Managing sessions')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Browse conversations' }).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Start conversation' }))
+  expect(actions.newChat).toHaveBeenCalledOnce()
+  rerender(view('chat.navigation', { count: 2 }))
+  fireEvent.click(screen.getByRole('button', { name: 'Workspace settings' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }))
+  expect(actions.openSettings).toHaveBeenCalledOnce(); expect(actions.collapseSidebar).toHaveBeenCalledOnce()
+  fireEvent.click(screen.getByRole('button', { name: 'Browse conversations' }))
+  expect(actions.manageSessions).toHaveBeenCalledOnce()
+  rerender(view('chat.followToolbar', { canFollow: true, loading: true }))
+  expect(screen.getByText('Loading')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Return to latest' }).disabled).toBe(true)
+  rerender(view('chat.followToolbar', { canFollow: true }))
+  expect(screen.getByText('Latest messages available')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Return to latest' }))
+  expect(actions.followLatest).toHaveBeenCalledOnce()
+  rerender(view('chat.followToolbar', {}))
+  expect(screen.getByText('At latest message')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Return to latest' }).disabled).toBe(true)
+})

@@ -114,6 +114,19 @@ it('real ChatApp retains roots, message, draft, attachment, scroll and subscript
   expect(within(navigation).getByRole('button', { name: 'Browse conversations' }).disabled).toBe(true)
   assertRetained()
   expect(within(toolbar).getByRole('button', { name: 'Return to latest' }).disabled).toBe(true)
+  expect(within(navigation).getByText('Managing sessions')).toBeTruthy()
+  expect(within(toolbar).getByText('At latest message')).toBeTruthy()
+  // jsdom has no layout: only scroll geometry is fictional; event/state/handler are real.
+  Object.defineProperties(roots[1], { scrollHeight: { configurable: true, value: 1000 }, clientHeight: { configurable: true, value: 100 } })
+  fireEvent.wheel(roots[1], { deltaY: -120 })
+  await waitFor(() => expect(within(toolbar).getByRole('button', { name: 'Return to latest' }).disabled).toBe(false))
+  expect(within(toolbar).getByText('Latest messages available')).toBeTruthy()
+  const scrollTo = vi.fn()
+  Object.defineProperty(roots[1], 'scrollTo', { configurable: true, value: scrollTo })
+  fireEvent.click(within(toolbar).getByRole('button', { name: 'Return to latest' }))
+  await waitFor(() => expect(scrollTo).toHaveBeenCalled())
+  expect(within(toolbar).getByRole('button', { name: 'Return to latest' }).disabled).toBe(true)
+  assertRetained()
   container.querySelectorAll('[data-chat-replacement]').forEach(region => {
     expect(region.textContent).not.toContain('private')
     expect(region.textContent).not.toContain('Retained fixture message')
@@ -129,6 +142,13 @@ it('real ChatApp retains roots, message, draft, attachment, scroll and subscript
   expect(await store.list()).toHaveLength(1)
   expect(unexpected).toEqual([])
   expect(calls.some(c => c.startsWith('POST '))).toBe(false)
+  // Explicit business action is separate from installation/preview/selection assertions.
+  fireEvent.click(screen.getByRole('button', { name: 'Enable plugin' }))
+  await waitFor(() => expect(container.querySelector('[data-chat-replacement="chat.navigation"]')).not.toBeNull())
+  fireEvent.click(within(container.querySelector('[data-chat-replacement="chat.navigation"]')).getByRole('button', { name: 'Start conversation' }))
+  await waitFor(() => expect(calls.filter(c => c === 'POST /api/chat/session/new')).toHaveLength(1))
+  await waitFor(() => expect(calls.filter(c => c === 'GET /api/chat/state/s2').length).toBeGreaterThan(0))
+  expect(unexpected).toEqual([])
 })
 it('rejects cross-surface data, sensitive bindings, execution, targets and business actions', () => {
   const nodes = [

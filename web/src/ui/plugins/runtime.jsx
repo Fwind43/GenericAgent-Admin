@@ -95,7 +95,8 @@ export function dispatchChatAction(area, node, state, actions) {
 export function ChatReplacement({ area, state = {}, actions = {}, children }) {
   const ui = useExternalUi(), view = chatView(ui?.bundle, area)
   if (!view) return children
-  const data = { title: area === 'chat.navigation' ? 'Conversations' : 'Conversation navigation', status: state.loading ? 'Loading' : state.running ? 'Running' : 'Ready', value: Number.isSafeInteger(state.count) ? state.count : 0 }
+  const status = state.loading ? 'Loading' : state.blocked ? 'Busy' : state.managing ? 'Managing sessions' : area === 'chat.followToolbar' ? (state.canFollow ? 'Latest messages available' : 'At latest message') : state.running ? 'Running' : 'Ready'
+  const data = { title: area === 'chat.navigation' ? 'Conversations' : 'Conversation navigation', status, value: Number.isSafeInteger(state.count) && state.count >= 0 ? state.count : 0 }
   return <ExternalBoundary key={ui.bundle.manifest.id + area} fallback={children} fail={() => {}}>
     <div className="gaui-external" data-chat-replacement={area}>
       <ExternalView bundle={ui.bundle} area={area} data={data} canInvoke={node => canChatAction(area, node, state)} invoke={node => dispatchChatAction(area, node, state, actions)}/>
