@@ -1828,8 +1828,8 @@ const toolReceiptSummary = fold => {
   return { kind, tool, status, state, target }
 }
 
-const ToolReceiptSummary = ({ fold, target }) => {
-  const receipt = toolReceiptSummary(fold)
+const ToolReceiptSummary = ({ fold, target, receipt: derivedReceipt }) => {
+  const receipt = derivedReceipt ?? toolReceiptSummary(fold)
   const resolvedTarget = target || receipt.target
   return (
     <span className={`ga-receipt is-${receipt.state}`} data-state={receipt.state} aria-label={[receipt.kind, receipt.tool, receipt.status, resolvedTarget].filter(Boolean).join(' · ')}>
@@ -1875,7 +1875,7 @@ const renderAssistantBody = (text = '', onAskReply, ultraplan_state, openAskUser
         open={fold.open || (openAskUser && receipt.tool === 'ask_user')}
         data-fold-type={fold.type}
       >
-        <summary>{fold.type.startsWith('tool-call') ? <ToolReceiptSummary fold={fold} /> : fold.label}</summary>
+        <summary>{fold.type.startsWith('tool-call') ? <ToolReceiptSummary fold={fold} receipt={receipt} /> : fold.label}</summary>
         {fold.type.startsWith('tool-call') ? (
           receipt.tool === 'ask_user'
             ? <AskUserPanel call={{ args: fold.body, result: hasResult ? fold.result : '' }} onReply={onAskReply} />

@@ -240,3 +240,19 @@ describe('poisoned file tool arguments', () => {
     expect(panel.querySelector('.oa-diff-stats-del').textContent).toBe('\u22121')
   })
 })
+
+
+test('receipt target follows append and non-append body replacement', () => {
+  const tool = (path, closed = true) => [String.fromCodePoint(0x1f6e0, 0xfe0f) + ' Tool: `file_read`', '```text', JSON.stringify({path}), ...(closed ? ['```'] : [])].join(String.fromCharCode(10))
+  const message = content => ({ id: 'receipt-revision', role: 'assistant', content, files: [], created_at: 0 })
+  const first = message(tool('/fiction/first.txt', false))
+  const snapshot = JSON.stringify(first)
+  const { container, rerender } = render(<ChatMessage message={first} pending={false} />)
+  expect(container.textContent).toContain('first.txt')
+  rerender(<ChatMessage message={message(tool('/fiction/first.txt'))} pending={false} />)
+  expect(container.textContent).toContain('first.txt')
+  rerender(<ChatMessage message={message(tool('/fiction/replaced.txt'))} pending={false} />)
+  expect(container.textContent).toContain('replaced.txt')
+  expect(container.textContent).not.toContain('first.txt')
+  expect(JSON.stringify(first)).toBe(snapshot)
+})
