@@ -1,3 +1,4 @@
+import { StudioUsage } from './usage'
 import { StudioProjectModeSettings, StudioProcessDisplaySettings } from './chatRuntimeSettings'
 import { StudioChatTitleSettings } from './chatTitleSettings'
 import { StudioAppearanceSettings } from './appearanceSettings'
@@ -30,4 +31,4 @@ export function StudioOverview({ overview, actions, presentation }) {
   </section>
 }
 export const layouts = { 'chat.sidebar': 'studio', 'chat.messages': 'studio', 'chat.composer': 'studio' }
-export const views = { 'admin.shell': StudioShell, 'admin.overview': StudioOverview, 'admin.settings.chat.title': StudioChatTitleSettings, 'admin.settings.chat.project': StudioProjectModeSettings, 'admin.settings.chat.process': StudioProcessDisplaySettings, 'admin.settings.appearance': StudioAppearanceSettings, 'admin.settings.remote': StudioRemoteSettings, 'admin.settings.paths': StudioGeneralSettings, 'admin.settings.network': StudioGeneralSettings, 'admin.settings.startup': StudioGeneralSettings, 'chat.chrome': StudioChatChrome, 'chat.sidebar': ChatSidebar, 'chat.messages': ChatMessages, 'chat.composer': ChatComposer }
+export const views = { 'admin.shell': StudioShell, 'admin.usage': StudioUsage, 'admin.overview': StudioOverview, 'admin.settings.chat.title': StudioChatTitleSettings, 'admin.settings.chat.project': StudioProjectModeSettings, 'admin.settings.chat.process': StudioProcessDisplaySettings, 'admin.settings.appearance': StudioAppearanceSettings, 'admin.settings.remote': StudioRemoteSettings, 'admin.settings.paths': StudioGeneralSettings, 'admin.settings.network': StudioGeneralSettings, 'admin.settings.startup': StudioGeneralSettings, 'chat.chrome': StudioChatChrome, 'chat.sidebar': ChatSidebar, 'chat.messages': ChatMessages, 'chat.composer': ChatComposer }

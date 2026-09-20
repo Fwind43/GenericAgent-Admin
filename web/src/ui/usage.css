@@ -1,0 +1,25 @@
+.app .studio-usage-header { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
+.app .studio-usage-header h2 { margin:0 0 8px; }
+.app .studio-usage-header p { margin:0 0 8px; color:var(--muted); }
+.app .studio-usage-header small { color:var(--muted); }
+.app .studio-usage-workspace { display:grid; grid-template-columns:minmax(170px, .7fr) minmax(0, 3fr); gap:24px; align-items:start; }
+.app .studio-usage-ledger { border-inline-end:1px solid var(--border); padding-inline-end:20px; }
+.app .studio-usage-ledger h3 { margin:0 0 16px; font-size:14px; }
+.app .studio-usage-ledger dl { display:grid; gap:18px; margin:0; }
+.app .studio-usage-ledger dt, .app .studio-usage-model-list dt { color:var(--muted); font-size:12px; }
+.app .studio-usage-ledger dd { margin:5px 0 0; font-size:25px; font-weight:700; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+.app .studio-usage-detail { min-width:0; display:grid; gap:24px; }
+.app .studio-usage-models { min-width:0; }
+.app .studio-usage-model-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr)); gap:12px; list-style:none; margin:0; padding:0; }
+.app .studio-usage-model-list li { min-width:0; padding:16px; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+.app .studio-usage-model-list li > header { display:flex; justify-content:space-between; gap:12px; overflow-wrap:anywhere; }
+.app .studio-usage-model-list header small { display:block; color:var(--muted); font-size:11px; font-weight:400; margin-top:4px; }
+.app .studio-usage-model-list header b { text-align:end; font-variant-numeric:tabular-nums; }
+.app .studio-usage-model-list dl { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:18px 0 0; }
+.app .studio-usage-model-list dd { margin:5px 0 0; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+@media(max-width:760px) {
+  .app .studio-usage-header { flex-wrap:wrap; }
+  .app .studio-usage-workspace { grid-template-columns:minmax(0,1fr); }
+  .app .studio-usage-ledger { padding:0 0 18px; border-inline-end:0; border-bottom:1px solid var(--border); }
+  .app .studio-usage-ledger dl { grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); }
+}
