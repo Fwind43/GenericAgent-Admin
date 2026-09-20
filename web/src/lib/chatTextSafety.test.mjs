@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, parseAssistantContent, splitMarkdownParts, parseCodeFenceInfo, textRenderStats, previewLongText } from './chatTextSafety.js'
+import { MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, parseAssistantContent, createAssistantContentParser, splitMarkdownParts, parseCodeFenceInfo, textRenderStats, previewLongText } from './chatTextSafety.js'
 
 test('many content lines do not trigger safe preview by line count alone', () => {
   const text = Array.from({ length: MARKDOWN_LINE_LIMIT + 20 }, (_, i) => `line ${i}`).join('\n')
@@ -212,4 +212,19 @@ test('splitMarkdownParts preserves filename from fence info', () => {
   assert.equal(parts[0].lang, 'text')
   assert.equal(parts[0].filename, 'test_render_doc.txt')
   assert.equal(parts[0].text, 'Hello Doc\n')
+})
+
+
+test('bounded parser reuse equals stateless parsing at every protocol prefix and replacement', () => {
+  const parse = createAssistantContentParser()
+  const source = 'LLM Running (Turn 1)\r\n<summary>work</summary>\nfirst\n```js\nLLM Running (Turn 99)\n```\nLLM Running (Turn 2)\nsecond\n```\n[Info] Final response to user.\n```\n<summary>done</summary>\nfinal'
+  for (let i = 0; i <= source.length; i++) assert.deepEqual(parse(source.slice(0, i)), parseAssistantContent(source.slice(0, i)))
+  for (const text of [source.replace('first', 'edited'), '', 'other session', source]) assert.deepEqual(parse(text), parseAssistantContent(text))
+  const first = parse('LLM Running (Turn 1)\nwork\nLLM Running (Turn 2)\na')
+  const next = parse('LLM Running (Turn 1)\nwork\nLLM Running (Turn 2)\nab')
+  assert.strictEqual(first.runs[0], next.runs[0])
+  assert.notStrictEqual(first.runs[1], next.runs[1])
+  const large = Array.from({length: 90}, (_, i) => `LLM Running (Turn ${i+1})\n${'x'.repeat(9000)}\n`).join('')
+  assert.deepEqual(parse(large), parseAssistantContent(large))
+  assert.deepEqual(parse(large + 'tail'), parseAssistantContent(large + 'tail'))
 })

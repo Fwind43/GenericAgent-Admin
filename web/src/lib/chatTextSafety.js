@@ -186,7 +186,7 @@ export const assistantTurnFallbackTitle = (chunk = '', turn = '') => {
   return turn === '' ? '' : `Turn ${turn}`
 }
 
-export const parseAssistantContent = (raw = '') => {
+export const parseAssistantContent = (raw = '', runCache = null) => {
   const full = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const markers = findTopLevelAssistantMarkers(full)
   const finalMarker = markers.find((m) => m.type === 'final')
@@ -200,9 +200,16 @@ export const parseAssistantContent = (raw = '') => {
       const start = m.end
       const end = i + 1 < turnMarkers.length ? turnMarkers[i + 1].index : processEnd
       const chunk = full.slice(start, end).trim()
-      const summary = chunk.match(/<summary>([\s\S]*?)<\/summary>/i)
-      const title = summary?.[1]?.trim() || assistantTurnFallbackTitle(chunk, m.turn)
-      runs.push({ turn: m.turn, title, body: cleanAssistantRunBody(chunk) })
+      const cached = runCache?.get(m.turn)
+      if (cached?.chunk === chunk) {
+        runs.push(cached.run)
+      } else {
+        const summary = chunk.match(/<summary>([\s\S]*?)<\/summary>/i)
+        const title = summary?.[1]?.trim() || assistantTurnFallbackTitle(chunk, m.turn)
+        const run = { turn: m.turn, title, body: cleanAssistantRunBody(chunk) }
+        runs.push(run)
+        runCache?.set(m.turn, { chunk, run })
+      }
     })
     const final = parseAssistantFinalBody(finalText || '')
     return { runs, ...final }
@@ -210,6 +217,23 @@ export const parseAssistantContent = (raw = '') => {
 
   const final = parseAssistantFinalBody(full.replace(/^```+\s*\n?\[Info\]\s*Final response to user\.\s*\n?```+\s*$/gim, ''))
   return { runs: [], ...final }
+}
+
+// Component-local reuse only: always rescan protocol boundaries, including fences.
+// Exact chunk equality handles edits/replacements and partial marker completion.
+// Bound both entry count and retained source characters; no global/session cache.
+export const createAssistantContentParser = () => {
+  const cache = new Map()
+  return raw => {
+    const result = parseAssistantContent(raw, cache)
+    const visible = new Set(result.runs.map(run => run.turn))
+    let chars = 0
+    for (const [turn, entry] of cache) {
+      chars += entry.chunk.length
+      if (!visible.has(turn) || chars > 512 * 1024 || cache.size > 64) cache.delete(turn)
+    }
+    return result
+  }
 }
 
 const isBlankLine = (line = '') => /^[\t\f\v ]*$/.test(line)

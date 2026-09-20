@@ -45,7 +45,7 @@ import { loopSidebarView, updateSessionLoop } from './lib/chatLoopSidebar.js'
 import { normalizeLoopRecords } from './lib/chatLoopRecords.js'
 import { confirmDanger, showAppAlert } from './lib/danger'
 import { formatDuration, fuzzyMatch, goalBudgetPercent, goalTurnPercent } from './lib/format'
-import { JSON_TREE_CHILD_LIMIT, JSON_TREE_STRING_LIMIT, LIST_ITEM_LIMIT, LONG_TEXT_PREVIEW_CHARS, MARKDOWN_BLOCK_LIMIT, MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, parseAssistantContent, previewLongText, splitMarkdownParts, textRenderStats } from './lib/chatTextSafety'
+import { JSON_TREE_CHILD_LIMIT, JSON_TREE_STRING_LIMIT, LIST_ITEM_LIMIT, LONG_TEXT_PREVIEW_CHARS, MARKDOWN_BLOCK_LIMIT, MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, createAssistantContentParser, previewLongText, splitMarkdownParts, textRenderStats } from './lib/chatTextSafety'
 import { parseStructuredContent } from './lib/structuredContent'
 import { segmentAgentProtocolBlocks } from './lib/agentProtocol'
 import { aggregateChatTaskbarState, chatTaskbarState, publishTaskbarState, shouldRefreshChatTaskbar, waitingChatSessions } from './lib/chatTaskbar.js'
@@ -3322,6 +3322,7 @@ const AssistantTurn = memo(function AssistantTurn({ turn, current, stackOpen, pe
 const AssistantContent = memo(function AssistantContent({ content, structuredContent, pending, onAskReply, isLatestMessage = false, turnUsages, ultraplan_state, runStartedAtMS = 0, clockNow = 0, modelID = '' }) {
   // Follow the run lifecycle until the user explicitly toggles execution history.
   const [stackOpenOverride, setStackOpenOverride] = useState(null)
+  const parseContent = useMemo(() => createAssistantContentParser(), [])
   const [autoCollapseProcess] = useAutoCollapseProcess()
   const stackOpen = stackOpenOverride ?? (Boolean(pending) || !autoCollapseProcess)
   const liveUltraPlanState = useMemo(() => normalizeUltraPlanState(ultraplan_state), [ultraplan_state])
@@ -3332,14 +3333,14 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
   // complete protocol whenever it has turn markers so the terminal event cannot
   // replace the live turn stack with a differently shaped final-only view.
   const parsed = useMemo(() => {
-    const textResult = parseAssistantContent(content)
+    const textResult = parseContent(content)
     if (textResult.runs.length > 0) return textResult
     if (structuredContent) {
       const result = parseStructuredContent(structuredContent)
       if (result) return result
     }
     return textResult
-  }, [content, structuredContent])
+  }, [content, structuredContent, parseContent])
   const hasTurnSplit = parsed.runs.length > 0
   const hasLiveUltraPlan = !!(liveUltraPlanState && (liveUltraPlanState.phases?.length > 0 || liveUltraPlanState.recentTasks?.length > 0 || liveUltraPlanState.objective))
   if (!content && pending && !hasLiveUltraPlan) {
