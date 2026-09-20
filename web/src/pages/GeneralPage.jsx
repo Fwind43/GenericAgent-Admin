@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react'
-import { FolderCog, Globe2, KeyRound, Palette, Power, Save, ShieldAlert, Wifi } from 'lucide-react'
+import React, { useEffect, useRef, useState } from 'react'
 import './general-workbench.css'
 import { UiSurface } from '../ui/UiHost'
 import { DefaultGeneralSettings } from '../ui/generalSettings.jsx'
 import { generalSettingsModels } from '../ui/generalSettings.js'
-import ThemeColorEditor from '../ThemeColorEditor'
-import ThemePicker from '../ThemePicker'
+import { useThemeColorController } from '../ThemeColorEditor'
+import { THEMES } from '../themes'
+import { DefaultAppearanceSettings } from '../ui/appearanceSettings'
+import { DefaultRemoteSettings } from '../ui/remoteSettings'
 import { api } from '../lib/api'
 import { confirmDanger } from '../lib/danger'
-import { SettingFooter, SettingNote, SettingRow, SettingToggle, SettingsPage, SettingsSection } from '../components/settings'
+import { SettingsPage } from '../components/settings'
 
 // Fields that belong to the config file this page edits. Everything else in the
 // config object is owned by the backend and must survive a save untouched.
@@ -19,13 +20,12 @@ export const configDirty = (draft, saved) => {
   return CONFIG_FIELDS.some(field => String(draft[field] || '') !== String(saved[field] || ''))
 }
 
-const PROXY_MODES = ['off', 'system', 'custom']
 const MIN_PASSWORD_LENGTH = 8
 
 // RemoteAccessSection owns the auth status and password form so the rest of
 // the settings page stays a pure config editor. Listen-address and password
 // state come from their own endpoints, not from the config draft.
-function RemoteAccessSection({ text, t, cfg, patch, dirty, onSave, busy }) {
+function RemoteAccessSection({ text, t, cfg, patch, dirty, onSave, busy, hidden }) {
   const [auth, setAuth] = useState(null)
   const [listen, setListen] = useState(null)
   const [currentPassword, setCurrentPassword] = useState('')
@@ -33,6 +33,7 @@ function RemoteAccessSection({ text, t, cfg, patch, dirty, onSave, busy }) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordBusy, setPasswordBusy] = useState(false)
   const [note, setNote] = useState(null)
+  const pending = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -49,90 +50,56 @@ function RemoteAccessSection({ text, t, cfg, patch, dirty, onSave, busy }) {
   const clearPasswordForm = () => { setCurrentPassword(''); setNewPassword(''); setConfirmPassword('') }
 
   const submitPassword = async () => {
+    if (busy || pending.current || !auth || managed || !newPassword || !confirmPassword || (passwordSet && !currentPassword)) return
     setNote(null)
     if (newPassword !== confirmPassword) { setNote({ tone: 'warn', message: text.remote.passwordMismatch }); return }
     if (newPassword.length < MIN_PASSWORD_LENGTH) { setNote({ tone: 'warn', message: text.remote.passwordTooShort }); return }
-    if (!await confirmDanger('auth-password', text.remote.confirmSet)) return
+    pending.current = true
     setPasswordBusy(true)
     try {
+      if (!await confirmDanger('auth-password', text.remote.confirmSet)) return
       await api('/api/auth/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword, confirmPassword }) })
       setAuth(previous => ({ ...(previous || {}), passwordSet: true }))
       clearPasswordForm()
       setNote({ tone: 'info', message: text.remote.passwordSaved })
-    } catch (e) { setNote({ tone: 'warn', message: e.message }) } finally { setPasswordBusy(false) }
+    } catch (e) { setNote({ tone: 'warn', message: e.message }) } finally { pending.current = false; setPasswordBusy(false) }
   }
 
   const removePassword = async () => {
+    if (busy || pending.current || !auth || managed || !passwordSet) return
+    pending.current = true
     setNote(null)
-    if (!await confirmDanger('auth-password-remove', text.remote.confirmRemove)) return
     setPasswordBusy(true)
     try {
+      if (!await confirmDanger('auth-password-remove', text.remote.confirmRemove)) return
       await api('/api/auth/password', { method: 'DELETE' })
       setAuth(previous => ({ ...(previous || {}), passwordSet: false }))
       clearPasswordForm()
       setNote({ tone: 'info', message: text.remote.passwordRemoved })
-    } catch (e) { setNote({ tone: 'warn', message: e.message }) } finally { setPasswordBusy(false) }
+    } catch (e) { setNote({ tone: 'warn', message: e.message }) } finally { pending.current = false; setPasswordBusy(false) }
   }
 
   const passwordHint = managed ? text.remote.passwordManagedByEnv : (passwordSet ? text.remote.passwordSet : text.remote.passwordNotSet)
 
-  return <SettingsSection title={text.remote.title} description={text.remote.desc} icon={<Wifi size={17}/>}>
-    {listen?.address && <p className="set-path">{text.remote.listening}<code>{listen.address}</code></p>}
-    <SettingToggle
-      id="settings-remote-access"
-      checked={remoteOn}
-      onChange={value => patch('remote_access', value)}
-      label={text.remote.toggle}
-      hint={text.remote.toggleHelp}
-      onText={text.remote.on}
-      offText={text.remote.off}
-    />
-    {remoteOn && <>
-      <SettingRow label={text.remote.port} hint={text.remote.portHelp} htmlFor="settings-remote-port">
-        <input
-          id="settings-remote-port"
-          type="number"
-          min="1"
-          max="65535"
-          value={cfg?.port || ''}
-          onChange={e => patch('port', e.target.value === '' ? 0 : (Number(e.target.value) || 0))}
-        />
-      </SettingRow>
-      <SettingToggle
-        id="settings-remote-password-required"
-        checked={passwordRequired}
-        onChange={value => patch('remote_allow_anonymous', !value)}
-        label={text.remote.passwordRequired}
-        hint={text.remote.passwordRequiredHelp}
-        onText={text.remote.on}
-        offText={text.remote.off}
-      />
-      {!passwordRequired && <SettingNote tone="warn" icon={<ShieldAlert size={14}/>}>{text.remote.anonymousWarning}</SettingNote>}
-      {passwordRequired && auth && !passwordSet && !managed && <SettingNote tone="warn" icon={<KeyRound size={14}/>}>{text.remote.needPasswordFirst}</SettingNote>}
-    </>}
-
-    <SettingRow label={text.remote.password} hint={passwordHint} stacked>
-      {!managed && <div className="set-password-form">
-        {passwordSet && <span className="set-password-user">{text.remote.username}: <code>{auth?.username || 'admin'}</code></span>}
-        {passwordSet && <input type="password" autoComplete="current-password" placeholder={text.remote.currentPassword} value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}/>}
-        <input type="password" autoComplete="new-password" placeholder={text.remote.newPassword} value={newPassword} onChange={e => setNewPassword(e.target.value)}/>
-        <input type="password" autoComplete="new-password" placeholder={text.remote.confirmPassword} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}/>
-        <div className="set-password-actions">
-          <button type="button" className="primary" onClick={submitPassword} disabled={passwordBusy || !newPassword || !confirmPassword || (passwordSet && !currentPassword)}>
-            <KeyRound size={15}/>{passwordSet ? text.remote.changePassword : text.remote.setPassword}
-          </button>
-          {passwordSet && <button type="button" onClick={removePassword} disabled={passwordBusy}>{text.remote.removePassword}</button>}
-        </div>
-      </div>}
-    </SettingRow>
-    {note && <SettingNote tone={note.tone}>{note.message}</SettingNote>}
-
-    <SettingFooter>
-      <SettingNote tone="muted" icon={<ShieldAlert size={14}/>}>{text.remote.restartNote}</SettingNote>
-      <span role="status" aria-live="polite" className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
-      <button className="primary" type="button" onClick={onSave} disabled={busy || !cfg || !dirty}><Save size={15}/>{busy ? t.busy : text.saveChanges}</button>
-    </SettingFooter>
-  </SettingsSection>
+  const disabled = busy || passwordBusy
+  const canSubmitPassword = !!auth && !managed && !disabled && !!newPassword && !!confirmPassword && (!passwordSet || !!currentPassword)
+  const model = { text: { remote: { ...text.remote }, confirmNote: text.confirmNote, unsaved: text.unsaved, saved: text.saved, saveChanges: text.saveChanges }, t: { busy: t.busy },
+    remoteOn, passwordRequired, managed, passwordSet, passwordHint, authLoaded: !!auth,
+    listenAddress: listen?.address || '', username: auth?.username || 'admin', port: cfg?.port || '',
+    currentPassword, newPassword, confirmPassword, note, dirty, busy, disabled,
+    canSave: !disabled && !!cfg && dirty, canSubmitPassword, canRemovePassword: !!auth && !managed && passwordSet && !disabled }
+  const editable = () => !busy && !pending.current
+  const actions = {
+    changeRemote: value => { if (editable() && typeof value === 'boolean') patch('remote_access', value) },
+    changePort: value => { if (editable() && (value === '' || /^\d+$/.test(String(value)))) patch('port', value === '' ? 0 : Number(value)) },
+    requirePassword: value => { if (editable() && typeof value === 'boolean') patch('remote_allow_anonymous', !value) },
+    changeCurrentPassword: value => { if (editable() && !managed && typeof value === 'string') setCurrentPassword(value) },
+    changeNewPassword: value => { if (editable() && !managed && typeof value === 'string') setNewPassword(value) },
+    changeConfirmPassword: value => { if (editable() && !managed && typeof value === 'string') setConfirmPassword(value) },
+    submitPassword, removePassword, save: () => { if (editable() && cfg && dirty) return onSave() },
+  }
+  const viewProps = { model, actions, hidden }
+  return <UiSurface name="admin.settings.remote" viewProps={viewProps} fallback={<DefaultRemoteSettings {...viewProps}/>}/>
 }
 
 export function GeneralPage({
@@ -151,6 +118,17 @@ export function GeneralPage({
     startup: { save, toggleAutostart: () => { if (!busy && autostart?.supported) return onToggleAutostart() } },
   }
   const [group, setGroup] = useState('appearance')
+  const colors = useThemeColorController({ theme, lang, active: group === 'appearance', disabled: busy })
+  const appearanceProps = {
+    hidden: group !== 'appearance',
+    model: { text: { ...text.appearance }, lang, theme, disabled: busy || colors.model.busy, colors: colors.model,
+      themes: THEMES.map(item => ({ id: item.id, label: item.label[lang] || item.label.en, description: item.description[lang] || item.description.en, preview: [...item.preview] })),
+      confirmNote: text.confirmNote, status: dirty ? text.unsaved : text.saved,
+      canSave: !busy && !!cfg && dirty, saveLabel: busy ? t.busy : text.saveChanges },
+    actions: { colors: colors.actions, save,
+      changeLanguage: value => { if (!busy && !colors.model.busy && ['zh', 'en'].includes(value)) onLanguage(value) },
+      changeTheme: value => { if (!busy && !colors.model.busy && THEMES.some(item => item.id === value)) setTheme(value) } },
+  }
   const groups = ['appearance', 'paths', 'network', 'remote', 'startup']
   return <SettingsPage className="general-workbench">
     <nav className="general-index" aria-label={lang === 'zh' ? '设置分组' : 'Settings groups'}>
@@ -158,40 +136,14 @@ export function GeneralPage({
       <p role="status">{dirty ? text.unsaved : text.saved}</p>
     </nav>
     <div className="general-detail">
-    <SettingsSection id="general-appearance" hidden={group !== 'appearance'} title={text.appearance.title} description={`${text.appearance.desc} ${lang === 'en' ? 'Changes apply immediately.' : '更改立即生效。'}`} icon={<Palette size={17}/>}>
-      <SettingRow label={text.appearance.language} hint={text.appearance.languageHelp}>
-        <div className="set-segmented" role="group" aria-label={t.language}>
-          <button type="button" aria-pressed={lang === 'zh'} className={lang === 'zh' ? 'is-active' : ''} onClick={()=>onLanguage('zh')}>中文</button>
-          <button type="button" aria-pressed={lang === 'en'} className={lang === 'en' ? 'is-active' : ''} onClick={()=>onLanguage('en')}>English</button>
-        </div>
-      </SettingRow>
-      <SettingRow label={text.appearance.theme} hint={text.appearance.themeHelp}>
-        <ThemePicker value={theme} onChange={setTheme} lang={lang}/>
-      </SettingRow>
-      <ThemeColorEditor theme={theme} lang={lang} active={group === 'appearance'} />
-      <SettingFooter>
-        <SettingNote tone="muted">
-          {text.appearance.fontAttribution}{' '}
-          <a href="/fonts/misans/MiSans-License.pdf" target="_blank" rel="noreferrer">{text.appearance.fontLicense}</a>
-        </SettingNote>
-      </SettingFooter>
-    </SettingsSection>
+    <UiSurface name="admin.settings.appearance" viewProps={appearanceProps} fallback={<DefaultAppearanceSettings {...appearanceProps}/>}/>
 
     {['paths', 'network', 'startup'].map(id => {
       const viewProps = { model: models[id], actions: actions[id], hidden: group !== id }
       return <UiSurface key={id} name={`admin.settings.${id}`} viewProps={viewProps} fallback={<DefaultGeneralSettings {...viewProps}/>}/>
     })}
 
-    <div id="general-remote" hidden={group !== 'remote'}><RemoteAccessSection text={text} t={t} cfg={cfg} patch={patch} dirty={dirty} onSave={onSave} busy={busy}/></div>
-
-
-    <div hidden={group !== 'appearance'}>
-      <SettingFooter>
-        <SettingNote tone="muted" icon={<ShieldAlert size={14}/>}>{text.confirmNote}</SettingNote>
-        <span role="status" aria-live="polite" className={`set-dirty ${dirty ? 'is-dirty' : ''}`}>{dirty ? text.unsaved : text.saved}</span>
-        <button className="primary" type="button" onClick={onSave} disabled={busy || !cfg || !dirty}><Save size={15}/>{busy ? t.busy : text.saveChanges}</button>
-      </SettingFooter>
-    </div>
+    <RemoteAccessSection hidden={group !== 'remote'} text={text} t={t} cfg={cfg} patch={patch} dirty={dirty} onSave={onSave} busy={busy}/>
   </div>
   </SettingsPage>
 }

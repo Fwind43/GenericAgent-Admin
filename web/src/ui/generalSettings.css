@@ -14,3 +14,13 @@
 .ui-studio-settings :is(input,select,button):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .ui-studio-settings :disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:720px){.ui-studio-settings-workspace{grid-template-columns:minmax(0,1fr);gap:16px}.ui-studio-settings aside{border-left:0;border-top:1px solid var(--border);padding:12px 0 0}}
+
+.ui-theme-choices{display:flex;flex-wrap:wrap;gap:12px}
+.ui-theme-choices button{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:12px;border-radius:12px}
+.ui-theme-choices button[aria-pressed=true]{border-color:var(--accent);background:var(--selected)}
+.ui-theme-choices button span{display:flex;gap:4px}
+.ui-theme-choices button i{width:18px;height:18px;border-radius:50%;border:1px solid var(--border)}
+.ui-studio-settings fieldset{min-width:0;border:1px solid var(--border);border-radius:10px;padding:14px;margin:12px 0}
+.ui-studio-settings fieldset label{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0;overflow-wrap:anywhere}
+.ui-studio-settings fieldset input:not([type=checkbox]):not([type=radio]),.ui-studio-settings select{min-width:0;max-width:100%;box-sizing:border-box}
+.ui-studio-settings footer{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:16px 0}
