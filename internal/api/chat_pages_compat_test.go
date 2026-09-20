@@ -140,3 +140,42 @@ func TestChatPagesInvalidParameters(t *testing.T) {
 		}
 	}
 }
+
+// Exercise the actual page revision loop against the previous encoding, including
+// a digest with a zero first byte (two leading hexadecimal zeroes).
+func TestChatPagesRevisionEncoding(t *testing.T) {
+	cs := historyOptimizationFixture(1)
+	found := false
+	for i := 0; i < 4096; i++ {
+		cs.Messages[0].Content = fmt.Sprintf("synthetic-leading-zero-%d", i)
+		raw, err := json.Marshal(cs.Messages[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha256.Sum256(raw)
+		if i != 0 && sum[0] != 0 {
+			continue
+		}
+		want := fmt.Sprintf("%x", sum)
+		view, status, err := chatSessionView(cs, httptest.NewRequest("GET", "/?view=page", nil))
+		if err != nil || status != 200 {
+			t.Fatal(status, err)
+		}
+		page := view.(map[string]interface{})
+		index := page["message_index"].([]chatMessageIndex)
+		messages := page["messages"].([]chatPageMessage)
+		if index[0].Revision != want || messages[0].ContentRevision != want || len(want) != 64 || strings.ToLower(want) != want {
+			t.Fatalf("revision mismatch: %v %v want %s", index, messages, want)
+		}
+		if sum[0] == 0 {
+			if !strings.HasPrefix(index[0].Revision, "00") {
+				t.Fatal("lost leading zeroes")
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("no leading-zero fixture within bounded search")
+	}
+}

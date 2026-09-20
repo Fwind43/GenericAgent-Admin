@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -74,7 +75,8 @@ func chatSessionView(cs chatSession, r *http.Request) (interface{}, int, error) 
 		if err != nil {
 			return nil, 500, err
 		}
-		index[i] = chatMessageIndex{ID: m.ID, Revision: fmt.Sprintf("%x", sha256.Sum256(b))}
+		sum := sha256.Sum256(b)
+		index[i] = chatMessageIndex{ID: m.ID, Revision: hex.EncodeToString(sum[:])}
 		if !history && m.Role == "assistant" && m.Kind != "btw" {
 			stats = append(stats, chatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Usage: m.Usage, Usages: m.Usages,
 				ElapsedMS: m.ElapsedMS, LLMElapsedMS: m.LLMElapsedMS, ToolElapsedMS: m.ToolElapsedMS,
