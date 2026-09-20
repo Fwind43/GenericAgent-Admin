@@ -1,7 +1,6 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import gsap from 'gsap'
-import { UiHost, UiSurface, PackageControls, useUiPackage } from './ui/UiHost'
-import { canActivate } from './ui/selection'
+import { UiHost, UiSurface, useUiPackage } from './ui/UiHost'
 import { overviewModel } from './ui/overview'
 import { useAdminDrawerFocus } from './hooks/useAdminDrawerFocus'
 import { useGSAP } from '@gsap/react'
@@ -68,7 +67,6 @@ function AdminApp({ embedded = false, active = true, onClose }) {
   const ui = useUiPackage()
   const [overviewDraft, setOverviewDraft] = useState({ dirty: false, busy: false })
   const [overviewRefreshing, setOverviewRefreshing] = useState(false)
-  const activationGuard = useRef(() => false)
   const defaultLang = 'zh'
   const [lang, setLang] = useState(() => localStorage.getItem('ga-admin-lang-explicit') === '1' ? (localStorage.getItem('ga-admin-lang') || defaultLang) : defaultLang)
   const [theme, setTheme] = useState(getInitialTheme)
@@ -110,7 +108,6 @@ function AdminApp({ embedded = false, active = true, onClose }) {
   const [root, setRoot] = useState('')
   const [health, setHealth] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [booting, setBooting] = useState(true)
   const [notice, setNotice] = useState(null)
   const [observability, setObservability] = useState(null)
   const [observabilityError, setObservabilityError] = useState('')
@@ -197,7 +194,6 @@ function AdminApp({ embedded = false, active = true, onClose }) {
   }
 
   const load = async () => {
-    setBooting(true)
     setNotice({ kind: 'pending', message: t.overview.refreshing })
     try {
       const [c, h] = await Promise.all([
@@ -215,7 +211,7 @@ function AdminApp({ embedded = false, active = true, onClose }) {
       setNotice({ kind: 'success', message: t.overview.refreshed })
     } catch (e) {
       setNotice({ kind: 'error', message: t.overview.refreshFailed(e.message) })
-    } finally { setBooting(false) }
+    }
   }
   useEffect(() => { load() }, [])
 
@@ -290,12 +286,6 @@ function AdminApp({ embedded = false, active = true, onClose }) {
   const openModels = (instance = null) => { models.openFor(instance); openTab('models') }
   const openGoal = (id) => { if (id) goals.setSelected(id); setTab('goals') }
 
-  const activationState = {
-    tab,
-    dirty: JSON.stringify(cfg) !== JSON.stringify(savedCfg) || overviewDraft.dirty || schedule.dirty || pageDraft.current.dirty || files.content !== files.loadedContent,
-    busy: busy || pageDraft.current.busy || booting || overviewDraft.busy || overviewRefreshing || services.pickerOpen || !!version.status?.running || Object.values(services.actionStates || {}).some(action => action.status === 'pending'),
-  }
-  activationGuard.current = () => canActivate(activationState)
   const packageNavigation = {
     current: tab,
     groups: ADMIN_GROUPS.map(group => ({ id: group.id, label: group.label[lang], items: group.items.map(id => ({ id, label: t.nav[id] })) })),
@@ -373,7 +363,6 @@ function AdminApp({ embedded = false, active = true, onClose }) {
         {serviceStatus}
       </aside>}/>
       <main ref={adminMainRef} className="main">
-        <PackageControls allowed={canActivate(activationState)} guard={() => activationGuard.current()}/>
         <div className="admin-mobile-bar">
           <button type="button" ref={adminToggleRef} className="admin-sidebar-toggle" aria-label={lang === 'zh' ? '展开管理导航' : 'Open admin navigation'} aria-expanded={adminSidebarOpen} aria-controls="admin-sidebar" onClick={()=>setAdminSidebarOpen(true)}><Menu size={21} aria-hidden="true"/></button>
           <span>{t.nav[tab]}</span>

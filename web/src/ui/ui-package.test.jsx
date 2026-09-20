@@ -2,10 +2,12 @@ import React, { useEffect, useState } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createRegistry, manifest, surfaceView, validateManifest } from './contract'
-import { canActivate, readSelection, SELECTION_KEY, writeSelection } from './selection'
+import { readSelection, SELECTION_KEY, writeSelection } from './selection'
 import { overviewModel } from './overview'
 import { UiHost, UiSurface, useUiPackage } from './UiHost'
 import { defaults } from './default'
+import { readFileSync } from 'node:fs'
+import UiRecovery from './UiRecovery'
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks() })
 it('validates manifest, duplicate, incompatible and missing views', async () => {
@@ -25,17 +27,13 @@ it('handles stale selection and storage failures', () => {
   expect(readSelection(null,()=>true)).toBe('default')
   writeSelection(localStorage,'studio'); expect(readSelection(localStorage,id=>id==='studio')).toBe('studio')
 })
-it('limits activation to idle clean overview', () => {
-  expect(canActivate({tab:'overview'})).toBe(true)
-  for(const state of [{tab:'files'},{tab:'overview',dirty:true},{tab:'overview',busy:true}]) expect(canActivate(state)).toBe(false)
-})
 it('maps actual host fields and excludes sensitive payloads', () => {
   const model=overviewModel({services:[{name:'worker',running:true,command:'secret'}],schedule:{task_count:2,tasks:[{enabled:true,prompt:'secret'}]},observability:{ok:true,generatedAt:'now',root:'secret',checks:[{name:'core',state:'ok'}]}})
   expect(model.schedule).toEqual({total:2,enabled:1,due:0}); expect(model.health).toBe('ok')
   expect(model.checks[0].ok).toBe(true); expect(model.updatedAt).toBe('now')
   expect(JSON.stringify(model)).not.toContain('secret')
 })
-const candidate = {manifest:manifest('studio'),views:{'admin.shell':()=> <nav>candidate shell</nav>,'admin.overview':()=> <p>candidate overview</p>}}
+const candidate = {manifest:{...manifest('studio'),surfaces:['admin.shell','admin.overview']},views:{'admin.shell':()=> <nav>candidate shell</nav>,'admin.overview':()=> <p>candidate overview</p>}}
 function makeRegistry(pkg=candidate) { const r=createRegistry();r.register(defaults.manifest,async()=>defaults);r.register(pkg.manifest,async()=>pkg);return r }
 function Harness({guard=()=>true,onMount=()=>{}}) {
   const ui=useUiPackage()
@@ -75,4 +73,25 @@ it('safe host never loads persisted candidate',()=>{
 it('preview does not change persisted selection',async()=>{
  writeSelection(localStorage,'default');render(<UiHost preview packageRegistry={makeRegistry()}><Harness/></UiHost>)
  await screen.findByText('candidate shell');expect(readSelection(localStorage,()=>true)).toBe('default')
+})
+
+it('removes permanent controls and spacing while preserving business chrome and isolated routes', () => {
+ const source = path => readFileSync(new URL(path, import.meta.url), 'utf8')
+ const app = source('../App.jsx')
+ expect(app).not.toMatch(/PackageControls|activationGuard|activationState/)
+ expect(source('./UiHost.jsx')).not.toContain('ui-package-controls')
+ expect(source('./host.css')).not.toMatch(/ui-package-controls|ui-package-actions/)
+ for (const kept of ['admin-mobile-bar', 'admin-page-header', 'settings-back', '<UiHost>', '<UiSurface']) expect(app).toContain(kept)
+ expect(source('../main.jsx')).toContain("uiMode === 'safe' ? <UiRecovery/> : <UiPreview/>")
+ expect(source('./UiPreview.jsx')).not.toContain('Enable separately on Overview')
+ expect(source('./chatChrome.jsx')).toContain('actions.openSettings')
+})
+it('isolated recovery restores default without business requests', () => {
+ const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(() => { throw new Error('Network forbidden') })
+ writeSelection(localStorage, 'studio')
+ render(<UiRecovery/>)
+ fireEvent.click(screen.getByRole('button', { name: /Restore default/ }))
+ expect(readSelection(localStorage, () => true)).toBe('default')
+ expect(screen.getByRole('status').textContent).toContain('Default saved')
+ expect(fetch).not.toHaveBeenCalled()
 })

@@ -1,5 +1,2 @@
-/* Host-owned controls must stay reachable even when a candidate fails. */
-.ui-package-controls{display:flex;flex-wrap:wrap;align-items:center;gap:12px;justify-content:space-between;padding:12px 0;margin-bottom:20px;border-bottom:1px solid var(--border,#ddd);font-size:12px}
-.ui-package-controls small{display:block;max-width:65ch;opacity:.76;line-height:1.6}
-.ui-package-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.ui-package-actions a{color:inherit;text-decoration:underline;text-underline-offset:3px}.ui-package-controls button{font:inherit;padding:7px 10px;min-height:34px}.ui-package-controls p{flex-basis:100%;margin:0}
+/* Isolated preview presentation; recovery remains host-owned. */
 .ui-preview-banner{padding:18px 24px;background:var(--panel,#fff);color:var(--text,#222);border-bottom:1px solid var(--border,#ddd);display:flex;flex-wrap:wrap;gap:16px;align-items:center}.ui-preview-banner a{color:inherit;text-decoration:underline}

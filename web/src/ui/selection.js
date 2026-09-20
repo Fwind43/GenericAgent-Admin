@@ -8,7 +8,4 @@ export function readSelection(storage, known) {
 export function writeSelection(storage, id) {
   try { storage.setItem(SELECTION_KEY, JSON.stringify({ version: 1, id })); return true } catch { return false }
 }
-// Selection is deliberately limited to the read-only overview in phase one.
-export const canActivate = ({ tab, dirty, busy }) => tab === 'overview' && !dirty && !busy
-
 export function browserStorage() { try { return window.localStorage } catch { return null } }

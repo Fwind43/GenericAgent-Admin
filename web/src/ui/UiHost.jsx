@@ -88,18 +88,3 @@ export function UiSurface({ name, viewProps, fallback = null, preserveMount = fa
     <Commit committed={ui.committed}><View {...viewProps} layout={layout} {...(isDefault ? { fallback } : {})}/></Commit>
   </SurfaceBoundary>
 }
-export function PackageControls({ allowed, guard }) {
-  const ui = useUiPackage()
-  return <section className="ui-package-controls" aria-label="Interface packages">
-    <div><strong>Interface / 界面包</strong><small>Admin shell + overview + chat chrome / 管理外壳、概览与聊天展示；业务区域沿用默认</small></div>
-    <div className="ui-package-actions">
-      <a href="/admin/overview?ui=preview" target="_blank" rel="noreferrer">Preview Studio / 示例预览 ↗</a>
-      <button type="button" disabled={ui.safe || ui.loading || !allowed || ui.id === 'studio'} onClick={() => ui.select('studio', guard)}>Enable Studio / 启用</button>
-      <button type="button" disabled={ui.safe || ui.loading || !allowed || ui.id === 'default'} onClick={() => ui.select('default', guard)}>Default / 默认</button>
-      <a href="/admin/overview?ui=safe" target="_blank" rel="noreferrer">Safe mode / 安全入口</a>
-    </div>
-    {!allowed && <small>Switch on Overview after saving or finishing pending work / 请在概览保存修改并等待操作结束后切换</small>}
-    {ui.safe && <small>Safe mode: candidate loading disabled. Reloading resets client connections. / 安全模式不加载候选包；刷新会重建客户端连接。</small>}
-    {ui.message && <p role="status">{ui.message}</p>}
-  </section>
-}

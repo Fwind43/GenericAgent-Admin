@@ -48,9 +48,10 @@ afterEach(async context => {
   vi.restoreAllMocks()
 })
 
-it('real admin: Studio navigation/refresh, dirty and busy guards, retained overview and root identity', async () => {
+it('real admin: no permanent package controls, saved Studio and business navigation remain', async () => {
   history.replaceState(null, '', '/chat')
   localStorage.clear()
+  localStorage.setItem('ga-admin-ui-package-v1', JSON.stringify({ version: 1, id: 'studio' }))
   localStorage.setItem('ga-admin-lang-explicit', '1')
   localStorage.setItem('ga-admin-lang', 'en')
   localStorage.setItem('ga-admin-theme', 'light')
@@ -84,8 +85,6 @@ it('real admin: Studio navigation/refresh, dirty and busy guards, retained overv
   const requests = []
   const unexpected = []
   evidence = { errors, unexpected, requests, forbiddenTransports }
-  let holdHealth = false
-  let releaseHealth
   vi.stubGlobal('fetch', vi.fn(async (input, options = {}) => {
     const url = String(input)
     const method = options.method || 'GET'
@@ -94,70 +93,36 @@ it('real admin: Studio navigation/refresh, dirty and busy guards, retained overv
       unexpected.push({ url, method })
       throw new Error(`Unmapped local request: ${method} ${url}`)
     }
-    if (url === '/api/health' && holdHealth) await new Promise(resolve => { releaseHealth = resolve })
     return { ok: true, status: 200, text: async () => JSON.stringify(fixtures[url]) }
   }))
   await act(async () => { await import('../main.jsx') })
   fireEvent.click(await screen.findByText('Open admin boundary'))
-  const enable = await screen.findByRole('button', { name: 'Enable Studio / \u542f\u7528' })
-  const defaultButton = () => screen.getByRole('button', { name: 'Default / \u9ed8\u8ba4' })
-  await waitFor(() => expect(enable.disabled).toBe(false))
-  const mirror = await waitFor(() => {
-    const input = document.getElementById('overview-github-mirror')
-    expect(input).not.toBeNull()
-    return input
-  })
-  const adminNode = mirror.closest('main')
+  await screen.findByRole('region', { name: 'Studio overview' }, { timeout: 10000 })
+  const adminNode = document.querySelector('.main')
   const chatNode = screen.getByTestId('chat-boundary')
-  const initialMirror = mirror.value
-
-  // A real OverviewPage draft must block switching and survive attempted clicks.
-  fireEvent.change(mirror, { target: { value: 'https://draft.invalid/' } })
-  await waitFor(() => expect(enable.disabled).toBe(true))
-  fireEvent.click(enable)
-  expect(mirror.value).toBe('https://draft.invalid/')
-  expect(document.querySelector('.studio-sidebar')).toBeNull()
-  fireEvent.change(mirror, { target: { value: initialMirror } })
-  await waitFor(() => expect(enable.disabled).toBe(false))
-  fireEvent.click(enable)
-  await screen.findByRole('region', { name: 'Studio overview' })
-  expect(document.getElementById('overview-github-mirror')).toBe(mirror)
-  expect(mirror.closest('[hidden]')).not.toBeNull()
-
+  const noControls = () => {
+    expect(document.querySelector('.ui-package-controls')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Interface packages' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Enable Studio/ })).toBeNull()
+    expect(adminNode.firstElementChild.className).toBe('admin-mobile-bar')
+  }
+  noControls()
+  expect(document.querySelector('.admin-page-header')).not.toBeNull()
   const healthBefore = requests.filter(r => r.url === '/api/health').length
-  const servicesBefore = requests.filter(r => r.url === '/api/services').length
-  holdHealth = true
   fireEvent.click(screen.getByRole('button', { name: /Refresh snapshot/ }))
-  await waitFor(() => expect(typeof releaseHealth).toBe('function'))
-  await waitFor(() => expect(defaultButton().disabled).toBe(true))
-  fireEvent.click(defaultButton())
-  expect(document.querySelector('.studio-sidebar')).not.toBeNull()
-  holdHealth = false
-  await act(async () => releaseHealth())
-  await waitFor(() => expect(defaultButton().disabled).toBe(false))
-  expect(requests.filter(r => r.url === '/api/health').length).toBeGreaterThan(healthBefore)
-  expect(requests.filter(r => r.url === '/api/services').length).toBeGreaterThan(servicesBefore)
-  fireEvent.click(defaultButton())
-  await waitFor(() => expect(document.querySelector('.studio-sidebar')).toBeNull())
-  expect(document.getElementById('overview-github-mirror')).toBe(mirror)
-  expect(mirror.value).toBe(initialMirror)
-  expect(mirror.closest('[hidden]')).toBeNull()
-  expect(mirror.closest('main')).toBe(adminNode)
+  await waitFor(() => expect(requests.filter(r => r.url === '/api/health').length).toBeGreaterThan(healthBefore))
   expect(screen.getByTestId('chat-boundary')).toBe(chatNode)
-  expect(screen.getByRole('textbox', { name: 'Boundary draft', hidden: true }).value).toBe('chat boundary draft')
   expect([probe.appMounts, probe.appUnmounts, probe.chatMounts, probe.chatUnmounts]).toEqual([1, 0, 1, 0])
 
-  fireEvent.click(enable)
   const nav = await screen.findByRole('complementary', { name: 'Studio workspace navigation' })
   fireEvent.click(within(nav).getByRole('button', { name: /Logs/i }))
   await waitFor(() => expect(location.pathname).toBe('/admin/logs'))
-  expect(defaultButton().disabled).toBe(true)
+  noControls()
   fireEvent.click(within(nav).getByRole('button', { name: /Overview/i }))
   await waitFor(() => expect(location.pathname).toBe('/admin/overview'))
   await screen.findByRole('region', { name: 'Studio overview' })
-  // GeneralPage and its RemoteAccessSection own real local state. Package
-  // activation is deliberately blocked here; this tests the production guard.
-  const { I18N, SETTINGS_TEXT } = await import('../lib/i18n')
+  // Existing settings and local drafts remain available without package controls.
+  const { SETTINGS_TEXT } = await import('../lib/i18n')
   const passwordInput = container => within(container.querySelector('#general-remote')).getByPlaceholderText(SETTINGS_TEXT.en.remote.newPassword)
   fireEvent.click(within(document.querySelector('.studio-sidebar')).getByRole('button', { name: /General/i }))
   await waitFor(() => expect(document.getElementById('settings-ga-root')).not.toBeNull())
@@ -165,10 +130,8 @@ it('real admin: Studio navigation/refresh, dirty and busy guards, retained overv
   const settingsDraft = await within(document.querySelector('#general-remote')).findByPlaceholderText(SETTINGS_TEXT.en.remote.newPassword)
   expect(settingsDraft).not.toBeNull()
   fireEvent.change(settingsDraft, { target: { value: 'fictional-unsaved-local-draft' } })
-  expect(defaultButton().disabled).toBe(true)
-  const selectionBefore = localStorage.getItem('ga-admin-ui-package-v1')
-  fireEvent.click(defaultButton())
-  expect(localStorage.getItem('ga-admin-ui-package-v1')).toBe(selectionBefore)
+  noControls()
+  expect(JSON.parse(localStorage.getItem('ga-admin-ui-package-v1')).id).toBe('studio')
   expect(passwordInput(document)).toBe(settingsDraft)
   expect(settingsDraft.value).toBe('fictional-unsaved-local-draft')
   // HEAD already unmounts Admin on departure. Do not confuse this with select.
@@ -184,7 +147,7 @@ it('real admin: Studio navigation/refresh, dirty and busy guards, retained overv
   expect(unexpected).toEqual([])
   expect(forbiddenTransports).toEqual([])
   expect(errors).toEqual([])
-  console.info('UI integration evidence', JSON.stringify({ requests, mounts: { app: probe.appMounts, chatBoundary: probe.chatMounts }, realOverviewRetained: true, realChatStreamingTested: false }))
+  console.info('UI integration evidence', JSON.stringify({ requests, mounts: { app: probe.appMounts, chatBoundary: probe.chatMounts }, permanentControlsRemoved: true, realChatStreamingTested: false }))
 }, 20000)
 
 // Isolated from the separately diagnosed route roundtrip: real component,
@@ -221,8 +184,7 @@ it('real settings host: package roundtrip retains GeneralPage local draft', asyn
   }))
   const { I18N, SETTINGS_TEXT } = await import('../lib/i18n')
   const passwordInput = container => within(container.querySelector('#general-remote')).getByPlaceholderText(SETTINGS_TEXT.en.remote.newPassword)
-  // Actual select with a real settings child, independent of App's overview-
-  // only policy. This does not claim production allows dirty-settings switches.
+  // Test-only selection harness; this is not a production settings entry.
   const { UiHost, useUiPackage } = await import('./UiHost')
   const { GeneralPage } = await import('../pages/GeneralPage.jsx')
   function SettingsHostHarness() {
