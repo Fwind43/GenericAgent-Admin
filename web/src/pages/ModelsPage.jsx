@@ -1,4 +1,5 @@
 import './models-workbench.css'
+import { UiSurface } from '../ui/UiHost'
 import {
   AlertTriangle,
   ArrowDown,
@@ -1252,37 +1253,33 @@ export function Models({
         aria-label={text.connections}
         aria-hidden={workspace !== 'providers'}
       >
-        <header className="model-connections-head">
-          <div>
-            <strong>{text.connections}</strong>
-            <span>{text.connectionsHelp}</span>
-          </div>
-          <Button icon={<Plus size={14} />} onClick={openNewProvider}>{text.addProvider}</Button>
-        </header>
-        <div className="model-connection-grid" tabIndex={0} aria-label={text.connections}>
-          {profiles.map((profile, index) => {
-            const state = providerState(validation[index])
-            return (
-              <button
-                type="button"
-                key={profileKeyId(index, profile)}
-                className={`model-connection-card is-${state}`}
-                onClick={() => openProvider(index)}
-              >
-                <span className="model-connection-title">
-                  <strong>{providerName(profile) || text.provider(index + 1)}</strong>
-                  <i className={`is-${state}`} title={state === 'error' ? text.stateError : state === 'warning' ? text.stateWarning : text.stateReady} />
-                </span>
-                <span className="model-connection-base">{profile.apibase || text.baseMissing}</span>
-                <span className="model-connection-meta">
-                  <em>{protocolLabel(profile.type || DEFAULT_PROTOCOL, t)}</em>
-                  <b>{text.modelCount(profileModels(profile).length)}</b>
-                </span>
-              </button>
-            )
-          })}
-          {!profiles.length && <div className="model-hint-block">{text.noProvidersHelp}</div>}
-        </div>
+        <UiSurface name="admin.models.providers" viewProps={{
+          model: {
+            title: text.connections, help: text.connectionsHelp,
+            addLabel: text.addProvider, emptyLabel: text.noProvidersHelp,
+            columns: { name: text.name, endpoint: 'BaseURL', protocol: text.protocol, models: text.model },
+            providers: profiles.map((profile, index) => {
+              const state = providerState(validation[index])
+              // Display-only origin: never pass credentials, URL paths/query,
+              // model configs, revealed keys or raw profiles to a UI package.
+              let endpoint = text.baseMissing
+              try {
+                const url = new URL(profile.apibase)
+                if (['https:', 'http:'].includes(url.protocol)) endpoint = url.origin
+              } catch { /* Invalid URLs remain editable in the host form. */ }
+              return {
+                id: index, name: providerName(profile) || text.provider(index + 1),
+                endpoint, protocol: protocolLabel(profile.type || DEFAULT_PROTOCOL, t),
+                modelCount: text.modelCount(profileModels(profile).length), state,
+                stateLabel: state === 'error' ? text.stateError : state === 'warning' ? text.stateWarning : text.stateReady,
+              }
+            }),
+          },
+          actions: {
+            addProvider: openNewProvider,
+            openProvider: index => { if (Number.isInteger(index) && profiles[index]) openProvider(index) },
+          },
+        }}/>
       </section>
 
       <Collapse ghost items={riskItems} className="model-risk-collapse" />

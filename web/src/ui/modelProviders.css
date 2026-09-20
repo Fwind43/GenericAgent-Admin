@@ -1,0 +1,15 @@
+.model-directory-status { display: block; font-size: 12px; color: var(--muted); }
+.studio-model-directory { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr); gap: 24px; padding: 20px; }
+.studio-model-directory aside { border-inline-end: 1px solid var(--border); padding-inline-end: 20px; }
+.studio-model-directory h2 { margin: 0 0 12px; font-size: 18px; }
+.studio-model-directory p { color: var(--muted); line-height: 1.6; }
+.studio-model-directory-scroll { min-width: 0; overflow-x: auto; }
+.studio-model-directory table { border-collapse: collapse; width: 100%; text-align: start; }
+.studio-model-directory caption { text-align: start; font-weight: 600; padding-bottom: 12px; }
+.studio-model-directory th, .studio-model-directory td { text-align: start; padding: 12px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.studio-model-directory small { margin-top: 6px; font-weight: 400; }
+[data-model-providers-layout] button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .studio-model-directory { grid-template-columns: 1fr; padding: 12px; gap: 16px; }
+  .studio-model-directory aside { border-inline-end: 0; border-bottom: 1px solid var(--border); padding: 0 0 16px; }
+}
