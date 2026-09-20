@@ -4051,7 +4051,11 @@ function MessageListContent({
   const rootRef = useRef(null)
   const threadMessages = useMemo(() => messages.filter(message => message.kind !== 'btw'), [messages])
   const lastMessageId = threadMessages.at(-1)?.id
-  const tailKeys = useMemo(() => new Set(threadMessages.slice(-MESSAGE_RENDER_TAIL).map(messageRenderKey)), [threadMessages])
+  // Content deltas retain the same slots: keep observer/effect dependencies
+  // stable until the ordered key sequence changes. JSON preserves key boundaries.
+  const messageKeysJSON = JSON.stringify(threadMessages.map(messageRenderKey))
+  const messageKeys = useMemo(() => JSON.parse(messageKeysJSON), [messageKeysJSON])
+  const tailKeys = useMemo(() => new Set(messageKeys.slice(-MESSAGE_RENDER_TAIL)), [messageKeys])
   const [activeKeys, setActiveKeys] = useState(() => new Set(tailKeys))
   const activationOrderRef = useRef([])
   const visibleKeysRef = useRef(new Set())
@@ -4073,12 +4077,12 @@ function MessageListContent({
           activationOrderRef.current = activationOrderRef.current.filter(item => item !== victim)
         }
       }
-      return next
+      return next.size === current.size && [...next].every(key => current.has(key)) ? current : next
     })
   }, [tailKeys])
 
   useEffect(() => {
-    const available = new Set(threadMessages.map(messageRenderKey))
+    const available = new Set(messageKeys)
     activationOrderRef.current = activationOrderRef.current.filter(key => available.has(key))
     setActiveKeys(current => {
       const next = new Set([...current].filter(key => available.has(key)))
@@ -4089,9 +4093,9 @@ function MessageListContent({
           if (!tailKeys.has(key) && !visibleKeysRef.current.has(key)) next.delete(key)
         }
       }
-      return next
+      return next.size === current.size && [...next].every(key => current.has(key)) ? current : next
     })
-  }, [threadMessages, tailKeys])
+  }, [messageKeys, tailKeys])
 
   useEffect(() => {
     const root = rootRef.current
@@ -4105,7 +4109,7 @@ function MessageListContent({
     const root = rootRef.current
     if (!root || typeof IntersectionObserver !== 'function') {
       setActiveKeys(current => {
-        const next = new Set(threadMessages.map(messageRenderKey))
+        const next = new Set(messageKeys)
         if (next.size === current.size && [...next].every(key => current.has(key))) return current
         return next
       })
@@ -4143,7 +4147,7 @@ function MessageListContent({
       queueRef.current = []
       visibleKeysRef.current.clear()
     }
-  }, [activateKey, sessionKey, threadMessages])
+  }, [activateKey, sessionKey, messageKeys])
 
   return (
     <div ref={rootRef} className="oa-message-list">
