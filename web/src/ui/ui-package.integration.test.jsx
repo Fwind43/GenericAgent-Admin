@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { writeFileSync } from 'node:fs'
+import process from 'node:process'
 
 let evidence = null
 
