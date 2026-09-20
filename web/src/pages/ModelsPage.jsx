@@ -390,76 +390,6 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
 }
 
 // Draft position is not a live GA slot. Only official indices are shown.
-function CallRow({ row, index, total, expanded, onToggle, moveRow, onOpenProvider, onRemove, text, t, children }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id })
-  const style = {
-    transform: DndCSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 20 : undefined,
-    position: 'relative',
-  }
-  const failover = row.type === 'failover'
-  const label = failover ? row.varName : (row.model || row.variableName)
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      role="listitem"
-      className={`model-call-row${isDragging ? ' is-dragging' : ''}${failover ? ' is-failover' : ''}${expanded ? ' is-expanded' : ''}`}
-    >
-      <div className="model-call-main">
-        <span {...attributes} {...listeners} className="model-drag-handle" aria-label={`${text.reorderRow}: ${label}`} title={text.reorderRow}>
-          <GripVertical size={16} aria-hidden="true" />
-        </span>
-        <div className="model-call-slot" aria-label={`--llm-no ${row.officialIndex ?? "?"}`}>
-          <strong>{row.officialIndex ?? "?"}</strong>
-          <span>--llm-no</span>
-        </div>
-        <div className="model-call-copy">
-          <span className="model-call-title">
-            {failover && <Network size={13} aria-hidden="true" />}
-            <strong title={row.displayName || label}>{row.displayName || label || text.missingModelId}</strong>
-            {failover && <Tag color="purple">{text.failoverGroup}</Tag>}
-          </span>
-          <span className="model-call-sub">
-            <code title={failover ? row.varName : row.variableName}>{failover ? row.varName : row.variableName}</code>
-            {failover
-              ? <em>{text.failoverMembersCount(row.members?.length || 0)}</em>
-              : row.displayName && <em title={row.model}>{row.model}</em>}
-          </span>
-        </div>
-        {!failover && (
-          <button type="button" className="model-call-provider" onClick={onOpenProvider} title={text.openProvider}>
-            <Building2 size={12} aria-hidden="true" />
-            <span>{row.providerName || text.unnamed}</span>
-          </button>
-        )}
-        <div className="model-call-actions">
-          <Button
-            type="text"
-            size="small"
-            className="model-call-toggle"
-            onClick={onToggle}
-            aria-expanded={expanded}
-            aria-label={`${expanded ? text.collapse : text.configure}: ${label}`}
-          >
-            <span>{expanded ? text.collapse : text.configure}</span>
-            <ChevronDown size={13} aria-hidden="true" />
-          </Button>
-          <Button type="text" size="small" icon={<ArrowUp size={15} />} aria-label={`${text.moveUp} ${label}`} title={text.moveUp} disabled={index === 0} onClick={() => moveRow(index, index - 1)} />
-          <Button type="text" size="small" icon={<ArrowDown size={15} />} aria-label={`${text.moveDown} ${label}`} title={text.moveDown} disabled={index === total - 1} onClick={() => moveRow(index, index + 1)} />
-          <Button danger type="text" size="small" icon={<Trash2 size={14} />} aria-label={`${t.delete} ${label}`} title={failover ? text.removeGroup : text.removeModel} onClick={onRemove} />
-        </div>
-      </div>
-      <Drawer open={expanded} onClose={onToggle} width={720} title={row.displayName || label} rootClassName="model-row-detail-drawer">
-        <p className="model-detail-scope">{/[\u3400-\u9fff]/.test(text.configure) ? '\u4fee\u6539\u4fdd\u7559\u5728\u9875\u9762\u8349\u7a3f\uff0c\u5173\u95ed\u4e0d\u4f1a\u4fdd\u5b58\u5230 GA\u3002' : 'Changes stay in the page draft. Closing does not save to GA.'}</p>
-        {children}
-      </Drawer>
-    </div>
-  )
-}
-
 // The provider form is shared by create and edit modes; only the modal footer
 // differs.
 function ProviderForm({ draft, profiles, editingIndex, onChange, t }) {
@@ -1172,39 +1102,46 @@ export function Models({
         aria-label={text.callListTitle}
         aria-hidden={workspace !== 'models'}
       >
-        <header className="model-call-head">
-          <div>
-            <strong>{text.callListTitle}</strong>
-            <span>{text.callListIntro}</span>
-          </div>
-          <Space size={8}>
-            <Button icon={<Network size={14} />} onClick={addGroup} disabled={candidates.length < 2} title={candidates.length < 2 ? text.failoverNeedsTwo : undefined}>
-              {text.addFailoverGroup}
-            </Button>
-            <Button type="primary" icon={<Plus size={15} />} onClick={() => setAddModelIndex(0)} disabled={!profiles.length}>
-              {text.addModel}
-            </Button>
-          </Space>
-        </header>
-
-        {rows.length ? (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragRow}>
-            <SortableContext items={rows.map(row => row.id)} strategy={verticalListSortingStrategy}>
-              <div className="model-call-rows" role="list" tabIndex={0} aria-label={text.callListTitle}>
-                {rows.map((row, index) => (
-                  <CallRow
-                    key={row.id}
-                    row={row}
-                    index={index}
-                    total={rows.length}
-                    expanded={expanded.has(row.id)}
-                    onToggle={() => toggleRow(row.id)}
-                    moveRow={moveRow}
-                    onOpenProvider={() => openProvider(row.profileIndex)}
-                    onRemove={() => row.type === 'failover' ? removeGroup(row.groupIndex) : removeModel(row)}
-                    text={text}
-                    t={t}
-                  >
+        <UiSurface name="admin.models.calls" viewProps={{
+          model: {
+            title: text.callListTitle, help: text.callListIntro,
+            addLabel: text.addModel, addGroupLabel: text.addFailoverGroup,
+            canAdd: Boolean(profiles.length), canGroup: candidates.length >= 2,
+            groupHelp: candidates.length < 2 ? text.failoverNeedsTwo : '',
+            emptyTitle: importLoading ? text.loadingMykey : profiles.length ? text.callListEmpty : text.noProviders,
+            emptyHelp: importLoading ? text.loadingHelp : profiles.length ? text.callListEmptyHelp : text.noProvidersHelp,
+            emptyAction: profiles.length ? text.addModel : text.addProvider, loading: importLoading,
+            labels: { reorder: text.reorderRow, configure: text.configure, collapse: text.collapse,
+              up: text.moveUp, down: text.moveDown, remove: t.delete, provider: text.openProvider,
+              group: text.failoverGroup, removeGroup: text.removeGroup, removeModel: text.removeModel },
+            rows: rows.map((row, index) => {
+              const group = row.type === 'failover'
+              const actionName = group ? row.varName : (row.model || row.variableName)
+              return {
+                id: row.id, group, actionName, title: row.displayName || actionName || text.missingModelId,
+                variable: group ? row.varName : row.variableName,
+                detail: group ? text.failoverMembersCount(row.members?.length || 0) : row.displayName ? row.model : '',
+                provider: group ? '' : row.providerName || text.unnamed,
+                slot: row.officialIndex ?? '?', expanded: expanded.has(row.id),
+                canMoveUp: index > 0, canMoveDown: index < rows.length - 1,
+              }
+            }),
+          },
+          actions: {
+            addModel: () => setAddModelIndex(0), addGroup, addProvider: openNewProvider,
+            toggle: id => { if (rows.some(row => row.id === id)) toggleRow(id) },
+            openProvider: id => { const row = rows.find(item => item.id === id); if (row?.type !== 'failover' && row) openProvider(row.profileIndex) },
+            remove: id => { const row = rows.find(item => item.id === id); if (row) return row.type === 'failover' ? removeGroup(row.groupIndex) : removeModel(row) },
+            moveUp: id => { const index = rows.findIndex(row => row.id === id); if (index > 0) moveRow(index, index - 1) },
+            moveDown: id => { const index = rows.findIndex(row => row.id === id); if (index >= 0 && index < rows.length - 1) moveRow(index, index + 1) },
+            reorder: (activeId, overId) => dragRow({ active: { id: activeId }, over: { id: overId } }),
+          },
+        }}/>
+        {/* Editors remain mounted in the stable host, outside package boundaries. */}
+        {rows.map(row => (
+          <Drawer key={row.id} open={expanded.has(row.id)} onClose={() => toggleRow(row.id)} width={720}
+            title={row.displayName || (row.type === 'failover' ? row.varName : row.model || row.variableName)} rootClassName="model-row-detail-drawer">
+            <p className="model-detail-scope">{/[\u3400-\u9fff]/.test(text.configure) ? '\u4fee\u6539\u4fdd\u7559\u5728\u9875\u9762\u8349\u7a3f\uff0c\u5173\u95ed\u4e0d\u4f1a\u4fdd\u5b58\u5230 GA\u3002' : 'Changes stay in the page draft. Closing does not save to GA.'}</p>
                     {row.type === 'failover' ? (
                       <FailoverGroupBody
                         group={failoverGroups[row.groupIndex] || {}}
@@ -1229,23 +1166,8 @@ export function Models({
                         t={t}
                       />
                     )}
-                  </CallRow>
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        ) : (
-          <div className="model-empty-state">
-            <Layers size={34} strokeWidth={1.2} className="model-empty-icon" />
-            <strong>{importLoading ? text.loadingMykey : profiles.length ? text.callListEmpty : text.noProviders}</strong>
-            <span>{importLoading ? text.loadingHelp : profiles.length ? text.callListEmptyHelp : text.noProvidersHelp}</span>
-            {!importLoading && (
-              profiles.length
-                ? <Button type="primary" icon={<Plus size={15} />} onClick={() => setAddModelIndex(0)}>{text.addModel}</Button>
-                : <Button type="primary" icon={<Plus size={15} />} onClick={openNewProvider}>{text.addProvider}</Button>
-            )}
-          </div>
-        )}
+          </Drawer>
+        ))}
       </section>
 
       <section
