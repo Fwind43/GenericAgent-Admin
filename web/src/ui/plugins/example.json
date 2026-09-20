@@ -1,0 +1,151 @@
+{
+  "manifest": {
+    "format": "gaui/1",
+    "id": "local-workshop",
+    "version": "1.0.0",
+    "name": "Local Workshop",
+    "surfaces": [
+      "admin.shell",
+      "admin.overview",
+      "chat.sidebar",
+      "chat.messages",
+      "chat.composer"
+    ]
+  },
+  "views": {
+    "admin.shell": {
+      "layout": {
+        "density": "compact",
+        "align": "center",
+        "hostOrder": "last"
+      },
+      "before": {
+        "type": "stack",
+        "style": {
+          "gap": 8
+        },
+        "children": [
+          {
+            "type": "heading",
+            "text": "Workshop navigation"
+          },
+          {
+            "type": "each",
+            "source": "navigation",
+            "children": [
+              {
+                "type": "button",
+                "bind": "item.label",
+                "action": "navigate",
+                "target": "item.id"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "text": "Back to chat",
+            "action": "backToChat"
+          }
+        ]
+      }
+    },
+    "admin.overview": {
+      "layout": {
+        "density": "compact",
+        "align": "center",
+        "hostOrder": "last"
+      },
+      "before": {
+        "type": "grid",
+        "style": {
+          "columns": 2,
+          "gap": 12
+        },
+        "children": [
+          {
+            "type": "heading",
+            "bind": "title"
+          },
+          {
+            "type": "text",
+            "bind": "status"
+          },
+          {
+            "type": "each",
+            "source": "services",
+            "children": [
+              {
+                "type": "row",
+                "children": [
+                  {
+                    "type": "text",
+                    "bind": "item.label"
+                  },
+                  {
+                    "type": "badge",
+                    "bind": "item.status"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "text": "Refresh overview",
+            "action": "refreshOverview"
+          }
+        ]
+      }
+    },
+    "chat.sidebar": {
+      "layout": {
+        "density": "compact",
+        "align": "center",
+        "hostOrder": "last"
+      },
+      "before": {
+        "type": "heading",
+        "text": "Local workshop"
+      }
+    },
+    "chat.messages": {
+      "layout": {
+        "density": "compact",
+        "align": "center",
+        "hostOrder": "last"
+      },
+      "before": {
+        "type": "heading",
+        "text": "Local workshop"
+      }
+    },
+    "chat.composer": {
+      "layout": {
+        "density": "compact",
+        "align": "center",
+        "hostOrder": "last"
+      },
+      "before": {
+        "type": "heading",
+        "text": "Local workshop"
+      }
+    }
+  },
+  "schema": {
+    "accent": {
+      "type": "color",
+      "label": "Accent",
+      "default": "#557766"
+    },
+    "density": {
+      "type": "enum",
+      "label": "Chat density",
+      "default": "compact",
+      "options": [
+        "compact",
+        "comfortable"
+      ]
+    }
+  },
+  "config": {}
+}

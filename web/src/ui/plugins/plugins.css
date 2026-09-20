@@ -1,0 +1,25 @@
+.gaui-runtime { display: contents; }
+.gaui-manager { max-width: 960px; padding: 20px; }
+.gaui-manager label { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0; }
+.gaui-manager button, .gaui-manager select, .gaui-manager input { font: inherit; padding: 8px; }
+.gaui-manager button { margin: 6px 10px 6px 0; }
+.gaui-preview { border: 1px solid currentColor; padding: 16px; margin-top: 16px; }
+.gaui-preview > section { border-bottom: 1px solid currentColor; padding: 12px 0; }
+.gaui-view { padding: 16px; min-width: 0; max-width: 100%; overflow-wrap: anywhere; color: var(--text-primary, inherit); }
+.gaui-node { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.gaui-stack { display: flex; flex-direction: column; }
+.gaui-row { display: flex; flex-wrap: wrap; align-items: center; }
+.gaui-grid { display: grid; }
+.gaui-accent { border-left: 3px solid var(--gaui-accent); }
+.gaui-muted { opacity: .8; }
+.gaui-button { text-align: left; padding: 10px 12px; background: transparent; color: inherit; border: 1px solid var(--gaui-accent); cursor: pointer; }
+/* Trusted host selectors only; external packages cannot supply selectors or CSS. */
+[data-ui-surface="chat.sidebar"][data-gaui-density="compact"] .oa-session { padding-block: 4px; }
+[data-ui-surface="chat.sidebar"][data-gaui-order="last"] { flex-direction: column-reverse; }
+[data-ui-surface="chat.messages"][data-gaui-density="compact"] .oa-message { padding-block: 6px; margin-block: 4px; }
+[data-ui-surface="chat.messages"][data-gaui-align="center"] > * { max-width: 880px; margin-inline: auto; width: 100%; }
+[data-ui-surface="chat.composer"][data-gaui-density="compact"] { padding-block: 6px; }
+[data-ui-surface="chat.composer"][data-gaui-align="center"] { width: min(100%, 880px); align-self: center; }
+[data-ui-surface="chat.composer"][data-gaui-order="first"] { display: flex; flex-direction: column-reverse; }
+[data-ui-surface^="chat."][data-gaui-density] { border-color: var(--gaui-accent); }
+@media(max-width: 600px) { .gaui-grid { grid-template-columns: minmax(0, 1fr) !important; } }

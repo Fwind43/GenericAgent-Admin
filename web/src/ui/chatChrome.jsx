@@ -1,5 +1,4 @@
 import React from 'react'
-import { UiSurface, useUiPackage } from './UiHost'
 import './chatChrome.css'
 
 // Packages receive snapshots and callbacks, never the controller or its children.
@@ -18,18 +17,5 @@ function ChatChrome({ session, presentation, actions, studio = false }) {
 export function DefaultChatChrome(props) { return <ChatChrome {...props}/> }
 export function StudioChatChrome(props) { return <ChatChrome {...props} studio/> }
 
-export function ChatPackageBar(props) {
-  const ui = useUiPackage()
-  if (!ui) return null // Direct legacy/test entry points remain usable.
-  return <section className="ui-chat-package" aria-label="Chat interface package">
-    {/* Always host-owned: package crashes cannot remove recovery controls. */}
-    <div className="ui-chat-switcher">
-      <span>Interface / 界面包</span>
-      <button type="button" disabled={ui.safe || ui.loading || ui.id === 'studio'} onClick={() => ui.select('studio')}>Enable Studio chat / 启用</button>
-      <button type="button" disabled={ui.id === 'default' && !ui.loading} onClick={() => ui.restore()}>Restore default chat / 恢复默认</button>
-      <a href="/admin/overview?ui=safe" target="_blank" rel="noreferrer">Safe mode / 安全入口</a>
-      {ui.message && <span role="status">{ui.message}</span>}
-    </div>
-    <UiSurface name="chat.chrome" viewProps={props} fallback={<DefaultChatChrome {...props}/>}/>
-  </section>
-}
+// Appearance is managed exclusively in Settings > UI plugins.
+export function ChatPackageBar() { return null }

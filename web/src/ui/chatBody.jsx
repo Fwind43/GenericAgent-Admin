@@ -1,10 +1,12 @@
 import React from 'react'
 import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
+import { useChatLayout } from './plugins/runtime'
 
 // Stateless views; ChatApp owns all data, drafts, refs, actions and subscriptions.
 export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
-  return (<aside data-ui-surface="chat.sidebar" data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
+  const externalLayout = useChatLayout('chat.sidebar')
+  return (<aside data-ui-surface="chat.sidebar" {...externalLayout} data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-sidebar-brand">GenericAgent <span>Admin</span></div>
         <button
@@ -171,7 +173,8 @@ export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDelet
 }
 
 export function ChatMessages({ layout = 'default', MessageList, activeSessionDetail, activeSidRef, conductorConflict, conductorParentID, ct, editAndResend, fillAskReply, historyPages, isConductorWorker, isCurrentRunning, isNearBottom, messages, openSession, pauseFollow, resumeFollow, sendBTW, sessionLoadFailed, sessionLoading, setConductorConflict, showFollow, sid, streamClock, switchWorldline, threadRef, updateFollowFromScroll, worldlineForView }) {
-  return (<section data-ui-surface="chat.messages" data-ui-layout={layout} className="oa-thread" ref={threadRef} aria-busy={sessionLoading} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) pauseFollow() }} onTouchMove={()=>{ if (!isNearBottom(threadRef.current)) pauseFollow() }}>
+  const externalLayout = useChatLayout('chat.messages')
+  return (<section data-ui-surface="chat.messages" {...externalLayout} data-ui-layout={layout} className="oa-thread" ref={threadRef} aria-busy={sessionLoading} onScroll={updateFollowFromScroll} onWheel={e=>{ if (e.deltaY < 0) pauseFollow() }} onTouchMove={()=>{ if (!isNearBottom(threadRef.current)) pauseFollow() }}>
           {isConductorWorker(activeSessionDetail) && conductorParentID(activeSessionDetail) && <button type="button" className="oa-conductor-back" onClick={()=>openSession(conductorParentID(activeSessionDetail))}>← {ct('返回 Conductor', 'Back to Conductor')}</button>}
           {activeSessionDetail?.conductor?.recovery && <div className="oa-banner" role="status">{ct('恢复待确认：本实例无法确认该任务是否仍在运行，保留原记录且不自动重跑。', 'Recovery pending confirmation: this instance cannot confirm whether the task is still running. Records are preserved without automatic replay.')}</div>}
           {sessionLoading && messages.length === 0 && <div className="oa-session-load" role="status" aria-live="polite">
@@ -216,7 +219,8 @@ export function ChatMessages({ layout = 'default', MessageList, activeSessionDet
 }
 
 export function ChatComposer({ layout = 'default', ComposerActions, CopyButton, PendingAttachments, ProviderModelCascade, REASONING_EFFORT_OPTIONS, activePromptPreset, activeSessionDetail, activeSidRef, addAttachmentFiles, applyComposerHeight, attachments, autorunEnabled, beginComposerResize, cancelRun, cmdManagerOpen, composerActionsTriggerRef, composerDragHeight, composerManualHeightRef, conductorEnabling, ct, defaultReasoningLabel, depsRepairing, dragging, extraPromptOpen, extraSysPromptPresetID, fileRef, finishComposerResize, handlePromptChange, handlePromptKeyDown, installChatPythonDeps, isConductorParent, isConductorWorker, isCurrentRunning, isUltraPlanPrompt, keychainOpen, loadChatState, loopRailOpen, modelDiagnosis, modelDiagnosisAdvice, modelDiagnosisTitle, moveComposerResize, onDropFiles, onPaste, openExtraPromptEditor, prompt, promptRef, providerGroups, queuedMessages, reasoningEffort, removeAttachment, saveModel, saveReasoningEffort, selectedModelNo, selectedProvider, send, sessionLoadFailed, sessionLoading, setCmdManagerOpen, setDragging, setErr, setKeychainOpen, setLoopRailOpen, sid, toggleAutorun, upgradeToConductor }) {
-  return (<div data-ui-surface="chat.composer" data-ui-layout={layout} className={`oa-composer ${dragging ? 'is-dragging' : ''}`} onDragOver={e=>{e.preventDefault(); setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDropFiles}>
+  const externalLayout = useChatLayout('chat.composer')
+  return (<div data-ui-surface="chat.composer" {...externalLayout} data-ui-layout={layout} className={`oa-composer ${dragging ? 'is-dragging' : ''}`} onDragOver={e=>{e.preventDefault(); setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDropFiles}>
           <input ref={fileRef} type="file" multiple hidden onChange={e=>{ addAttachmentFiles(e.target.files); e.target.value='' }} />
           {attachments.length > 0 && <PendingAttachments attachments={attachments} onRemove={removeAttachment}/>}
           {modelDiagnosis && <div className={`oa-model-alert ${modelDiagnosis.fixable ? 'is-fixable' : ''}`} role="status" aria-live="polite">

@@ -1,7 +1,6 @@
 import React from 'react'
 import { Palette } from 'lucide-react'
 import { SettingsSection, SettingRow, SettingFooter, SettingNote } from '../components/settings'
-import { ThemeColorView } from '../ThemeColorEditor'
 import './generalSettings.css'
 
 function LanguageSelect({ model, actions }) {
@@ -18,14 +17,11 @@ export function DefaultAppearanceSettings({ model, actions, hidden }) {
       </button>)}</div>
     </SettingRow>
     <p>{model.text.fontAttribution} <a href="/fonts/misans/MiSans-License.pdf" target="_blank" rel="noreferrer">{model.text.fontLicense}</a></p>
-    <ThemeColorView model={model.colors} actions={actions.colors}/>
     <SettingFooter><SettingNote tone="muted">{model.confirmNote}</SettingNote><span role="status">{model.status}</span><button type="button" className="primary" disabled={!model.canSave} onClick={actions.save}>{model.saveLabel}</button></SettingFooter>
   </SettingsSection>
 }
 
 export function StudioAppearanceSettings({ model, actions, hidden }) {
-  const colors = model.colors
-  const zh = model.lang === 'zh'
   return <section id="general-appearance" hidden={hidden} className="ui-studio-settings">
     <header><small>STUDIO / APPEARANCE</small><h3>{model.text.title}</h3><p>{model.text.desc}</p></header>
     <form onSubmit={e => { e.preventDefault(); actions.save() }}>
@@ -36,14 +32,6 @@ export function StudioAppearanceSettings({ model, actions, hidden }) {
       <footer><span role="status">{model.status}</span><small>{model.confirmNote}</small><button className="primary" disabled={!model.canSave}>{model.saveLabel}</button></footer>
     </form>
     <p>{model.text.fontAttribution} <a href="/fonts/misans/MiSans-License.pdf" target="_blank" rel="noreferrer">{model.text.fontLicense}</a></p>
-    <section aria-label={zh ? '自定义主题颜色' : 'Custom theme colors'}>
-      <h4>{zh ? '自定义主题颜色' : 'Custom theme colors'}</h4>
-      {!colors.open ? <button type="button" disabled={colors.busy} onClick={actions.colors.begin}>{zh ? '编辑颜色' : 'Edit colors'}</button> : <form onSubmit={e => { e.preventDefault(); actions.colors.save() }}>
-        <p>{zh ? '实时预览不会保存。留空继承预设；取消或离开分组恢复原颜色。' : 'Live preview does not save. Blank inherits the preset; cancel or leave this group to restore the original colors.'}</p>
-        <fieldset disabled={colors.busy}>{colors.groups.map(group => <fieldset key={group.title}><legend>{group.title}</legend>{group.tokens.map(token => <label key={token}>{token}<input aria-label={token} value={colors.draft[token] || ''} placeholder="inherit" onChange={e => actions.colors.changeColor(token, e.target.value)}/></label>)}</fieldset>)}</fieldset>
-        <footer><button type="button" disabled={colors.busy} onClick={actions.colors.restoreDefaults}>{zh ? '恢复默认' : 'Restore defaults'}</button><button type="button" disabled={colors.busy} onClick={actions.colors.cancel}>{zh ? '取消预览' : 'Cancel preview'}</button><button disabled={!colors.canSave}>{colors.busy ? (zh ? '保存中…' : 'Saving…') : (zh ? '保存颜色' : 'Save colors')}</button></footer>
-      </form>}
-      {colors.message && <p role={colors.failed ? 'alert' : 'status'}>{colors.message}</p>}
-    </section>
+
   </section>
 }

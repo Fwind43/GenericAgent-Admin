@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import './general-workbench.css'
 import { UiSurface } from '../ui/UiHost'
+import { PluginManager } from '../ui/plugins/PluginManager'
 import { DefaultGeneralSettings } from '../ui/generalSettings.jsx'
 import { generalSettingsModels } from '../ui/generalSettings.js'
 import { useThemeColorController } from '../ThemeColorEditor'
@@ -129,13 +130,14 @@ export function GeneralPage({
       changeLanguage: value => { if (!busy && !colors.model.busy && ['zh', 'en'].includes(value)) onLanguage(value) },
       changeTheme: value => { if (!busy && !colors.model.busy && THEMES.some(item => item.id === value)) setTheme(value) } },
   }
-  const groups = ['appearance', 'paths', 'network', 'remote', 'startup']
+  const groups = ['plugins', 'appearance', 'paths', 'network', 'remote', 'startup']
   return <SettingsPage className="general-workbench">
     <nav className="general-index" aria-label={lang === 'zh' ? '设置分组' : 'Settings groups'}>
-      {groups.map(id => <button key={id} type="button" aria-current={group === id ? 'true' : undefined} aria-controls={`general-${id}`} onClick={() => setGroup(id)}>{text[id].title}</button>)}
+      {groups.map(id => <button key={id} type="button" aria-current={group === id ? 'true' : undefined} aria-controls={`general-${id}`} onClick={() => setGroup(id)}>{id === 'plugins' ? 'UI plugins / UI插件' : text[id].title}</button>)}
       <p role="status">{dirty ? text.unsaved : text.saved}</p>
     </nav>
     <div className="general-detail">
+    <div hidden={group !== 'plugins'}><PluginManager/></div>
     <UiSurface name="admin.settings.appearance" viewProps={appearanceProps} fallback={<DefaultAppearanceSettings {...appearanceProps}/>}/>
 
     {['paths', 'network', 'startup'].map(id => {
