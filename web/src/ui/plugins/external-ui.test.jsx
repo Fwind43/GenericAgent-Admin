@@ -81,7 +81,7 @@ describe('external UI local package boundary', () => {
     render(<ExternalUiProvider store={store} onEnable={enable}><PluginManager/><State/></ExternalUiProvider>)
     fireEvent.change(screen.getByLabelText('Install .gaui.zip'), { target: { files: [{ name: 'local-workshop.gaui.zip', size: archive().byteLength, arrayBuffer: async () => archive() }] } })
     await screen.findByText('Installed locally; not enabled')
-    expect(screen.getByRole('option', { name: 'Local Workshop 1.0.0' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: `${example.manifest.name} ${example.manifest.version}` })).toBeTruthy()
     expect(screen.getByTestId('active').textContent).toBe('default')
     fireEvent.change(screen.getByLabelText('Accent'), { target: { value: '#224466' } })
     fireEvent.click(screen.getByRole('button', { name: 'Preview', exact: true }))

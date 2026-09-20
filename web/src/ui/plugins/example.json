@@ -2,7 +2,7 @@
   "manifest": {
     "format": "gaui/1",
     "id": "local-workshop",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "name": "Local Workshop",
     "surfaces": [
       "admin.shell",
@@ -104,8 +104,53 @@
         "hostOrder": "last"
       },
       "before": {
-        "type": "heading",
-        "text": "Local workshop"
+        "type": "grid",
+        "style": {
+          "columns": 2,
+          "gap": 8,
+          "padding": 8
+        },
+        "children": [
+          {
+            "type": "stack",
+            "children": [
+              {
+                "type": "heading",
+                "text": "Workshop navigation"
+              },
+              {
+                "type": "badge",
+                "bind": "status"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "text": "Manage conversations",
+            "action": "manageSessions"
+          },
+          {
+            "type": "button",
+            "text": "Workspace settings",
+            "action": "openSettings"
+          }
+        ]
+      },
+      "after": {
+        "type": "row",
+        "style": {
+          "gap": 8
+        },
+        "children": [
+          {
+            "type": "text",
+            "text": "Conversations"
+          },
+          {
+            "type": "badge",
+            "bind": "value"
+          }
+        ]
       }
     },
     "chat.messages": {
@@ -115,8 +160,48 @@
         "hostOrder": "last"
       },
       "before": {
-        "type": "heading",
-        "text": "Local workshop"
+        "type": "grid",
+        "style": {
+          "columns": 2,
+          "gap": 8,
+          "padding": 8
+        },
+        "children": [
+          {
+            "type": "stack",
+            "children": [
+              {
+                "type": "heading",
+                "text": "Workshop reading desk"
+              },
+              {
+                "type": "badge",
+                "bind": "status"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "text": "Follow latest",
+            "action": "followLatest"
+          }
+        ]
+      },
+      "after": {
+        "type": "row",
+        "style": {
+          "gap": 8
+        },
+        "children": [
+          {
+            "type": "text",
+            "text": "Messages"
+          },
+          {
+            "type": "badge",
+            "bind": "value"
+          }
+        ]
       }
     },
     "chat.composer": {
@@ -126,8 +211,48 @@
         "hostOrder": "last"
       },
       "before": {
-        "type": "heading",
-        "text": "Local workshop"
+        "type": "grid",
+        "style": {
+          "columns": 2,
+          "gap": 8,
+          "padding": 8
+        },
+        "children": [
+          {
+            "type": "stack",
+            "children": [
+              {
+                "type": "heading",
+                "text": "Workshop writing desk"
+              },
+              {
+                "type": "badge",
+                "bind": "status"
+              }
+            ]
+          },
+          {
+            "type": "button",
+            "text": "Browse commands",
+            "action": "openCommands"
+          }
+        ]
+      },
+      "after": {
+        "type": "row",
+        "style": {
+          "gap": 8
+        },
+        "children": [
+          {
+            "type": "text",
+            "text": "Attachments"
+          },
+          {
+            "type": "badge",
+            "bind": "value"
+          }
+        ]
       }
     }
   },

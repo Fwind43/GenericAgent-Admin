@@ -7,7 +7,8 @@ The manager provides a downloadable `local-workshop.gaui.zip`; its source is `ex
 ## Current coverage
 
 - `admin.shell` and `admin.overview`: declarative replacement views using projected data and allowlisted host callbacks.
-- `chat.sidebar`, `chat.messages`, `chat.composer`: restricted layout attributes; host-owned business content and draft nodes stay mounted. These are not arbitrary replacement chat renderers.
+- `chat.sidebar`, `chat.messages`, `chat.composer`: allowlisted declarative `before`/`after` trees around a fixed host-owned slot, plus restricted layout attributes. Summary projection contains only title/status/count; message text, drafts, attachment values and controller references are not exposed. Host business content and draft nodes stay mounted. These are not arbitrary replacement chat renderers.
+- Chat actions are limited to opening settings, entering session management, following the latest message and opening commands; surface and host-state guards apply. Sending, deleting, model changes and arbitrary action parameters are not supported. Invalid chat declarations fall back independently to their host surface.
 - Other administrative pages retain their existing host/built-in surfaces. Full external replacement of every page is not implemented.
 - Legacy custom-color controls and the persistent chat package bar are removed. Stored legacy colors are retained and suppressed while an external package is active; preset theme/language settings remain.
 

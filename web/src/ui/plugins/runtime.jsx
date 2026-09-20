@@ -37,7 +37,7 @@ export function ExternalUiProvider({ children, store = pluginStore, disabled = f
   return <External.Provider value={{ bundle: disabled ? null : bundle, error, busy: busy || disabled, store, activate, refresh, fail }}><div className="gaui-runtime" data-external-ui={bundle ? 'active' : undefined}>{children}</div></External.Provider>
 }
 export function useChatLayout(area) {
-  const ui = useExternalUi(), view = ui?.bundle?.views[area]
+  const ui = useExternalUi(), view = chatView(ui?.bundle, area)
   return view ? { 'data-gaui-density': ui.bundle.config.density || view.layout.density, 'data-gaui-align': view.layout.align, 'data-gaui-order': view.layout.hostOrder, style: { '--gaui-accent': ui.bundle.config.accent || '#557766' } } : {}
 }
 export function projectData(area, props) {
@@ -70,3 +70,29 @@ export class ExternalBoundary extends React.Component {
   render() { return this.state.failed ? this.props.fallback : this.props.children }
 }
 export function coverage(bundle) { return { covered: bundle.manifest.surfaces, missing: AREAS.filter(s => !bundle.manifest.surfaces.includes(s)) } }
+
+// Validate each chat surface independently at the rendering boundary. Host siblings never remount.
+function chatView(bundle, area) {
+  if (!bundle?.views?.[area] || !bundle.manifest.surfaces.includes(area)) return null
+  try {
+    return validateBundle({ ...bundle, manifest: { ...bundle.manifest, surfaces: [area] }, views: { [area]: bundle.views[area] } }).views[area]
+  } catch { return null }
+}
+export function dispatchChatAction(area, node, state, actions) {
+  if (node.target !== undefined) return
+  if (area === 'chat.sidebar' && node.action === 'openSettings' && !state.blocked) actions.openSettings?.()
+  if (area === 'chat.sidebar' && node.action === 'manageSessions' && !state.blocked && !state.managing) actions.manageSessions?.()
+  if (area === 'chat.messages' && node.action === 'followLatest' && state.canFollow && !state.loading) actions.followLatest?.()
+  if (area === 'chat.composer' && node.action === 'openCommands' && !state.loading && !state.commandsOpen) actions.openCommands?.()
+}
+export function ChatDecoration({ area, position, state = {}, actions = {} }) {
+  const ui = useExternalUi(), view = chatView(ui?.bundle, area)
+  if (!view) return null
+  // Explicit summary projection: no message/draft/attachment values, IDs, refs or controllers.
+  const data = { title: area === 'chat.sidebar' ? 'Conversations' : area === 'chat.messages' ? 'Conversation' : 'Compose', status: state.loading ? 'Loading' : state.running ? 'Running' : 'Ready', value: Number.isSafeInteger(state.count) ? state.count : 0 }
+  return <ExternalBoundary key={ui.bundle.manifest.id + position} fallback={null} fail={() => {}}>
+    <div className="gaui-chat-region gaui-external" data-chat-decoration={position} data-host-order={view.layout.hostOrder} style={{ '--gaui-accent': ui.bundle.config.accent || '#3388cc' }}>
+      <NodeTree node={view[position]} data={data} invoke={node => dispatchChatAction(area, node, state, actions)}/>
+    </div>
+  </ExternalBoundary>
+}

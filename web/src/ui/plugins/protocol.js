@@ -56,12 +56,14 @@ export function validateBundle(input) {
     if (n.type === 'each') {
       choice(n.source, ['navigation', 'services', 'metrics'])
       if (inEach || !Array.isArray(n.children) || n.children.length !== 1) fail('Invalid repetition')
-      if ((n.source === 'navigation') !== (area === 'admin.shell')) fail('Data unavailable on this surface')
+      if (!((area === 'admin.shell' && n.source === 'navigation') || (area === 'admin.overview' && ['services', 'metrics'].includes(n.source)))) fail('Data unavailable on this surface')
     } else if (n.source !== undefined) fail('Source only allowed on lists')
     if (n.type === 'button') {
-      choice(n.action, ['navigate', 'backToChat', 'refreshOverview'])
+      choice(n.action, ['navigate', 'backToChat', 'refreshOverview', 'openSettings', 'manageSessions', 'followLatest', 'openCommands'])
       if (n.action === 'navigate') { if (area !== 'admin.shell' || n.target !== 'item.id' || !inEach) fail('Invalid navigation') }
       else if (n.target !== undefined) fail('Unexpected action parameter')
+      const chatActions = { openSettings: 'chat.sidebar', manageSessions: 'chat.sidebar', followLatest: 'chat.messages', openCommands: 'chat.composer' }
+      if (chatActions[n.action] && chatActions[n.action] !== area) fail('Action unavailable')
       if (n.action === 'backToChat' && area !== 'admin.shell') fail('Action unavailable')
       if (n.action === 'refreshOverview' && area !== 'admin.overview') fail('Action unavailable')
     } else if (n.action !== undefined || n.target !== undefined) fail('Action only allowed on buttons')

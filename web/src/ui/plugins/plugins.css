@@ -15,11 +15,18 @@
 .gaui-button { text-align: left; padding: 10px 12px; background: transparent; color: inherit; border: 1px solid var(--gaui-accent); cursor: pointer; }
 /* Trusted host selectors only; external packages cannot supply selectors or CSS. */
 [data-ui-surface="chat.sidebar"][data-gaui-density="compact"] .oa-session { padding-block: 4px; }
-[data-ui-surface="chat.sidebar"][data-gaui-order="last"] { flex-direction: column-reverse; }
+
 [data-ui-surface="chat.messages"][data-gaui-density="compact"] .oa-message { padding-block: 6px; margin-block: 4px; }
 [data-ui-surface="chat.messages"][data-gaui-align="center"] > * { max-width: 880px; margin-inline: auto; width: 100%; }
 [data-ui-surface="chat.composer"][data-gaui-density="compact"] { padding-block: 6px; }
 [data-ui-surface="chat.composer"][data-gaui-align="center"] { width: min(100%, 880px); align-self: center; }
-[data-ui-surface="chat.composer"][data-gaui-order="first"] { display: flex; flex-direction: column-reverse; }
+
 [data-ui-surface^="chat."][data-gaui-density] { border-color: var(--gaui-accent); }
 @media(max-width: 600px) { .gaui-grid { grid-template-columns: minmax(0, 1fr) !important; } }
+
+/* Only trusted in-flow regions can move. No fixed/absolute positioning, selectors or z-index from packages. */
+[data-ui-surface^="chat."][data-gaui-density] { display: flex; flex-direction: column; }
+.gaui-chat-region { flex: 0 0 auto; max-height: 180px; overflow: auto; min-width: 0; width: 100%; contain: paint; }
+.gaui-chat-region[data-chat-decoration="before"] { order: -1; }
+.gaui-chat-region[data-chat-decoration="after"] { order: 1; }
+.gaui-chat-region[data-host-order="first"] { order: 1; }
