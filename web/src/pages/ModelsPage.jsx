@@ -101,6 +101,10 @@ function optionalNumber(value) {
   return Number.isNaN(parsed) ? value : parsed
 }
 
+// Reject nested/unexpected values at the display boundary. Validation remains host-owned.
+const editorNumber = value => typeof value === 'number' || typeof value === 'string' ? value : ''
+const editorBool = value => typeof value === 'boolean' ? value : undefined
+
 function OptionalBoolSelect({ value, onChange, t, trueLabel, falseLabel }) {
   return (
     <Select
@@ -133,45 +137,33 @@ function ModelParams({ config, protocol, onChange, t }) {
 
   return (
     <div className="model-row-body">
-      <div className="model-subsection">
-        <div className="model-subsection-head">
-          <strong>{text.callParams}</strong>
-          <span>{config.model}</span>
-        </div>
-        <p className="model-subsection-help">{text.callParamsHelp}</p>
-        <div className="model-params-grid">
-          <label className="model-field model-field--wide">
-            <span className="model-field-label">{text.displayName}</span>
-            <Input value={config.name || ''} onChange={event => onChange({ name: event.target.value })} placeholder={text.displayNamePlaceholder} />
-          </label>
-          {['temperature', 'max_tokens', 'max_retry_after'].map(key => (
-            <label className="model-field" key={key}>
-              <span className="model-field-label">{key}</span>
-              <Input type="number" min={key === 'max_tokens' ? 1 : 0} step={key === 'max_tokens' ? 1 : 'any'} value={extra[key] ?? ''} onChange={event => updateExtra(key, optionalNumber(event.target.value))} placeholder={text.inherit} />
-            </label>
-          ))}
-          <label className="model-field">
-            <span className="model-field-label">omit_thinking</span>
-            <OptionalBoolSelect value={extra.omit_thinking} onChange={value => updateExtra('omit_thinking', value)} t={t} />
-          </label>
-          <label className="model-field">
-            <span className="model-field-label">{text.stream}</span>
-            <OptionalBoolSelect value={config.stream} onChange={stream => onChange({ stream })} t={t} />
-          </label>
-          <label className="model-field">
-            <span className="model-field-label">{text.maxRetries}</span>
-            <Input type="number" min={0} value={config.max_retries ?? ''} onChange={event => onChange({ max_retries: optionalNumber(event.target.value) })} placeholder={text.inherit} />
-          </label>
-          <label className="model-field">
-            <span className="model-field-label">{text.readTimeout}</span>
-            <Input type="number" min={1} value={config.read_timeout ?? ''} onChange={event => onChange({ read_timeout: optionalNumber(event.target.value) })} placeholder={text.inherit} />
-          </label>
-          <label className="model-field">
-            <span className="model-field-label">{text.connectTimeout}</span>
-            <Input type="number" min={1} value={config.connect_timeout ?? ''} onChange={event => onChange({ connect_timeout: optionalNumber(event.target.value) })} placeholder={text.inherit} />
-          </label>
-        </div>
-      </div>
+      <UiSurface name="admin.models.editor.common" viewProps={{
+        // Deliberately project scalar values only; never spread config/extra here.
+        model: {
+          title: text.callParams, help: text.callParamsHelp, modelId: config.model,
+          labels: { name: text.displayName, namePlaceholder: text.displayNamePlaceholder,
+            stream: text.stream, maxRetries: text.maxRetries, readTimeout: text.readTimeout,
+            connectTimeout: text.connectTimeout, inherit: text.inherit, enabled: t.enabled, disabled: t.disabled },
+          values: {
+            name: typeof config.name === 'string' ? config.name : '',
+            temperature: editorNumber(extra.temperature), maxTokens: editorNumber(extra.max_tokens),
+            maxRetryAfter: editorNumber(extra.max_retry_after), omitThinking: editorBool(extra.omit_thinking),
+            stream: editorBool(config.stream), maxRetries: editorNumber(config.max_retries),
+            readTimeout: editorNumber(config.read_timeout), connectTimeout: editorNumber(config.connect_timeout),
+          },
+        },
+        actions: {
+          setName: name => onChange({ name: String(name) }),
+          setTemperature: value => updateExtra('temperature', optionalNumber(value)),
+          setMaxTokens: value => updateExtra('max_tokens', optionalNumber(value)),
+          setMaxRetryAfter: value => updateExtra('max_retry_after', optionalNumber(value)),
+          setOmitThinking: value => updateExtra('omit_thinking', editorBool(value)),
+          setStream: value => onChange({ stream: editorBool(value) }),
+          setMaxRetries: value => onChange({ max_retries: optionalNumber(value) }),
+          setReadTimeout: value => onChange({ read_timeout: optionalNumber(value) }),
+          setConnectTimeout: value => onChange({ connect_timeout: optionalNumber(value) }),
+        },
+      }} />
 
       {hasProtocolFields && (
         <div className="model-subsection">

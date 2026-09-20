@@ -1,0 +1,10 @@
+.model-editor-common { min-width: 0; }
+.model-editor-common-studio > header { display: grid; gap: 6px; margin-bottom: 14px; }
+.model-editor-common-studio code { overflow-wrap: anywhere; opacity: .7; }
+.model-editor-common-panels { display: grid; gap: 14px; }
+.model-editor-common-panels fieldset { min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--border-color, #8885); border-radius: 8px; }
+.model-editor-common-panels legend { width: auto; margin: 0; padding: 0 6px; font-size: 12px; font-weight: 600; }
+.model-editor-common-panels fieldset:first-child .model-params-grid { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 600px) {
+  .model-editor-common .model-params-grid { grid-template-columns: minmax(0, 1fr); }
+}
