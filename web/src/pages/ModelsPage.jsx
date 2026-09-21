@@ -1,3 +1,4 @@
+import ModelDiscoveryList from './ModelDiscoveryList'
 import './models-workbench.css'
 import { modelRiskView } from './modelsRiskView'
 import { UiSurface } from '../ui/UiHost'
@@ -613,8 +614,12 @@ function AddModelModal({ open, profiles, initialIndex, onClose, onAdd, discoverM
 
   const profile = profiles[providerIndex]
   const candidates = uniqueModels(discovered)
+  const discoveryRequest = useRef(0)
+  const existingModels = [...profileModels(profile), ...(profile?.model_configs || []).map(item => item.model), ...added]
 
   const selectProvider = index => {
+    discoveryRequest.current += 1
+    setBusy(false)
     setProviderIndex(index)
     setDiscovered([])
     setFetched(false)
@@ -638,6 +643,7 @@ function AddModelModal({ open, profiles, initialIndex, onClose, onAdd, discoverM
 
   const discover = async () => {
     if (!profile) return
+    const request = ++discoveryRequest.current
     setBusy(true)
     setError('')
     try {
@@ -648,12 +654,13 @@ function AddModelModal({ open, profiles, initialIndex, onClose, onAdd, discoverM
         apiKey: key && !isMaskedSecret(key) ? key : undefined,
         varName: profile.var_name,
       })
+      if (request !== discoveryRequest.current) return
       setDiscovered(response?.models || [])
       setFetched(true)
     } catch (failure) {
-      setError(String(failure?.message || failure))
+      if (request === discoveryRequest.current) setError(String(failure?.message || failure))
     } finally {
-      setBusy(false)
+      if (request === discoveryRequest.current) setBusy(false)
     }
   }
 
@@ -716,20 +723,9 @@ function AddModelModal({ open, profiles, initialIndex, onClose, onAdd, discoverM
         ) : busy ? (
           <div className="model-hint-block" role="status">{text.fetching}</div>
         ) : fetched ? (
-          <div className="model-subsection">
-            <div className="model-subsection-head">
-              <strong>{text.discovered(candidates.length)}</strong>
-              <Button size="small" type="primary" onClick={() => add(candidates)} disabled={!candidates.length}>{text.addAll}</Button>
-            </div>
-            <div className="model-candidate-list">
-              {candidates.length ? candidates.map(model => (
-                <button key={model} type="button" className="model-candidate-item" onClick={() => add([model])} aria-label={text.addModelAria(model)}>
-                  <span title={model}>{model}</span>
-                  <Plus size={14} />
-                </button>
-              )) : <div className="model-hint-block">{text.noNewModels}</div>}
-            </div>
-          </div>
+          <ModelDiscoveryList key={providerIndex} candidates={candidates} existing={existingModels}
+            onAdd={values => add(values.filter(model => !existingModels.includes(model)))}
+            english={text.fetchModels === 'Fetch from provider'} />
         ) : null}
 
         {added.length > 0 && (
