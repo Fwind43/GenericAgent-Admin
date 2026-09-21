@@ -15,11 +15,27 @@
 .ui-studio-settings :disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:720px){.ui-studio-settings-workspace{grid-template-columns:minmax(0,1fr);gap:16px}.ui-studio-settings aside{border-left:0;border-top:1px solid var(--border);padding:12px 0 0}}
 
-.ui-theme-choices{display:flex;flex-wrap:wrap;gap:12px}
-.ui-theme-choices button{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:12px;border-radius:12px}
-.ui-theme-choices button[aria-pressed=true]{border-color:var(--accent);background:var(--selected)}
-.ui-theme-choices button span{display:flex;gap:4px}
-.ui-theme-choices button i{width:18px;height:18px;border-radius:50%;border:1px solid var(--border)}
+.app .ui-theme-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;width:100%}
+.app .ui-theme-choices button{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0;text-align:left;border:1px solid var(--border);background:var(--surface);color:var(--text);padding:12px;border-radius:12px;box-shadow:none;transition:border-color .15s,box-shadow .15s}
+.app .ui-theme-choices button:hover:not(:disabled){background:var(--surface);border-color:var(--border-strong);color:var(--text)}
+.app .ui-theme-choices button[aria-pressed=true]{border-color:var(--accent);background:var(--surface);color:var(--text);box-shadow:0 0 0 1px var(--accent)}
+.app .ui-theme-choices button:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.app .ui-theme-choices button:disabled{opacity:.55;cursor:not-allowed}
+.app .ui-theme-choices .ui-theme-preview{display:flex;height:100px;overflow:hidden;background:var(--preview-bg);border:1px solid color-mix(in srgb,var(--preview-ink) 12%,transparent);border-radius:7px;gap:0;margin:0;color:var(--preview-ink)}
+.app .ui-theme-choices .ui-theme-preview-rail{display:flex;flex-direction:column;gap:7px;width:24%;padding:16px 10px;background:var(--preview-panel);border-right:1px solid color-mix(in srgb,var(--preview-ink) 10%,transparent)}
+.app .ui-theme-choices .ui-theme-preview-rail i{display:block;height:4px;width:75%;background:currentColor;opacity:.15;border:0;border-radius:2px}
+.app .ui-theme-choices .ui-theme-preview-rail i:first-child{opacity:.65;width:55%;margin-bottom:9px}
+.app .ui-theme-choices .ui-theme-preview-main{display:flex;flex:1;flex-direction:column;align-items:flex-start;gap:7px;padding:16px}
+.app .ui-theme-choices .ui-theme-preview-main i{width:38%;height:5px;background:currentColor;opacity:.65;border:0;border-radius:2px;margin-bottom:4px}
+.app .ui-theme-choices .ui-theme-preview-main span{width:85%;height:4px;background:currentColor;opacity:.12;border-radius:2px}
+.app .ui-theme-choices .ui-theme-preview-main span:nth-child(3){width:60%}
+.app .ui-theme-choices .ui-theme-preview-main em{width:28px;height:12px;background:currentColor;opacity:.8;border-radius:3px;margin-top:4px}
+.app .ui-theme-choices .ui-theme-caption{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px}
+.app .ui-theme-choices .ui-theme-caption b{font-size:14px;font-weight:600}
+.app .ui-theme-choices .ui-theme-check{display:grid;place-items:center;width:18px;height:18px;border:1px solid var(--border-strong);border-radius:50%;font-size:12px;line-height:1}
+.app .ui-theme-choices button[aria-pressed=true] .ui-theme-check{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.app .ui-theme-choices button small{color:var(--muted);font-size:12px;line-height:1.5;font-weight:400}
+@media(max-width:420px){.app .ui-theme-choices{grid-template-columns:minmax(0,1fr)}}
 .ui-studio-settings fieldset{min-width:0;border:1px solid var(--border);border-radius:10px;padding:14px;margin:12px 0}
 .ui-studio-settings fieldset label{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0;overflow-wrap:anywhere}
 .ui-studio-settings fieldset input:not([type=checkbox]):not([type=radio]),.ui-studio-settings select{min-width:0;max-width:100%;box-sizing:border-box}

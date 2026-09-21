@@ -13,7 +13,12 @@ export function DefaultAppearanceSettings({ model, actions, hidden }) {
     <SettingRow label={model.text.language} hint={model.text.languageHelp} htmlFor="settings-language"><LanguageSelect model={model} actions={actions}/></SettingRow>
     <SettingRow label={model.text.theme} hint={model.text.themeHelp} stacked>
       <div className="ui-theme-choices">{model.themes.map(theme => <button key={theme.id} type="button" aria-pressed={theme.id === model.theme} disabled={model.disabled} onClick={() => actions.changeTheme(theme.id)}>
-        <b>{theme.label}</b><small>{theme.description}</small><span aria-hidden="true">{theme.preview.map((color, i) => <i key={i} style={{ background: color }}/>)}</span>
+        <span className="ui-theme-preview" aria-hidden="true" style={{ '--preview-bg': theme.preview[0], '--preview-panel': theme.preview[1], '--preview-ink': theme.preview[2] }}>
+          <span className="ui-theme-preview-rail"><i/><i/><i/></span>
+          <span className="ui-theme-preview-main"><i/><span/><span/><em/></span>
+        </span>
+        <span className="ui-theme-caption"><b>{theme.label}</b><span className="ui-theme-check" aria-hidden="true">{theme.id === model.theme ? '\u2713' : ''}</span></span>
+        <small>{theme.description}</small>
       </button>)}</div>
     </SettingRow>
     <p>{model.text.fontAttribution} <a href="/fonts/misans/MiSans-License.pdf" target="_blank" rel="noreferrer">{model.text.fontLicense}</a></p>
