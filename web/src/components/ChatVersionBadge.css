@@ -1,0 +1,12 @@
+.oa-title > .oa-chat-version {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  opacity: .65;
+}

@@ -1,3 +1,4 @@
+import ChatVersionBadge from './components/ChatVersionBadge'
 import { ChatPackageBar } from './ui/chatChrome'
 import { UiSurface, useUiPackage } from './ui/UiHost'
 import { conductorSidebarSections } from './lib/chatConductor.js'
@@ -7603,7 +7604,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
           <button className="oa-icon-btn oa-sidebar-toggle" onClick={()=>setCollapsed(false)} title={ct('展开侧栏', 'Expand sidebar')} aria-label={ct('展开侧栏', 'Expand sidebar')}><PanelLeftOpen size={18} aria-hidden="true"/></button>
           <button className="oa-icon-btn oa-collapsed-new" onClick={newSession} title={ct('新对话', 'New chat')} aria-label={ct('新对话', 'New chat')}><MessageSquarePlus size={18}/></button>
         </div>}
-        <div className="oa-title"><b>{current ? shortTitle(current) : ct('新对话', 'New chat')}</b>{(current?.project_id || current?.project_mode) && <span className="oa-project-badge" title={current.project_id || current.project_mode}><FolderOpen size={12} aria-hidden="true"/><span>{current.project_id || current.project_mode}</span></span>}{current?.workspace && <span className="oa-workspace-badge" title={current.workspace}>Workspace: {current.workspace}</span>}</div>
+        <div className="oa-title"><b>{current ? shortTitle(current) : ct('新对话', 'New chat')}</b><ChatVersionBadge/>{(current?.project_id || current?.project_mode) && <span className="oa-project-badge" title={current.project_id || current.project_mode}><FolderOpen size={12} aria-hidden="true"/><span>{current.project_id || current.project_mode}</span></span>}{current?.workspace && <span className="oa-workspace-badge" title={current.workspace}>Workspace: {current.workspace}</span>}</div>
         <div className="oa-topbar-tools" role="toolbar" aria-label={ct('聊天工具', 'Chat tools')}>
           <div className="oa-topbar-view-tools" role="group" aria-label={ct('对话视图', 'Conversation views')}>
             <button className={`oa-context-btn ${contextOpen ? 'is-open' : ''}`} type="button" onClick={()=>setContextOpen(v=>!v)} disabled={!sid} title={ct('查看发给模型的 raw_history', 'View raw_history sent to the model')}>
