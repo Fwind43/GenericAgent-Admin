@@ -477,7 +477,7 @@ function ProviderModal({
       ) : (
         <div className="model-drawer-footer">
           <Button danger icon={<Trash2 size={14} />} onClick={onRemove}>{text.deleteProviderTitle}</Button>
-          <Button type="primary" onClick={onClose}>{t.close}</Button>
+          <Button onClick={onClose}>{t.close}</Button>
         </div>
       )}
     >
@@ -667,7 +667,7 @@ function AddModelModal({ open, profiles, initialIndex, onClose, onAdd, discoverM
       onCancel={onClose}
       width={640}
       destroyOnHidden
-      footer={<Button type="primary" onClick={onClose}>{t.close}</Button>}
+      footer={<Button onClick={onClose}>{t.close}</Button>}
     >
       <div className="model-add-body">
         <label className="model-field">

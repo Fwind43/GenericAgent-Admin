@@ -63,59 +63,59 @@
 
 :root,
 html[data-theme="warm"] {
-  --bg: #FEFCF7;
-  --bg-soft: #FAF7F0;
-  --surface: #F3EEE3;
-  --surface-strong: #FEFCF7;
-  --surface-muted: #F5F0E5;
+  --bg: #FDFCFA;
+  --bg-soft: #F7F6F3;
+  --surface: #FFFFFF;
+  --surface-strong: #FDFCFA;
+  --surface-muted: #F2F1EE;
   --surface-subtle: rgba(0, 0, 0, .025);
   --surface-subtle-hover: rgba(0, 0, 0, .045);
   --surface-hover: rgba(0, 0, 0, .03);
-  --border: #E0D8C8;
-  --border-strong: #C9BDA8;
+  --border: #DEDDD8;
+  --border-strong: #C8C6C0;
   --border-subtle: rgba(0, 0, 0, .08);
   --border-muted: rgba(0, 0, 0, .12);
-  --text: #1A1610;
-  --muted: #5C5344;
+  --text: #292826;
+  --muted: #64625E;
   /* Text colours below clear WCAG AA (4.5:1) on every warm surface, including
-     the deepest one (--surface #F3EEE3), not just on --bg. */
-  --muted-2: #7C674C;
-  --strong: #0F0D08;
-  --em: #5C5344;
+     the deepest one (--surface-muted #F2F1EE), not just on --bg. */
+  --muted-2: #706D68;
+  --strong: #22211F;
+  --em: #64625E;
   --blue: #027590;
   --cyan: #0A7775;
   --violet: #7455C9;
   --green: #357838;
   --orange: #9A5C00;
   --red: #C62828;
-  --gold: #C9A961;  /* Reduced saturation */
-  --accent: #C9A961;  /* Reduced saturation */
-  --accent-hover: #A8914F;  /* Adjusted from new base */
-  --accent-bg: rgba(201, 169, 97, 0.08);
-  --accent-bg-strong: rgba(201, 169, 97, 0.15);
-  --accent-text: #806833;
-  /* Ink on the gold fill: white was 2.25:1, this ink reads 8:1. */
-  --text-on-accent: #1A1610;
+  --gold: #A45642;  /* Muted terracotta: accents only, never the canvas. */
+  --accent: #A45642;  /* Muted terracotta: accents only, never the canvas. */
+  --accent-hover: #8D4736;
+  --accent-bg: rgba(164, 86, 66, 0.08);
+  --accent-bg-strong: rgba(164, 86, 66, 0.15);
+  --accent-text: #904A39;
+  /* White on terracotta clears AA for normal button labels. */
+  --text-on-accent: #FFFFFF;
   --success: #357838;
   --warning: #9A5C00;
   --error: #C62828;
   --info: #027590;
-  --focus-ring: rgba(201, 169, 97, .35);
-  --focus-glow: rgba(201, 169, 97, .1);
+  --focus-ring: rgba(164, 86, 66, .35);
+  --focus-glow: rgba(164, 86, 66, .1);
   --input-bg: rgba(0, 0, 0, .03);
   --hover-bg: rgba(0, 0, 0, .05);
-  --code-bg: #F5F0E5;
-  --code-text: #8b4513;
+  --code-bg: #F2F1EE;
+  --code-text: #805345;
   --code-inline-bg: rgba(0, 0, 0, .06);
-  --chat-table-border: #E0D8C8;
-  --chat-table-header-bg: #F5F0E5;
-  --chat-table-row-alt: rgba(92, 83, 68, .035);
-  --chat-table-row-hover: rgba(201, 169, 97, .12);
-  --chat-table-scrollbar: rgba(92, 83, 68, .28);
-  --pre-text: #1A1610;
-  --sidebar: #FAF7F0;
-  --topbar-bg: rgba(250, 247, 240, .98);
-  --main-bg: rgba(254, 252, 247, 0.5);
+  --chat-table-border: #DEDDD8;
+  --chat-table-header-bg: #F2F1EE;
+  --chat-table-row-alt: rgba(100, 98, 94, .035);
+  --chat-table-row-hover: rgba(164, 86, 66, .12);
+  --chat-table-scrollbar: rgba(100, 98, 94, .28);
+  --pre-text: #292826;
+  --sidebar: #F7F6F3;
+  --topbar-bg: rgba(247, 246, 243, .98);
+  --main-bg: rgba(253, 252, 250, 0.5);
   --shadow: 0 24px 70px rgba(26, 22, 16, .08);
   --shadow-soft: 0 14px 42px rgba(26, 22, 16, .055);
   --shadow-tiny: 0 1px 2px rgba(26, 22, 16, .04);
@@ -11558,17 +11558,15 @@ html[data-color-scheme="dark"] .set-card-icon { color: #67d9bd; background: rgba
   font-size: 11px;
 }
 
-/* Warm is the default theme, and it is the only light-scheme theme with a hue:
-   without this the page would drop a cool navy/blue-grey card onto warm paper.
-   Ink doubles as a button fill with white text, so it stays dark enough for AA. */
+/* Warm paper stays neutral; only deliberate actions carry the accent. */
 html[data-theme="warm"] .models-page {
-  --model-ink: #7A6330;
-  --model-ink-strong: #5C4A24;
-  --model-wash: #F5F0E5;
-  --model-wash-strong: #EDE4D2;
-  --model-paper: rgba(254, 252, 247, .94);
-  --model-panel: rgba(250, 247, 240, .82);
-  --model-focus: #A8914F;
+  --model-ink: #55524D;
+  --model-ink-strong: #34322F;
+  --model-wash: #F2F1EE;
+  --model-wash-strong: #E8E6E1;
+  --model-paper: #FFFFFF;
+  --model-panel: #F7F6F3;
+  --model-focus: var(--accent);
   --model-ok: #357838;
   --model-warn: #9A5C00;
   --model-error: #C62828;
