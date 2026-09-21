@@ -71,7 +71,7 @@ it.each(['default', 'studio'])('%s edits and reorders through the host, then sav
   expect(within(directory()).getByRole('button', { name: `${t.models.moveUp} model-a` }).disabled).toBe(true)
   click(`${t.models.configure}: model-a`)
   const dialog = screen.getByRole('dialog')
-  fireEvent.change(within(dialog).getByDisplayValue('Alpha'), { target: { value: 'Edited alpha' } })
+  fireEvent.change(await within(dialog).findByDisplayValue('Alpha'), { target: { value: 'Edited alpha' } })
   expect(host.profiles[0].model_configs[0].name).toBe('Edited alpha')
   expect(requests('/api/models/export')).toHaveLength(0)
   fireEvent.click(within(dialog).getByRole('button', { name: t.close, exact: true }))

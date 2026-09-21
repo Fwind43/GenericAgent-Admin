@@ -13,3 +13,14 @@
   .studio-model-directory { grid-template-columns: 1fr; padding: 12px; gap: 16px; }
   .studio-model-directory aside { border-inline-end: 0; border-bottom: 1px solid var(--border); padding: 0 0 16px; }
 }
+
+.model-provider-entry { min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.models-page .model-provider-entry .model-connection-card { width: 100%; border: 0; border-radius: 0; }
+.model-provider-direct-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
+.model-provider-direct-actions button { width: auto; min-height: 36px; padding: 6px 10px; }
+.model-provider-direct-actions .model-provider-delete { color: var(--danger, #dc4446); margin-inline-start: auto; }
+@media (max-width: 800px) {
+ .model-provider-direct-actions button { min-height: 44px; }
+ .models-page .model-call-actions { flex-wrap: wrap; }
+ .models-page .model-call-actions .ant-btn { min-height: 44px; width: auto; }
+}

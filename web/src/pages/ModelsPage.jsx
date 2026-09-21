@@ -1164,6 +1164,7 @@ export function Models({
           model: {
             title: text.connections, help: text.connectionsHelp,
             addLabel: text.addProvider, emptyLabel: text.noProvidersHelp,
+            editLabel: text.configure, addModelLabel: text.addModel, deleteLabel: t.delete,
             columns: { name: text.name, endpoint: 'BaseURL', protocol: text.protocol, models: text.model },
             providers: profiles.map((profile, index) => {
               const state = providerState(validation[index])
@@ -1185,6 +1186,8 @@ export function Models({
           actions: {
             addProvider: openNewProvider,
             openProvider: index => { if (Number.isInteger(index) && profiles[index]) openProvider(index) },
+            addModel: index => { if (Number.isInteger(index) && profiles[index]) setAddModelIndex(index) },
+            removeProvider: index => { if (Number.isInteger(index) && profiles[index]) return removeProvider(index) },
           },
         }}/>
       </section>

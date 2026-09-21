@@ -29,7 +29,7 @@ function RowActions({ row, model, actions }) {
     </Button>
     <Button type="text" size="small" icon={<ArrowUp size={15}/>} aria-label={`${l.up} ${row.actionName}`} title={l.up} disabled={!row.canMoveUp} onClick={() => actions.moveUp(row.id)}/>
     <Button type="text" size="small" icon={<ArrowDown size={15}/>} aria-label={`${l.down} ${row.actionName}`} title={l.down} disabled={!row.canMoveDown} onClick={() => actions.moveDown(row.id)}/>
-    <Button danger type="text" size="small" icon={<Trash2 size={14}/>} aria-label={`${l.remove} ${row.actionName}`} title={row.group ? l.removeGroup : l.removeModel} onClick={() => actions.remove(row.id)}/>
+    <Button danger type="text" size="small" icon={<Trash2 size={14}/>} aria-label={`${l.remove} ${row.actionName}`} title={row.group ? l.removeGroup : l.removeModel} onClick={() => actions.remove(row.id)}>{l.remove}</Button>
   </div>
 }
 function Provider({ row, model, actions }) {
