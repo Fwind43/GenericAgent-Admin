@@ -2,7 +2,7 @@
 .app .general-workbench { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 1120px; min-width: 0; margin-inline: auto; }
 .app .general-workbench [hidden] { display: none !important; }
 .app .general-index { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-muted); }
-.app .general-index button { flex: 0 0 auto; text-align: center; border: 1px solid transparent; border-radius: 8px; background: transparent; padding: 9px 16px; min-height: 40px; color: var(--muted); }
+.app .general-index button { flex: 0 0 auto; width: auto; text-align: center; border: 1px solid transparent; border-radius: 8px; background: transparent; padding: 9px 16px; min-height: 40px; color: var(--muted); }
 .app .general-index button:hover { color: var(--text); background: var(--hover); }
 .app .general-index button[aria-current] { color: var(--accent); background: var(--surface-strong); border-color: var(--border); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
 .app .general-index button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
