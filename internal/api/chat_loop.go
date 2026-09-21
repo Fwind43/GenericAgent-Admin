@@ -911,7 +911,21 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		s.endChatRunOwned(sid, token)
 		return false
 	}
-	cs.QueuedMessages = append(cs.QueuedMessages[:queueIndex], cs.QueuedMessages[queueIndex+1:]...)
+	batchCount := conductorCompletionBatchCount(cs, queueIndex, queueID)
+	batch := append([]chatQueuedMessage(nil), cs.QueuedMessages[queueIndex:queueIndex+batchCount]...)
+	s.ChatMu.Lock()
+	if current := s.ChatRuns[sid]; current != token || current.Done || current.Canceled {
+		s.ChatMu.Unlock()
+		s.SessionMu.Unlock()
+		s.endChatRunOwned(sid, token)
+		return false
+	}
+	token.QueueIDs = make([]string, 0, len(batch))
+	for _, item := range batch {
+		token.QueueIDs = append(token.QueueIDs, item.ID)
+	}
+	s.ChatMu.Unlock()
+	cs.QueuedMessages = append(cs.QueuedMessages[:queueIndex], cs.QueuedMessages[queueIndex+batchCount:]...)
 	cs.UpdatedAt = time.Now().Unix()
 
 	pendingID := newChatID()
@@ -968,10 +982,7 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 
 	if internalCompletion {
 		cmdReq["input_kind"] = "conductor_completion"
-		dispatchID := strings.TrimPrefix(queuedItem.ID, "conductor-")
-		if idx := conductorFindChild(cs.ConductorChildren, dispatchID); idx >= 0 {
-			cmdReq["conductor_completion_receipt"] = cs.ConductorChildren[idx]
-		}
+		prepareConductorCompletionBatch(cmdReq, cs, batch)
 	}
 
 	for key, value := range conductorReq {

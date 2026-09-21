@@ -16,6 +16,17 @@ class ConductorReadTest(unittest.TestCase):
         exec(compile(ast.Module(body=nodes+[collect], type_ignores=[]), '<read>', 'exec'), self.env)
         self.result = dict(dispatch_id='d', session_id='w', status='succeeded', result_receipt=dict(id='a',revision='v'))
 
+    def test_batch_consumption_acknowledges_each_valid_receipt(self):
+        agent = SimpleNamespace(extra_sys_prompts=['original'])
+        second = dict(self.result, dispatch_id='second')
+        req = dict(input_kind='conductor_completion',
+                   conductor_completion_receipts=[self.result, {'status': 'pending'}, second],
+                   conductor_completion_receipt=self.result)
+        _, restore = self.env['_prepare_conductor_completion'](agent, req, 'A and B')
+        self.assertEqual([e['dispatch_id'] for e in self.events], ['d', 'second'])
+        restore()
+        self.assertEqual(agent.extra_sys_prompts, ['original'])
+
     def test_automatic_consumption_and_failure(self):
         agent = SimpleNamespace(extra_sys_prompts=['original'])
         req = dict(input_kind='conductor_completion', conductor_completion_receipt=self.result)

@@ -2649,7 +2649,11 @@ def _prepare_conductor_completion(agent, req, prompt):
         "merely to read this event; dispatch only for an identified unmet requirement.\n"
         + json.dumps(prompt, ensure_ascii=False)
     ]
-    _ack_conductor_result(req.get('conductor_completion_receipt'))
+    receipts = req.get('conductor_completion_receipts')
+    if not isinstance(receipts, list):
+        receipts = [req.get('conductor_completion_receipt')]
+    for receipt in receipts:
+        _ack_conductor_result(receipt)
     def restore():
         agent.extra_sys_prompts = original
     return ('[Internal Conductor completion event; not a new user request] '

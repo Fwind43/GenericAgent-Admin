@@ -282,6 +282,7 @@ type chatRun struct {
 	ID                 string
 	SID                string
 	QueueID            string
+	QueueIDs           []string
 	Events             [][]byte
 	TaskbarText        strings.Builder
 	TaskbarDirty       bool

@@ -869,8 +869,8 @@ func (s *Server) chatGuidePost(w http.ResponseWriter, r *http.Request, sid, queu
 	// idempotent even when the item has already left the persisted queue.
 	s.ChatMu.Lock()
 	current := s.ChatRuns[sid]
-	matchingRun := current != nil && current.QueueID == queueID
-	anotherQueueRunning := current != nil && !current.Done && current.QueueID != "" && current.QueueID != queueID
+	matchingRun := chatRunContainsQueueID(current, queueID)
+	anotherQueueRunning := current != nil && !current.Done && current.QueueID != "" && !matchingRun
 	matchingDone := matchingRun && current.Done
 	s.ChatMu.Unlock()
 
