@@ -7111,6 +7111,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
   useEffect(() => {
     let stopped = false
     let inFlight = false
+    let metadataSessionID = ''
+    let metadataRefreshedAt = 0
     const refreshList = async () => {
       if (stopped || inFlight || (!shouldRefreshChatTaskbar() && !shouldPollConductorSessions(sessionsRef.current))) return
       inFlight = true
@@ -7132,6 +7134,13 @@ export default function ChatApp({ onOpenSettings } = {}) {
           const conductorPoll = conductorPollActions(after, {
             streamAttached: Boolean(streamAbortRef.current),
             runAttached: Boolean(activeRunRef.current),
+            metadataUnchanged: metadataSessionID === activeID && equalSessionSummaryValue(before, after)
+              && equalSessionSummaryValue(
+                previous.filter(item => conductorParentID(item) === activeID),
+                next.filter(item => conductorParentID(item) === activeID),
+              ),
+            metadataAge: Date.now() - metadataRefreshedAt,
+            workersActive: next.some(item => conductorParentID(item) === activeID && canStopConductorWorker(item)),
           })
           if (conductorPoll.attachRunningStream) {
             void attachRunningStream(activeID, { waitForRun:true })
@@ -7144,6 +7153,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
               ? await chatApi(`/api/chat/conductor/${encodeURIComponent(activeID)}/children`)
               : null
             if (!stopped && activeSidRef.current === activeID) {
+              metadataSessionID = activeID
+              metadataRefreshedAt = Date.now()
               setActiveSessionDetail(current => current && String(current.id) === String(after.id)
                 ? { ...current, ...after, ...(Array.isArray(metadata?.children) ? { conductor_children: metadata.children, conductor_usage_summary: metadata.usage_summary, conductor_dispatch_count: metadata.dispatch_count } : {}) }
                 : current)
@@ -7157,8 +7168,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
       }
     }
     const timer = window.setInterval(refreshList, 3000)
-    const onVisible = () => { if (!document.hidden) refreshList() }
-    const onOnline = () => refreshList()
+    const onVisible = () => { if (!document.hidden) { metadataRefreshedAt = 0; refreshList() } }
+    const onOnline = () => { metadataRefreshedAt = 0; refreshList() }
     document.addEventListener('visibilitychange', onVisible)
     window.addEventListener('online', onOnline)
     return () => {

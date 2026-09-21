@@ -52,3 +52,15 @@ console.log('chatConductor tests passed')
 assert.equal(workerStatus({ status:'running', recovery:'pending_confirmation' }), 'recovery_pending')
 assert.equal(canStopConductorWorker({ status:'running', recovery:'pending_confirmation' }), false)
 assert.equal(shouldPollConductorSessions([{ ...workerA, conductor:{ ...workerA.conductor, recovery:'pending_confirmation' } }]), true)
+
+// Unchanged idle metadata is bounded, but transitions and active work remain prompt.
+const idleParent = { id:'idle', conductor:{role:'parent'} }
+const freshMetadata = {metadataUnchanged:true, metadataAge:29999}
+assert.equal(conductorPollActions(idleParent, freshMetadata).refreshMetadata, false)
+assert.equal(conductorPollActions(idleParent, {...freshMetadata, metadataAge:30000}).refreshMetadata, true)
+assert.equal(conductorPollActions(idleParent, {...freshMetadata, metadataUnchanged:false}).refreshMetadata, true)
+assert.equal(conductorPollActions(idleParent, {...freshMetadata, workersActive:true}).refreshMetadata, true)
+assert.equal(conductorPollActions({...idleParent, running:true}, freshMetadata).refreshMetadata, true)
+assert.equal(conductorPollActions(workerA, freshMetadata).refreshMetadata, true)
+assert.equal(conductorPollActions(terminalWorker, freshMetadata).refreshMetadata, false)
+assert.equal(conductorPollActions(ordinary, {...freshMetadata, metadataAge:Infinity}).refreshMetadata, false)

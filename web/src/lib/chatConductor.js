@@ -25,8 +25,13 @@ export const conductorStatusCounts = workers => (Array.isArray(workers) ? worker
   return counts
 }, { total: 0, queued: 0, running: 0, succeeded: 0, failed: 0, cancelled: 0 })
 
-export const conductorPollActions = (session, { streamAttached = false, runAttached = false } = {}) => ({
-  refreshMetadata: isConductorParent(session) || isConductorWorker(session),
+export const conductorPollActions = (session, {
+  streamAttached = false, runAttached = false,
+  metadataUnchanged = false, metadataAge = Infinity, workersActive = false,
+} = {}) => ({
+  refreshMetadata: (isConductorParent(session) || isConductorWorker(session))
+    && (!metadataUnchanged || metadataAge >= 30000 || Boolean(session?.running)
+      || isActiveConductorWorker(session) || workersActive),
   attachRunningStream: Boolean(session?.running) && !streamAttached && !runAttached,
 })
 
