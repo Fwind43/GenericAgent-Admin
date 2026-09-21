@@ -45,3 +45,23 @@
 .models-page .model-connection-card { padding:12px 16px; }
 .models-page .model-call-rows:focus-visible,.models-page .model-connection-grid:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 @media (max-width:800px) { .models-page .model-call-rows,.models-page .model-connection-grid { max-height:none; overflow:visible; } }
+
+/* Roomy desktop workspace, readable mobile actions instead of icon-only tabs. */
+.app > .main .models-page { width: 100%; max-width: 1280px; min-width: 0; margin-inline: auto; }
+.app > .main .models-page .model-save-bar { gap: 12px; padding: 10px; box-shadow: none; }
+.app > .main .models-page .model-workbench-scope { font-size: 12px; line-height: 1.6; margin-bottom: 12px; color: var(--muted); }
+.app > .main .models-page .model-workspace-tabs button { width: auto; min-height: 40px; padding-inline: 14px; }
+.app > .main .models-page :is(.model-call-head,.model-connections-head) { gap: 16px; }
+.app > .main .models-page .model-empty-state { min-height: 180px; padding: 24px 16px; }
+@media (max-width: 680px) {
+ .app > .main .models-page .model-save-bar { grid-template-columns: minmax(0,1fr); gap: 8px; position: static; }
+ .app > .main .models-page .model-toolbar-main { width: 100%; }
+ .app > .main .models-page .model-workspace-tabs { width: 100%; flex: 1; }
+ .app > .main .models-page .model-workspace-tabs button { font-size: 12px; min-height: 44px; padding-inline: 8px; }
+ .app > .main .models-page .model-save-actions { justify-content: flex-end; gap: 8px; }
+ .app > .main .models-page .model-save-action { width: auto; margin-left: 0; padding-inline: 12px; }
+ .app > .main .models-page .model-save-action > span:not(.ant-btn-icon) { display: inline; }
+ .app > .main .models-page :is(.model-call-head,.model-connections-head) { flex-direction: column; align-items: stretch; gap: 12px; }
+ .app > .main .models-page :is(.model-call-head,.model-connections-head) .ant-space { flex-wrap: wrap; gap: 8px !important; }
+ .app > .main .models-page .model-empty-state { min-height: 160px; padding: 20px 12px; }
+}
