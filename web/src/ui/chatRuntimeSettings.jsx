@@ -3,6 +3,20 @@ import { FoldVertical } from 'lucide-react'
 import { SettingFooter, SettingRow, SettingToggle, SettingsSection } from '../components/settings'
 import './generalSettings.css'
 
+function ProjectModeHelp({ model }) {
+  const { labels, options } = model
+  if (!labels.officialHelp) return null
+  return <div style={{ padding: '0 20px 16px', fontSize: 13, lineHeight: 1.65 }}>
+    <dl style={{ margin: 0 }}>
+      <dt style={{ fontWeight: 600 }}>{options.find(option => option.value === 'official')?.label}</dt>
+      <dd style={{ margin: '2px 0 10px', color: 'var(--muted)' }}>{labels.officialHelp}</dd>
+      <dt style={{ fontWeight: 600 }}>{options.find(option => option.value === 'admin')?.label}</dt>
+      <dd style={{ margin: '2px 0 10px', color: 'var(--muted)' }}>{labels.adminHelp}</dd>
+    </dl>
+    <p style={{ margin: 0, color: 'var(--muted)' }}>{labels.switchHelp}</p>
+  </div>
+}
+
 export function DefaultProjectModeSettings({ model, actions }) {
   const { labels } = model
   return <SettingsSection title={labels.title} description={labels.description}>
@@ -11,6 +25,7 @@ export function DefaultProjectModeSettings({ model, actions }) {
         {model.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </SettingRow>
+    <ProjectModeHelp model={model}/>
     <SettingFooter>
       <button className="primary" type="button" disabled={model.disabled || model.busy || !model.dirty} onClick={actions.save}>{model.busy ? labels.saving : labels.save}</button>
       <small>{model.dirty ? labels.unsaved : labels.current}</small>
@@ -30,6 +45,7 @@ export function StudioProjectModeSettings({ model, actions }) {
           {model.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </div>
+      <ProjectModeHelp model={model}/>
       <footer><button className="primary" type="submit" disabled={model.disabled || model.busy || !model.dirty}>{model.busy ? labels.saving : labels.save}</button><small>{model.dirty ? labels.unsaved : labels.current}</small></footer>
     </form>
     {model.feedback && <p role="status">{model.feedback}</p>}

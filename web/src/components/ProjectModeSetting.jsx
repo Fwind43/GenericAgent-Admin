@@ -39,6 +39,9 @@ export default function ProjectModeSetting({ value = 'official', onSave, lang = 
       labels: {
         title: tr('项目模式', 'Project mode'),
         description: tr('选择所有项目的运行模式，已有项目和新项目均从下一轮起生效；正在执行的轮次保持不变，两套记忆分别保留。', 'Choose the runtime mode for all existing and new projects. Applies from the next turn; active turns stay unchanged and both memory stores are preserved.'),
+        officialHelp: tr('沿用 GenericAgent 官方项目记忆与工作流，适合保持官方使用方式。', 'Uses GenericAgent’s official project memory and workflow, for compatibility with the official experience.'),
+        adminHelp: tr('按 L1 索引、L2 项目事实、L3 专题文档分层管理记忆，适合长期维护、知识较多的项目。', 'Organizes memory into L1 index, L2 project facts and L3 topic documents, for long-running, knowledge-rich projects.'),
+        switchHelp: tr('这里只切换项目记忆机制，不切换模型或工作目录。两套记忆分别保留，不会自动完整迁移或实时同步。', 'This changes project memory, not the model or working directory. Both memory stores are preserved; they are not automatically fully migrated or kept in sync.'),
         mode: tr('全局运行模式', 'Global runtime mode'), save: tr('保存', 'Save'), saving: tr('保存中…', 'Saving…'),
         unsaved: tr('有未保存的更改', 'Unsaved changes'), current: tr('与已保存设置一致', 'Matches saved settings'),
       },
