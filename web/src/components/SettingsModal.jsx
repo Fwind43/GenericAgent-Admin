@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react'
-import { Modal } from 'antd'
+import Modal from 'antd/es/modal'
 import { ErrorBoundary, RouteFallback } from './feedback'
 import './settings-modal.css'
 

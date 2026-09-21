@@ -1,5 +1,6 @@
 import React from 'react'
-import { Alert, Button } from 'antd'
+import Alert from 'antd/es/alert'
+import Button from 'antd/es/button'
 import { FileCode2, RefreshCw, RotateCcw, Save, UploadCloud } from 'lucide-react'
 import './modelTransfer.css'
 

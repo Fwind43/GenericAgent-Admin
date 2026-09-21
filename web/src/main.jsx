@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useMemo, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { ConfigProvider, theme as antdTheme } from 'antd'
+import ConfigProvider from 'antd/es/config-provider'
+import antdTheme from 'antd/es/theme'
 import zhCN from 'antd/locale/zh_CN'
 import enUS from 'antd/locale/en_US'
 import './fonts/misans.css'

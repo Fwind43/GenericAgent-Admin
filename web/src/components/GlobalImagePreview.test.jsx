@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { GlobalImagePreview } from './GlobalImagePreview'
 
-vi.mock('antd', () => ({
-  Image: ({ src, alt, preview }) => <div role="dialog"><img src={src} alt={alt} /><button onClick={() => preview.onOpenChange(false)}>Close</button></div>,
+vi.mock('antd/es/image', () => ({
+  default: ({ src, alt, preview }) => <div role="dialog"><img src={src} alt={alt} /><button onClick={() => preview.onOpenChange(false)}>Close</button></div>,
 }))
 afterEach(cleanup)
 

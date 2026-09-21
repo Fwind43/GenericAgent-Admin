@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Tooltip } from 'antd'
+import Tooltip from 'antd/es/tooltip'
 import { List, X } from 'lucide-react'
 import './MessageNavigator.css'
 

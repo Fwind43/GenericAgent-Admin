@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Button, Tag } from 'antd'
+import Button from 'antd/es/button'
+import Tag from 'antd/es/tag'
 import { CUSTOM_COLOR_TOKENS, getInitialCustomColors, persistCustomColors, previewCustomColors, sanitizeColorValue } from './themes'
 import './theme-editor.css'
 

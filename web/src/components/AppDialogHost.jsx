@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Modal } from 'antd'
+import Modal from 'antd/es/modal'
 import { AlertTriangle, Info } from 'lucide-react'
 import { registerDialogAdapter } from '../lib/danger'
 

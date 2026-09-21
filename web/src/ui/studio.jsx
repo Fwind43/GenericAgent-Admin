@@ -1,15 +1,18 @@
-import { StudioModelRisks } from './modelRisks'
-import { StudioModelTransfer, StudioModelPreviewControls } from './modelTransfer'
-import { StudioModelEditorCommon } from './modelEditorCommon'
-import { StudioModelCalls } from './modelCalls'
-import { StudioModelProviders } from './modelProviders'
-import { StudioTasks } from './tasks'
-import { StudioUsage } from './usage'
-import { StudioProjectModeSettings, StudioProcessDisplaySettings } from './chatRuntimeSettings'
-import { StudioChatTitleSettings } from './chatTitleSettings'
-import { StudioAppearanceSettings } from './appearanceSettings'
-import { StudioRemoteSettings } from './remoteSettings'
-import { StudioGeneralSettings } from './generalSettings.jsx'
+import { lazySurface } from './lazySurface'
+const StudioModelRisks = lazySurface(() => import('./modelRisks'), 'StudioModelRisks')
+const StudioModelTransfer = lazySurface(() => import('./modelTransfer'), 'StudioModelTransfer')
+const StudioModelPreviewControls = lazySurface(() => import('./modelTransfer'), 'StudioModelPreviewControls')
+const StudioModelEditorCommon = lazySurface(() => import('./modelEditorCommon'), 'StudioModelEditorCommon')
+const StudioModelCalls = lazySurface(() => import('./modelCalls'), 'StudioModelCalls')
+const StudioModelProviders = lazySurface(() => import('./modelProviders'), 'StudioModelProviders')
+const StudioTasks = lazySurface(() => import('./tasks'), 'StudioTasks')
+const StudioUsage = lazySurface(() => import('./usage'), 'StudioUsage')
+const StudioProjectModeSettings = lazySurface(() => import('./chatRuntimeSettings'), 'StudioProjectModeSettings')
+const StudioProcessDisplaySettings = lazySurface(() => import('./chatRuntimeSettings'), 'StudioProcessDisplaySettings')
+const StudioChatTitleSettings = lazySurface(() => import('./chatTitleSettings'), 'StudioChatTitleSettings')
+const StudioAppearanceSettings = lazySurface(() => import('./appearanceSettings'), 'StudioAppearanceSettings')
+const StudioRemoteSettings = lazySurface(() => import('./remoteSettings'), 'StudioRemoteSettings')
+const StudioGeneralSettings = lazySurface(() => import('./generalSettings.jsx'), 'StudioGeneralSettings')
 import { StudioChatChrome } from './chatChrome'
 import { ChatSidebar, ChatMessages, ChatComposer } from './chatBody'
 import React from 'react'

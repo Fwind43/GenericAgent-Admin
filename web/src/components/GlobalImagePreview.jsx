@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Image } from 'antd'
+import Image from 'antd/es/image'
 import './GlobalImagePreview.css'
 
 // Capture before local attachment handlers so a click opens only one viewer.

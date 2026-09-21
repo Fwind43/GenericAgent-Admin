@@ -1,4 +1,5 @@
-import { Input, Select } from 'antd'
+import Input from 'antd/es/input'
+import Select from 'antd/es/select'
 import './modelEditorCommon.css'
 
 const fields = [

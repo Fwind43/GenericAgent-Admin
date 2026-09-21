@@ -1,4 +1,6 @@
-import { Button, Space, Tag } from 'antd'
+import Button from 'antd/es/button'
+import Space from 'antd/es/space'
+import Tag from 'antd/es/tag'
 import { ArrowDown, ArrowUp, Building2, ChevronDown, GripVertical, Layers, Network, Plus, Trash2 } from 'lucide-react'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'

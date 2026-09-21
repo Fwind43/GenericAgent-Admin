@@ -1,15 +1,18 @@
-import { DefaultModelRisks } from './modelRisks'
-import { DefaultModelTransfer, DefaultModelPreviewControls } from './modelTransfer'
-import { DefaultModelEditorCommon } from './modelEditorCommon'
-import { DefaultModelCalls } from './modelCalls'
-import { DefaultModelProviders } from './modelProviders'
-import { DefaultTasks } from './tasks'
-import { DefaultUsage } from './usage'
-import { DefaultProjectModeSettings, DefaultProcessDisplaySettings } from './chatRuntimeSettings'
-import { DefaultChatTitleSettings } from './chatTitleSettings'
-import { DefaultAppearanceSettings } from './appearanceSettings'
-import { DefaultRemoteSettings } from './remoteSettings'
-import { DefaultGeneralSettings } from './generalSettings.jsx'
+import { lazySurface } from './lazySurface'
+const DefaultModelRisks = lazySurface(() => import('./modelRisks'), 'DefaultModelRisks')
+const DefaultModelTransfer = lazySurface(() => import('./modelTransfer'), 'DefaultModelTransfer')
+const DefaultModelPreviewControls = lazySurface(() => import('./modelTransfer'), 'DefaultModelPreviewControls')
+const DefaultModelEditorCommon = lazySurface(() => import('./modelEditorCommon'), 'DefaultModelEditorCommon')
+const DefaultModelCalls = lazySurface(() => import('./modelCalls'), 'DefaultModelCalls')
+const DefaultModelProviders = lazySurface(() => import('./modelProviders'), 'DefaultModelProviders')
+const DefaultTasks = lazySurface(() => import('./tasks'), 'DefaultTasks')
+const DefaultUsage = lazySurface(() => import('./usage'), 'DefaultUsage')
+const DefaultProjectModeSettings = lazySurface(() => import('./chatRuntimeSettings'), 'DefaultProjectModeSettings')
+const DefaultProcessDisplaySettings = lazySurface(() => import('./chatRuntimeSettings'), 'DefaultProcessDisplaySettings')
+const DefaultChatTitleSettings = lazySurface(() => import('./chatTitleSettings'), 'DefaultChatTitleSettings')
+const DefaultAppearanceSettings = lazySurface(() => import('./appearanceSettings'), 'DefaultAppearanceSettings')
+const DefaultRemoteSettings = lazySurface(() => import('./remoteSettings'), 'DefaultRemoteSettings')
+const DefaultGeneralSettings = lazySurface(() => import('./generalSettings.jsx'), 'DefaultGeneralSettings')
 import React from 'react'
 import { manifest } from './contract'
 import { DefaultChatChrome } from './chatChrome'

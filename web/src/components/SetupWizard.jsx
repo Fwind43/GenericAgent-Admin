@@ -1,5 +1,8 @@
 import React, { useEffect, useRef } from 'react'
-import { Alert, Button, Input, Typography } from 'antd'
+import Alert from 'antd/es/alert'
+import Button from 'antd/es/button'
+import Input from 'antd/es/input'
+import Typography from 'antd/es/typography'
 import { Check, CheckCircle2, Download, FolderOpen, GitPullRequest, Play, RefreshCw, Terminal, Wand2 } from 'lucide-react'
 import {
   installTargetPath,
