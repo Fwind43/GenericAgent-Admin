@@ -767,3 +767,17 @@ describe('assistant pre-token feedback', () => {
     expect(refs.map(ref => ref.querySelector('a').getAttribute('href'))).toEqual(items.map(item => `#${item.id}`))
   })
 })
+
+ test('round totals show first model TTFT instead of summing later calls', () => {
+  const container = renderAssistant('Done', { elapsed_ms: 9000, first_token_ms: 3000, usages: [{ input_tokens: 10, ttft_ms: 1250 }, { output_tokens: 20, ttft_ms: 4000 }] })
+  expect(container.querySelector('.oa-usage-total .oa-usage-ttft').textContent).toContain('TTFT 1.25s')
+ })
+ test('round totals distinguish legacy first response from model TTFT', () => {
+  const container = renderAssistant('Done', { elapsed_ms: 9000, first_token_ms: 2300 })
+  expect(container.querySelector('.oa-usage-total .oa-usage-ttft').textContent).toContain('2.30s')
+  expect(container.querySelector('.oa-usage-total .oa-usage-ttft').textContent).not.toContain('TTFT')
+ })
+ test('round totals do not invent missing TTFT', () => {
+  const container = renderAssistant('Done', { elapsed_ms: 9000 })
+  expect(container.querySelector('.oa-usage-total .oa-usage-ttft').textContent).toContain('TTFT —')
+ })
