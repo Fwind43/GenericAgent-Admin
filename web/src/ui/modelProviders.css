@@ -14,6 +14,34 @@
   .studio-model-directory aside { border-inline-end: 0; border-bottom: 1px solid var(--border); padding: 0 0 16px; }
 }
 
+/* Bound the embedded editor; keep directory controls outside its scroll area. */
+.models-page .model-settings-workspace {
+  height: min(72dvh, 900px);
+  min-height: 0;
+}
+.models-page .model-settings-nav {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.models-page .model-provider-navigation {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.models-page .model-provider-navigation > header,
+.models-page .model-provider-create { flex-shrink: 0; }
+.models-page .model-provider-navigation-list,
+.models-page .model-settings-detail {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+.models-page .model-provider-navigation-list { flex: 1; }
+
 .model-provider-entry { min-width: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .models-page .model-provider-entry .model-connection-card { width: 100%; border: 0; border-radius: 0; }
 .model-provider-direct-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
