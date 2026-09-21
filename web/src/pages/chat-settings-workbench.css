@@ -1,22 +1,33 @@
-.app > .main .chat-settings-workbench { display: grid; grid-template-columns: minmax(180px,220px) minmax(0,1fr); gap: 24px; max-width: 1180px; align-items: start; }
-.app > .main .chat-settings-nav { display: grid; gap: 8px; }
-.app > .main .chat-settings-nav a { display: grid; gap: 4px; min-height: 44px; padding: 12px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; text-decoration: none; overflow-wrap: anywhere; }
-.app > .main .chat-settings-nav small { color: var(--muted); font-size: 11px; }
-.app > .main .chat-settings-content { display: grid; gap: 20px; min-width: 0; }
+.app > .main .chat-settings-workbench { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; width: 100%; max-width: 1120px; margin-inline: auto; min-width: 0; align-items: start; }
+.app > .main .chat-settings-nav { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.app > .main .chat-settings-nav a { display: grid; align-content: center; gap: 4px; min-height: 64px; padding: 12px 16px; box-sizing: border-box; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; text-decoration: none; overflow-wrap: anywhere; }
+.app > .main .chat-settings-nav a:hover { background: var(--surface-strong); border-color: var(--accent); }
+.app > .main .chat-settings-nav small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.app > .main .chat-settings-content { display: grid; gap: 16px; min-width: 0; }
 .app > .main .chat-settings-content > div { min-width: 0; scroll-margin-top: 16px; }
-.app > .main .chat-settings-scope { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.app > .main .chat-settings-scope { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.app > .main .chat-settings-workbench .set-card { margin: 0; }
+.app > .main .chat-settings-workbench .set-card-head { padding: 20px 24px; }
+.app > .main .chat-settings-workbench .set-row { padding: 18px 24px; gap: 24px; }
 .app > .main .chat-settings-workbench :is(.set-note,.set-row-copy,.set-section-desc,p) { overflow-wrap: anywhere; }
 .app > .main .chat-settings-workbench :is(.set-row-control,select) { min-width: 0; max-width: 100%; }
 .app > .main .chat-settings-workbench :is(button,select) { min-height: 44px; }
-.app > .main .chat-settings-workbench .set-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.app > .main .chat-settings-workbench .set-card-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 24px; }
 .app > .main .chat-settings-workbench .set-card-footer :is(.set-note,.set-save-scope) { flex: 1 1 220px; padding: 0; margin: 0; }
 .app > .main .chat-settings-workbench :is(a,button,select):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 820px) {
- .app > .main .chat-settings-workbench { grid-template-columns: minmax(0,1fr); gap: 16px; }
- .app > .main .chat-settings-nav { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
- .app > .main .chat-settings-nav a { padding: 10px 8px; font-size: 12px; }
- .app > .main .chat-settings-workbench .set-row { flex-direction: column; align-items: stretch; gap: 12px; }
- .app > .main .chat-settings-workbench .set-row-control { width: 100%; flex-wrap: wrap; }
+ .app > .main .chat-settings-workbench { gap: 16px; }
+ .app > .main .chat-settings-workbench .set-row:not(.set-row-toggle) { flex-direction: column; align-items: stretch; gap: 12px; }
+ .app > .main .chat-settings-workbench .set-row:not(.set-row-toggle) .set-row-control { width: 100%; flex-wrap: wrap; }
  .app > .main .chat-settings-workbench .set-row-control select { width: 100%; }
+ .app > .main .chat-settings-workbench .set-row-toggle { flex-direction: row; align-items: center; gap: 16px; }
+ .app > .main .chat-settings-workbench .set-row-toggle .set-row-copy { flex: 1; min-width: 0; }
+ .app > .main .chat-settings-workbench .set-row-toggle .set-row-control { width: auto; flex: 0 0 auto; }
+}
+@media (max-width: 600px) {
+ .app > .main .chat-settings-nav { gap: 6px; }
+ .app > .main .chat-settings-nav a { padding: 10px 8px; font-size: 12px; }
+ .app > .main .chat-settings-workbench :is(.set-card-head,.set-row) { padding: 16px; }
+ .app > .main .chat-settings-workbench .set-card-footer { padding: 14px 16px; }
  .app > .main .chat-settings-workbench .set-card-footer button { width: 100%; justify-content: center; }
 }
