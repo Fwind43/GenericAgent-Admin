@@ -65,13 +65,19 @@ func TestConductorParentPromptInjection(t *testing.T) {
 
 func TestConductorWorkflowContract(t *testing.T) {
     groups := map[string][]string{
-        "task_contract": {"smallest useful task graph", "Every objective must be self-contained", "observable acceptance checks", "Do not assume a new worker can see the parent conversation"},
+        "lightweight_delegation": {"Prefer one worker", "Pass only necessary known context", "Do not require a task template", "Trust workers", "Do not assume a new worker can see the parent conversation"},
         "concurrency": {"Different worker sessions do not imply isolated workspaces", "serialize tasks that write the same files", "prerequisite evidence is adequate"},
         "authorization": {"Carry forward explicit authorization", "Delegate safe inspection", "Do not automatically restart canceled work"},
         "recovery": {"timeout is not proof that no worker was created", "reusable completed worker", "recovery_pending", "previous instance and child processes have stopped", "automatically replay side effects"},
-        "bounded_correction": {"failed worker may already have changed external state", "two consecutive corrections without new evidence", "smallest decision or input needed"},
-        "delivery": {"one dispatch, not the whole user request", "required work is pending", "synthesize one delivery against the original acceptance checks"},
+        "bounded_correction": {"failed worker may already have changed external state", "If corrections repeat without progress", "smallest decision or input needed"},
+        "delivery": {"one dispatch, not the whole user request", "required work is pending", "Synthesize one concise delivery against the user's original goal"},
     }
+    for _, obsolete := range []string{"Every objective must be self-contained", "two consecutive corrections"} {
+        if strings.Contains(conductorParentPrompt, obsolete) {
+            t.Errorf("obsolete heavyweight rule %q", obsolete)
+        }
+    }
+    groups["event_driven"] = []string{"After dispatch, end this turn", "automatically starts a review turn", "Never poll or sleep", "original session_id"}
     for name, rules := range groups {
         t.Run(name, func(t *testing.T) {
             for _, rule := range rules {
