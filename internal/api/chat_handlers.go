@@ -31,6 +31,7 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(summaries, func(i, j int) bool { return summaries[i].UpdatedAt > summaries[j].UpdatedAt })
 	items := make([]map[string]interface{}, 0, len(summaries))
+	recoveryView := s.conductorRecoveryReader()
 	for _, summary := range summaries {
 		running, taskbarState := s.chatSessionTaskbarSnapshot(summary)
 		items = append(items, map[string]interface{}{
@@ -38,7 +39,7 @@ func (s *Server) chatSessions(w http.ResponseWriter, r *http.Request) {
 			"updated_at": summary.UpdatedAt, "count": summary.Count, "running": running, "taskbar_state": taskbarState,
 			"workspace": summary.Workspace, "project_mode": summary.ProjectMode, "project_provider": summary.ProjectProvider, "project_id": summary.ProjectID,
 			"hub_enabled": summary.HubEnabled, "pinned": summary.Pinned, "loop": summary.Loop, "autorun": summary.Autorun,
-			"result": summary.Result, "conductor": s.conductorRecoveryView(chatSession{ID: summary.ID, Conductor: summary.Conductor}).Conductor,
+			"result": summary.Result, "conductor": recoveryView(chatSession{ID: summary.ID, Conductor: summary.Conductor}).Conductor,
 			"unread": summary.Result != nil && !chatResultRead(readState[summary.ID], *summary.Result),
 		})
 	}
