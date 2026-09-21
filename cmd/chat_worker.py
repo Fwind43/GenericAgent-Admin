@@ -112,14 +112,18 @@ _TURN_USAGES = []
 # Monotonic timestamp of the first observable streamed chunk in the active
 # outbound LLM call. It is consumed atomically when GA prints [Output].
 _GENERATION_STARTED_AT = None
+_GENERATION_LAST_AT = None
+_GENERATION_CHUNKS = 0
 # Latest context-size stats parsed from llmcore's [Debug] lines.
 _CTX_STATS = {'ctx_chars': 0, 'ctx_msgs': 0}
 
 
 def _clear_generation_timer_locked():
     """Clear the active generation timer while _USAGE_LOCK is held."""
-    global _GENERATION_STARTED_AT
+    global _GENERATION_STARTED_AT, _GENERATION_LAST_AT, _GENERATION_CHUNKS
     _GENERATION_STARTED_AT = None
+    _GENERATION_LAST_AT = None
+    _GENERATION_CHUNKS = 0
 
 
 def _reset_generation_timer():
@@ -136,8 +140,10 @@ def _mark_generation_started(item, request_started_at=None):
     if not chunk or chunk.startswith(('!!!Error:', '[Error:')):
         return False
     now = time.perf_counter()
-    global _GENERATION_STARTED_AT
+    global _GENERATION_STARTED_AT, _GENERATION_LAST_AT, _GENERATION_CHUNKS
     with _USAGE_LOCK:
+        _GENERATION_LAST_AT = now
+        _GENERATION_CHUNKS += 1
         if _GENERATION_STARTED_AT is None:
             _GENERATION_STARTED_AT = now
         if request_started_at is not None and 'ttft_ms' not in _CURRENT_USAGE:
@@ -147,12 +153,16 @@ def _mark_generation_started(item, request_started_at=None):
 
 def _consume_generation_ms_locked():
     """Return measured generation time and clear it while the usage lock is held."""
-    global _GENERATION_STARTED_AT
-    started_at = _GENERATION_STARTED_AT
-    _GENERATION_STARTED_AT = None
-    if started_at is None:
+    started_at, last_at, chunks = (
+        _GENERATION_STARTED_AT, _GENERATION_LAST_AT, _GENERATION_CHUNKS)
+    _clear_generation_timer_locked()
+    if started_at is None or last_at is None or chunks < 2:
         return 0
-    return max(1, int(round((time.perf_counter() - started_at) * 1000)))
+    elapsed_ms = int(round((last_at - started_at) * 1000))
+    # Buffered bursts do not provide a useful observable streaming interval.
+    # Never include logging/consumer latency after the last text chunk.
+    return elapsed_ms if elapsed_ms >= 100 else 0
+
 
 
 class _UsageCapturingStderr:
