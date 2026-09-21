@@ -162,8 +162,8 @@ export const applyCustomColorsToDocument = (input, documentRef = globalThis.docu
   }
   if (element) {
     const rules = []
-    if (globalDeclarations.length) rules.push(`html:root[data-custom-colors="1"]:not([data-external-ui="active"]){${globalDeclarations.join('')}}`)
-    if (chatDeclarations.length) rules.push(`html:root[data-custom-colors="1"]:not([data-external-ui="active"]) .oa-chat{${chatDeclarations.join('')}}`)
+    if (globalDeclarations.length) rules.push(`html:root[data-custom-colors="1"]{${globalDeclarations.join('')}}`)
+    if (chatDeclarations.length) rules.push(`html:root[data-custom-colors="1"] .oa-chat{${chatDeclarations.join('')}}`)
     element.textContent = rules.join('')
     // :root raises specificity above preset root and chat token scopes.
     // Keep the sheet last as well for equally specific late-loaded rules.

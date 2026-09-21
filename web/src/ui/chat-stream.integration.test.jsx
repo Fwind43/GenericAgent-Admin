@@ -1,13 +1,12 @@
 import React from 'react'
-import { IDBFactory } from 'fake-indexeddb'
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import ChatApp from '../../ChatApp'
-import { UiHost } from '../UiHost'
+import ChatApp from '../ChatApp'
+import { UiHost } from './UiHost'
 
 // Hoisted observation only: every business method comes from the actual module.
 const observation = vi.hoisted(() => ({ instances: [], scope: null }))
-vi.mock('../../lib/chatStream.js', async importOriginal => {
+vi.mock('../lib/chatStream.js', async importOriginal => {
   const actual = await importOriginal()
   return { ...actual, createStreamDeltaBatcher: options => {
     const instance = { pending: new Set(), executed: new Set(), cancelled: new Set(), scheduled: [] }
@@ -37,7 +36,6 @@ afterEach(() => {
   observation.instances = []; observation.scope = null
 })
 it.each(['done', 'cancel', 'switch', 'late-state'])('mounted stream %s retains content and isolates sessions', async mode => {
-  vi.stubGlobal('indexedDB', new IDBFactory())
   let controller, signal
   const stream = new ReadableStream({ start(c) { controller = c } })
   let persisted = ''

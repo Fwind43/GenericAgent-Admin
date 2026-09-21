@@ -4,7 +4,6 @@ import { defaults } from './default'
 import { surfaceView } from './contract'
 import { readSelection, writeSelection, browserStorage } from './selection'
 import './host.css'
-import { ExternalUiProvider, ExternalBoundary, ExternalView, projectData, dispatchAction, useExternalUi } from './plugins/runtime'
 const Context = createContext(null)
 export function UiHost({ children, disabled = false, preview = false, packageRegistry = registry }) {
   const safe = disabled || new URLSearchParams(window.location.search).get('ui') === 'safe'
@@ -63,12 +62,10 @@ export function UiHost({ children, disabled = false, preview = false, packageReg
   }
   const isDefaultSurface = name => failedSurfaces.includes(name) || surfaceView(pkg, name, defaults) === defaults.views[name]
   const committed = () => { if (pending.current) { pending.current = false; persist(pkg.manifest.id) } }
-  return <Context.Provider value={{ pkg, id: pkg.manifest.id, select, restore, committed, loading, message, safe, preview, failSurface, isDefaultSurface, isFailedSurface: name => failedSurfaces.includes(name) }}><ExternalUiProvider disabled={safe || preview} onEnable={() => restore()}>{children}</ExternalUiProvider></Context.Provider>
+  return <Context.Provider value={{ pkg, id: pkg.manifest.id, select, restore, committed, loading, message, safe, preview, failSurface, isDefaultSurface, isFailedSurface: name => failedSurfaces.includes(name) }}>{children}</Context.Provider>
 }
 export function useUiPackage() {
-  const ui = useContext(Context), external = useExternalUi()
-  if (!ui) return null
-  return { ...ui, isDefaultSurface: name => external?.bundle?.views[name] ? false : ui.isDefaultSurface(name) }
+  return useContext(Context)
 }
 class SurfaceBoundary extends React.Component {
   state = { failed: false }
@@ -82,14 +79,7 @@ class SurfaceBoundary extends React.Component {
 function Commit({ children, committed }) { useEffect(() => { committed() }); return children }
 export function UiSurface({ name, viewProps, fallback = null, preserveMount = false }) {
   const ui = useUiPackage()
-  const external = useExternalUi()
   const DefaultView = defaults.views[name]
-  if (external?.bundle?.views[name] && name.startsWith('admin.')) {
-    const data = projectData(name, viewProps || {})
-    return <ExternalBoundary key={external.bundle.manifest.id + name} fail={external.fail} fallback={fallback}>
-      <ExternalView bundle={external.bundle} area={name} data={data} invoke={(node, item) => dispatchAction(name, node, item, data, viewProps || {})}/>
-    </ExternalBoundary>
-  }
   if (!ui) return <DefaultView {...viewProps} fallback={fallback}/>
   const failed = ui.isFailedSurface(name)
   const View = failed ? DefaultView : surfaceView(ui.pkg, name, defaults)

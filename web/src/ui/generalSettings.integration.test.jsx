@@ -128,3 +128,10 @@ it('keeps the draft after save failure and hides inactive groups without duplica
   expect(document.getElementById('settings-http-proxy')).toBeNull()
   expect(document.getElementById('general-paths').hidden).toBe(true)
 })
+
+it('does not expose external UI plugin settings', () => {
+  mount()
+  expect(screen.queryByRole('button', { name: /UI plugins/i })).toBeNull()
+  expect(screen.getByRole('button', { name: text.appearance.title, exact: true })).not.toBeNull()
+  expect(document.querySelector('input[type=file][accept*=zip]')).toBeNull()
+})

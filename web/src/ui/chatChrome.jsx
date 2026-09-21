@@ -17,5 +17,5 @@ function ChatChrome({ session, presentation, actions, studio = false }) {
 export function DefaultChatChrome(props) { return <ChatChrome {...props}/> }
 export function StudioChatChrome(props) { return <ChatChrome {...props} studio/> }
 
-// Appearance is managed exclusively in Settings > UI plugins.
+// Appearance is managed exclusively in Settings > Appearance.
 export function ChatPackageBar() { return null }
