@@ -1,7 +1,9 @@
-.oa-title > .oa-chat-version {
+.oa-sidebar .oa-chat-version {
+  display: block;
+  margin: 4px 12px 0;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 160px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

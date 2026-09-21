@@ -1,3 +1,4 @@
+import ChatVersionBadge from '../components/ChatVersionBadge'
 import React from 'react'
 import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
@@ -166,6 +167,7 @@ export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDelet
           </select>
         </label>
         <button className="oa-sidebar-settings" onClick={()=>{ if (onOpenSettings) onOpenSettings(); else window.location.href = '/admin' }}><Settings size={15}/>{ct('设置', 'Settings')}</button>
+        <ChatVersionBadge/>
       </div>
     </aside>)
 }
