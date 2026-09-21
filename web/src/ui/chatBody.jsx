@@ -1,3 +1,4 @@
+import ProjectSessionPage from '../components/ProjectSessionPage'
 import ChatVersionBadge from '../components/ChatVersionBadge'
 import React from 'react'
 import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
@@ -136,7 +137,7 @@ export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDelet
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
         <div className="oa-session-list">
-          {recentSessions.map(renderSidebarTree)}
+          <ProjectSessionPage key={`${chatInstanceID}:${sidebarSearch}`} items={recentSessions} renderItem={renderSidebarTree} ct={ct} expandLabel={remaining => ct(`展开其余 ${remaining} 个...`, `Expand ${remaining} more...`)}/>
           {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
           </div>
