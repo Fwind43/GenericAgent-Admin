@@ -26,14 +26,14 @@ const formatTokens = (value, lang) => {
 const COPY = {
   zh: {
     title: '累计 Token 用量', intro: '统计本机已持久化聊天会话中的模型用量，不包含聊天正文。',
-    total: '总 Token', input: '输入 Token', output: '输出 Token', sessions: '有用量会话',
+    total: '总 Token', input: '输入 Token', output: '输出 Token',
     models: '按模型', model: '模型', empty: '尚未记录到 Token 用量。',
     loading: '正在汇总会话用量…', failed: '无法加载用量总览', retry: '重试', refresh: '刷新', skipped: '个会话文件无法读取，已跳过。', unknown: '未知模型',
     heatmap: '每日活跃度', heatmapHint: '过去 26 周 · 按每日 Token 用量着色', less: '少', more: '多',
   },
   en: {
     title: 'Cumulative token usage', intro: 'Calculated from locally persisted chat sessions. Message content is never returned.',
-    total: 'Total tokens', input: 'Input tokens', output: 'Output tokens', sessions: 'Sessions with usage',
+    total: 'Total tokens', input: 'Input tokens', output: 'Output tokens',
     models: 'By model', model: 'Model', empty: 'No token usage has been recorded yet.',
     loading: 'Aggregating session usage…', failed: 'Unable to load usage overview', retry: 'Retry', refresh: 'Refresh', skipped: 'session files could not be read and were skipped.', unknown: 'Unknown model',
     heatmap: 'Daily activity', heatmapHint: 'Past 26 weeks · colored by daily token usage', less: 'Less', more: 'More',
@@ -131,7 +131,6 @@ export function UsagePage({ lang = 'zh' }) {
     metrics: [tokenMetric('total_tokens', c.total), tokenMetric('input_tokens', c.input), tokenMetric('output_tokens', c.output),
       { key: 'cacheRead', label: labels.cacheRead, ...tok(cache(data?.totals).read) },
       { key: 'cacheWrite', label: labels.cacheWrite, ...tok(cache(data?.totals).write) },
-      { key: 'sessions', label: c.sessions, short: `${n(data?.sessions_with_usage)} / ${n(data?.session_count)}` },
       ],
     weeks, windowOptions: [13, 26, 52].map(value => ({ value, label: lang === 'zh' ? `过去 ${value} 周` : `Past ${value} weeks` })),
     heatmap: heatmapModel(data?.daily, lang, c, weeks),
