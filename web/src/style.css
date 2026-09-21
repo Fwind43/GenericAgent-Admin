@@ -19133,6 +19133,12 @@ html[data-theme="green"] .oa-chat {
   --oa-user: #D2E3CC;
   --oa-green: #2F7D4F;
 }
+/* Keep message surfaces in the green palette instead of neutral gray. */
+html[data-theme="green"] .oa-message.user .oa-msg-body {
+  background: var(--oa-user);
+  border-color: var(--border);
+  box-shadow: var(--shadow-tiny);
+}
 html[data-theme="green"] .overview-page {
   --overview-accent: #22603C;
   --overview-accent-soft: rgba(47, 125, 79, .13);
