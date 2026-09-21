@@ -304,7 +304,7 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   </div>
 })
 
-const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, onOpen, onStop, onClose, stoppingID = '' }) {
+const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, onOpen, onStop, onRecover, onClose, stoppingID = '' }) {
   const workers = conductorWorkers(detail, sessions)
   const counts = conductorStatusCounts(workers)
   const usage = detail?.conductor_usage_summary
@@ -341,6 +341,7 @@ const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, 
             {worker.review?.unverified && <p>{worker.review.unverified}</p>}
             {worker.review?.basis && <p>{worker.review.basis}</p>}
             {objective && <details><summary>{ct('任务详情', 'Task details')}</summary><p>{objective}</p></details>}
+            {status === 'recovery_pending' && <button type="button" className="oa-conductor-stop" disabled={!!stoppingID} onClick={()=>onRecover(worker)}>{ct('确认中断并交回指挥家', 'Confirm interruption and return to conductor')}</button>}
             {canStopConductorWorker(worker) && <button type="button" className="oa-conductor-stop" onClick={()=>onStop(id)} disabled={stoppingID === id}>{stoppingID === id ? ct('停止中…', 'Stopping…') : ct('停止任务', 'Stop task')}</button>}
           </article>
         }) : <p className="oa-conductor-empty">{ct('尚未派发子代理。', 'No subagents dispatched yet.')}</p>}
@@ -6075,6 +6076,29 @@ export default function ChatApp({ onOpenSettings } = {}) {
     await createSession('', { mode:'conductor' })
   }
 
+  const recoverConductorWorker = async (worker) => {
+    const parentID = activeSidRef.current
+    const instanceID = chatInstanceRef.current
+    const workerID = worker?.session_id || worker?.id
+    const dispatchID = worker?.dispatch_id
+    if (!parentID || !workerID || !dispatchID || conductorStoppingID) return
+    if (!await confirmDanger('conductor-recovery', ct('仅在确认旧 Admin 实例及其子任务均已停止后继续。此操作将封存中断并交回指挥家审查，可能继续派发并产生费用；不会撤销已有操作。确认已停止？', 'Continue only after verifying that the previous Admin owner and worker have stopped. This finalizes the interruption and returns it for conductor review, which may dispatch work and incur costs. Existing actions are not rolled back. Confirm stopped?'))) return
+    if (instanceID !== chatInstanceRef.current || parentID !== activeSidRef.current) return
+    setConductorStoppingID(workerID)
+    setErr('')
+    try {
+      await chatApi(`/api/chat/conductor/${encodeURIComponent(parentID)}/recover`, { method: 'POST', body: JSON.stringify({ dispatch_id: dispatchID, confirm_stopped: true }) })
+      if (instanceID !== chatInstanceRef.current || parentID !== activeSidRef.current) return
+      setNotice(ct('中断已封存，已交回指挥家；已停止的父任务需手动继续。', 'Interruption finalized and returned to conductor; a stopped parent requires manual continuation.'))
+      await loadSessions(parentID)
+      if (instanceID === chatInstanceRef.current && parentID === activeSidRef.current) await refreshActiveSessionSnapshot(parentID)
+    } catch (e) {
+      if (instanceID === chatInstanceRef.current && parentID === activeSidRef.current) setErr(e?.message || String(e))
+    } finally {
+      setConductorStoppingID('')
+    }
+  }
+
   const stopConductorWorker = async (workerID) => {
     if (!workerID || conductorStoppingID) return
     setConductorStoppingID(workerID)
@@ -7701,7 +7725,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
       </div>
       <div className={`oa-workspace ${loopRailOpen ? 'has-loop' : ''} ${btwRailOpen && btwMessages.length > 0 ? 'has-btw' : ''} ${btwMessages.length > 0 && !btwRailOpen ? 'has-launchers' : ''}`}>
         <UiSurface name="chat.messages" preserveMount viewProps={{ MessageList, activeSessionDetail, activeSidRef, conductorConflict, conductorParentID, ct, editAndResend, fillAskReply, historyPages, isConductorWorker, isCurrentRunning, isNearBottom, messages, openSession, pauseFollow, resumeFollow, sendBTW, sessionLoadFailed, sessionLoading, setConductorConflict, showFollow, sid, streamClock, switchWorldline, threadRef, updateFollowFromScroll, worldlineForView }}/>
-        {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && conductorWorkersOpen && <ConductorWorkspace detail={activeSessionDetail} sessions={sessions} onOpen={openSession} onStop={stopConductorWorker} stoppingID={conductorStoppingID} onClose={()=>setConductorWorkersOpen(false)}/>}
+        {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && conductorWorkersOpen && <ConductorWorkspace detail={activeSessionDetail} sessions={sessions} onOpen={openSession} onStop={stopConductorWorker} onRecover={recoverConductorWorker} stoppingID={conductorStoppingID} onClose={()=>setConductorWorkersOpen(false)}/>}
         {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && conductorEventsOpen && <ConductorEvents conductorDetail={activeSessionDetail} onClose={()=>setConductorEventsOpen(false)}/> }
         <MessageNavigator messages={messages} sessionID={sid} threadRef={threadRef}
           onNavigate={jumpToMessageNode} loading={sessionLoading} ct={ct}

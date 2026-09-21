@@ -385,5 +385,23 @@ test.each(['light', 'dark', 'warm'])('recovery pending remains explicit (%s)', a
   expect(await workspace.findByText('Recovery pending confirmation')).toBeTruthy()
   expect(workspace.getByText(/no automatic replay/)).toBeTruthy()
   expect(workspace.queryByText('Execution finished')).toBeNull()
+  const { registerDialogAdapter } = await import('./lib/danger')
+  let confirmed = false
+  const dialog = vi.fn(() => confirmed)
+  const unregister = registerDialogAdapter(dialog)
+  try {
+    const recoveryButton = workspace.getByRole('button', { name: 'Confirm interruption and return to conductor' })
+    expect(recoveryButton).toBeTruthy()
+    fireEvent.click(recoveryButton)
+    await waitFor(() => expect(dialog).toHaveBeenCalledTimes(1))
+    const recoveryPosts = () => fetch.mock.calls.filter(([url, init]) => String(url).includes('/recover') && init?.method === 'POST')
+    expect(recoveryPosts()).toHaveLength(0)
+    confirmed = true
+    fireEvent.click(recoveryButton)
+    await waitFor(() => expect(recoveryPosts()).toHaveLength(1))
+    expect(JSON.parse(recoveryPosts()[0][1].body)).toEqual({dispatch_id: 'r1', confirm_stopped: true})
+  } finally {
+    unregister()
+  }
   delete document.documentElement.dataset.theme
 })
