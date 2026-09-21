@@ -11,5 +11,5 @@ export default function ChatVersionBadge() {
     }).catch(() => { if (active) setVersion('?') })
     return () => { active = false }
   }, [])
-  return <span className="oa-chat-version" title={`GenericAgent Admin ${version ?? '…'}`} aria-label={`GenericAgent Admin ${version ?? '…'}`}>Admin {version ?? '…'}</span>
+  return <span className="oa-chat-version" title={`GenericAgent Admin ${version ?? '…'}`} aria-label={`GenericAgent Admin ${version ?? '…'}`}>{version ?? '…'}</span>
 }

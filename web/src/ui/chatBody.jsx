@@ -7,7 +7,7 @@ import './chatBody.css'
 export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
   return (<aside data-ui-surface="chat.sidebar" data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
-        <div className="oa-sidebar-brand">GenericAgent <span>Admin</span></div>
+        <div className="oa-sidebar-brand">GenericAgent <span>Admin</span><ChatVersionBadge/></div>
         <button
           className="oa-new-chat"
           onClick={newSession}
@@ -167,7 +167,6 @@ export function ChatSidebar({ layout = 'default', ProjectActionsMenu, batchDelet
           </select>
         </label>
         <button className="oa-sidebar-settings" onClick={()=>{ if (onOpenSettings) onOpenSettings(); else window.location.href = '/admin' }}><Settings size={15}/>{ct('设置', 'Settings')}</button>
-        <ChatVersionBadge/>
       </div>
     </aside>)
 }
