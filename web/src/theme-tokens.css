@@ -16,6 +16,10 @@
   --scrollbar-thumb: rgba(23,23,23,0.24);
   --scrollbar-hover: rgba(23,23,23,0.4);
 }
+:root[data-theme="warm"] {
+  --selected: #F0E1DA;
+  --selected-text: #824B3E;
+}
 :root[data-color-scheme="dark"] {
   --scrollbar-thumb: rgba(255,255,255,0.26);
   --scrollbar-hover: rgba(255,255,255,0.44);

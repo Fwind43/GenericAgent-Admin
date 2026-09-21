@@ -63,59 +63,58 @@
 
 :root,
 html[data-theme="warm"] {
-  --bg: #FDFCFA;
-  --bg-soft: #F7F6F3;
-  --surface: #FFFFFF;
-  --surface-strong: #FDFCFA;
-  --surface-muted: #F2F1EE;
+  --bg: #F4F0ED;
+  --bg-soft: #EEE6E1;
+  --surface: #FCFAF8;
+  --surface-strong: #FCFAF8;
+  --surface-muted: #EEE6E1;
   --surface-subtle: rgba(0, 0, 0, .025);
   --surface-subtle-hover: rgba(0, 0, 0, .045);
   --surface-hover: rgba(0, 0, 0, .03);
-  --border: #DEDDD8;
-  --border-strong: #C8C6C0;
+  --border: #DED3CB;
+  --border-strong: #C8B8AD;
   --border-subtle: rgba(0, 0, 0, .08);
   --border-muted: rgba(0, 0, 0, .12);
-  --text: #292826;
-  --muted: #64625E;
-  /* Text colours below clear WCAG AA (4.5:1) on every warm surface, including
-     the deepest one (--surface-muted #F2F1EE), not just on --bg. */
-  --muted-2: #706D68;
-  --strong: #22211F;
-  --em: #64625E;
+  --text: #362F2B;
+  --muted: #776A63;
+  /* Cocoa foregrounds keep warm paper surfaces readable. */
+  --muted-2: #776A63;
+  --strong: #302824;
+  --em: #776A63;
   --blue: #027590;
   --cyan: #0A7775;
   --violet: #7455C9;
   --green: #357838;
   --orange: #9A5C00;
   --red: #C62828;
-  --gold: #A45642;  /* Muted terracotta: accents only, never the canvas. */
-  --accent: #A45642;  /* Muted terracotta: accents only, never the canvas. */
-  --accent-hover: #8D4736;
-  --accent-bg: rgba(164, 86, 66, 0.08);
-  --accent-bg-strong: rgba(164, 86, 66, 0.15);
-  --accent-text: #904A39;
+  --gold: #995D4D;  /* Muted terracotta: accents only, never the canvas. */
+  --accent: #995D4D;  /* Muted terracotta: accents only, never the canvas. */
+  --accent-hover: #824B3E;
+  --accent-bg: rgba(153, 93, 77, 0.08);
+  --accent-bg-strong: rgba(153, 93, 77, 0.15);
+  --accent-text: #824B3E;
   /* White on terracotta clears AA for normal button labels. */
   --text-on-accent: #FFFFFF;
   --success: #357838;
   --warning: #9A5C00;
   --error: #C62828;
   --info: #027590;
-  --focus-ring: rgba(164, 86, 66, .35);
-  --focus-glow: rgba(164, 86, 66, .1);
+  --focus-ring: rgba(153, 93, 77, .35);
+  --focus-glow: rgba(153, 93, 77, .1);
   --input-bg: rgba(0, 0, 0, .03);
   --hover-bg: rgba(0, 0, 0, .05);
-  --code-bg: #F2F1EE;
+  --code-bg: #EEE6E1;
   --code-text: #805345;
   --code-inline-bg: rgba(0, 0, 0, .06);
-  --chat-table-border: #DEDDD8;
-  --chat-table-header-bg: #F2F1EE;
-  --chat-table-row-alt: rgba(100, 98, 94, .035);
-  --chat-table-row-hover: rgba(164, 86, 66, .12);
-  --chat-table-scrollbar: rgba(100, 98, 94, .28);
-  --pre-text: #292826;
-  --sidebar: #F7F6F3;
-  --topbar-bg: rgba(247, 246, 243, .98);
-  --main-bg: rgba(253, 252, 250, 0.5);
+  --chat-table-border: #DED3CB;
+  --chat-table-header-bg: #EEE6E1;
+  --chat-table-row-alt: rgba(119, 106, 99, .035);
+  --chat-table-row-hover: rgba(153, 93, 77, .12);
+  --chat-table-scrollbar: rgba(119, 106, 99, .28);
+  --pre-text: #362F2B;
+  --sidebar: #EEE6E1;
+  --topbar-bg: rgba(238, 230, 225, .98);
+  --main-bg: rgba(244, 240, 237, 0.5);
   --shadow: 0 24px 70px rgba(26, 22, 16, .08);
   --shadow-soft: 0 14px 42px rgba(26, 22, 16, .055);
   --shadow-tiny: 0 1px 2px rgba(26, 22, 16, .04);
@@ -9479,9 +9478,9 @@ html[data-color-scheme="dark"] .oa-cascade-group-models button:hover { backgroun
   margin-inline: auto;
 }
 html[data-theme="warm"] .overview-page {
-  --overview-accent: #806833;
-  --overview-accent-soft: rgba(201, 169, 97, .13);
-  --overview-code: #6f5a2a;
+  --overview-accent: #995D4D;
+  --overview-accent-soft: rgba(153, 93, 77, .10);
+  --overview-code: #824B3E;
 }
 .overview-page .overview-stats {
   display: grid;
@@ -11560,12 +11559,12 @@ html[data-color-scheme="dark"] .set-card-icon { color: #67d9bd; background: rgba
 
 /* Warm paper stays neutral; only deliberate actions carry the accent. */
 html[data-theme="warm"] .models-page {
-  --model-ink: #55524D;
-  --model-ink-strong: #34322F;
-  --model-wash: #F2F1EE;
-  --model-wash-strong: #E8E6E1;
-  --model-paper: #FFFFFF;
-  --model-panel: #F7F6F3;
+  --model-ink: #776A63;
+  --model-ink-strong: #362F2B;
+  --model-wash: #EEE6E1;
+  --model-wash-strong: #F0E1DA;
+  --model-paper: #FCFAF8;
+  --model-panel: #F4F0ED;
   --model-focus: var(--accent);
   --model-ok: #357838;
   --model-warn: #9A5C00;
