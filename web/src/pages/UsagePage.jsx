@@ -29,14 +29,14 @@ const COPY = {
     total: '总 Token', input: '输入 Token', output: '输出 Token', sessions: '有用量会话', replies: '有用量回复',
     models: '按模型', model: '模型', empty: '尚未记录到 Token 用量。',
     loading: '正在汇总会话用量…', failed: '无法加载用量总览', retry: '重试', refresh: '刷新', skipped: '个会话文件无法读取，已跳过。', unknown: '未知模型',
-    heatmap: '每日活跃度', heatmapHint: '过去 52 周 · 按每日 Token 用量着色', less: '少', more: '多',
+    heatmap: '每日活跃度', heatmapHint: '过去 26 周 · 按每日 Token 用量着色', less: '少', more: '多',
   },
   en: {
     title: 'Cumulative token usage', intro: 'Calculated from locally persisted chat sessions. Message content is never returned.',
     total: 'Total tokens', input: 'Input tokens', output: 'Output tokens', sessions: 'Sessions with usage', replies: 'Measured replies',
     models: 'By model', model: 'Model', empty: 'No token usage has been recorded yet.',
     loading: 'Aggregating session usage…', failed: 'Unable to load usage overview', retry: 'Retry', refresh: 'Refresh', skipped: 'session files could not be read and were skipped.', unknown: 'Unknown model',
-    heatmap: 'Daily activity', heatmapHint: 'Past 52 weeks · colored by daily token usage', less: 'Less', more: 'More',
+    heatmap: 'Daily activity', heatmapHint: 'Past 26 weeks · colored by daily token usage', less: 'Less', more: 'More',
   },
 }
 
@@ -81,7 +81,7 @@ export function UsagePage({ lang = 'zh' }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [weeks, setWeeks] = useState(52)
+  const [weeks, setWeeks] = useState(26)
   const [modelQuery, setModelQuery] = useState('')
 
   const lifecycle = useRef({ mounted: false, ticket: 0, pending: false })
@@ -112,6 +112,8 @@ export function UsagePage({ lang = 'zh' }) {
 
   const labels = {
     ...c,
+    cacheRead: lang === 'zh' ? '缓存读取 Token' : 'Cache read tokens',
+    cacheWrite: lang === 'zh' ? '缓存写入 Token' : 'Cache write tokens',
     scope: lang === 'zh' ? `累计全部已记录用量 · 热图仅展示过去 ${weeks} 周` : `All recorded usage · heatmap shows the past ${weeks} weeks only`,
     cumulative: lang === 'zh' ? '累计用量' : 'Cumulative usage',
     window: lang === 'zh' ? '热图时间窗' : 'Heatmap window',
@@ -121,18 +123,21 @@ export function UsagePage({ lang = 'zh' }) {
     noMatches: lang === 'zh' ? '无匹配模型' : 'No matching models',
     scroll: lang === 'zh' ? '横向滚动查看全部列 · Token 缩写可悬停查看精确值' : 'Scroll horizontally for all columns · hover token values for exact counts',
   }
+  const cache = totals => ({ read: totals?.other?.cache_read_tokens || totals?.other?.cached_tokens || 0, write: totals?.other?.cache_creation_tokens || 0 })
   const tokenMetric = (key, label) => ({ key, label, ...tok(data?.totals?.[key]) })
   const model = {
     labels, loading, error, hasData: !!data, empty: data?.assistant_replies === 0,
     warning: data?.skipped_sessions > 0 ? `${n(data.skipped_sessions)} ${c.skipped}` : '',
     metrics: [tokenMetric('total_tokens', c.total), tokenMetric('input_tokens', c.input), tokenMetric('output_tokens', c.output),
+      { key: 'cacheRead', label: labels.cacheRead, ...tok(cache(data?.totals).read) },
+      { key: 'cacheWrite', label: labels.cacheWrite, ...tok(cache(data?.totals).write) },
       { key: 'sessions', label: c.sessions, short: `${n(data?.sessions_with_usage)} / ${n(data?.session_count)}` },
       { key: 'replies', label: c.replies, short: n(data?.assistant_replies) }],
     weeks, windowOptions: [13, 26, 52].map(value => ({ value, label: lang === 'zh' ? `过去 ${value} 周` : `Past ${value} weeks` })),
     heatmap: heatmapModel(data?.daily, lang, c, weeks),
     modelQuery, modelCount: `${filteredModels.length} / ${(data?.models || []).length} ${c.models}`,
     rows: filteredModels.map(item => ({ id: item.id, name: item.name || c.unknown, replies: n(item.assistant_replies),
-      input: tok(item.totals?.input_tokens), output: tok(item.totals?.output_tokens), total: tok(item.totals?.total_tokens) })),
+      cacheRead: tok(cache(item.totals).read), cacheWrite: tok(cache(item.totals).write), input: tok(item.totals?.input_tokens), output: tok(item.totals?.output_tokens), total: tok(item.totals?.total_tokens) })),
   }
   const actions = {
     refresh: load,

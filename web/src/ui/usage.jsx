@@ -55,9 +55,9 @@ export function DefaultUsage({ model, actions }) {
         <section id="usage-models" className="usage-panel">
           <div className="usage-model-head"><div><h3>{c.models}</h3><p>{c.modelScope}</p></div><ModelFilter model={model} actions={actions}/></div>
           <p className="usage-model-count" aria-live="polite">{model.modelCount}</p><p className="usage-scroll-hint">{c.scroll}</p>
-          <div className="usage-table-wrap" tabIndex={0} role="region" aria-label={c.models}><table><thead><tr><th>{c.model}</th><th>{c.replies}</th><th>{c.input}</th><th>{c.output}</th><th>{c.total}</th></tr></thead><tbody>
-            {model.rows.map(row => <tr key={row.id}><td><strong>{row.name}</strong><small>{row.id}</small></td><td>{row.replies}</td><td><TokenValue value={row.input}/></td><td><TokenValue value={row.output}/></td><td><b><TokenValue value={row.total}/></b></td></tr>)}
-            {!model.rows.length && <tr><td colSpan={5}>{c.noMatches}</td></tr>}
+          <div className="usage-table-wrap" tabIndex={0} role="region" aria-label={c.models}><table><thead><tr><th>{c.model}</th><th>{c.replies}</th><th>{c.input}</th><th>{c.output}</th><th>{c.cacheRead}</th><th>{c.cacheWrite}</th><th>{c.total}</th></tr></thead><tbody>
+            {model.rows.map(row => <tr key={row.id}><td><strong>{row.name}</strong><small>{row.id}</small></td><td>{row.replies}</td><td><TokenValue value={row.input}/></td><td><TokenValue value={row.output}/></td><td><TokenValue value={row.cacheRead}/></td><td><TokenValue value={row.cacheWrite}/></td><td><b><TokenValue value={row.total}/></b></td></tr>)}
+            {!model.rows.length && <tr><td colSpan={7}>{c.noMatches}</td></tr>}
           </tbody></table></div>
         </section>
       </>}
@@ -81,7 +81,7 @@ export function StudioUsage({ model, actions }) {
               <p className="usage-model-count" aria-live="polite">{model.modelCount}</p>
               <ul className="studio-usage-model-list" aria-label={c.models}>{model.rows.map(row => <li key={row.id}>
                 <header><div><strong>{row.name}</strong><small>{row.id}</small></div><b><TokenValue value={row.total}/><small>{c.total}</small></b></header>
-                <dl><div><dt>{c.replies}</dt><dd>{row.replies}</dd></div><div><dt>{c.input}</dt><dd><TokenValue value={row.input}/></dd></div><div><dt>{c.output}</dt><dd><TokenValue value={row.output}/></dd></div></dl>
+                <dl><div><dt>{c.replies}</dt><dd>{row.replies}</dd></div><div><dt>{c.input}</dt><dd><TokenValue value={row.input}/></dd></div><div><dt>{c.output}</dt><dd><TokenValue value={row.output}/></dd></div><div><dt>{c.cacheRead}</dt><dd><TokenValue value={row.cacheRead}/></dd></div><div><dt>{c.cacheWrite}</dt><dd><TokenValue value={row.cacheWrite}/></dd></div></dl>
               </li>)}</ul>
               {!model.rows.length && <p className="usage-state">{c.noMatches}</p>}
             </section>

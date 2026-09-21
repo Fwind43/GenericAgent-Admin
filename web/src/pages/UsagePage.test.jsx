@@ -10,7 +10,7 @@ it('recovers failed aggregation with the same API and exposes cumulative scope',
  api.mockRejectedValueOnce(new Error('Fixture failure')).mockResolvedValueOnce({assistant_replies:0,session_count:0,totals:{}})
  render(<UsagePage lang="en"/>);expect((await screen.findByRole('alert')).textContent).toContain('Fixture failure')
  fireEvent.click(screen.getByRole('button',{name:'Retry'}))
- await screen.findByText('All recorded usage · heatmap shows the past 52 weeks only')
+ await screen.findByText('All recorded usage · heatmap shows the past 26 weeks only')
  await screen.findByText(/No token usage has been recorded/i)
  expect(document.querySelectorAll('.usage-section-nav a')).toHaveLength(1)
  for(const link of document.querySelectorAll('.usage-section-nav a')) expect(document.querySelector(link.getAttribute('href'))).toBeTruthy()
@@ -37,4 +37,13 @@ it('changes only the heatmap window and filters model rows without changing tota
  expect(screen.queryByText('Alpha')).toBeNull();expect(screen.getByText('Beta')).toBeTruthy()
  expect(api).toHaveBeenCalledTimes(1)
  for(const link of document.querySelectorAll('.usage-section-nav a')) expect(document.querySelector(link.getAttribute('href'))).toBeTruthy()
+})
+
+it('defaults to 26 weeks and exposes cache read and write without inflating totals',async()=>{
+ api.mockResolvedValue({assistant_replies:1,totals:{total_tokens:12345,other:{cache_read_tokens:4000,cached_tokens:4000,cache_creation_tokens:120}},models:[{id:'alpha',totals:{other:{cache_read_tokens:4000,cache_creation_tokens:120}}}]})
+ render(<UsagePage lang="en"/>);await screen.findByText('12.35K')
+ expect(screen.getByRole('combobox').value).toBe('26')
+ expect(screen.getAllByText('4K')).toHaveLength(2)
+ expect(screen.getAllByText('120')).toHaveLength(2)
+ expect(screen.getByRole('columnheader',{name:'Cache read tokens'})).toBeTruthy()
 })
