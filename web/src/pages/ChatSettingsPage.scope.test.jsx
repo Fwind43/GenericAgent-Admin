@@ -13,7 +13,7 @@ test('distinguishes immediate preferences from the automatic-title save scope', 
   render(<ChatSettingsPage t={I18N.en} text={SETTINGS_TEXT.en} lang="en"
     projectProvider="official" onSaveProjectProvider={projectSave}
     titleModel={{ enabled: true, saving: false, draft: '', options: [{value:'',label:'Follow'}], setEnabled, setDraft: vi.fn(), submit }}/>)
-  expect(screen.getByText('Changes apply immediately on this device; no save required.')).toBeTruthy()
+  expect(await screen.findByText('Changes apply immediately on this device; no save required.')).toBeTruthy()
   const scope = screen.getByText('Save applies only to automatic titles, including the switch above.')
   await user.click(document.getElementById('settings-auto-title'))
   expect(setEnabled).toHaveBeenCalledWith(false)

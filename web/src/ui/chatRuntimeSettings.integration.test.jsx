@@ -49,7 +49,8 @@ afterEach(() => {
 })
 
 it('preserves drafts and immediate preferences across independent package DOM with whitelisted contracts', async () => {
-  mount(); const originalMode = mode(), originalToggle = toggle()
+  mount(); await projectSection().findByRole('combobox')
+  const originalMode = mode(), originalToggle = toggle()
   fireEvent.change(mode(), { target: { value: 'admin' } }); fireEvent.click(toggle())
   expect(localStorage.getItem(AUTO_COLLAPSE_PROCESS_KEY)).toBe('false')
   await selectPackage('studio')

@@ -46,13 +46,12 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
   }
   return <SettingsPage className="chat-settings-workbench">
     <nav className="chat-settings-nav" aria-label={en ? 'Chat settings sections' : '聊天设置分区'}>
-      <a href="#chat-project-mode">{en ? 'Project mode' : '项目模式'}<small>{en ? 'Save separately' : '单独保存'}</small></a>
-      <a href="#chat-process-display">{text.chat.processDisplay}<small>{en ? 'This device · immediate' : '此设备 · 即时生效'}</small></a>
-      <a href="#chat-auto-title">{text.chat.autoTitle}<small>{en ? 'Save separately' : '单独保存'}</small></a>
+      <a href="#chat-project-mode">{en ? 'Project mode' : '项目模式'}</a>
+      <a href="#chat-process-display">{text.chat.processDisplay}</a>
+      <a href="#chat-auto-title">{text.chat.autoTitle}</a>
     </nav>
     <div className="chat-settings-content">
     <div id="chat-project-mode" tabIndex={-1}>
-      <p className="chat-settings-scope">{en ? 'Project mode saves independently of display preferences and automatic titles.' : '项目模式独立保存，不影响显示偏好和自动标题设置。'}</p>
     <ProjectModeSetting value={projectProvider} onSave={onSaveProjectProvider} lang={lang} disabled={projectSettingsDisabled}/>
     </div>
     <div id="chat-process-display" tabIndex={-1}>
