@@ -174,7 +174,13 @@ test('green ships as a light palette with a full registry entry', () => {
   assert.ok(green, 'green theme must be registered')
   assert.equal(green.colorScheme, 'light')
   assert.equal(green.antdAlgorithm, 'default')
-  assert.deepEqual(green.preview, ['#F4FAF3', '#E3F0E0', '#2F7D4F'])
+  assert.deepEqual(green.preview, ['#E5EFE1', '#D2E3CC', '#2F7D4F'])
+  assert.equal(green.antdToken.colorBgElevated, '#EAF2E6')
+  for (const token of ['colorBgBase', 'colorBgContainer', 'colorBgLayout', 'colorBgElevated']) {
+    const hex = green.antdToken[token].slice(1)
+    const [r, g, b] = hex.match(/../g).map(value => parseInt(value, 16))
+    assert.ok(g - r >= 8 && g - b >= 12, `${token} must retain a visible green tint`)
+  }
   assert.equal(typeof green.label?.zh, 'string')
   assert.equal(typeof green.label?.en, 'string')
   // Registry order is a product decision: green comes after dark.
