@@ -5910,19 +5910,12 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const refreshActiveSessionSnapshot = async (id) => {
     if (!id || activeSidRef.current !== id) return
     const streamActivityToken = streamActivitySeqRef.current
-    const observedStream = streamAbortRef.current
     const d = await chatApi(`/api/chat/session/${id}?view=page`)
     if (activeSidRef.current !== id || streamActivitySeqRef.current !== streamActivityToken) return
-    if (streamAbortRef.current || activeRunRef.current) {
-      const summary = sessionsRef.current.find(session => session.id === id)
-      if (summary?.running || streamAbortRef.current !== observedStream) return
-      // The authoritative session is terminal, but this tab still has a live
-      // fetch. A buffering proxy can leave that fetch waiting forever even
-      // after another client has already received and persisted the reply.
-      // Abort only the stream observed before the detail request. Its owner
-      // remains responsible for clearing the ref and local busy state.
-      observedStream?.abort?.()
-    }
+    // List summaries and detail responses are independent snapshots. An idle
+    // summary does not prove this stream has delivered its final output.
+    // Leave reconciliation to the stream owner while it is still active.
+    if (streamAbortRef.current || activeRunRef.current) return
     historyPages.apply(d, addChatInstanceToURL(`/api/chat/session/${d.id}?view=page`, chatInstanceRef.current))
     if (contextOpen) setContextRefresh(value => value + 1)
     setPlanState(d.plan || null)

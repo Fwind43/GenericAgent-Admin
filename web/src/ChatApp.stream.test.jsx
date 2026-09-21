@@ -152,6 +152,28 @@ async function replayRace({ type = 'done', mirror = true, stateFirst = true } = 
 }
 
 describe('background snapshot guards', () => {
+  test.each([false, true])('preserves live output despite an idle summary (active owner: %s)', async activeOwner => {
+    let applied = 0
+    let aborted = 0
+    const sandbox = {
+      activeSidRef: { current: 'selected' },
+      streamActivitySeqRef: { current: 1 },
+      streamAbortRef: { current: { abort: () => { aborted++ } } },
+      activeRunRef: { current: activeOwner },
+      sessionsRef: { current: [{ id: 'selected', running: false }] },
+      chatApi: async () => ({ id: 'selected', messages: [] }),
+      historyPages: { apply: () => { applied++ } },
+      addChatInstanceToURL: value => value,
+      chatInstanceRef: { current: '' },
+      contextOpen: false,
+      setPlanState: () => {},
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(between('  const refreshActiveSessionSnapshot =', '  const loadWorldline =') + '\nglobalThis.refresh = refreshActiveSessionSnapshot', sandbox)
+    await sandbox.refresh('selected')
+    expect(aborted).toBe(0)
+    expect(applied).toBe(0)
+  })
   test.each(['session switch', 'new stream', 'stream controller'])('discards snapshot after %s', async race => {
     const gate = deferred()
     let applied = 0
