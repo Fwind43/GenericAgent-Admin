@@ -18,6 +18,8 @@ const out=esbuild.transformSync(pre+body+'\nmodule.exports=MessageListContent;',
 const Module=require('node:module');const mod=new Module('list-extracted.cjs');mod.paths=require.resolve.paths('react');mod._compile(out,'list-extracted.cjs');
 const React=require('react');const {JSDOM}=require('jsdom');const dom=new JSDOM('<div id="root"></div>');
 globalThis.window=dom.window;globalThis.document=dom.window.document;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+// Node 20 has no navigator; newer Node versions expose a getter-only global.
+Object.defineProperty(globalThis,'navigator',{configurable:true,value:dom.window.navigator});
 let created=0,observes=0,disconnected=0;
 let latest; globalThis.IntersectionObserver=class{constructor(cb){created++;this.cb=cb;this.nodes=[];latest=this}observe(n){observes++;this.nodes.push(n)}disconnect(){disconnected++;this.nodes=[]}};
 let raf;globalThis.requestAnimationFrame=f=>(raf=f,1);globalThis.cancelAnimationFrame=()=>{raf=null};globalThis.__rows=0;
