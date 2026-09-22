@@ -103,6 +103,7 @@ function RemoteAccessSection({ text, t, cfg, patch, dirty, onSave, busy, hidden 
 }
 
 export function GeneralPage({
+  onOpenTheme,
   t, lang, text, cfg, setCfg, root, setRoot, savedCfg, onSave, busy,
   theme, setTheme, onLanguage, autostart, onToggleAutostart,
 }) {
@@ -125,7 +126,7 @@ export function GeneralPage({
       themes: THEMES.map(item => ({ id: item.id, label: item.label[lang] || item.label.en, description: item.description[lang] || item.description.en, preview: [...item.preview] })),
       confirmNote: text.confirmNote, status: dirty ? text.unsaved : text.saved,
       canSave: !busy && !!cfg && dirty, saveLabel: busy ? t.busy : text.saveChanges },
-    actions: { colors: colors.actions, save,
+    actions: { openTheme: onOpenTheme, colors: colors.actions, save,
       changeLanguage: value => { if (!busy && !colors.model.busy && ['zh', 'en'].includes(value)) onLanguage(value) },
       changeTheme: value => { if (!busy && !colors.model.busy && THEMES.some(item => item.id === value)) setTheme(value) } },
   }

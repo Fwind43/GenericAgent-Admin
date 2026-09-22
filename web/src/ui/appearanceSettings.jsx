@@ -1,5 +1,6 @@
 import React from 'react'
 import { Palette } from 'lucide-react'
+import { buildRoute } from '../lib/routing'
 import { SettingsSection, SettingRow, SettingFooter, SettingNote } from '../components/settings'
 import './generalSettings.css'
 
@@ -21,6 +22,7 @@ export function DefaultAppearanceSettings({ model, actions, hidden }) {
         <small>{theme.description}</small>
       </button>)}</div>
     </SettingRow>
+    <a href={buildRoute('theme')} onClick={e => { if (actions.openTheme) { e.preventDefault(); actions.openTheme() } }}>{model.lang === 'zh' ? '打开主题工作台 →' : 'Open theme workbench →'}</a>
     <p>{model.text.fontAttribution} <a href="/fonts/misans/MiSans-License.pdf" target="_blank" rel="noreferrer">{model.text.fontLicense}</a></p>
     <SettingFooter><SettingNote tone="muted">{model.confirmNote}</SettingNote><span role="status">{model.status}</span><button type="button" className="primary" disabled={!model.canSave} onClick={actions.save}>{model.saveLabel}</button></SettingFooter>
   </SettingsSection>
@@ -36,6 +38,7 @@ export function StudioAppearanceSettings({ model, actions, hidden }) {
       </fieldset>
       <footer><span role="status">{model.status}</span><small>{model.confirmNote}</small><button className="primary" disabled={!model.canSave}>{model.saveLabel}</button></footer>
     </form>
+    <a href={buildRoute('theme')} onClick={e => { if (actions.openTheme) { e.preventDefault(); actions.openTheme() } }}>{model.lang === 'zh' ? '打开主题工作台 →' : 'Open theme workbench →'}</a>
     <p>{model.text.fontAttribution} <a href="/fonts/misans/MiSans-License.pdf" target="_blank" rel="noreferrer">{model.text.fontLicense}</a></p>
 
   </section>

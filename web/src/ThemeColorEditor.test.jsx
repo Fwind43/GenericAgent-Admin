@@ -2,6 +2,22 @@ import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ThemeColorEditor from './ThemeColorEditor'
+
+it('filters overrides without losing drafts or bypassing validation', () => {
+  render(<ThemeColorEditor lang="en"/>);
+  fireEvent.click(screen.getByText('Edit colors'));
+  fireEvent.change(screen.getByLabelText('accent'), { target: { value: '#123456' } });
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'accent' } });
+  expect(screen.queryByLabelText('bg')).toBeNull();
+  fireEvent.click(screen.getByLabelText('Overrides only'));
+  expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  fireEvent.change(screen.getByLabelText('accent'), { target: { value: 'invalid' } });
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'no-match' } });
+  expect(screen.getByText('No matching color tokens. Adjust your filters.')).toBeTruthy();
+  expect(screen.getByText('Save colors').disabled).toBe(true);
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: '' } });
+  expect(screen.getByLabelText('accent').value).toBe('invalid');
+});
 import { CUSTOM_COLOR_TOKENS, CUSTOM_COLORS_STYLE_ID, CUSTOM_COLORS_STORAGE_KEY, customColorsToAntd, hydrateCustomColors, persistCustomColorsLocal, sanitizeColorValue } from './themes'
 
 beforeEach(() => {
@@ -65,4 +81,13 @@ it('validates color grammar and maps semantic AntD tokens', () => {
   for (const value of ['#12', '#12345', 'rgb(256,0,0)', 'rgba(1,2,3,2)', 'var(--x)', 'red;display:none']) expect(sanitizeColorValue(value)).toBe('')
   for (const value of ['#1234', '#12345678', 'rgb(255,0,1)', 'rgba(1,2,3,.5)']) expect(sanitizeColorValue(value)).toBe(value)
   expect(customColorsToAntd({ 'accent-text': '#112233', success: '#123456', focus: '#abcdef', 'on-accent': '#fff' })).toMatchObject({ colorLink: '#112233', colorSuccess: '#123456', controlOutline: '#abcdef', colorTextLightSolid: '#fff' })
+})
+
+it('isolates draft colors from the document until save succeeds', async () => {
+  render(<ThemeColorEditor theme="warm" isolated/>); edit(); change('#123456')
+  expect(document.getElementById(CUSTOM_COLORS_STYLE_ID).textContent).toContain('--accent:#abcdef')
+  expect(screen.getByLabelText('Live preview').style.getPropertyValue('--accent')).toBe('#123456')
+  fireEvent.click(screen.getByRole('button', { name: 'Save colors' }))
+  await screen.findByRole('status')
+  expect(document.getElementById(CUSTOM_COLORS_STYLE_ID).textContent).toContain('--accent:#123456')
 })

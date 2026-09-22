@@ -27,6 +27,7 @@ import { useTitleModel } from './hooks/useTitleModel'
 import { useVersionUpdates } from './hooks/useVersionUpdates'
 // Page-level code splitting keeps the app shell small and loads each route on demand.
 const OverviewPage = lazy(() => import('./pages/OverviewPage'))
+const ThemePage = lazy(() => import('./pages/ThemePage'))
 const GeneralPage = lazy(() => import('./pages/GeneralPage'))
 const ChatSettingsPage = lazy(() => import('./pages/ChatSettingsPage'))
 const KeychainPage = lazy(() => import('./pages/KeychainPage'))
@@ -46,6 +47,7 @@ const prefersReducedMotion = () => typeof window !== 'undefined' && window.match
 const NAV_ICONS = {
   overview: <Activity size={16}/>,
   settings: <SlidersHorizontal size={16}/>,
+  theme: <Sparkles size={16}/>,
   chat: <Sparkles size={16}/>,
   models: <BrainCircuit size={16}/>,
   keychain: <KeyRound size={16}/>,
@@ -392,7 +394,9 @@ function AdminApp({ embedded = false, active = true, onClose }) {
               onDraftStateChange={setOverviewDraft}
             /></div>}
             {tab==='overview' && !ui.isDefaultSurface('admin.overview') && !overviewDraft.dirty && !overviewDraft.busy && <UiSurface name="admin.overview" viewProps={{ overview: packageOverview, presentation: { lang, theme }, actions: { refreshOverview, refreshing: overviewRefreshing } }}/>}
+            {tab==='theme' && <ThemePage theme={theme} lang={lang}/>}
             {tab==='settings' && <GeneralPage
+              onOpenTheme={() => openTab('theme')}
               t={t}
               lang={lang}
               text={text}
