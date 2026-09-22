@@ -30,7 +30,7 @@ test('top handle grows upwards, shrinks downwards and clamps', () => {
 })
 
 test('chat composer wires desktop resize and narrow fallback', () => {
-  const chatApp = readFileSync(resolve(here, '../ChatApp.jsx'), 'utf8')
+  const chatApp = (readFileSync(resolve(here, '../ChatApp.jsx'), 'utf8') + '\n' + readFileSync(resolve(here, '../ui/chatBody.jsx'), 'utf8'))
   const style = readFileSync(resolve(here, '../style.css'), 'utf8')
   assert.match(chatApp, /onPointerDown=\{beginComposerResize\}/)
   assert.match(chatApp, /window\.addEventListener\('resize', applyComposerHeight\)/)

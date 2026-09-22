@@ -8,13 +8,13 @@ import {
   persistChatInstanceID,
 } from './chatInstanceScope.js'
 
-const chatSource = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+const chatSource = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
 const chatStyles = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
 
 test('renders the instance selector once directly above settings in the session sidebar', () => {
   assert.equal((chatSource.match(/className="oa-sidebar-instance"/g) || []).length, 1)
   assert.equal((chatSource.match(/aria-label=\{ct\('选择 GA 实例'/g) || []).length, 1)
-  const sidebar = chatSource.indexOf('<aside className={`oa-sidebar')
+  const sidebar = chatSource.indexOf('<aside data-ui-surface="chat.sidebar"')
   const search = chatSource.indexOf('className="oa-sidebar-search"', sidebar)
   const footer = chatSource.indexOf('className="oa-sidebar-foot"', sidebar)
   const selector = chatSource.indexOf('className="oa-sidebar-instance"', footer)

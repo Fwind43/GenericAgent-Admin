@@ -40,7 +40,7 @@ test('invalid offsets are normalized and deleted sessions are forgotten', () => 
 })
 
 test('ChatApp saves rendered ownership and restores a matching paused session after DOM commit', () => {
-  const source = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const source = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   const openStart = source.indexOf('const openSession = async')
   const createStart = source.indexOf('const createSession = async')
   const scrollRestoreStart = source.indexOf('const scrollRestore = pendingSessionScrollRestoreRef.current', createStart)
@@ -59,7 +59,7 @@ test('ChatApp saves rendered ownership and restores a matching paused session af
 })
 
 test('ChatApp forgets deleted sessions and clears snapshots when switching instances', () => {
-  const source = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const source = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   const switchStart = source.indexOf('const switchChatInstance =')
   const scrollStart = source.indexOf('const markProgrammaticScroll =', switchStart)
 
@@ -73,7 +73,7 @@ test('ChatApp forgets deleted sessions and clears snapshots when switching insta
 })
 
 test('chat keeps resume-follow control without the previous-message icon', () => {
-  const source = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const source = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   const rowStart = source.indexOf('{showFollow && <div className="oa-follow-row">')
   const rowEnd = source.indexOf('</div>}', rowStart)
   const row = source.slice(rowStart, rowEnd)

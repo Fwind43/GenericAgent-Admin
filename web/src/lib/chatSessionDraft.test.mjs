@@ -28,7 +28,7 @@ function functionBlock(source, start, end) {
 }
 
 test('project new chat is always available outside the actions menu', () => {
-  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const main = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   const header = functionBlock(main, '<div className="oa-project-head">', '<div className="oa-project-body"')
   const menuStart = header.indexOf('<ProjectActionsMenu')
   assert.ok(menuStart > 0)
@@ -41,7 +41,7 @@ test('project new chat is always available outside the actions menu', () => {
 })
 
 test('pinned projects expose a persistent group style outside the collapsed body', () => {
-  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const main = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   const group = functionBlock(main, '<section data-project-name={projectKey}', '<div className="oa-project-body"')
   assert.ok(group.includes("${group.pinned ? 'is-pinned' : ''}"))
   assert.match(group, /aria-pressed=\{group\.pinned\}/)
@@ -51,7 +51,7 @@ test('pinned projects expose a persistent group style outside the collapsed body
 })
 
 test('new chat stays out of the session list until its first send', () => {
-  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const main = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
 
   // Scoped to newSession alone. A project chat is persisted by the server the
   // moment it is created, so newProjectSession does refresh the list, and the
@@ -125,7 +125,7 @@ test('chat session draft storage failures do not break the composer', () => {
 })
 
 test('main chat wires reactive draft badges into persistence, sending, and deletion', () => {
-  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const main = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   const style = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
   assert.match(main, /listChatSessionDraftIds/)
   assert.match(main, /loadChatSessionDraft/)
@@ -166,7 +166,7 @@ test('main chat wires reactive draft badges into persistence, sending, and delet
 
 
 test('project drag handles are opt-in from the new-project toolbar', () => {
-  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const main = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   assert.match(main, /\[projectSortMode, setProjectSortMode\] = useState\(false\)/)
   const toolbar = functionBlock(main, '<div className="oa-sidebar-view-actions">', '{(showAllProjects || sidebarSearch')
   assert.match(toolbar, /aria-pressed=\{projectSortMode\}/)
@@ -179,7 +179,7 @@ test('project drag handles are opt-in from the new-project toolbar', () => {
 
 
 test('project folder action uses selected instance and confirmed folder opening', () => {
-  const source = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const source = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
   const handler = functionBlock(source, '  const openProjectFolder = async', '  const openProjectDraft =')
   assert.match(handler, /chatApi\('\/api\/files\/open'/)
   assert.match(handler, /dangerous: true/)
