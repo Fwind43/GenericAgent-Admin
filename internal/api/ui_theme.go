@@ -31,7 +31,7 @@ func (s *Server) uiTheme(w http.ResponseWriter, r *http.Request) {
 		}
 		theme := canonicalUITheme(req.Theme)
 		if strings.TrimSpace(req.Theme) != "" && theme == "" {
-			bad(w, http.StatusBadRequest, "ui_theme must be one of light, warm, dark, green")
+			bad(w, http.StatusBadRequest, "ui_theme must be one of light, warm, dark, green, khaki")
 			return
 		}
 		if s.ConfigMu != nil {

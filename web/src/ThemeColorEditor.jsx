@@ -110,7 +110,7 @@ export function ThemeColorView({ model, actions, compact = false }) {
   const groupLabel = title => title.split(' / ')[zh ? 1 : 0] || title
   return <section className={`theme-editor${compact ? " theme-editor-compact" : ""}`} aria-label={zh ? '自定义主题颜色' : 'Custom theme colors'}>
     <header><div><h3>{zh ? '自定义主题颜色' : 'Custom theme colors'}</h3>
-      <p>{zh ? '以当前四套预设之一为基础，编辑下列34项颜色。仅覆盖列出的界面与聊天令牌，不改变图片或所有第三方内容。' : 'Based on the selected preset. Edit 34 listed interface and chat colors; images and unlisted third-party content are not recolored.'}</p></div>
+      <p>{zh ? '以当前选中的预设为基础，编辑下列34项颜色。仅覆盖列出的界面与聊天令牌，不改变图片或所有第三方内容。' : 'Based on the selected preset. Edit 34 listed interface and chat colors; images and unlisted third-party content are not recolored.'}</p></div>
       {!open && <button type="button" disabled={busy} onClick={begin}>{zh ? '编辑颜色' : 'Edit colors'}</button>}
     </header>
     {open && <>

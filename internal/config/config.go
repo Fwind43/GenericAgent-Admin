@@ -23,7 +23,7 @@ const DefaultUITheme = "warm"
 
 func ValidUITheme(theme string) bool {
 	switch strings.TrimSpace(theme) {
-	case "light", "warm", "dark", "green":
+	case "light", "warm", "dark", "green", "khaki":
 		return true
 	default:
 		return false
@@ -296,7 +296,7 @@ func Validate(cfg AppConfig) error {
 		return fmt.Errorf("buffer_lines must be positive")
 	}
 	if theme := strings.TrimSpace(cfg.UITheme); theme != "" && !ValidUITheme(theme) {
-		return fmt.Errorf("ui_theme must be one of light, warm, dark, green")
+		return fmt.Errorf("ui_theme must be one of light, warm, dark, green, khaki")
 	}
 	if len(cfg.UICustomColors) > 0 && len(cfg.UICustomColors) > len(UIColorTokenScopes) {
 		return fmt.Errorf("ui_custom_colors has too many entries")

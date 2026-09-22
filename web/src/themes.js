@@ -68,6 +68,28 @@ export const THEMES = Object.freeze([
       colorBgElevated: '#EAF2E6',
     },
   },
+  {
+    id: 'khaki',
+    colorScheme: 'light',
+    icon: Sunset,
+    label: { zh: '卡其色', en: 'Khaki' },
+    description: { zh: '沙米底色与柔和卡其点缀', en: 'Soft sand with muted khaki accents' },
+    preview: ['#F1EEE5', '#E1DAC8', '#756441'],
+    antdAlgorithm: 'default',
+    antdToken: {
+      colorBgBase: '#F1EEE5',
+      colorTextBase: '#353329',
+      colorBorder: '#D5CCB6',
+      colorPrimary: '#756441',
+      colorSuccess: '#2F7D4F',
+      colorWarning: '#9A6A00',
+      colorError: '#C0392B',
+      colorInfo: '#0F7291',
+      colorBgContainer: '#E1DAC8',
+      colorBgLayout: '#E8E3D5',
+      colorBgElevated: '#FAF8F1',
+    },
+  },
 ])
 
 export const DEFAULT_THEME_ID = 'warm'

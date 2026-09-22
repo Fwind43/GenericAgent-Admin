@@ -184,7 +184,7 @@ test('green ships as a light palette with a full registry entry', () => {
   assert.equal(typeof green.label?.zh, 'string')
   assert.equal(typeof green.label?.en, 'string')
   // Registry order is a product decision: green comes after dark.
-  assert.deepEqual(THEMES.map(theme => theme.id), ['light', 'warm', 'dark', 'green'])
+  assert.deepEqual(THEMES.map(theme => theme.id), ['light', 'warm', 'dark', 'green', 'khaki'])
 })
 
 test('custom colors accept only whitelisted tokens holding literal colors', () => {
@@ -380,4 +380,12 @@ test('explicit state colors survive real AntD algorithms and alias formatting; b
     assert.deepEqual(blank, baseline, `${preset.id}: cleared palette`)
     assert.equal(configured.token.colorPrimary, preset.antdToken.colorPrimary || '#10a37f', 'custom primary is not reintroduced as a seed')
   }
+})
+
+test('khaki has a complete light palette', () => {
+  const theme = getTheme('khaki')
+  assert.equal(theme.id, 'khaki')
+  assert.equal(theme.colorScheme, 'light')
+  assert.deepEqual(theme.preview, ['#F1EEE5', '#E1DAC8', '#756441'])
+  assert.equal(theme.antdToken.colorBgElevated, '#FAF8F1')
 })

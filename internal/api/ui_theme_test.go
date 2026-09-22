@@ -199,3 +199,38 @@ func TestUIThemeCustomReloadAndResetIsolated(t *testing.T) {
 		t.Fatal("reset not stable or changed preset")
 	}
 }
+
+func TestUIThemePutPersistsKhaki(t *testing.T) {
+	s := newConfigTestServer(t)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/ui/theme", bytes.NewReader([]byte(`{"theme":"khaki"}`)))
+	markDangerous(req)
+	s.Routes().ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rr.Code, rr.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["theme"] != "khaki" {
+		t.Fatalf("theme=%q want khaki", got["theme"])
+	}
+	if snap := s.CfgStore.Snapshot().UITheme; snap != "khaki" {
+		t.Fatalf("stored ui_theme=%q want khaki", snap)
+	}
+
+	get := httptest.NewRecorder()
+	getReq := httptest.NewRequest(http.MethodGet, "/api/ui/theme", nil)
+	s.Routes().ServeHTTP(get, getReq)
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET status=%d body=%s", get.Code, get.Body.String())
+	}
+	got = map[string]any{}
+	if err := json.Unmarshal(get.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["theme"] != "khaki" {
+		t.Fatalf("GET theme=%q want khaki", got["theme"])
+	}
+}
