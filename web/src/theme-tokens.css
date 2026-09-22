@@ -20,6 +20,40 @@
   --selected: #F0E1DA;
   --selected-text: #824B3E;
 }
+/* Warm chat uses the same paper surfaces as the workspace preview. */
+html[data-theme="warm"] .oa-chat {
+  --oa-bg: var(--bg);
+  --oa-panel: var(--surface);
+  --oa-sidebar: var(--bg-soft);
+  --oa-sidebar-2: var(--bg-soft);
+  --oa-text: var(--text);
+  --oa-muted: var(--muted);
+  --oa-faint: var(--muted);
+  --oa-line: var(--border);
+  --oa-line-strong: var(--border-strong);
+  --oa-hover: var(--hover);
+  --oa-active: var(--selected);
+  --oa-user: var(--surface-muted);
+  --oa-green: var(--accent-text);
+  background: var(--oa-bg);
+}
+html[data-theme="warm"] .oa-main { background: var(--oa-bg); }
+html[data-theme="warm"] .oa-sidebar { background: var(--oa-sidebar) !important; }
+html[data-theme="warm"] .oa-message.user .oa-bubble {
+  background: var(--oa-user);
+  color: var(--oa-text);
+}
+html[data-theme="warm"] .oa-composer {
+  background: var(--oa-panel) !important;
+  border-color: var(--oa-line) !important;
+}
+html[data-theme="warm"] .oa-composer .oa-send:not(:disabled) {
+  background: var(--accent-text) !important;
+  color: var(--on-accent) !important;
+}
+html[data-theme="warm"] .oa-composer .oa-send:hover:not(:disabled) {
+  background: var(--accent-hover) !important;
+}
 :root[data-color-scheme="dark"] {
   --scrollbar-thumb: rgba(255,255,255,0.26);
   --scrollbar-hover: rgba(255,255,255,0.44);
