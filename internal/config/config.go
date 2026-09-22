@@ -191,7 +191,8 @@ type AppConfig struct {
 	UITheme                  string                    `json:"ui_theme,omitempty"`
 	// UICustomColors overrides individual appearance tokens on top of the
 	// selected palette. Keys are token names without the leading "--".
-	UICustomColors map[string]string `json:"ui_custom_colors,omitempty"`
+	UICustomColors map[string]string  `json:"ui_custom_colors,omitempty"`
+	UISizes        map[string]float64 `json:"ui_sizes,omitempty"`
 	// ChatDefaultLLMNo is the llm_no seeded into freshly created chat sessions.
 	// It tracks the model last picked in Admin Chat so a new conversation keeps
 	// using it instead of silently falling back to the first configured model.

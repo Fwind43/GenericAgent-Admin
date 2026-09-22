@@ -251,15 +251,17 @@ export const hydrateCustomColors = async () => {
   }
 }
 
-export const persistCustomColors = async (input, themeId = DEFAULT_THEME_ID) => {
+export const persistCustomColors = async (input, themeId = DEFAULT_THEME_ID, sizes) => {
   const colors = normalizeCustomColors(input)
   if (typeof window === 'undefined') return colors
   const { api } = await import('./lib/api.js')
-  await api('/api/ui/theme', {
+  const data = await api('/api/ui/theme', {
     method: 'PUT',
     dangerous: true,
-    body: JSON.stringify({ theme: getTheme(themeId).id, custom: colors }),
+    body: JSON.stringify({ theme: getTheme(themeId).id, custom: colors, ...(sizes ? { sizes } : {}) }),
   })
+  if (sizes && !data?.sizes) throw new Error('Server does not support size settings yet')
+  if (sizes) { const { applySizes } = await import('./themeSizes.js'); applySizes(data.sizes) }
   // No local mutation until the server acknowledged the write. Errors propagate.
   paletteRevision += 1
   window.__GA_UI_CUSTOM_COLORS__ = colors

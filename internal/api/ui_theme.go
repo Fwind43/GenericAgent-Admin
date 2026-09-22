@@ -15,6 +15,7 @@ func (s *Server) uiTheme(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
 			"theme":  effectiveUITheme(s.storedUITheme()),
 			"custom": s.storedUICustomColors(),
+			"sizes":  s.CfgStore.Snapshot().UISizes,
 		})
 		return
 	case http.MethodPut:
@@ -22,12 +23,22 @@ func (s *Server) uiTheme(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var req struct {
-			Theme  string             `json:"theme"`
-			Custom *map[string]string `json:"custom"`
+			Theme  string              `json:"theme"`
+			Custom *map[string]string  `json:"custom"`
+			Sizes  *map[string]float64 `json:"sizes"`
 		}
 		if err := decode(r, &req); err != nil {
 			bad(w, http.StatusBadRequest, err.Error())
 			return
+		}
+		if req.Sizes != nil {
+			for key, value := range *req.Sizes {
+				bounds, ok := uiSizeBounds[key]
+				if !ok || value < bounds[0] || value > bounds[1] {
+					bad(w, http.StatusBadRequest, "invalid UI size: "+key)
+					return
+				}
+			}
 		}
 		theme := canonicalUITheme(req.Theme)
 		if strings.TrimSpace(req.Theme) != "" && theme == "" {
@@ -46,6 +57,9 @@ func (s *Server) uiTheme(w http.ResponseWriter, r *http.Request) {
 			// An explicit object replaces the palette; an empty object clears it.
 			cfg.UICustomColors = config.NormalizeUICustomColors(*req.Custom)
 		}
+		if req.Sizes != nil {
+			cfg.UISizes = *req.Sizes
+		}
 		if err := s.CfgStore.Save(cfg); err != nil {
 			bad(w, http.StatusBadRequest, err.Error())
 			return
@@ -54,6 +68,7 @@ func (s *Server) uiTheme(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{
 			"theme":  effectiveUITheme(saved.UITheme),
 			"custom": sanitizeUICustomColors(saved.UICustomColors),
+			"sizes":  saved.UISizes,
 		})
 		return
 	default:
@@ -139,4 +154,8 @@ func injectUIPalette(data []byte, theme string, custom map[string]string, withCu
 		return out
 	}
 	return append(snippet, data...)
+}
+
+var uiSizeBounds = map[string][2]float64{
+	"uiFont": {12, 18}, "chatFont": {12, 22}, "lineHeight": {20, 36}, "contentWidth": {640, 1200}, "sidebarWidth": {240, 380}, "controlHeight": {28, 48}, "radius": {0, 24}, "spacing": {8, 24},
 }

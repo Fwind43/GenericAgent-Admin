@@ -234,3 +234,31 @@ func TestUIThemePutPersistsKhaki(t *testing.T) {
 		t.Fatalf("GET theme=%q want khaki", got["theme"])
 	}
 }
+
+func TestUIThemeSizesPersistValidateAndPreserve(t *testing.T) {
+	s := newConfigTestServer(t)
+	put := func(body string, want int) {
+		t.Helper()
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPut, "/api/ui/theme", strings.NewReader(body))
+		markDangerous(req)
+		s.Routes().ServeHTTP(rr, req)
+		if rr.Code != want {
+			t.Fatalf("%d %s", rr.Code, rr.Body.String())
+		}
+	}
+	put(`{"sizes":{"chatFont":20,"radius":8}}`, 200)
+	put(`{"theme":"dark"}`, 200)
+	if s.CfgStore.Snapshot().UISizes["chatFont"] != 20 {
+		t.Fatal("lost sizes")
+	}
+	put(`{"sizes":{"chatFont":999}}`, 400)
+	put(`{"sizes":{"unknown":1}}`, 400)
+	if s.CfgStore.Snapshot().UISizes["chatFont"] != 20 {
+		t.Fatal("invalid write changed sizes")
+	}
+	put(`{"sizes":{}}`, 200)
+	if len(s.CfgStore.Snapshot().UISizes) != 0 {
+		t.Fatal("reset failed")
+	}
+}

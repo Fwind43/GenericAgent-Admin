@@ -1,3 +1,5 @@
+import { hydrateSizes } from './themeSizes'
+import './theme-sizes.css'
 import React, { Suspense, lazy, useMemo, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import ConfigProvider from 'antd/es/config-provider'
@@ -85,7 +87,7 @@ function LocalizedRoot() {
   // Saved custom colors must be live on the very first paint; the injected
   // boot script covers the same-origin index.html case, this covers the rest.
   useEffect(() => {
-    if (!isolatedUiRoute) void hydrateCustomColors()
+    if (!isolatedUiRoute) { void hydrateCustomColors(); void hydrateSizes() }
   }, [])
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
