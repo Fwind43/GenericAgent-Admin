@@ -215,8 +215,8 @@ it('real settings host: package roundtrip retains GeneralPage local draft', asyn
     for (const target of ['default', 'studio']) {
       fireEvent.click(scope.getByRole('button', { name: 'Harness switch' }))
       await waitFor(() => expect(scope.getByTestId('harness-package').textContent).toBe(target))
-      expect(passwordInput(container)).toBe(localPassword)
-      expect(localPassword.value).toBe('host-local-unsaved-draft')
+      // Package views may replace DOM nodes; the host-owned draft must survive.
+      expect(passwordInput(container).value).toBe('host-local-unsaved-draft')
     }
     evidence.realSettingsHostRoundtrip = true
   } finally {

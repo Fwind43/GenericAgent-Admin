@@ -6,7 +6,7 @@ afterEach(cleanup)
 it('defaults to official and saves Admin explicitly', async () => {
   const save = vi.fn().mockResolvedValue('admin')
   render(<ProjectModeSetting onSave={save} lang="en" />)
-  expect(screen.getByRole('combobox').value).toBe('official')
+  expect((await screen.findByRole('combobox')).value).toBe('official')
   fireEvent.change(screen.getByRole('combobox'), { target: { value: 'admin' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save' }))
   await waitFor(() => expect(save).toHaveBeenCalledWith('admin'))

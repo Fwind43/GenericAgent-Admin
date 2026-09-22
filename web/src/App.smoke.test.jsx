@@ -403,27 +403,31 @@ function ModelsHarness({
 
 // The provider modal renders in a body portal, so its fields are read from
 // the document rather than the render container.
-const openProviderDrawer = () => fireEvent.click(document.querySelector('.model-connection-card'))
+const openProviderDrawer = () => fireEvent.click(document.querySelector('.model-provider-nav-select'))
 const providerNameInput = () => document.querySelector('.model-field--provider input')
 const openAddModel = () => fireEvent.click(screen.getByRole('button', { name: /添加模型$/ }))
 
 describe('Models call list', () => {
-  test('lists every model using official indices, not local positions', () => {
+  test('lists every model using official indices, not local positions', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness initialProfile={{
       ...validModelProfile,
       models: ['demo-model', 'demo-model-2'],
       model_configs: [{ model: 'demo-model' }, { model: 'demo-model-2' }],
     }} officialSlots={{ '0:0': 9, '0:1': 15 }} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     const slots = [...document.querySelectorAll('.model-call-slot strong')]
     expect(slots.map(slot => slot.textContent)).toEqual(['9', '15'])
     expect(document.querySelector('.model-call-row .model-call-title strong').textContent).toBe('demo-model')
   })
 
-  test('keeps compact toolbar utilities icon-only with accessible labels', () => {
+  test('keeps compact toolbar utilities icon-only with accessible labels', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     for (const label of ['重新读取', '配置预览', '放弃更改']) {
       const button = screen.getByRole('button', { name: label })
@@ -433,14 +437,21 @@ describe('Models call list', () => {
     }
   })
 
-  test('switches workspaces without unmounting model or provider controls', () => {
+  test('switches workspaces without unmounting model or provider controls', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     const [modelsTab, providersTab] = document.querySelectorAll('.model-workspace-tabs button')
     const modelsWorkspace = document.querySelector('.model-call-list')
     const providersWorkspace = document.querySelector('.model-connections')
 
+    expect(providersTab.getAttribute('aria-pressed')).toBe('true')
+    expect(modelsWorkspace.classList.contains('is-workspace-hidden')).toBe(true)
+    expect(providersWorkspace.classList.contains('is-workspace-hidden')).toBe(false)
+
+    fireEvent.click(modelsTab)
     expect(modelsTab.getAttribute('aria-pressed')).toBe('true')
     expect(modelsWorkspace.classList.contains('is-workspace-hidden')).toBe(false)
     expect(providersWorkspace.classList.contains('is-workspace-hidden')).toBe(true)
@@ -449,20 +460,22 @@ describe('Models call list', () => {
     expect(providersTab.getAttribute('aria-pressed')).toBe('true')
     expect(modelsWorkspace.classList.contains('is-workspace-hidden')).toBe(true)
     expect(providersWorkspace.classList.contains('is-workspace-hidden')).toBe(false)
-    expect(providersWorkspace.querySelector('.model-connection-card')).toBeTruthy()
+    expect(providersWorkspace.querySelector('.model-provider-nav-select')).toBeTruthy()
 
     fireEvent.click(modelsTab)
     expect(modelsTab.getAttribute('aria-pressed')).toBe('true')
     expect(modelsWorkspace.classList.contains('is-workspace-hidden')).toBe(false)
   })
 
-  test('opens provider settings as a modal and expands model configuration on demand', () => {
+  test('opens inline provider settings and expands model configuration on demand', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     openProviderDrawer()
 
-    const modal = document.querySelector('.model-provider-modal')
+    const modal = document.querySelector('.model-settings-detail')
     expect(modal).toBeTruthy()
     expect(document.querySelector('.model-provider-drawer')).toBeNull()
     expect(modal.querySelectorAll('.model-provider-model-card')).toHaveLength(1)
@@ -488,7 +501,7 @@ describe('Models call list', () => {
     expect(modal.querySelector('.model-params-grid')).toBeNull()
   })
 
-  test('shows model display names in the provider list without confusing provider names or IDs', () => {
+  test('shows model display names in the provider list without confusing provider names or IDs', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness initialProfile={{
       ...validModelProfile,
@@ -498,6 +511,8 @@ describe('Models call list', () => {
         { model: 'same-model', name: 'same-model' },
       ],
     }} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     openProviderDrawer()
 
@@ -517,15 +532,18 @@ describe('Models call list', () => {
     expect(modelIdField.querySelector('small').textContent).toContain('不是上方的自定义显示名称')
   })
 
-  test('edits a model display name without changing its model ID', () => {
+  test('edits a model display name without changing its model ID', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness initialProfile={{
       ...validModelProfile,
       model_configs: [{ model: 'demo-model', name: 'Demo Friendly' }],
     }} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
+    fireEvent.click(document.querySelectorAll('.model-workspace-tabs button')[0])
     fireEvent.click(screen.getByRole('button', { name: /^配置: / }))
-    const displayNameInput = screen.getByLabelText('显示名称')
+    const displayNameInput = await screen.findByLabelText('显示名称')
     expect(displayNameInput.value).toBe('Demo Friendly')
 
     fireEvent.change(displayNameInput, { target: { value: 'Renamed Friendly' } })
@@ -535,10 +553,12 @@ describe('Models call list', () => {
     expect(document.querySelector('.model-call-sub em').textContent).toBe('demo-model')
   })
 
-  test('keeps focus in the provider name while its controlled value changes', () => {
+  test('keeps focus in the provider name while its controlled value changes', async () => {
     installBrowserPolyfills()
 
     render(<ModelsHarness />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
     openProviderDrawer()
     const nameInput = providerNameInput()
     nameInput.focus()
@@ -556,13 +576,15 @@ describe('Models call list', () => {
     let resolveDiscovery
     const discoverModels = vi.fn(() => new Promise(resolve => { resolveDiscovery = resolve }))
     render(<ModelsHarness discoverModels={discoverModels} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     openAddModel()
     fireEvent.click(screen.getByRole('button', { name: '从服务商获取' }))
     expect(await screen.findByText(/正在获取模型/)).toBeTruthy()
 
     resolveDiscovery({ models: [] })
-    expect(await screen.findByText(/没有发现模型/)).toBeTruthy()
+    expect(await screen.findByText(/暂无模型/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '从服务商获取' }))
     expect(discoverModels).toHaveBeenCalledTimes(2)
   })
@@ -573,6 +595,8 @@ describe('Models call list', () => {
       .mockRejectedValueOnce(new Error('upstream unavailable'))
       .mockResolvedValueOnce({ models: [] })
     render(<ModelsHarness discoverModels={discoverModels} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     openAddModel()
     fireEvent.click(screen.getByRole('button', { name: '从服务商获取' }))
@@ -581,17 +605,19 @@ describe('Models call list', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /重\s*试/ }))
     await waitFor(() => expect(discoverModels).toHaveBeenCalledTimes(2))
-    expect(await screen.findByText(/没有发现模型/)).toBeTruthy()
+    expect(await screen.findByText(/暂无模型/)).toBeTruthy()
   })
 
   test('appends a discovered candidate to the end of the call list', async () => {
     installBrowserPolyfills()
     const discoverModels = vi.fn(async () => ({ models: ['new-model'] }))
     render(<ModelsHarness discoverModels={discoverModels} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     openAddModel()
     fireEvent.click(screen.getByRole('button', { name: '从服务商获取' }))
-    fireEvent.click(await screen.findByRole('button', { name: '再添加一个 new-model 模型实例' }))
+    fireEvent.click(await screen.findByRole('button', { name: '添加 new-model' }))
 
     await waitFor(() => {
       const titles = [...document.querySelectorAll('.model-call-title strong')]
@@ -603,10 +629,16 @@ describe('Models call list', () => {
     installBrowserPolyfills()
     const discoverModels = vi.fn(async () => ({ models: ['demo-model'] }))
     render(<ModelsHarness discoverModels={discoverModels} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     openAddModel()
     fireEvent.click(screen.getByRole('button', { name: '从服务商获取' }))
-    fireEvent.click(await screen.findByRole('button', { name: '再添加一个 demo-model 模型实例' }))
+    expect(await screen.findByText('该服务商的模型已全部添加')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '添加 demo-model' })).toBeNull()
+    const manualInput = document.querySelector('.model-add-actions input')
+    fireEvent.change(manualInput, { target: { value: 'demo-model' } })
+    fireEvent.click(document.querySelector('.model-add-actions button'))
 
     await waitFor(() => {
       const titles = [...document.querySelectorAll('.model-call-title strong')]
@@ -614,9 +646,11 @@ describe('Models call list', () => {
     })
   })
 
-  test('shows invalid provider errors and the API key warning in its drawer', () => {
+  test('shows invalid provider errors and the API key warning in its drawer', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness initialProfile={{ ...validModelProfile, var_name: '', apibase: '', apikey: '' }} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     expect(screen.getByText(/有服务商存在阻断项/)).toBeTruthy()
     openProviderDrawer()
@@ -628,10 +662,12 @@ describe('Models call list', () => {
     expect(screen.getByText(/API Key 为空/)).toBeTruthy()
   })
 
-  test('collects edits into one draft that only the page-level save writes', () => {
+  test('collects edits into one draft that only the page-level save writes', async () => {
     installBrowserPolyfills()
     const saveAll = vi.fn(async () => true)
     render(<ModelsHarness saveAll={saveAll} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     expect(screen.getByText('与 mykey.py 一致')).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存到 mykey.py' }).disabled).toBe(true)
@@ -644,9 +680,11 @@ describe('Models call list', () => {
     expect(saveAll).toHaveBeenCalledTimes(1)
   })
 
-  test('reports a failed save at the top of the page and keeps the draft', () => {
+  test('reports a failed save at the top of the page and keeps the draft', async () => {
     installBrowserPolyfills()
     render(<ModelsHarness saveState={{ status: 'error', error: 'disk is read-only' }} />)
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
     openProviderDrawer()
     fireEvent.change(providerNameInput(), { target: { value: 'renamed' } })
@@ -657,7 +695,7 @@ describe('Models call list', () => {
     expect(providerNameInput().value).toBe('renamed')
   })
 
-  test('keeps failover groups independently collapsed and expands a newly added group', () => {
+  test('keeps failover groups independently collapsed and expands a newly added group', async () => {
     installBrowserPolyfills()
     const twoModels = {
       ...validModelProfile,
@@ -683,35 +721,31 @@ describe('Models call list', () => {
         ]}
       />,
     )
+    await waitFor(() => expect(document.querySelector('.model-provider-nav-select')).toBeTruthy())
+    await waitFor(() => expect(document.querySelector('.model-call-slot strong')).toBeTruthy())
 
+    fireEvent.click(document.querySelectorAll('.model-workspace-tabs button')[0])
     const readGroups = () => [...document.querySelectorAll('.model-call-row.is-failover')]
-    let groups = readGroups()
-    let toggles = groups.map(group => group.querySelector('.model-call-toggle'))
-    expect(groups).toHaveLength(2)
-    expect(toggles.map(toggle => toggle?.getAttribute('aria-expanded'))).toEqual(['false', 'false'])
-    expect(groups.every(group => !group.querySelector('.model-row-body'))).toBe(true)
+    const states = () => readGroups().map(group => group.querySelector('.model-call-toggle').getAttribute('aria-expanded'))
+    const openDrawer = () => document.querySelector('.model-row-detail-drawer.ant-drawer-open')
+    expect(readGroups()).toHaveLength(2)
+    expect(states()).toEqual(['false', 'false'])
 
-    fireEvent.click(toggles[0])
-    groups = readGroups()
-    toggles = groups.map(group => group.querySelector('.model-call-toggle'))
-    expect(toggles.map(toggle => toggle?.getAttribute('aria-expanded'))).toEqual(['true', 'false'])
-    expect(groups[0].querySelector('.model-row-body')).toBeTruthy()
-    expect(groups[1].querySelector('.model-row-body')).toBeNull()
+    fireEvent.click(readGroups()[0].querySelector('.model-call-toggle'))
+    expect(states()).toEqual(['true', 'false'])
+    await waitFor(() => expect(openDrawer()?.querySelector('.model-row-body')).toBeTruthy())
+    expect(openDrawer().textContent).toContain('mixin_config_primary')
 
-    fireEvent.click(toggles[1])
-    fireEvent.click(toggles[0])
-    groups = readGroups()
-    toggles = groups.map(group => group.querySelector('.model-call-toggle'))
-    expect(toggles.map(toggle => toggle?.getAttribute('aria-expanded'))).toEqual(['false', 'true'])
-    expect(groups[0].querySelector('.model-row-body')).toBeNull()
-    expect(groups[1].querySelector('.model-row-body')).toBeTruthy()
+    fireEvent.click(readGroups()[1].querySelector('.model-call-toggle'))
+    expect(states()).toEqual(['false', 'true'])
+    await waitFor(() => expect(openDrawer().textContent).toContain('mixin_config_secondary'))
+    fireEvent.click(openDrawer().querySelector('.ant-drawer-close'))
+    expect(states()).toEqual(['false', 'false'])
 
     fireEvent.click(screen.getByRole('button', { name: '新建故障转移组' }))
-    groups = readGroups()
-    toggles = groups.map(group => group.querySelector('.model-call-toggle'))
-    expect(groups).toHaveLength(3)
-    expect(toggles.map(toggle => toggle?.getAttribute('aria-expanded'))).toEqual(['false', 'true', 'true'])
-    expect(groups[2].querySelector('.model-row-body')).toBeTruthy()
+    expect(readGroups()).toHaveLength(3)
+    expect(states()).toEqual(['false', 'false', 'true'])
+    await waitFor(() => expect(openDrawer()?.querySelector('.model-row-body')).toBeTruthy())
   })
 })
 
@@ -719,7 +753,7 @@ describe('Models call list', () => {
 describe('chat viewport containment styles', () => {
   test('locks root scrolling only while the dedicated chat workspace is mounted', () => {
     expect(appStyles).toMatch(
-      /html:has\(\.oa-chat\),\s*body:has\(\.oa-chat\),\s*#root:has\(> \.oa-chat\)\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*100%;[^}]*overflow:\s*hidden;/,
+      /html:has\(\.oa-chat\):not\(:has\(\.app:not\(\.app-embedded\)\)\),\s*body:has\(\.oa-chat\):not\(:has\(\.app:not\(\.app-embedded\)\)\),\s*#root:has\(> \.oa-chat\):not\(:has\(\.app:not\(\.app-embedded\)\)\)\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*100%;[^}]*overflow:\s*hidden;/,
     )
   })
 })
@@ -1714,10 +1748,10 @@ describe('usage overview page', () => {
     expect((screen.getAllByText('gpt-5')).length).toBeGreaterThan(0)
     expect(screen.queryByText('Alpha')).toBeNull()
     expect(screen.queryByText('Session details')).toBeNull()
-    expect(screen.getByText('Daily activity')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Daily activity' })).toBeTruthy()
     const heatCells = document.querySelectorAll('.usage-heat-cell')
-    expect(heatCells.length).toBeGreaterThanOrEqual(358)
-    expect(heatCells.length).toBeLessThanOrEqual(364)
+    expect(heatCells.length).toBeGreaterThanOrEqual(176)
+    expect(heatCells.length).toBeLessThanOrEqual(182)
     expect(document.querySelector('.usage-heat-cell:not([data-level="0"])')).toBeTruthy()
   })
 
@@ -1804,7 +1838,7 @@ describe('operator shell feedback', () => {
     expect(window.location.href).toBe(originalURL)
     expect(globalThis.fetch.mock.calls.some(([url, options]) => String(url) === '/api/config' && ['POST', 'PUT'].includes(options?.method))).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: /Back to chat|回到聊天|返回对话/i }))
-    expect(onClose).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
     expect(window.location.href).toBe(originalURL)
     window.history.replaceState(null, '', '/')
   })
@@ -1813,7 +1847,7 @@ describe('operator shell feedback', () => {
     installBrowserPolyfills()
     globalThis.fetch = vi.fn(async (url) => shellPayload(url))
     render(<App />)
-    const files = await screen.findByRole('button', { name: /文件|Files/i })
+    const files = await screen.findByRole('button', { name: /^(文件|Files)$/i })
     const usage = screen.getByRole('button', { name: /用量总览|Usage/i })
     const overview = screen.getByRole('button', { name: /^(总览|Overview)$/i })
     const pageHeader = document.querySelector('.admin-page-header')
@@ -1837,7 +1871,7 @@ describe('operator shell feedback', () => {
     expect(document.activeElement).toBe(files)
     expect(files.tagName).toBe('BUTTON')
     fireEvent.click(files)
-    expect(files.getAttribute('aria-current')).toBe('page')
+    await waitFor(() => expect(files.getAttribute('aria-current')).toBe('page'))
     expect(files.disabled).toBe(false)
     expect(document.querySelectorAll('.admin-page-header')).toHaveLength(1)
     expect(document.querySelector('.admin-page-header h2')?.textContent).toMatch(/文件|Files/i)
@@ -1855,7 +1889,7 @@ describe('operator shell feedback', () => {
       globalThis.fetch = vi.fn(async (url) => shellPayload(url))
       view = render(<App />)
 
-      const files = await screen.findByRole('button', { name: /文件|Files/i })
+      const files = await screen.findByRole('button', { name: /^(文件|Files)$/i })
       const shell = document.querySelector('.app')
       const open = screen.getByRole('button', { name: /展开管理导航|Open admin navigation/i })
       expect(shell?.classList.contains('admin-sidebar-open')).toBe(false)
@@ -1884,24 +1918,15 @@ describe('operator shell feedback', () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await screen.findByRole('button', { name: /文件|Files/i })
-
-    // Appearance lives on the General settings page, not in the shell chrome.
-    fireEvent.click(screen.getByRole('button', { name: /^(常规|General)$/i }))
-    const trigger = await screen.findByRole('button', { name: /外观|Appearance/i })
-    expect(trigger).toBeTruthy()
-    
-    await user.click(trigger)
-    
-    // Wait for panel to appear in DOM
-    const panel = await waitFor(() => {
-      const p = document.querySelector('.theme-picker-panel')
-      expect(p).toBeTruthy()
-      return p
-    }, { timeout: 3000 })
-    
-    expect(panel).toBeTruthy()
-    expect(panel.querySelectorAll('.theme-picker-option').length).toBe(THEMES.length)
+    fireEvent.click(await screen.findByRole('button', { name: /^(常规|General)$/i }))
+    await waitFor(() => expect(document.querySelectorAll('.ui-theme-choices button')).toHaveLength(THEMES.length))
+    for (let index = 0; index < THEMES.length; index += 1) {
+      const button = document.querySelectorAll('.ui-theme-choices button')[index]
+      await waitFor(() => expect(button.disabled).toBe(false))
+      await user.click(button)
+      await waitFor(() => expect(button.getAttribute('aria-pressed')).toBe('true'))
+      expect(window.localStorage.getItem('ga-admin-theme')).toBe(THEMES[index].id)
+    }
   })
 
   test('switches the complete overview shell to English without stale Chinese labels', async () => {
@@ -1910,7 +1935,9 @@ describe('operator shell feedback', () => {
     render(<App />)
 
     fireEvent.click(await screen.findByRole('button', { name: '常规' }))
-    fireEvent.click(await screen.findByRole('button', { name: 'English' }))
+    const language = await screen.findByRole('combobox', { name: /语言|Language/i })
+    await waitFor(() => expect(language.disabled).toBe(false))
+    fireEvent.change(language, { target: { value: 'en' } })
     expect(screen.getByRole('button', { name: /Appearance/i })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /^Overview$/i }))
 
@@ -2154,7 +2181,7 @@ describe('operator shell feedback', () => {
     await waitFor(() => expect(document.querySelectorAll('.log-line')).toHaveLength(3))
     expect(document.querySelector('.log-line.is-error')).toBeTruthy()
 
-    const filter = screen.getByRole('searchbox')
+    const filter = screen.getByRole('searchbox', { name: /过滤日志行|Filter log lines/i })
     fireEvent.change(filter, { target: { value: 'disk' } })
     await waitFor(() => expect(document.querySelectorAll('.log-line')).toHaveLength(1))
     expect(document.querySelector('.log-line-no').textContent).toBe('2')

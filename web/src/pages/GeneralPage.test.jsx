@@ -77,9 +77,9 @@ describe('GeneralPage update mirror', () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
     render(<Harness onSave={onSave} />)
-    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.remote.title }))
+    fireEvent.click(screen.getByRole('button', { name: SETTINGS_TEXT.en.network.title }))
 
-    const input = screen.getByLabelText('GitHub mirror')
+    const input = await screen.findByLabelText('GitHub mirror')
     await user.type(input, 'https://mirror.example')
     await user.click(screen.getAllByRole('button', { name: /save changes/i })[0])
 
