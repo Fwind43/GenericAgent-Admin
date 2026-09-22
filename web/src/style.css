@@ -19269,3 +19269,17 @@ html[data-theme="khaki"] .models-page {
 html[data-theme="khaki"] .app .main > .admin-page-header p {
   color: var(--muted);
 }
+
+/* Match the warm workspace preview without changing other admin palettes. */
+html[data-theme="warm"] #admin-sidebar {
+  --sidebar-bg: var(--bg-soft);
+  --sidebar-control: var(--surface);
+  --sidebar-accent: var(--accent-text);
+  --sidebar-hover: var(--selected);
+  --sidebar-active: var(--selected);
+  --sidebar-line: var(--border);
+}
+html[data-theme="warm"] #admin-sidebar nav button.active,
+html[data-theme="warm"] #admin-sidebar nav button[aria-current="page"] {
+  --text: var(--accent-text);
+}
