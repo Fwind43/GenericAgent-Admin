@@ -19266,6 +19266,6 @@ html[data-theme="khaki"] .models-page {
   --model-error: #C0392B;
 }
 
-html[data-theme="khaki"] .admin-page-header p {
+html[data-theme="khaki"] .app .main > .admin-page-header p {
   color: var(--muted);
 }
