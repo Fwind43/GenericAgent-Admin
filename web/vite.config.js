@@ -36,6 +36,7 @@ console.log(`[Vite] Backend proxy target: ${proxyTarget}`)
 
 export default defineConfig({
   plugins: [react()],
+  esbuild: { jsx: 'automatic' },
   server: {
     host: config.viteHost,
     port: config.vitePort,
