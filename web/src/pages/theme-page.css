@@ -52,3 +52,5 @@
 .studio-size-grid output { color:var(--muted); font-variant-numeric:tabular-nums; }
 .studio-size-grid input { width:100%; padding:0; accent-color:var(--accent); cursor:pointer; }
 @media(max-width:480px) { .studio-size-grid { grid-template-columns:1fr; } }
+
+.studio-real-preview { display:block; width:100%; height:620px; border:0; background:transparent; }

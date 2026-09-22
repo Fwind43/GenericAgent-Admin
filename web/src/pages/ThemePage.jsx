@@ -1,3 +1,4 @@
+import ThemeChatPreview from './ThemeChatPreview'
 import { SIZE_FIELDS, getSizes, normalizeSizes, sizeVariables } from '../themeSizes'
 import React, { useEffect, useRef, useState } from 'react'
 import { ThemeColorView, useThemeColorController, basePreviewVariables } from '../ThemeColorEditor'
@@ -51,9 +52,8 @@ export default function ThemePage({ theme, lang, setTheme, onDraftChange }) {
     </section>
     <section className="studio-preview-section" aria-label={zh ? '聊天界面预览' : 'Chat preview'}>
       <div className="studio-heading"><h3>{zh ? '界面预览' : 'Workspace preview'}</h3><span>{preset.label[lang] || preset.label.en} · {zh ? '示例内容，不会发送消息' : 'Sample content, no messages sent'}</span></div>
-      <div className="studio-chat" style={{ ...variables, ...sizeVariables(sizes) }}>
-        <aside className="studio-chat-sidebar"><strong>GenericAgent</strong><div className="studio-new">＋ {zh ? '新对话' : 'New chat'}</div><small>{zh ? '最近会话' : 'Recent chats'}</small><div className="studio-current">{zh ? '今天的工作计划' : 'Today’s work plan'}</div><p>{zh ? '整理项目思路' : 'Project notes'}</p><p>{zh ? '探索新的想法' : 'Explore ideas'}</p><footer>GenericAgent Admin</footer></aside>
-        <div className="studio-chat-main"><div className="studio-chat-top">{zh ? '今天的工作计划' : 'Today’s work plan'}<span>···</span></div><div className="studio-messages"><div className="studio-user">{zh ? '帮我梳理一下今天的工作。' : 'Help me organize today’s work.'}</div><div className="studio-answer"><strong>GenericAgent</strong><p>{zh ? '当然。先从最重要的一件事开始。' : 'Of course. Start with the most important thing.'}</p><ul><li>{zh ? '明确目标，留出专注时间' : 'Define your goal and make time to focus'}</li><li>{zh ? '拆分步骤，逐项推进' : 'Break it into steps and work through them'}</li></ul><span className="studio-status">✓ {zh ? '已完成' : 'Completed'}</span></div></div><div className="studio-composer"><span>{zh ? '有什么可以帮你？' : 'How can I help?'}</span><div><span>＋</span><b>↑</b></div></div></div>
+      <div className="studio-chat" style={{ ...variables, ...sizeVariables(sizes), display:'block' }}>
+        <ThemeChatPreview preset={preset} variables={{...variables,...sizeVariables(sizes)}} zh={zh}/>
       </div>
     </section>
     <div className="studio-apply"><div><strong>{dirty ? (zh ? '正在预览，尚未应用' : 'Previewing, not applied') : (zh ? '正在使用此主题' : 'This theme is active')}</strong><small>{zh ? '已有的自定义颜色会保留。预览不会改变其他页面。' : 'Custom colors are preserved. Preview leaves other pages unchanged.'}</small></div><button disabled={!dirty || busy || colors.model.open} onClick={() => { select(theme); setSizes(savedSizes); setError('') }}>{zh ? '取消' : 'Cancel'}</button><button className="primary" disabled={!dirty || busy || colors.model.open} onClick={apply}>{busy ? (zh ? '应用中…' : 'Applying…') : (zh ? '应用主题' : 'Apply theme')}</button></div>
