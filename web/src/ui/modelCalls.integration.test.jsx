@@ -47,6 +47,7 @@ async function ready(id = 'default') {
   await waitFor(() => expect(requests('/api/models/import-mykey')).toHaveLength(1))
   if (id !== 'default') await select(id)
   await waitFor(() => expect(directory()).not.toBeNull())
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${t.models.callListTitle}\\s*\\d+$`) }))
 }
 const requests = path => api.mock.calls.filter(([url]) => url === path)
 beforeEach(() => {

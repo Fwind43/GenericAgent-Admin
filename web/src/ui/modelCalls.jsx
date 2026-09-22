@@ -46,30 +46,19 @@ function Empty({ model, actions }) {
     {!model.loading && <Button type="primary" icon={<Plus size={15}/>} onClick={model.canAdd ? actions.addModel : actions.addProvider}>{model.emptyAction}</Button>}
   </div>
 }
-export function DefaultModelCalls({ model, actions }) {
-  return <div data-model-calls-layout="default">
-    <header className="model-call-head"><div><strong>{model.title}</strong><span>{model.help}</span></div><AddActions model={model} actions={actions}/></header>
+function ModelCalls({ model, actions, layout = 'default' }) {
+  return <div data-model-calls-layout={layout} className="model-calls-redesign">
+    <header className="model-call-head"><div><strong>{model.title}<span className="model-call-count">{model.rows.length}</span></strong><span>{model.help}</span></div><AddActions model={model} actions={actions}/></header>
     {model.rows.length ? <Ordering model={model} actions={actions}><div className="model-call-rows" role="list" tabIndex={0} aria-label={model.title}>
       {model.rows.map(row => <SortableRow key={row.id} row={row}>{({ attributes, listeners }) => <div className="model-call-main">
         <button type="button" {...attributes} {...listeners} className="model-drag-handle" aria-label={`${model.labels.reorder}: ${row.actionName}`} title={model.labels.reorder}><GripVertical size={16}/></button>
         <div className="model-call-slot" aria-label={`--llm-no ${row.slot}`}><strong>{row.slot}</strong><span>--llm-no</span></div>
-        <div className="model-call-copy"><span className="model-call-title">{row.group && <Network size={13}/>}<strong title={row.title}>{row.title}</strong>{row.group && <Tag color="purple">{model.labels.group}</Tag>}</span>
+        <div className="model-call-copy"><span className="model-call-title">{row.group && <Network size={13}/>}<strong title={row.title}>{row.title}</strong>{row.group && <Tag>{model.labels.group}</Tag>}</span>
           <span className="model-call-sub"><code title={row.variable}>{row.variable}</code>{row.detail && <em title={row.detail}>{row.detail}</em>}</span></div>
         <Provider row={row} model={model} actions={actions}/><RowActions row={row} model={model} actions={actions}/>
       </div>}</SortableRow>)}
     </div></Ordering> : <Empty model={model} actions={actions}/>}
   </div>
 }
-export function StudioModelCalls({ model, actions }) {
-  return <div data-model-calls-layout="studio" className="studio-call-workbench">
-    <aside><small>--llm-no</small><h2>{model.title}</h2><p>{model.help}</p><AddActions model={model} actions={actions}/></aside>
-    {model.rows.length ? <Ordering model={model} actions={actions}><div className="studio-call-grid" role="list" aria-label={model.title}>
-      {model.rows.map(row => <SortableRow key={row.id} row={row} studio>{({ attributes, listeners }) => <>
-        <header><span className="studio-call-index" aria-label={`--llm-no ${row.slot}`}>{row.slot}</span><code>{row.variable}</code>
-          <button type="button" {...attributes} {...listeners} className="model-drag-handle" aria-label={`${model.labels.reorder}: ${row.actionName}`} title={model.labels.reorder}><GripVertical size={16}/></button></header>
-        <h3>{row.title}</h3>{row.group && <Tag color="purple">{model.labels.group}</Tag>}{row.detail && <p>{row.detail}</p>}
-        <Provider row={row} model={model} actions={actions}/><footer><RowActions row={row} model={model} actions={actions}/></footer>
-      </>}</SortableRow>)}
-    </div></Ordering> : <Empty model={model} actions={actions}/>}
-  </div>
-}
+export function DefaultModelCalls(props) { return <ModelCalls {...props} layout="default"/> }
+export function StudioModelCalls(props) { return <ModelCalls {...props} layout="studio"/> }

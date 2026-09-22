@@ -48,6 +48,7 @@ async function open(layout = 'default') { await mount(layout); click(`${t.models
 async function ready(id = 'default') {
   await waitFor(() => expect(requests('/api/models/import-mykey')).toHaveLength(1))
   if (id !== 'default') await select(id)
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(t.models.callListTitle) }))
   await waitFor(() => expect(directory()).not.toBeNull())
 }
 const requests = path => api.mock.calls.filter(([url]) => url === path)

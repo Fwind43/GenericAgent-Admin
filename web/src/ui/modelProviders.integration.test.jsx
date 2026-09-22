@@ -45,7 +45,7 @@ async function ready(id = 'default') {
   await waitFor(() => expect(directory()).not.toBeNull())
 }
 const requests = path => api.mock.calls.filter(([url]) => url === path)
-const open = async () => { fireEvent.click(within(directory()).getByRole('button', { name: /Synthetic provider/ })); return screen.findByRole('dialog') }
+const open = async () => { fireEvent.click(within(directory()).getByRole('button', { name: /Synthetic provider/ })); return document.querySelector('.model-settings-detail') }
 beforeEach(() => {
   localStorage.clear(); vi.clearAllMocks(); captured = null
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden') }))
@@ -158,7 +158,7 @@ it.each(['default', 'studio'])('offers direct provider actions without saving in
   mount(); await ready(id)
   const actions = directory().querySelector('.model-provider-direct-actions')
   fireEvent.click(within(actions).getByRole('button', { name: t.models.configure, exact: true }))
-  const dialog = await screen.findByRole('dialog')
+  const dialog = document.querySelector('.model-settings-detail')
   expect(within(dialog).getByDisplayValue('Synthetic provider')).toBeTruthy()
   fireEvent.click(within(dialog.querySelector('.model-drawer-footer')).getByRole('button', { name: t.close, exact: true }))
   confirmDanger.mockResolvedValueOnce(false)
@@ -167,4 +167,22 @@ it.each(['default', 'studio'])('offers direct provider actions without saving in
   expect(host.profiles).toHaveLength(1)
   expect(requests('/api/models/export')).toHaveLength(0)
   expect(within(actions).getByRole('button', { name: t.models.addModel, exact: true })).toBeTruthy()
+})
+
+it.each(['default', 'studio'])('clears provider models only after confirmation without saving in %s', async id => {
+  mount(); await ready(id); const dialog = await open()
+  const before = structuredClone(host.profiles[0])
+  act(() => host.setFailoverGroups([{ var_name: 'test_group', members: [{ provider_var_name: before.var_name, model: 'demo-model' }, { provider_var_name: 'other', model: 'other-model' }] }]))
+  const clear = within(dialog).getByRole('button', { name: t.models.clearProviderModels, exact: true })
+  confirmDanger.mockResolvedValueOnce(false)
+  fireEvent.click(clear)
+  await waitFor(() => expect(confirmDanger).toHaveBeenCalledWith('model-provider-clear', expect.any(String)))
+  expect(host.profiles[0]).toEqual(before)
+  expect(host.failoverGroups[0].members).toHaveLength(2)
+  fireEvent.click(clear)
+  await waitFor(() => expect(host.profiles[0].models).toEqual([]))
+  expect(host.profiles[0]).toMatchObject({ model: '', model_configs: [], apikey: before.apikey, apibase: before.apibase, display_name: before.display_name })
+  expect(host.failoverGroups[0].members).toEqual([{ provider_var_name: 'other', model: 'other-model' }])
+  expect(clear.disabled).toBe(true)
+  expect(requests('/api/models/export')).toHaveLength(0)
 })

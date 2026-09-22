@@ -1,0 +1,9 @@
+.model-advanced-default select { width: 100%; min-height: 32px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--panel); font: inherit; }
+.model-advanced-studio { display: grid; gap: 10px; }
+.model-advanced-studio fieldset { min-width: 0; margin: 0; padding: 8px 12px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.model-advanced-studio legend { width: auto; padding: 0 6px; margin: 0; color: var(--muted); font-size: 12px; }
+.model-advanced-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.model-advanced-choices button { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); padding: 5px 10px; font: inherit; cursor: pointer; }
+.model-advanced-choices button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.model-advanced-choices button:focus-visible, .model-advanced-default select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.model-advanced-default + .model-params-grid, .model-advanced-studio + .model-params-grid { margin-top: 12px; }

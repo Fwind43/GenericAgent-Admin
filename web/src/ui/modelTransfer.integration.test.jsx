@@ -45,10 +45,12 @@ async function mount(layout) {
   render(<UiHost packageRegistry={registry}><Harness /></UiHost>)
   await waitFor(() => expect(host.profiles).toHaveLength(1))
   if (layout === 'studio') await select(layout)
+  await waitFor(() => expect(transfer()).not.toBeNull())
   expect(transfer().dataset.modelTransfer).toBe(layout)
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(t.models.callListTitle) }))
 }
 async function dirty() {
-  fireEvent.click(screen.getByRole('button', { name: `${t.models.configure}: model-a`, exact: true }))
+  fireEvent.click(await screen.findByRole('button', { name: `${t.models.configure}: model-a`, exact: true }))
   const editor = await waitFor(() => { const node = document.querySelector('[data-model-editor-common]'); expect(node).not.toBeNull(); return node })
   fireEvent.change(within(editor).getByLabelText(t.models.displayName), { target: { value: 'Synthetic draft' } })
   await waitFor(() => expect(host.changes.total).toBeGreaterThan(0))

@@ -1,5 +1,7 @@
 import ModelDiscoveryList from './ModelDiscoveryList'
 import './models-workbench.css'
+import './models-redesign.css'
+import { modelAdvancedView } from './modelsAdvancedView'
 import { modelRiskView } from './modelsRiskView'
 import { UiSurface } from '../ui/UiHost'
 import {
@@ -139,6 +141,7 @@ function ModelParams({ config, protocol, onChange, t }) {
     else next[key] = value
     onChange({ extra: next })
   }
+  const advanced = modelAdvancedView(config, protocol, t, onChange)
   const hasProtocolFields = fields.userAgent || fields.apiMode || fields.serviceTier
     || fields.thinkingType || fields.reasoningFamily || fields.fakeClaudeCode
 
@@ -178,26 +181,28 @@ function ModelParams({ config, protocol, onChange, t }) {
             <strong>{text.protocolParams}</strong>
             <span>{protocolLabel(protocol, t)}</span>
           </div>
+          <UiSurface name="admin.models.editor.advanced" viewProps={{ model: advanced.model, actions: advanced.actions }} />
+          {/* Free text, auth-related choices, numeric parsing and unknown enum values stay host-owned. */}
           <div className="model-params-grid">
             {fields.userAgent && (
               <label className="model-field">
                 <span className="model-field-label">User-Agent</span>
-                <Input value={config.user_agent || ''} onChange={event => onChange({ user_agent: event.target.value || undefined })} placeholder={text.optional} />
+                <Input aria-label="User-Agent" value={config.user_agent || ''} onChange={event => onChange({ user_agent: event.target.value || undefined })} placeholder={text.optional} />
               </label>
             )}
-            {fields.apiMode && (
+            {fields.apiMode && !advanced.handled.includes('api_mode') && (
               <label className="model-field">
                 <span className="model-field-label">{text.apiMode}</span>
                 <Select allowClear value={config.api_mode || undefined} onChange={api_mode => onChange({ api_mode })} placeholder={text.inherit} options={API_MODE_OPTIONS} />
               </label>
             )}
-            {fields.serviceTier && (
+            {fields.serviceTier && !advanced.handled.includes('service_tier') && (
               <label className="model-field">
                 <span className="model-field-label">{text.serviceTier}</span>
                 <Select allowClear value={config.service_tier || undefined} onChange={service_tier => onChange({ service_tier })} placeholder={text.inherit} options={SERVICE_TIER_OPTIONS} />
               </label>
             )}
-            {fields.thinkingType && (
+            {fields.thinkingType && !advanced.handled.includes('thinking_type') && (
               <label className="model-field">
                 <span className="model-field-label">{text.thinkingType}</span>
                 <Select allowClear value={config.thinking_type || undefined} onChange={thinking_type => onChange({ thinking_type })} placeholder={text.inherit} options={THINKING_TYPE_OPTIONS} />
@@ -206,7 +211,7 @@ function ModelParams({ config, protocol, onChange, t }) {
             {fields.thinkingType && (
               <label className="model-field">
                 <span className="model-field-label">thinking_budget_tokens</span>
-                <Input type="number" min={1} step={1} disabled={config.thinking_type !== 'enabled'} value={extra.thinking_budget_tokens ?? ''} onChange={event => updateExtra('thinking_budget_tokens', optionalNumber(event.target.value))} placeholder={text.inherit} />
+                <Input aria-label="thinking_budget_tokens" type="number" min={1} step={1} disabled={config.thinking_type !== 'enabled'} value={extra.thinking_budget_tokens ?? ''} onChange={event => updateExtra('thinking_budget_tokens', optionalNumber(event.target.value))} placeholder={text.inherit} />
               </label>
             )}
             {protocol === 'native_claude' && (
@@ -215,13 +220,13 @@ function ModelParams({ config, protocol, onChange, t }) {
                 <Select allowClear value={extra.api_key_header || undefined} onChange={value => updateExtra('api_key_header', value)} placeholder={text.inherit} options={['auto', 'x-api-key', 'bearer'].map(value => ({ value, label: value }))} />
               </label>
             )}
-            {fields.reasoningFamily && (
+            {fields.reasoningFamily && !advanced.handled.includes('reasoning_effort') && (
               <label className="model-field">
                 <span className="model-field-label">{text.reasoningEffort}</span>
                 <Select allowClear value={config.reasoning_effort || undefined} onChange={reasoning_effort => onChange({ reasoning_effort })} placeholder={text.inherit} options={reasoningEffortOptions(protocol)} />
               </label>
             )}
-            {fields.fakeClaudeCode && (
+            {fields.fakeClaudeCode && !advanced.handled.includes('fake_cc_system_prompt') && (
               <label className="model-field">
                 <span className="model-field-label">{text.fakeClaude}</span>
                 <OptionalBoolSelect value={config.fake_cc_system_prompt} onChange={fake_cc_system_prompt => onChange({ fake_cc_system_prompt })} t={t} />
@@ -425,7 +430,16 @@ function ProviderForm({ draft, profiles, editingIndex, onChange, t }) {
   )
 }
 
+function InlineProviderEditor({ title, children, footer, onCancel, open }) {
+  if (!open) return null
+  return <article className="model-settings-detail">
+    <header className="model-settings-detail-head"><Button type="text" onClick={onCancel} aria-label="Back">←</Button><h2>{title}</h2></header>
+    {children}<footer className="model-settings-detail-footer">{footer}</footer>
+  </article>
+}
+
 function ProviderModal({
+  inline = false,
   open,
   mode,
   profile,
@@ -438,6 +452,7 @@ function ProviderModal({
   onRemove,
   onAddModels,
   onRemoveModel,
+  onClearModels,
   revealedKey,
   revealBusy,
   onRevealKey,
@@ -459,8 +474,9 @@ function ProviderModal({
     onChange({ model: next.model, models: next.models, model_configs: next.model_configs })
   }
 
+  const Container = inline ? InlineProviderEditor : Modal
   return (
-    <Modal
+    <Container
       title={creating ? text.addProvider : (providerName(profile) || text.providerEditor)}
       width={920}
       centered
@@ -529,7 +545,10 @@ function ProviderModal({
           <div className="model-subsection">
             <div className="model-subsection-head">
               <strong>{text.providerModels}</strong>
-              <Button size="small" icon={<Plus size={13} />} onClick={onAddModels}>{text.addModel}</Button>
+              <Space size={8}>
+                <Button size="small" danger disabled={!configs.length} onClick={async () => { if (await onClearModels?.()) setExpandedModel(null) }}>{text.clearProviderModels}</Button>
+                <Button size="small" icon={<Plus size={13} />} onClick={onAddModels}>{text.addModel}</Button>
+              </Space>
             </div>
             {configs.length ? (
               <div className="model-provider-models">
@@ -595,7 +614,7 @@ function ProviderModal({
           </div>
         )}
       </div>
-    </Modal>
+    </Container>
   )
 }
 
@@ -767,7 +786,7 @@ export function Models({
 }) {
   const text = t.models
   const [expanded, setExpanded] = useState(() => new Set())
-  const [workspace, setWorkspace] = useState('models')
+  const [workspace, setWorkspace] = useState('providers')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [providerDrawer, setProviderDrawer] = useState(null)
   const [providerDraft, setProviderDraft] = useState(null)
@@ -933,6 +952,7 @@ export function Models({
   })
 
   const openProvider = index => {
+    setWorkspace('providers')
     setProviderDrawer({ mode: 'edit', index })
     setProviderDraft(null)
   }
@@ -969,6 +989,19 @@ export function Models({
     // A provider only matters once it has models, so keep the flow going.
     setAddModelIndex(profiles.length)
   }
+  const clearProviderModels = async index => {
+    const profile = profiles[index]
+    const count = profileModelConfigs(profile || {}).length
+    if (!profile || !count) return false
+    if (!await confirmDanger('model-provider-clear', text.clearProviderModelsConfirm(providerName(profile) || text.provider(index + 1), count))) return false
+    setFailoverGroups(groups => groups.map(group => ({
+      ...group,
+      members: (group.members || []).filter(member => member.provider_var_name !== profile.var_name),
+    })))
+    patchModelConfigs(index, { model: '', models: [], model_configs: [] })
+    return true
+  }
+
   const removeProvider = async index => {
     const profile = profiles[index]
     const name = providerName(profile) || text.provider(index + 1)
@@ -1156,8 +1189,11 @@ export function Models({
         aria-label={text.connections}
         aria-hidden={workspace !== 'providers'}
       >
+        <div className={`model-settings-workspace${providerDrawer?.mode === 'edit' ? ' has-selection' : ''}`}>
+          <aside className="model-settings-nav">
         <UiSurface name="admin.models.providers" viewProps={{
           model: {
+            selectedId: providerDrawer?.mode === 'edit' ? drawerIndex : null,
             title: text.connections, help: text.connectionsHelp,
             addLabel: text.addProvider, emptyLabel: text.noProvidersHelp,
             editLabel: text.configure, addModelLabel: text.addModel, deleteLabel: t.delete,
@@ -1186,11 +1222,8 @@ export function Models({
             removeProvider: index => { if (Number.isInteger(index) && profiles[index]) return removeProvider(index) },
           },
         }}/>
-      </section>
-
-      <Collapse ghost items={riskItems} className="model-risk-collapse" />
-
-      <ProviderModal
+          </aside>
+          {providerDrawer?.mode === 'edit' ? <ProviderModal inline
         open={Boolean(providerDrawer)}
         mode={shownDrawer?.mode}
         profile={drawerProfile}
@@ -1202,6 +1235,41 @@ export function Models({
           ? setProviderDraft(current => ({ ...current, ...patch }))
           : patchProfile(drawerIndex, patch)}
         onCreate={createProvider}
+        onClearModels={() => clearProviderModels(drawerIndex)}
+        onRemove={() => removeProvider(drawerIndex)}
+        onAddModels={() => setAddModelIndex(drawerIndex)}
+        onRemoveModel={(configIndex, config) => removeModel({
+          profileIndex: drawerIndex,
+          configIndex,
+          variableName: config?.model,
+        })}
+        revealedKey={revealedKeys[drawerKey]}
+        revealBusy={!!revealBusy[drawerKey]}
+        onRevealKey={onRevealKey}
+        onClearRevealedKey={onClearRevealedKey}
+        t={t}
+      /> : <div className="model-settings-welcome">
+            <Network size={28}/><h2>{text.connections}</h2><p>{text.connectionsHelp}</p>
+            <Button type="primary" icon={<Plus size={14}/>} onClick={profiles.length ? () => openProvider(0) : openNewProvider}>{profiles.length ? text.configure : text.addProvider}</Button>
+          </div>}
+        </div>
+      </section>
+
+      <Collapse ghost items={riskItems} className="model-risk-collapse" />
+
+      <ProviderModal
+        open={providerDrawer?.mode === 'create'}
+        mode={shownDrawer?.mode}
+        profile={drawerProfile}
+        index={drawerIndex}
+        profiles={profiles}
+        result={drawerIndex === undefined ? null : validation[drawerIndex]}
+        onClose={closeProvider}
+        onChange={patch => shownDrawer?.mode === 'create'
+          ? setProviderDraft(current => ({ ...current, ...patch }))
+          : patchProfile(drawerIndex, patch)}
+        onCreate={createProvider}
+        onClearModels={() => clearProviderModels(drawerIndex)}
         onRemove={() => removeProvider(drawerIndex)}
         onAddModels={() => setAddModelIndex(drawerIndex)}
         onRemoveModel={(configIndex, config) => removeModel({
