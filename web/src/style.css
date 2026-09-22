@@ -16066,7 +16066,7 @@ html[data-color-scheme="dark"] .logs-page {
 
 #admin-sidebar { scrollbar-color: var(--scrollbar-colors); }
 @supports selector(::-webkit-scrollbar) {
-  #admin-sidebar { scrollbar-color: var(--scrollbar-colors); scrollbar-width: auto; }
+  #admin-sidebar { scrollbar-color: auto; scrollbar-width: auto; }
 }
 #admin-sidebar::-webkit-scrollbar { width: 6px; }
 #admin-sidebar::-webkit-scrollbar-track { background: var(--scrollbar-track); }
