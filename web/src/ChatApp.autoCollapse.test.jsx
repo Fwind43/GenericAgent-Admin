@@ -45,15 +45,15 @@ test('responds to same-tab and cross-tab preference changes', () => {
   expect(expanded(view)).toBe('false')
 })
 
-test('settings toggle is enabled by default and saves immediately', () => {
+test('settings toggle is enabled by default and saves immediately', async () => {
   const props = { t: {}, text: SETTINGS_TEXT.en, titleModel: { enabled: false, options: [], draft: '' } }
   const view = render(<ChatSettingsPage {...props} />)
-  const toggle = view.container.querySelector('#settings-auto-collapse-process')
+  const toggle = await view.findByRole('switch', { name: SETTINGS_TEXT.en.chat.autoCollapseProcess })
   expect(toggle.checked).toBe(true)
   fireEvent.click(toggle)
   expect(toggle.checked).toBe(false)
   expect(localStorage.getItem(key)).toBe('false')
   view.unmount()
   const restored = render(<ChatSettingsPage {...props} />)
-  expect(restored.container.querySelector('#settings-auto-collapse-process').checked).toBe(false)
+  expect((await restored.findByRole('switch', { name: SETTINGS_TEXT.en.chat.autoCollapseProcess })).checked).toBe(false)
 })

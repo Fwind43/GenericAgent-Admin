@@ -58,7 +58,7 @@ describe('message nodes', () => {
   test('shows a themed scrollbar in the expanded directory', () => {
     const expanded = navigatorCSS.match(/\.oa-message-nav\[data-expanded="true"\] \.oa-message-nav-track\s*\{([^}]+)\}/)[1]
     expect(expanded).toMatch(/scrollbar-width:\s*thin/)
-    expect(expanded).toMatch(/scrollbar-color:\s*var\(--muted\) var\(--surface-strong\)/)
+    expect(expanded).toMatch(/scrollbar-color:\s*var\(--scrollbar-thumb\) var\(--scrollbar-track\)/)
     expect(expanded).toMatch(/scrollbar-gutter:\s*stable/)
     const webkit = navigatorCSS.match(/\.oa-message-nav\[data-expanded="true"\] \.oa-message-nav-track::-webkit-scrollbar\s*\{([^}]+)\}/)[1]
     expect(webkit).toMatch(/display:\s*block/)

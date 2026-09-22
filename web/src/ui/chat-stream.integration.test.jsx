@@ -1,4 +1,5 @@
 import React from 'react'
+import gsap from 'gsap'
 import { afterEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ChatApp from '../ChatApp'
@@ -60,7 +61,8 @@ it.each(['done', 'cancel', 'switch', 'late-state'])('mounted stream %s retains c
       tailSchedules.push({ id, instance: observation.scope }); heldFrames.set(id, callback); frames.add(id)
       return id
     }
-    const id = request(time => { frames.delete(id); callback(time) }); frames.add(id); return id
+    const id = request(time => { frames.delete(id); callback(time) }); frames.add(id)
+    return id
   })
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(id => { frames.delete(id); heldFrames.delete(id); cancel(id) })
   const add = document.addEventListener.bind(document), remove = document.removeEventListener.bind(document)
@@ -95,6 +97,7 @@ it.each(['done', 'cancel', 'switch', 'late-state'])('mounted stream %s retains c
     calls.push(key)
     let data
     switch (key) {
+      case 'GET /api/version/info': data = { version: '0.3.12' }; break
       case 'GET /api/config': data = { slash_commands: [] }; break
       case 'GET /api/slash-commands': data = { commands: [] }; break
       case 'PUT /api/ui/theme': data = JSON.parse(init.body); break
@@ -246,7 +249,9 @@ it.each(['done', 'cancel', 'switch', 'late-state'])('mounted stream %s retains c
   phase('stream-cleaned')
   cleanup()
   expect(sources.every(source => source.closed)).toBe(true)
-  expect(frames.size).toBe(0)
+  expect(gsap.globalTimeline.getChildren()).toHaveLength(0)
+  // GSAP's shared ticker auto-sleeps periodically after scoped animations revert.
+  await waitFor(() => expect(frames.size).toBe(0), { timeout: 4000 })
   expect(listeners.size).toBe(0)
   expect(unexpected).toEqual([])
   phase('unmount-cleaned')

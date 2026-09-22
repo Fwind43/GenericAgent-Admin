@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
 
-const source = readFileSync('src/ChatApp.jsx', 'utf8')
+const source = readFileSync('src/ChatApp.jsx', 'utf8') + '\n' + readFileSync('src/ui/chatBody.jsx', 'utf8')
 
 describe('session-scoped guided-message queue wiring', () => {
   test('prefetches state without delaying history and applies it after history', () => {

@@ -2,7 +2,13 @@ import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ChatApp from '../ChatApp'
-import { UiHost } from './UiHost'
+import { UiHost, useUiPackage } from './UiHost'
+
+// Exercise the real host without restoring the retired permanent chat selector.
+function PackageProbe() {
+  const ui = useUiPackage()
+  return <div data-testid="package-probe"><button onClick={() => ui.select('studio')}>Test Studio</button><button onClick={() => ui.restore()}>Test default</button><output>{ui.id}</output></div>
+}
 
 // Real controller and UI; transport only is an in-process fixture.
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
@@ -28,6 +34,7 @@ it('real chat retains draft, message DOM and queue subscription across package s
     calls.push(key)
     let data
     switch (key) {
+      case 'GET /api/version/info': data = { version: 'v0.3.12' }; break
       case 'GET /api/config': data = { slash_commands: [] }; break
       case 'GET /api/slash-commands': data = { commands: [] }; break
       case 'PUT /api/ui/theme': data = JSON.parse(init.body); break
@@ -42,7 +49,7 @@ it('real chat retains draft, message DOM and queue subscription across package s
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
   const settings = vi.fn()
-  const { container } = render(<UiHost><ChatApp onOpenSettings={settings}/></UiHost>)
+  const { container } = render(<UiHost><PackageProbe/><ChatApp onOpenSettings={settings}/></UiHost>)
   const message = await screen.findByText('Retained fixture message', { selector: '.oa-msg-text' })
   const composer = await screen.findByPlaceholderText(/Message GenericAgent/)
   fireEvent.change(composer, { target: { value: 'unsent draft survives' } })
@@ -51,9 +58,9 @@ it('real chat retains draft, message DOM and queue subscription across package s
   const sourceCount = sources.length
   const detailReads = calls.filter(c => c === 'GET /api/chat/session/s1').length
   const main = container.querySelector('.oa-main')
-  const bar = screen.getByRole('region', { name: 'Chat interface package' })
-  fireEvent.click(within(bar).getByRole('button', { name: /Enable Studio chat/ }))
-  await screen.findByLabelText('Studio chat')
+  const bar = screen.getByTestId('package-probe')
+  fireEvent.click(within(bar).getByRole('button', { name: 'Test Studio' }))
+  await waitFor(() => expect(main.dataset.uiChat).toBe('studio'))
   expect(main.dataset.uiChat).toBe('studio')
   expect(container.querySelector('.oa-main')).toBe(main)
   expect(screen.getByText('Retained fixture message', { selector: '.oa-msg-text' })).toBe(message)
@@ -61,10 +68,10 @@ it('real chat retains draft, message DOM and queue subscription across package s
   expect(composer.value).toBe('unsent draft survives')
   expect(source.closed).toBe(false)
   expect(sources).toHaveLength(sourceCount)
-  fireEvent.click(within(screen.getByRole('toolbar', { name: 'Package chat tools' })).getByRole('button', { name: 'Settings' }))
+  fireEvent.click(within(container.querySelector('[data-ui-surface="chat.sidebar"]')).getByRole('button', { name: 'Settings', exact: true }))
   expect(settings).toHaveBeenCalledTimes(1)
-  fireEvent.click(within(bar).getByRole('button', { name: /Restore default chat/ }))
-  await screen.findByLabelText('Default chat')
+  fireEvent.click(within(bar).getByRole('button', { name: 'Test default' }))
+  await waitFor(() => expect(main.dataset.uiChat).toBe('default'))
   expect(main.dataset.uiChat).toBe('default')
   expect(screen.getByText('Retained fixture message', { selector: '.oa-msg-text' })).toBe(message)
   expect(screen.getByPlaceholderText(/Message GenericAgent/)).toBe(composer)

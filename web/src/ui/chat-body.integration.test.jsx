@@ -2,7 +2,13 @@ import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ChatApp from '../ChatApp'
-import { UiHost } from './UiHost'
+import { UiHost, useUiPackage } from './UiHost'
+
+// Exercise the real host without restoring the retired permanent chat selector.
+function PackageProbe() {
+  const ui = useUiPackage()
+  return <div data-testid="package-probe"><button onClick={() => ui.select('studio')}>Test Studio</button><button onClick={() => ui.restore()}>Test default</button><output>{ui.id}</output></div>
+}
 
 // Real controller and UI; transport only is an in-process fixture.
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() })
@@ -30,6 +36,7 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
     calls.push(key)
     let data
     switch (key) {
+      case 'GET /api/version/info': data = { version: 'v0.3.12' }; break
       case 'GET /api/config': data = { slash_commands: [] }; break
       case 'GET /api/slash-commands': data = { commands: [] }; break
       case 'PUT /api/ui/theme': data = JSON.parse(init.body); break
@@ -51,7 +58,7 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
     return new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
   const settings = vi.fn()
-  const { container } = render(<UiHost><ChatApp onOpenSettings={settings}/></UiHost>)
+  const { container } = render(<UiHost><PackageProbe/><ChatApp onOpenSettings={settings}/></UiHost>)
   const message = await screen.findByText('Retained fixture message', { selector: '.oa-msg-text' })
   const composer = await screen.findByPlaceholderText(/Message GenericAgent/)
   fireEvent.change(composer, { target: { value: 'unsent draft survives' } })
@@ -64,9 +71,9 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   const thread = roots[1]
   thread.scrollTop = 147
   const main = container.querySelector('.oa-main')
-  const bar = screen.getByRole('region', { name: 'Chat interface package' })
-  fireEvent.click(within(bar).getByRole('button', { name: /Enable Studio chat/ }))
-  await screen.findByLabelText('Studio chat')
+  const bar = screen.getByTestId('package-probe')
+  fireEvent.click(within(bar).getByRole('button', { name: 'Test Studio' }))
+  await waitFor(() => expect(main.dataset.uiChat).toBe('studio'))
   expect(main.dataset.uiChat).toBe('studio')
   roots.forEach(node => {
     expect(node.dataset.uiLayout).toBe('studio')
@@ -79,10 +86,10 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   expect(composer.value).toBe('unsent draft survives')
   expect(source.closed).toBe(false)
   expect(sources).toHaveLength(sourceCount)
-  fireEvent.click(within(screen.getByRole('toolbar', { name: 'Package chat tools' })).getByRole('button', { name: 'Settings' }))
+  fireEvent.click(within(roots[0]).getByRole('button', { name: 'Settings', exact: true }))
   expect(settings).toHaveBeenCalledTimes(1)
-  fireEvent.click(within(bar).getByRole('button', { name: /Restore default chat/ }))
-  await screen.findByLabelText('Default chat')
+  fireEvent.click(within(bar).getByRole('button', { name: 'Test default' }))
+  await waitFor(() => expect(main.dataset.uiChat).toBe('default'))
   expect(main.dataset.uiChat).toBe('default')
   expect(screen.getByText('Retained fixture message', { selector: '.oa-msg-text' })).toBe(message)
   expect(screen.getByPlaceholderText(/Message GenericAgent/)).toBe(composer)
@@ -92,8 +99,8 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   expect(calls.filter(c => c === 'GET /api/chat/session/s1')).toHaveLength(detailReads)
   roots.forEach(node => expect(node.dataset.uiLayout).toBe('default'))
   expect(thread.scrollTop).toBe(147)
-  fireEvent.click(within(bar).getByRole('button', { name: /Enable Studio chat/ }))
-  await screen.findByLabelText('Studio chat')
+  fireEvent.click(within(bar).getByRole('button', { name: 'Test Studio' }))
+  await waitFor(() => expect(main.dataset.uiChat).toBe('studio'))
   fireEvent.click(container.querySelector('.oa-send'))
   await waitFor(() => expect(sent).not.toBeNull())
   expect(sent.prompt).toBe('unsent draft survives')
