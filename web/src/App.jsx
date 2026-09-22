@@ -394,7 +394,7 @@ function AdminApp({ embedded = false, active = true, onClose }) {
               onDraftStateChange={setOverviewDraft}
             /></div>}
             {tab==='overview' && !ui.isDefaultSurface('admin.overview') && !overviewDraft.dirty && !overviewDraft.busy && <UiSurface name="admin.overview" viewProps={{ overview: packageOverview, presentation: { lang, theme }, actions: { refreshOverview, refreshing: overviewRefreshing } }}/>}
-            {tab==='theme' && <ThemePage theme={theme} lang={lang}/>}
+            {tab==='theme' && <ThemePage theme={theme} lang={lang} setTheme={setTheme} onDraftChange={onPageDraft}/>}
             {tab==='settings' && <GeneralPage
               onOpenTheme={() => openTab('theme')}
               t={t}

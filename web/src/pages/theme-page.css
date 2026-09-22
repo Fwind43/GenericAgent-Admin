@@ -1,0 +1,43 @@
+.theme-studio { max-width: 1200px; margin: 0 auto; }
+.studio-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 0 14px; }
+.studio-heading h3 { margin:0; font-size:16px; }
+.studio-heading > span { color:var(--muted); font-size:12px; }
+.studio-presets { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; margin-bottom:28px; }
+.theme-studio .studio-preset { display:block; padding:8px; text-align:left; min-width:0; white-space:normal; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--text); }
+.theme-studio .studio-preset[aria-pressed=true] { border-color:var(--accent-text); box-shadow:0 0 0 1px var(--accent-text); }
+.studio-mini { display:flex; height:80px; border-radius:5px; overflow:hidden; border:1px solid #8883; }
+.studio-mini > i { width:27%; border-right:1px solid #8883; }
+.studio-mini > span { flex:1; padding:13px 10px; display:flex; flex-direction:column; gap:7px; }
+.studio-mini b { height:3px; width:65%; background:currentColor; opacity:.3; border-radius:3px; }
+.studio-mini em { width:40%; height:12px; margin-left:auto; opacity:.55; border-radius:4px; }
+.studio-preset-name { display:flex; align-items:center; justify-content:space-between; gap:4px; margin:10px 2px 5px; font-weight:600; font-size:13px; }
+.studio-preset-name small { font-size:11px; color:var(--text); font-weight:400; }
+.studio-description { display:block; margin:0 2px 3px; font-size:12px; line-height:1.5; color:var(--muted); }
+.studio-chat { display:grid; grid-template-columns:190px minmax(0,1fr); border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--oa-bg,var(--bg)); color:var(--oa-text,var(--text)); }
+.studio-chat-sidebar { background:var(--oa-panel,var(--bg-soft)); border-right:1px solid var(--oa-line,var(--border)); padding:22px 16px; display:flex; flex-direction:column; gap:16px; font-size:12px; }
+.studio-chat-sidebar > strong { font-size:14px; }
+.studio-chat-sidebar > small,.studio-chat-sidebar > p,.studio-chat-sidebar footer { color:var(--oa-muted,var(--muted)); margin:0; }
+.studio-chat-sidebar footer { margin-top:auto; font-size:10px; }
+.studio-new { border:1px solid var(--oa-line,var(--border)); border-radius:7px; padding:9px; }
+.studio-current { background:var(--oa-hover,var(--hover)); padding:9px; border-radius:7px; }
+.studio-chat-top { display:flex; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--oa-line,var(--border)); font-size:12px; }
+.studio-messages { max-width:650px; padding:24px 32px 14px; margin:auto; font-size:13px; line-height:1.7; }
+.studio-user { background:var(--oa-user,var(--surface-muted)); border-radius:14px 14px 4px 14px; padding:10px 16px; width:fit-content; margin-left:auto; }
+.studio-answer { margin-top:20px; }
+.studio-answer p { margin:8px 0; }
+.studio-answer ul { padding-left:20px; margin:8px 0; }
+.studio-status { color:var(--success); font-size:11px; }
+.studio-composer { margin:10px 28px 22px; padding:14px 16px 10px; background:var(--oa-panel,var(--surface)); border:1px solid var(--oa-line,var(--border)); border-radius:12px; color:var(--oa-muted,var(--muted)); font-size:12px; }
+.studio-composer > div { display:flex; justify-content:space-between; align-items:center; margin-top:18px; }
+.studio-composer b { display:grid; place-items:center; width:28px; height:28px; border-radius:50%; background:var(--accent-text); color:var(--on-accent); }
+.studio-apply { display:flex; align-items:center; gap:10px; padding:18px 0 24px; }
+.studio-apply > div { flex:1; }
+.studio-apply strong { display:block; font-size:13px; }
+.studio-apply small { display:block; margin-top:5px; color:var(--muted); font-size:12px; }
+.studio-apply button { white-space:nowrap; }
+.studio-advanced { border-top:1px solid var(--border); padding-top:20px; }
+.theme-studio .studio-advanced .theme-editor { border:0; padding:0; background:transparent; }
+.theme-studio .studio-advanced .theme-editor h3 { font-size:14px; }
+.theme-studio .studio-advanced .theme-editor header p { max-width:650px; }
+@media(max-width:760px) { .studio-presets { grid-template-columns:repeat(3,minmax(0,1fr)); } .studio-chat { grid-template-columns:140px minmax(0,1fr); } .studio-heading { flex-wrap:wrap; gap:6px; } .studio-messages { padding:20px; } }
+@media(max-width:480px) { .studio-presets { grid-template-columns:repeat(2,minmax(0,1fr)); } .studio-chat { grid-template-columns:minmax(0,1fr); } .studio-chat-sidebar { display:none; } .studio-apply { flex-wrap:wrap; } .studio-apply > div { flex-basis:100%; } .studio-apply button { flex:1; } .studio-composer { margin:10px 16px 16px; } }

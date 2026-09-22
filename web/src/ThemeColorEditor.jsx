@@ -5,6 +5,8 @@ import ConfigProvider from 'antd/es/config-provider'
 import { CUSTOM_COLORS_STYLE_ID, customColorsToAntd, CUSTOM_COLOR_TOKENS, getInitialCustomColors, persistCustomColors, previewCustomColors, sanitizeColorValue } from './themes'
 import './theme-editor.css'
 
+const colorLabels = {"bg": "\u9875\u9762\u80cc\u666f", "bg-soft": "\u6b21\u7ea7\u80cc\u666f", "surface": "\u5361\u7247\u8868\u9762", "surface-strong": "\u6d6e\u5c42\u8868\u9762", "surface-muted": "\u5f31\u5316\u8868\u9762", "text": "\u6b63\u6587\u6587\u5b57", "muted": "\u8f85\u52a9\u6587\u5b57", "border": "\u8fb9\u6846", "border-strong": "\u5f3a\u8c03\u8fb9\u6846", "accent": "\u5f3a\u8c03\u5e95\u8272", "accent-hover": "\u5f3a\u8c03\u60ac\u505c", "accent-text": "\u5f3a\u8c03\u6587\u5b57", "on-accent": "\u5f3a\u8c03\u8272\u4e0a\u6587\u5b57", "hover": "\u60ac\u505c\u80cc\u666f", "selected": "\u9009\u4e2d\u80cc\u666f", "selected-text": "\u9009\u4e2d\u6587\u5b57", "disabled-bg": "\u7981\u7528\u80cc\u666f", "disabled-text": "\u7981\u7528\u6587\u5b57", "focus": "\u7126\u70b9\u8f6e\u5ed3", "success": "\u6210\u529f", "warning": "\u8b66\u544a", "error": "\u9519\u8bef", "info": "\u63d0\u793a", "scrollbar-track": "\u6eda\u52a8\u6761\u8f68\u9053", "scrollbar-thumb": "\u6eda\u52a8\u6761\u6ed1\u5757", "scrollbar-hover": "\u6eda\u52a8\u6761\u60ac\u505c", "oa-bg": "\u804a\u5929\u80cc\u666f", "oa-panel": "\u804a\u5929\u9762\u677f", "oa-text": "\u804a\u5929\u6587\u5b57", "oa-muted": "\u804a\u5929\u8f85\u52a9\u6587\u5b57", "oa-line": "\u804a\u5929\u8fb9\u6846", "oa-green": "\u804a\u5929\u5f3a\u8c03\u8272", "oa-hover": "\u804a\u5929\u60ac\u505c", "oa-user": "\u7528\u6237\u6d88\u606f"}
+
 export const colorGroups = [
   ['Backgrounds / 背景与表面', ['bg', 'bg-soft', 'surface', 'surface-strong', 'surface-muted']],
   ['Text & borders / 文字与边框', ['text', 'muted', 'border', 'border-strong']],
@@ -78,11 +80,11 @@ export function useThemeColorController({ theme, lang = 'en', active = true, dis
 }
 
 // Read the active base palette without temporarily mutating the application.
-function basePreviewVariables() {
+export function basePreviewVariables(theme) {
   const values = {}
   const visit = rules => {
     for (const rule of rules) {
-      if (rule.selectorText && rule.style && document.documentElement.matches(rule.selectorText)) {
+      if (rule.selectorText && rule.style && document.documentElement.matches(theme ? rule.selectorText.replace(/\[data-theme=["']?([^"'\]]+)["']?\]/g, (_, id) => id === theme.id ? '' : ':not(*)').replace(/\[data-color-scheme=["']?([^"'\]]+)["']?\]/g, (_, scheme) => scheme === theme.colorScheme ? '' : ':not(*)') : rule.selectorText)) {
         for (const property of Array.from(rule.style)) {
           if (property.startsWith('--')) values[property] = rule.style.getPropertyValue(property).trim()
         }
@@ -104,13 +106,13 @@ export function ThemeColorView({ model, actions, compact = false }) {
   const [onlyOverrides, setOnlyOverrides] = useState(false)
   const visibleGroups = groups.map(group => ({ ...group, tokens: group.tokens.filter(token =>
     (category === 'all' || category === group.title) &&
-    token.toLowerCase().includes(query.trim().toLowerCase()) &&
+    `${token} ${zh ? colorLabels[token] || '' : ''}`.toLowerCase().includes(query.trim().toLowerCase()) &&
     (!onlyOverrides || !!draft[token]?.trim())) })).filter(group => group.tokens.length)
   const overrideCount = Object.values(draft).filter(value => value.trim()).length
   const groupLabel = title => title.split(' / ')[zh ? 1 : 0] || title
   return <section className={`theme-editor${compact ? " theme-editor-compact" : ""}`} aria-label={zh ? '自定义主题颜色' : 'Custom theme colors'}>
     <header><div><h3>{zh ? '自定义主题颜色' : 'Custom theme colors'}</h3>
-      <p>{zh ? '以当前选中的预设为基础，编辑下列34项颜色。仅覆盖列出的界面与聊天令牌，不改变图片或所有第三方内容。' : 'Based on the selected preset. Edit 34 listed interface and chat colors; images and unlisted third-party content are not recolored.'}</p></div>
+      <p>{zh ? '高级设置：微调背景、文字与聊天颜色。留空即可继承当前主题。' : 'Based on the selected preset. Edit 34 listed interface and chat colors; images and unlisted third-party content are not recolored.'}</p></div>
       {!open && <button type="button" disabled={busy} onClick={begin}>{zh ? '编辑颜色' : 'Edit colors'}</button>}
     </header>
     {open && <>
@@ -132,7 +134,7 @@ export function ThemeColorView({ model, actions, compact = false }) {
             const value = draft[token] || ''
             const bad = !!value.trim() && !sanitizeColorValue(value)
             return <div className="theme-color-field" key={token}>
-              <label htmlFor={`theme-color-${token}`}>{token}</label>
+              <label htmlFor={`theme-color-${token}`}>{zh ? colorLabels[token] || token : token}{zh && <small> · {token}</small>}</label>
               <div className="theme-color-inputs">
                 <input type="color" aria-label={`${token} color picker`} value={/^#[\da-f]{6}$/i.test(value) ? value : '#808080'} onChange={e => changeColor(token, e.target.value)}/>
                 <input id={`theme-color-${token}`} value={value} maxLength={64} placeholder={zh ? '继承预设' : 'Inherit preset'} aria-invalid={bad} aria-describedby={bad ? `theme-error-${token}` : undefined} onChange={e => changeColor(token, e.target.value)}/>
