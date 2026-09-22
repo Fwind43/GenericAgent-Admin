@@ -18,3 +18,16 @@ html[style*="--size-"] .oa-chat .oa-composer textarea:not(.file-editor) { font-s
 .theme-studio .studio-chat .studio-chat-sidebar strong { min-height:var(--size-controlHeight); box-sizing:border-box; }
 @media(max-width:760px) { .theme-studio .studio-chat { grid-template-columns:minmax(110px, 28%) minmax(0,1fr); } }
 @media(max-width:480px) { .theme-studio .studio-chat { grid-template-columns:minmax(0,1fr); } }
+
+/* Weight variables are unitless. Keep semantic headings and emphasis intact. */
+html[style*="--size-"] body,
+html[style*="--size-"] .oa-chat,
+html[style*="--size-"] :is(button, input, select, textarea),
+html[style*="--size-"] .nav-item,
+html[style*="--size-"] .oa-session-title { font-weight:var(--size-uiWeight); }
+html[style*="--size-"] .oa-chat :is(.oa-content, .oa-md, .oa-bubble),
+html[style*="--size-"] .oa-chat .oa-composer textarea:not(.file-editor) { font-weight:var(--size-chatWeight) !important; }
+.theme-studio .studio-chat,
+.theme-studio .studio-chat :is(.studio-current, .studio-chat-sidebar p) { font-weight:var(--size-uiWeight); }
+.theme-studio .studio-chat :is(.studio-messages, .studio-user, .studio-answer, .studio-composer) { font-weight:var(--size-chatWeight); }
+.theme-studio .studio-size-grid .studio-weight-number { width:96px; padding:5px 8px; margin-bottom:8px; cursor:text; }

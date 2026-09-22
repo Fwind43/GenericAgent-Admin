@@ -1,5 +1,7 @@
 import { api } from './lib/api.js'
 export const SIZE_FIELDS = [
+ ['uiWeight','界面字重','Interface weight',100,900,1,400],
+ ['chatWeight','聊天字重','Chat weight',100,900,1,400],
  ['uiFont','界面字号','Interface font',12,18,1,14],
  ['chatFont','聊天字号','Chat font',12,22,1,15],
  ['lineHeight','聊天行高','Line height',20,36,1,24],
@@ -11,7 +13,7 @@ export const SIZE_FIELDS = [
 ]
 export const normalizeSizes = value => Object.fromEntries(SIZE_FIELDS.map(([key,,,min,max,,def]) => [key, typeof value?.[key] === 'number' && Number.isFinite(value[key]) ? Math.min(max,Math.max(min,value[key])) : def]))
 export const getSizes = () => { try { return normalizeSizes(JSON.parse(localStorage.getItem('ga-admin-sizes'))) } catch { return normalizeSizes() } }
-export const sizeVariables = sizes => Object.fromEntries(Object.entries(normalizeSizes(sizes)).map(([key,value]) => [`--size-${key}`,`${value}px`]))
+export const sizeVariables = sizes => Object.fromEntries(Object.entries(normalizeSizes(sizes)).map(([key,value]) => [`--size-${key}`,`${value}${key.endsWith('Weight') ? '' : 'px'}`]))
 export function applySizes(value) {
  const sizes = normalizeSizes(value)
  try { localStorage.setItem('ga-admin-sizes',JSON.stringify(sizes)) } catch { /* storage may be unavailable */ }

@@ -42,3 +42,15 @@ it('previews sizes locally, cancels and saves acknowledged sizes', async () => {
  await waitFor(() => expect(JSON.parse(localStorage.getItem('ga-admin-sizes')).chatFont).toBe(20))
  expect(JSON.parse(fetch.mock.calls[0][1].body).sizes.chatFont).toBe(20)
 })
+
+it('previews and saves numeric variable weights without pixel units', async () => {
+ const fetch = vi.fn().mockImplementation(async (_url,options) => ({ok:true,text:async () => options.body}))
+ vi.stubGlobal('fetch',fetch)
+ render(<ThemePage theme="warm" lang="en" setTheme={vi.fn()}/> )
+ fireEvent.change(screen.getByRole('spinbutton',{name:'Chat weight value'}),{target:{value:'537'}})
+ expect(document.querySelector('.studio-chat').style.getPropertyValue('--size-chatWeight')).toBe('537')
+ expect(localStorage.getItem('ga-admin-sizes')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'Apply theme'}))
+ await waitFor(() => expect(JSON.parse(localStorage.getItem('ga-admin-sizes')).chatWeight).toBe(537))
+ expect(JSON.parse(fetch.mock.calls[0][1].body).sizes.chatWeight).toBe(537)
+})

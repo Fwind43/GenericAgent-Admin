@@ -247,7 +247,12 @@ func TestUIThemeSizesPersistValidateAndPreserve(t *testing.T) {
 			t.Fatalf("%d %s", rr.Code, rr.Body.String())
 		}
 	}
-	put(`{"sizes":{"chatFont":20,"radius":8}}`, 200)
+	put(`{"sizes":{"chatFont":20,"radius":8,"chatWeight":537,"uiWeight":453}}`, 200)
+	if s.CfgStore.Snapshot().UISizes["chatWeight"] != 537 || s.CfgStore.Snapshot().UISizes["uiWeight"] != 453 {
+		t.Fatal("lost weights")
+	}
+	put(`{"sizes":{"chatWeight":901}}`, 400)
+	put(`{"sizes":{"uiWeight":99}}`, 400)
 	put(`{"theme":"dark"}`, 200)
 	if s.CfgStore.Snapshot().UISizes["chatFont"] != 20 {
 		t.Fatal("lost sizes")

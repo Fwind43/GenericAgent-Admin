@@ -157,5 +157,5 @@ func injectUIPalette(data []byte, theme string, custom map[string]string, withCu
 }
 
 var uiSizeBounds = map[string][2]float64{
-	"uiFont": {12, 18}, "chatFont": {12, 22}, "lineHeight": {20, 36}, "contentWidth": {640, 1200}, "sidebarWidth": {240, 380}, "controlHeight": {28, 48}, "radius": {0, 24}, "spacing": {8, 24},
+	"uiWeight": {100, 900}, "chatWeight": {100, 900}, "uiFont": {12, 18}, "chatFont": {12, 22}, "lineHeight": {20, 36}, "contentWidth": {640, 1200}, "sidebarWidth": {240, 380}, "controlHeight": {28, 48}, "radius": {0, 24}, "spacing": {8, 24},
 }
