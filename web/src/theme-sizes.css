@@ -1,14 +1,15 @@
 /* User dimensions override legacy fixed chat metrics, not mobile geometry. */
 html[style*="--size-"] .oa-chat { --oa-chat-measure:var(--size-contentWidth); font-size:var(--size-uiFont); }
 html[style*="--size-"] .oa-chat .oa-content,
-html[style*="--size-"] .oa-chat .oa-answer-text { font-size:var(--size-chatFont) !important; line-height:var(--size-lineHeight) !important; }
+html[style*="--size-"] .oa-chat .oa-answer-text,
+html[style*="--size-"] .oa-chat .oa-content .oa-md { font-size:var(--size-chatFont) !important; line-height:var(--size-lineHeight) !important; }
 html[style*="--size-"] .oa-chat .oa-message { max-width:var(--size-contentWidth) !important; padding-block:var(--size-spacing); }
 html[style*="--size-"] .oa-chat .oa-sidebar { width:min(var(--size-sidebarWidth), calc(100vw - 40px)) !important; flex-basis:var(--size-sidebarWidth); }
 html[style*="--size-"] .oa-chat .oa-sidebar button,
 html[style*="--size-"] .oa-chat .oa-sidebar input { font-size:var(--size-uiFont); min-height:var(--size-controlHeight); }
 html[style*="--size-"] .oa-chat .oa-bubble,
 html[style*="--size-"] .oa-chat .oa-composer-box { border-radius:var(--size-radius) !important; }
-html[style*="--size-"] .oa-chat .oa-composer textarea { font-size:var(--size-chatFont); min-height:var(--size-controlHeight); }
+html[style*="--size-"] .oa-chat .oa-composer textarea:not(.file-editor) { font-size:var(--size-chatFont) !important; line-height:var(--size-lineHeight) !important; min-height:var(--size-controlHeight); }
 .theme-studio .studio-chat { grid-template-columns:minmax(120px, var(--size-sidebarWidth)) minmax(0,1fr); font-size:var(--size-uiFont); }
 .theme-studio .studio-chat .studio-chat-sidebar { font-size:var(--size-uiFont); padding:var(--size-spacing); }
 .theme-studio .studio-chat .studio-messages { max-width:var(--size-contentWidth); width:100%; box-sizing:border-box; margin-inline:auto; font-size:var(--size-chatFont); line-height:var(--size-lineHeight); padding:var(--size-spacing); }
