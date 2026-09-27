@@ -1,5 +1,6 @@
 import ProjectSessionPage from '../components/ProjectSessionPage'
 import ChatVersionBadge from '../components/ChatVersionBadge'
+import { SidebarPreferenceSubmenu } from '../components/ProjectActionsMenu'
 import React from 'react'
 import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
@@ -129,6 +130,13 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
               aria-label={ct('一键已读', 'Mark all as read')}
             ><CheckCheck size={16}/></button>
             <ProjectActionsMenu label={ct('最近更多', 'More recent options')}>
+              <SidebarPreferenceSubmenu label={ct('最近显示', 'Show recent')} value={sidebarPreferences.recentFilter}
+                options={[
+                  { value: 'all', label: ct('所有对话', 'All conversations') },
+                  { value: 'chat', label: ct('普通对话', 'Regular chats') },
+                  { value: 'project', label: ct('项目对话', 'Project chats') },
+                  { value: 'conductor', label: ct('指挥家对话', 'Conductor chats') },
+                ]} onChange={value=>updateSidebarPreference('recentFilter', value)}/>
               {sidebarPreferenceMenu}
               <button type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理会话', 'Manage sessions')}</button>
             </ProjectActionsMenu>
@@ -136,15 +144,6 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           </div>
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
-          <label className="oa-recent-filter">
-            <span>{ct('显示', 'Show')}</span>
-            <select aria-label={ct('最近会话筛选', 'Filter recent sessions')} value={sidebarPreferences.recentFilter || 'all'} onChange={event=>updateSidebarPreference('recentFilter', event.target.value)}>
-              <option value="all">{ct('所有对话', 'All conversations')}</option>
-              <option value="chat">{ct('普通对话', 'Regular chats')}</option>
-              <option value="project">{ct('项目对话', 'Project chats')}</option>
-              <option value="conductor">{ct('指挥家', 'Conductors')}</option>
-            </select>
-          </label>
         <div className="oa-session-list">
           <ProjectSessionPage key={`${chatInstanceID}:${sidebarSearch}:${sidebarPreferences.recentFilter}`} items={recentSessions} renderItem={renderSidebarTree} ct={ct} expandLabel={remaining => ct(`展开其余 ${remaining} 个...`, `Expand ${remaining} more...`)}/>
           {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch || (sidebarPreferences.recentFilter && sidebarPreferences.recentFilter !== 'all') ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}

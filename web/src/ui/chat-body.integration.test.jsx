@@ -65,7 +65,8 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   const { container } = render(<UiHost><PackageProbe/><ChatApp onOpenSettings={settings}/></UiHost>)
   const message = await screen.findByText('Retained fixture message', { selector: '.oa-msg-text' })
   const recent = container.querySelector('#oa-sidebar-history-body')
-  const filter = within(recent).getByRole('combobox', { name: 'Filter recent sessions' })
+  expect(within(recent).queryByRole('combobox')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Show recent' })).toBeNull()
   expect(within(recent).getByText('Project fixture')).toBeTruthy()
   expect(recent.querySelector('.oa-session-project-badge').textContent).toBe('Alpha')
   expect(recent.querySelector('.oa-session-conductor-badge')).toBeTruthy()
@@ -75,7 +76,11 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
     ['chat', ['Fixture conversation']],
     ['all', ['Fixture conversation', 'Project fixture', 'Conductor fixture']],
   ]) {
-    fireEvent.change(filter, { target: { value } })
+    fireEvent.click(screen.getByRole('button', { name: 'More recent options' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Show recent' }))
+    const labels = { all: 'All conversations', chat: 'Regular chats', project: 'Project chats', conductor: 'Conductor chats' }
+    fireEvent.click(screen.getByRole('menuitemradio', { name: labels[value] }))
+    expect(screen.queryByRole('menu', { name: 'Show recent' })).toBeNull()
     expect(Array.from(recent.querySelectorAll('.oa-session-title b')).map(node => node.textContent)).toEqual(titles)
     expect(JSON.parse(localStorage.getItem('ga-chat-sidebar-preferences')).recentFilter).toBe(value)
   }
@@ -83,6 +88,10 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   fireEvent.click(recentToggle)
   expect(recent.hidden).toBe(true)
   expect(JSON.parse(localStorage.getItem('ga-chat-sidebar-preferences')).historyExpanded).toBe(false)
+  fireEvent.click(screen.getByRole('button', { name: 'More recent options' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Show recent' }))
+  expect(screen.getByRole('menuitemradio', { name: 'All conversations' }).getAttribute('aria-checked')).toBe('true')
+  fireEvent.keyDown(document, { key: 'Escape' })
   fireEvent.click(recentToggle)
   const composer = await screen.findByPlaceholderText(/Message GenericAgent/)
   fireEvent.change(composer, { target: { value: 'unsent draft survives' } })
