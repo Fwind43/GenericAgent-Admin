@@ -2163,6 +2163,10 @@ def handle_worldline_request(agent, req):
     if store is None and req.get('activate') is True:
         store = _ensure_worldline_store(agent, root_for_req, workspace)
         history = req.get('history') if isinstance(req.get('history'), list) else []
+        # A restarted worker must hydrate the session even when the tree already
+        # exists. Legacy/code-only restores may deliberately leave memory intact.
+        _restore_admin_history(agent, history, req.get('raw_history'))
+        _restore_ga_state(agent, req.get('history_info'), req.get('working'))
         latest_user, completed_pair = None, None
         for message in history:
             if not isinstance(message, dict):
@@ -2175,8 +2179,6 @@ def handle_worldline_request(agent, req):
                   message.get('error') is not True):
                 completed_pair = (latest_user, message)
         if store is not None and not store.nodes and completed_pair is not None:
-            _restore_admin_history(agent, history, req.get('raw_history'))
-            _restore_ga_state(agent, req.get('history_info'), req.get('working'))
             user_message, assistant_message = completed_pair
             prompt = _chat_content_text(user_message.get('content')).strip()
             node_id = _commit_worldline(agent, prompt or 'Imported chat history')

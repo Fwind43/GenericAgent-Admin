@@ -471,6 +471,82 @@ class WorldlineSidecarTests(unittest.TestCase):
             })
             self.assertEqual(emitted[-1]['tree'], {'nodes': []})
 
+    def test_existing_tree_activation_restores_persisted_working_memory(self):
+        agent = SimpleNamespace(history=[], handler=None)
+        emitted = []
+        with mock.patch.object(worker, '_resolve_request_root', return_value=self.root), \
+             mock.patch.object(worker, '_apply_workspace', return_value=None), \
+             mock.patch.object(worker, '_ensure_worldline_store', return_value=self.store), \
+             mock.patch.object(worker, '_restore_admin_history') as restore_history, \
+             mock.patch.object(worker, '_commit_worldline') as commit, \
+             mock.patch.object(worker, '_worldline_nodes', return_value={'nodes': []}), \
+             mock.patch.object(worker, '_snapshot_backend_history', return_value=[]), \
+             mock.patch.object(worker, 'emit', side_effect=emitted.append):
+            worker.handle_worldline_request(agent, {
+                'activate': True, 'action': 'state', 'sid': 'sid-1',
+                'history': [], 'raw_history': [],
+                'history_info': [{'step': 7}],
+                'working': {'key_info': 'persisted checkpoint'},
+            })
+        self.assertEqual(emitted[-1]['working'].get('key_info'), 'persisted checkpoint')
+        self.assertEqual(emitted[-1]['history_info'], [{'step': 7}])
+        restore_history.assert_called_once_with(agent, [], [])
+        commit.assert_not_called()
+
+    def test_real_store_restore_memory_survives_cold_activation_and_reload(self):
+        from frontends.worldline import RewindStore
+
+        cases = [
+            ('legacy', None, 'conversation', 'at', 'persisted checkpoint'),
+            ('branch', 'branch checkpoint', 'conversation', 'at', 'branch checkpoint'),
+            ('empty', '', 'conversation', 'at', ''),
+            ('before', 'branch checkpoint', 'conversation', 'before', 'parent checkpoint'),
+            ('code', 'branch checkpoint', 'code', 'at', 'persisted checkpoint'),
+        ]
+        for label, target_key, mode, to, expected in cases:
+            with self.subTest(case=label):
+                workspace = self.root / label
+                workspace.mkdir()
+                store = RewindStore(str(self.root / ('rewind-' + label)), str(workspace))
+                history = [{'role': 'user', 'content': 'parent'}]
+                kwargs = {} if target_key is None else {'hist_info': [], 'key_info': 'parent checkpoint'}
+                store.commit('parent', history=list(history), **kwargs)
+                history.append({'role': 'assistant', 'content': 'target'})
+                kwargs = {} if target_key is None else {'hist_info': [], 'key_info': target_key}
+                target = store.commit('target', history=list(history), **kwargs)
+                history.append({'role': 'user', 'content': 'head'})
+                kwargs = {} if target_key is None else {'hist_info': [], 'key_info': 'head checkpoint'}
+                store.commit('head', history=list(history), **kwargs)
+                if label == 'legacy':
+                    # Modern commits derive WM automatically; simulate pre-WM nodes.
+                    for node in store.nodes.values():
+                        for field in ('hinfo', 'hinfo_len', 'kinfo'):
+                            node.pop(field, None)
+                    self.assertFalse(store.path_has_wm(target))
+                agent = SimpleNamespace(history=[], handler=None,
+                                        llmclient=SimpleNamespace(backend=SimpleNamespace(history=[])))
+                emitted = []
+                with mock.patch.object(worker, '_resolve_request_root', return_value=self.root), \
+                     mock.patch.object(worker, '_apply_workspace', return_value=workspace), \
+                     mock.patch.object(worker, '_ensure_worldline_store', return_value=store), \
+                     mock.patch.object(worker, 'emit', side_effect=emitted.append):
+                    worker.handle_worldline_request(agent, {
+                        'activate': True, 'action': 'restore', 'sid': label,
+                        'node_id': target, 'mode': mode, 'to': to,
+                        'history': [], 'raw_history': history,
+                        'history_info': [],
+                        'working': {'key_info': 'persisted checkpoint', 'sentinel': 'keep'},
+                    })
+                state = emitted[-1]
+                self.assertEqual(state['working']['key_info'], expected)
+                self.assertEqual(state['working']['sentinel'], 'keep')
+                reloaded = SimpleNamespace(history=[], handler=None,
+                                           llmclient=SimpleNamespace(backend=SimpleNamespace(history=[])))
+                worker._restore_admin_history(reloaded, [], state['raw_history'])
+                worker._restore_ga_state(reloaded, state['history_info'], state['working'])
+                self.assertEqual(worker._snapshot_ga_state(reloaded)['working']['key_info'], expected)
+                self.assertEqual(reloaded.llmclient.backend.history, state['raw_history'])
+
     def test_mapped_restore_uses_core_conv_mode_and_returns_display_mapping(self):
         worker._bind_worldline_head(self.store, self.root, 'sid-1', {
             'node_id': 'b', 'turn_status': 'completed', 'has_final_answer': True,
