@@ -5742,6 +5742,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
     streamAbortRef.current?.abort?.()
     const ctrl = new AbortController()
     streamAbortRef.current = ctrl
+    const openToken = openSeqRef.current
+    const isCurrent = () => !ctrl.signal.aborted && streamAbortRef.current === ctrl &&
+      openSeqRef.current === openToken && isActiveSession(id)
     let pendingId = waitForRun ? '' : `resume-${Date.now()}`
     // Resolve the placeholder id up-front: `followChatStream` below reads `pendingId` right
     // after `await fetch`, which may win the race against the state updater.
@@ -5764,8 +5767,12 @@ export default function ChatApp({ onOpenSettings } = {}) {
         if (!res.ok) throw new Error(await res.text())
       }
       await followChatStream(res, pendingId, clientUserID, id, ctrl.signal, waitForRun)
-      if (isActiveSession(id)) {
+      if (isCurrent()) {
         const list = await loadSessions(id)
+        // The terminal event updates the body, but read receipts also need the
+        // persisted result and content revision from the final page snapshot.
+        await refreshCompletedRun(id, openToken, isCurrent)
+        if (!isCurrent()) return
         const currentSession = list.find(session => session.id === id)
         if (shouldPollGeneratedTitle(currentSession)) {
           void pollGeneratedChatTitle({ sessionId:id, loadSessions, isActive:isActiveSession }).catch(()=>{})
