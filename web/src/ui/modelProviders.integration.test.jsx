@@ -80,7 +80,7 @@ it.each(['default', 'studio'])('opens host editor, edits draft and saves only th
 it('passes a narrow redacted directory contract and keeps drafts/editor through switches', async () => {
   mount(); await ready('studio')
   expect(Object.keys(captured).sort()).toEqual(['actions', 'layout', 'model'])
-  expect(Object.keys(captured.actions).sort()).toEqual(['addModel', 'addProvider', 'openProvider', 'removeProvider'])
+  expect(Object.keys(captured.actions).sort()).toEqual(['addModel', 'addProvider', 'openProvider', 'removeProvider', 'reorderProviders'])
   expect(Object.keys(captured.model.providers[0]).sort()).toEqual(['endpoint', 'id', 'modelCount', 'name', 'protocol', 'state', 'stateLabel'])
   expect(captured.model.providers[0].endpoint).toBe('https://example.invalid')
   expect(JSON.stringify(captured)).not.toMatch(/synthetic-secret|password|token=|private|apikey|api_demo/)
@@ -185,4 +185,39 @@ it.each(['default', 'studio'])('clears provider models only after confirmation w
   expect(host.failoverGroups[0].members).toEqual([{ provider_var_name: 'other', model: 'other-model' }])
   expect(clear.disabled).toBe(true)
   expect(requests('/api/models/export')).toHaveLength(0)
+})
+
+it('reorders providers without moving model slots, retains the editor, saves and discards', async () => {
+  let stored = fixture()
+  api.mockImplementation(async (url, options) => {
+    if (url === '/api/models/import-mykey') return stored
+    if (url === '/api/chat/state') return { llms: [] }
+    if (url === '/api/models/export') { stored = JSON.parse(options.body); return { ok: true } }
+    throw new Error(`Unmocked endpoint ${url}`)
+  })
+  mount(); await ready('studio')
+  act(() => host.setProfiles([0, 1, 2].map(index => ({ ...host.profiles[0], var_name: `api_demo_${index}`, display_name: `Provider ${index}`, models: [`model-${index}`], model_configs: [{ model: `model-${index}`, sort_order: index }] }))))
+  act(() => captured.actions.openProvider(1))
+  expect(screen.getByDisplayValue('Provider 1')).toBeTruthy()
+  act(() => captured.actions.reorderProviders(0, 2))
+  expect(host.profiles.map(p => p.display_name)).toEqual(['Provider 1', 'Provider 2', 'Provider 0'])
+  expect(screen.getByDisplayValue('Provider 1')).toBeTruthy()
+  expect(host.profiles.map(p => p.model_configs[0].sort_order)).toEqual([1, 2, 0])
+  expect(requests('/api/models/export')).toHaveLength(0)
+  const draft = host.profiles
+  act(() => { captured.actions.reorderProviders(-1, 0); captured.actions.reorderProviders(0, 9); captured.actions.reorderProviders('0', 1) })
+  expect(host.profiles).toBe(draft)
+  click(t.models.saveAll)
+  await waitFor(() => expect(host.changes.total).toBe(0))
+  expect(requests('/api/models/export')).toHaveLength(1)
+  const saved = JSON.parse(requests('/api/models/export')[0][1].body).profiles
+  expect(saved.map(p => p.display_name)).toEqual(['Provider 1', 'Provider 2', 'Provider 0'])
+  expect(saved.map(p => p.provider_sort_order)).toEqual([0, 1, 2])
+  expect(saved.map(p => p.model_configs[0].sort_order)).toEqual([1, 2, 0])
+  await waitFor(() => expect(screen.getByTestId('busy').textContent).toBe('false'))
+  act(() => captured.actions.reorderProviders(2, 0))
+  expect(host.changes.total).toBeGreaterThan(0)
+  act(() => host.discardDraft())
+  expect(host.profiles.map(p => p.display_name)).toEqual(['Provider 1', 'Provider 2', 'Provider 0'])
+  expect(host.changes.total).toBe(0)
 })

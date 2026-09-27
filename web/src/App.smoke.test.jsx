@@ -1411,6 +1411,22 @@ describe('chat response identity and time', () => {
 })
 
 describe('chat model cascade', () => {
+  test('sorts configured providers while preserving official indices and unknown group positions', () => {
+    const llms = [
+      { index: 8, provider: 'Beta', model: 'b1', provider_sort_order: 1 },
+      { index: 9, provider: 'MixinSession', model: 'route' },
+      { index: 2, provider: 'Alpha', model: 'a1', provider_sort_order: 0 },
+      { index: 3, provider: 'Beta', model: 'b2', provider_sort_order: 1 },
+    ]
+    expect(groupRuntimeModels(llms)).toEqual([
+      { value: 'provider:Alpha', label: 'Alpha', models: [{ value: 2, label: 'a1' }] },
+      { value: 'provider:MixinSession', label: 'MixinSession', models: [{ value: 9, label: 'route' }] },
+      { value: 'provider:Beta', label: 'Beta', models: [{ value: 8, label: 'b1' }, { value: 3, label: 'b2' }] },
+    ])
+    expect(llms.map(m => m.index)).toEqual([8, 9, 2, 3])
+    expect(groupRuntimeModels(llms.map(({ provider_sort_order: _order, ...model }) => model)).map(g => g.label)).toEqual(['Beta', 'MixinSession', 'Alpha'])
+  })
+
   const groups = [
     { value: 'alpha', label: 'Alpha', models: [{ value: 'a-1', label: 'Alpha One' }] },
     { value: 'beta', label: 'Beta', models: [{ value: 'b-1', label: 'Beta One' }] },

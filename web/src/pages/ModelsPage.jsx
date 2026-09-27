@@ -861,6 +861,14 @@ export function Models({
 
   const blocked = summary.errors > 0 || Boolean(failoverError)
   const saving = saveState.status === 'saving'
+  const reorderProviders = (from, to) => {
+    if (saving || !Number.isInteger(from) || !Number.isInteger(to) || from === to || from < 0 || to < 0 || from >= profiles.length || to >= profiles.length) return
+    const remap = index => index === from ? to : from < to && index > from && index <= to ? index - 1 : from > to && index >= to && index < from ? index + 1 : index
+    setProfiles(arrayMove(profiles, from, to))
+    setProviderDrawer(current => current?.mode === 'edit' ? { ...current, index: remap(current.index) } : current)
+    setAddModelIndex(current => current === null ? null : remap(current))
+  }
+
 
   const toggleRow = id => setExpanded(current => {
     return current.has(id) ? new Set() : new Set([id])
@@ -1197,6 +1205,7 @@ export function Models({
             title: text.connections, help: text.connectionsHelp,
             addLabel: text.addProvider, emptyLabel: text.noProvidersHelp,
             editLabel: text.configure, addModelLabel: text.addModel, deleteLabel: t.delete,
+            reorderingDisabled: saving,
             columns: { name: text.name, endpoint: 'BaseURL', protocol: text.protocol, models: text.model },
             providers: profiles.map((profile, index) => {
               const state = providerState(validation[index])
@@ -1217,6 +1226,7 @@ export function Models({
           },
           actions: {
             addProvider: openNewProvider,
+            reorderProviders,
             openProvider: index => { if (Number.isInteger(index) && profiles[index]) openProvider(index) },
             addModel: index => { if (Number.isInteger(index) && profiles[index]) setAddModelIndex(index) },
             removeProvider: index => { if (Number.isInteger(index) && profiles[index]) return removeProvider(index) },

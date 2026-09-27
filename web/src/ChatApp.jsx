@@ -248,12 +248,22 @@ const runtimeModelGroup = (m) => {
 }
 export const groupRuntimeModels = (llms = []) => {
   const groups = new Map()
+  const providerOrder = new Map()
   llms.forEach(model => {
     const group = runtimeModelGroup(model)
     if (!groups.has(group.value)) groups.set(group.value, { ...group, models:[] })
     groups.get(group.value).models.push({ value:model.index, label:runtimeModelLabel(model) })
+    if (Number.isInteger(model.provider_sort_order) && !providerOrder.has(group.value)) {
+      providerOrder.set(group.value, model.provider_sort_order)
+    }
   })
-  return Array.from(groups.values())
+  // Reorder only configured-provider slots; keep failover/unknown groups in
+  // their existing positions and preserve every official model index.
+  const result = Array.from(groups.values())
+  const ordered = result.filter(group => providerOrder.has(group.value))
+    .sort((a, b) => providerOrder.get(a.value) - providerOrder.get(b.value))
+  let next = 0
+  return result.map(group => providerOrder.has(group.value) ? ordered[next++] : group)
 }
 
 export const SessionAutorunBadge = memo(function SessionAutorunBadge({ enabled = false, sessionId = '', targetSessionId = '' }) {

@@ -2711,3 +2711,26 @@ func TestChatSaveSettingsPreservesGeneratedTitleAndActivity(t *testing.T) {
 		}
 	}
 }
+
+func TestAnnotateChatLLMProvidersKeepsProviderOrderSeparateFromModelOrder(t *testing.T) {
+	first, second := 0, 1
+	profiles := []modelconfig.Profile{
+		{VarName: "native_oai_config_alpha", ProviderSortOrder: &second, ModelConfigs: []modelconfig.ModelConfig{{Model: "alpha", SortOrder: &first}}},
+		{VarName: "native_oai_config_beta", ProviderSortOrder: &first, ModelConfigs: []modelconfig.ModelConfig{{Model: "beta", SortOrder: &second}}},
+	}
+	llms := []map[string]interface{}{{"index": 0, "model": "alpha"}, {"index": 1, "model": "beta"}}
+	annotateChatLLMProviders(llms, profiles)
+	for i, want := range []int{1, 0} {
+		if llms[i]["index"] != i || llms[i]["provider_sort_order"] != want {
+			t.Fatalf("order/index changed: %#v", llms)
+		}
+	}
+	profiles[0].ProviderSortOrder = nil
+	profiles[1].ProviderSortOrder = nil
+	annotateChatLLMProviders(llms, profiles)
+	for i := range llms {
+		if llms[i]["provider_sort_order"] != i {
+			t.Fatalf("legacy provider order: %#v", llms)
+		}
+	}
+}
