@@ -5,7 +5,7 @@ import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Download, Edit3, F
 import './chatBody.css'
 
 // Stateless views; ChatApp owns all data, drafts, refs, actions and subscriptions.
-export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
+export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
   return (<aside data-ui-surface="chat.sidebar" data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-sidebar-brand">GenericAgent <span>Admin</span><ChatVersionBadge version={version}/></div>
@@ -136,9 +136,18 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           </div>
           </div>
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
+          <label className="oa-recent-filter">
+            <span>{ct('显示', 'Show')}</span>
+            <select aria-label={ct('最近会话筛选', 'Filter recent sessions')} value={sidebarPreferences.recentFilter || 'all'} onChange={event=>updateSidebarPreference('recentFilter', event.target.value)}>
+              <option value="all">{ct('所有对话', 'All conversations')}</option>
+              <option value="chat">{ct('普通对话', 'Regular chats')}</option>
+              <option value="project">{ct('项目对话', 'Project chats')}</option>
+              <option value="conductor">{ct('指挥家', 'Conductors')}</option>
+            </select>
+          </label>
         <div className="oa-session-list">
-          <ProjectSessionPage key={`${chatInstanceID}:${sidebarSearch}`} items={recentSessions} renderItem={renderSidebarTree} ct={ct} expandLabel={remaining => ct(`展开其余 ${remaining} 个...`, `Expand ${remaining} more...`)}/>
-          {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
+          <ProjectSessionPage key={`${chatInstanceID}:${sidebarSearch}:${sidebarPreferences.recentFilter}`} items={recentSessions} renderItem={renderSidebarTree} ct={ct} expandLabel={remaining => ct(`展开其余 ${remaining} 个...`, `Expand ${remaining} more...`)}/>
+          {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch || (sidebarPreferences.recentFilter && sidebarPreferences.recentFilter !== 'all') ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
           </div>
         </section>

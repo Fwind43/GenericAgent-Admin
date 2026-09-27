@@ -36,7 +36,7 @@ function PreviewContent({ zh, doc }) {
   return <div className={`oa-chat${collapsed ? ' is-collapsed' : ''}`} inert style={{ height: '100vh', minHeight: 0 }}>
     <ChatSidebar ct={ct} version="Preview" ProjectActionsMenu={ProjectActionsMenu}
       renderSidebarProject={noop} renderSidebarTree={noop} collapsed={collapsed} sidebarSearch="" sidebarSections={{ conductors: [] }}
-      sidebarPreferences={{ showProjects: true }} chatReadState={{ hasUnread: false, markAllRead: noop }}
+      sidebarPreferences={{ showProjects: true, recentFilter: 'all' }} updateSidebarPreference={noop} chatReadState={{ hasUnread: false, markAllRead: noop }}
       pinnedSessions={[]} pinnedProjectGroups={[]} regularProjectGroups={[]} projectSessionGroups={[]}
       recentSessions={[]} sessions={[]} chatInstances={[]} chatInstanceID=""
       historyExpanded projectsExpanded pinnedExpanded conductorsExpanded onOpenSettings={noop}/>

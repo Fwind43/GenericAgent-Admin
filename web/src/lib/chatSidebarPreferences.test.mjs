@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readSidebarPreferences, sortSidebarSessions } from './chatSidebarPreferences.js'
+import { readSidebarPreferences, sortSidebarSessions, sidebarPreferenceDefaults, filterSidebarRecentNodes } from './chatSidebarPreferences.js'
 test('preferences tolerate invalid and unavailable storage', () => {
-  for (const raw of ['null', '{}', 'invalid']) assert.deepEqual(readSidebarPreferences({getItem:()=>raw}), {showProjects:true,showConductor:true,sort:'updated'})
-  assert.deepEqual(readSidebarPreferences({getItem:()=>'{"layout":"list","sort":"priority"}'}), {showProjects:false,showConductor:true,sort:'priority'})
-  assert.deepEqual(readSidebarPreferences({getItem:()=>{throw Error()}}), {showProjects:true,showConductor:true,sort:'updated'})
+  for (const raw of ['null', '{}', 'invalid']) assert.deepEqual(readSidebarPreferences({getItem:()=>raw}), {...sidebarPreferenceDefaults,showProjects:true,showConductor:true,sort:'updated'})
+  assert.deepEqual(readSidebarPreferences({getItem:()=>'{"layout":"list","sort":"priority"}'}), {...sidebarPreferenceDefaults,showProjects:false,showConductor:true,sort:'priority'})
+  assert.deepEqual(readSidebarPreferences({getItem:()=>{throw Error()}}), {...sidebarPreferenceDefaults,showProjects:true,showConductor:true,sort:'updated'})
 })
 test('priority ranks pins, waiting, running, and ordinary sessions without mutation', () => {
   const sessions = [{id:'idle',updated_at:200}, {id:'run',running:true,updated_at:100}, {id:'wait',taskbar_state:'waiting'}, {id:'pin',pinned:true}]
@@ -20,6 +20,37 @@ test('timestamps support seconds, milliseconds, ISO dates and stable ties', () =
 test('visibility flags persist independently and override legacy layout', () => {
   for (const showProjects of [true, false]) for (const showConductor of [true, false]) {
     const saved = {showProjects, showConductor, layout:'list', sort:'updated'}
-    assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(saved)}), {showProjects,showConductor,sort:'updated'})
+    assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(saved)}), {...sidebarPreferenceDefaults,showProjects,showConductor,sort:'updated'})
   }
+})
+
+test('recent filters preserve order, overlapping ownership, and detached workers', () => {
+  const nodes = [
+    {session:{id:'chat'},workers:[]},
+    {session:{id:'project',project_name:'Missing project'},workers:[]},
+    {session:{id:'parent',conductor:{role:'parent'}},workers:[]},
+    {session:{id:'both',project_name:'A',conductor:{role:'parent'}},workers:[]},
+    {session:{id:'worker',conductor:{role:'worker'}},workers:[]},
+    {session:{id:'tree'},workers:[{id:'child'}]},
+  ]
+  const ids = filter => filterSidebarRecentNodes(nodes,filter).map(node=>node.session.id)
+  assert.deepEqual(ids('all'), nodes.map(node=>node.session.id))
+  assert.deepEqual(ids('chat'), ['chat'])
+  assert.deepEqual(ids('project'), ['project','both'])
+  assert.deepEqual(ids('conductor'), ['parent','both','worker','tree'])
+  assert.deepEqual(filterSidebarRecentNodes(null), [])
+  assert.deepEqual(ids('invalid'), ids('all'))
+})
+
+test('filters and collapsed sections survive storage round trips independently', () => {
+  for (const recentFilter of ['all','chat','project','conductor']) {
+    const saved = {...sidebarPreferenceDefaults, recentFilter, historyExpanded:false,
+      pinnedExpanded:false, projectsExpanded:false, conductorsExpanded:true,
+      showAllProjects:true, expandedProjectNames:['A','B']}
+    assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(saved)}), saved)
+  }
+  const invalid = readSidebarPreferences({getItem:()=>JSON.stringify({recentFilter:'bad',historyExpanded:'false',expandedProjectNames:['A',4,'A']})})
+  assert.equal(invalid.recentFilter,'all')
+  assert.equal(invalid.historyExpanded,true)
+  assert.deepEqual(invalid.expandedProjectNames,['A'])
 })

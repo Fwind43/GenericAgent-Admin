@@ -118,7 +118,7 @@ test('real ChatApp renders a Conductor workspace and navigates and stops workers
 
   fireEvent.click(await screen.findByRole('button', { name: 'Subagents' }))
   const workspace = await screen.findByRole('complementary', { name: 'Subagents' })
-  const badge = screen.getByLabelText('Conductor session')
+  const badge = within(document.getElementById('oa-sidebar-history-body')).getByLabelText('Conductor session')
   expect(badge.closest('.oa-session-row')).toBeTruthy()
   expect(badge.closest('.oa-session-title')).toBeTruthy()
   expect(badge.previousElementSibling.tagName).toBe('B')
@@ -318,7 +318,7 @@ for (const theme of ['light', 'dark', 'warm']) {
    await waitFor(() => expect(posts).toEqual([typeof project === 'string'
     ? { project_mode: project, mode: 'conductor' }
     : { project_provider: project.provider, project_id: project.id, mode: 'conductor' }]))
-   await screen.findByLabelText('Conductor session')
+   await within(document.getElementById('oa-sidebar-history-body')).findByLabelText('Conductor session')
    expect(screen.queryByRole('button', { name: 'New project Conductor' })).toBeNull()
    delete document.documentElement.dataset.theme
   })

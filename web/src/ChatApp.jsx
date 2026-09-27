@@ -1,7 +1,7 @@
 import { ChatPackageBar } from './ui/chatChrome'
 import { UiSurface, useUiPackage } from './ui/UiHost'
 import { conductorSidebarSections } from './lib/chatConductor.js'
-import { readSidebarPreferences, sortSidebarSessions } from './lib/chatSidebarPreferences.js'
+import { readSidebarPreferences, sortSidebarSessions, filterSidebarRecentNodes } from './lib/chatSidebarPreferences.js'
 import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
 import './conductor.css'
 import './chatSidebar.css'
@@ -56,7 +56,7 @@ import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ult
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
 import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
-import { filterRecentNodes, groupProjectSessions } from './lib/chatProjectSessions.js'
+import { groupProjectSessions } from './lib/chatProjectSessions.js'
 import { useRuntimeModelRefresh } from './lib/useRuntimeModelRefresh.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
@@ -307,7 +307,7 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
       <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>actionsRef.current.setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') actionsRef.current.saveRename(session.id); if(event.key==='Escape') actionsRef.current.cancelRename() }}/>
       <button onClick={()=>actionsRef.current.saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>actionsRef.current.cancelRename()} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
     </div> : <button className="oa-session" onClick={()=>actionsRef.current.openSession(session.id)} title={title}>
-      <span className="oa-session-title" title={title}>{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{conductorKind === 'parent' && <span role={onToggleTree ? 'button' : undefined} tabIndex={onToggleTree ? 0 : undefined} aria-expanded={onToggleTree ? treeExpanded : undefined} onClick={onToggleTree ? event=>{ event.stopPropagation(); onToggleTree(event) } : undefined} onKeyDown={onToggleTree ? event=>{ if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onToggleTree(event) } } : undefined} className={`oa-session-conductor-badge ${onToggleTree ? 'oa-conductor-badge-toggle' : ''}`} title={ct('指挥家会话', 'Conductor session')} aria-label={ct('指挥家会话', 'Conductor session')}>{ct('指挥家', 'Conductor')}</span>}{conductorKind === 'worker' && !nested && <em className="oa-conductor-role is-worker">{ct('子任务', 'Worker')}</em>}{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
+      <span className="oa-session-title" title={title}>{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{session.project_name && <span className="oa-session-project-badge" title={ct(`项目：${session.project_name}`, `Project: ${session.project_name}`)}><Folder size={10} aria-hidden="true"/>{session.project_name}</span>}{conductorKind === 'parent' && <span role={onToggleTree ? 'button' : undefined} tabIndex={onToggleTree ? 0 : undefined} aria-expanded={onToggleTree ? treeExpanded : undefined} onClick={onToggleTree ? event=>{ event.stopPropagation(); onToggleTree(event) } : undefined} onKeyDown={onToggleTree ? event=>{ if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onToggleTree(event) } } : undefined} className={`oa-session-conductor-badge ${onToggleTree ? 'oa-conductor-badge-toggle' : ''}`} title={ct('指挥家会话', 'Conductor session')} aria-label={ct('指挥家会话', 'Conductor session')}>{ct('指挥家', 'Conductor')}</span>}{conductorKind === 'worker' && !nested && <em className="oa-conductor-role is-worker">{ct('子任务', 'Worker')}</em>}{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
       <small title={fmtTime(session.updated_at)}>{session.running && !waiting ? <em className="oa-session-running-label" role="img" aria-label={ct('运行中', 'Running')} title={ct('运行中', 'Running')}><span className="oa-session-running-wave" style={{ '--oa-wave-phase': `${-(Array.from(String(session.id)).reduce((hash, char)=> (hash * 31 + char.charCodeAt(0)) % 2400, 0) / 1000)}s` }} aria-hidden="true"><i/><i/><i/><i/></span></em> : ageText}</small>
     </button>}
     {!editing && <button className={`oa-session-more ${menuOpen ? 'is-open' : ''}`} onClick={(event)=>actionsRef.current.toggleMenu(session.id, event)} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
@@ -4815,19 +4815,25 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const [sidebarPreferences, setSidebarPreferences] = useState(() => readSidebarPreferences())
   const updateSidebarPreference = (key, value) => {
     setSidebarPreferences(current => {
-      const next = { ...current, [key]: value }
+      const next = { ...current, [key]: typeof value === 'function' ? value(current[key]) : value }
       try { localStorage.setItem('ga-chat-sidebar-preferences', JSON.stringify(next)) } catch { /* Optional preference storage. */ }
       return next
     })
   }
-  const [historyExpanded, setHistoryExpanded] = useState(true)
-  const [pinnedExpanded, setPinnedExpanded] = useState(true)
-  const [conductorsExpanded, setConductorsExpanded] = useState(false)
-  const [projectsExpanded, setProjectsExpanded] = useState(true)
+  const historyExpanded = sidebarPreferences.historyExpanded
+  const setHistoryExpanded = value => updateSidebarPreference('historyExpanded', value)
+  const pinnedExpanded = sidebarPreferences.pinnedExpanded
+  const setPinnedExpanded = value => updateSidebarPreference('pinnedExpanded', value)
+  const conductorsExpanded = sidebarPreferences.conductorsExpanded
+  const setConductorsExpanded = value => updateSidebarPreference('conductorsExpanded', value)
+  const projectsExpanded = sidebarPreferences.projectsExpanded
+  const setProjectsExpanded = value => updateSidebarPreference('projectsExpanded', value)
   const [projectSortMode, setProjectSortMode] = useState(false)
   const [sidebarSearch, setSidebarSearch] = useState('')
-  const [showAllProjects, setShowAllProjects] = useState(false)
-  const [expandedProjectNames, setExpandedProjectNames] = useState(() => new Set())
+  const showAllProjects = sidebarPreferences.showAllProjects
+  const setShowAllProjects = value => updateSidebarPreference('showAllProjects', value)
+  const expandedProjectNames = new Set(sidebarPreferences.expandedProjectNames)
+  const setExpandedProjectNames = update => updateSidebarPreference('expandedProjectNames', current => [...update(new Set(current))])
   const [projectDraftOpen, setProjectDraftOpen] = useState(false)
   const [projectDraftName, setProjectDraftName] = useState('')
   const [projectCreating, setProjectCreating] = useState(false)
@@ -7600,10 +7606,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const pinnedProjectGroups = filteredProjectGroups.filter(group => group.pinned)
   const regularProjectGroups = filteredProjectGroups.filter(group => !group.pinned)
   const pinnedSessions = sidebarSections.pinned
-  // With project sections visible, project sessions live under their project
-  // folder; keep only non-project chats in the plain recent list. Sessions whose
-  // project is unknown to the sidebar stay visible so nothing silently disappears.
-  const recentSessions = filterRecentNodes(sidebarSections.recent, projects, sidebarPreferences.showProjects)
+  const recentSessions = filterSidebarRecentNodes(
+    conductorSidebarSections(sortedSidebarSessions, sidebarSearch, false).recent, sidebarPreferences.recentFilter,
+  )
   const renderSidebarTree = node => node.workers.length
     ? <ConductorSessionTree key={node.session.id} session={node.session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
     : renderSidebarSession(node.session)
@@ -7643,7 +7648,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }
 
   return <div ref={chatScope} className={`oa-chat ${collapsed ? 'is-collapsed' : ''}`}>
-    <UiSurface name="chat.sidebar" preserveMount viewProps={{ ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, sidebarSearch, sidebarSections, startRename, switchChatInstance }}/>
+    <UiSurface name="chat.sidebar" preserveMount viewProps={{ ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }}/>
     <div className={`oa-sidebar-backdrop ${collapsed ? '' : 'is-visible'}`} aria-hidden={collapsed} onClick={()=>setCollapsed(true)} />
 
     <main className="oa-main" data-ui-chat={uiPackage?.isDefaultSurface('chat.chrome') === false ? uiPackage.id : 'default'}>

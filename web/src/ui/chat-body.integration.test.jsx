@@ -29,6 +29,10 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   const session = { id: 's1', title: 'Fixture conversation', count: 1, updated_at: '2026-09-20T00:00:00Z' }
   let sent = null, created = false
   const secondSession = { id: 's2', title: 'New fixture conversation', count: 0 }
+  const ownershipSessions = [
+    { id: 'project-only', title: 'Project fixture', project_id: 'alpha', project_name: 'Alpha', count: 0 },
+    { id: 'conductor-only', title: 'Conductor fixture', conductor: { role: 'parent' }, count: 0 },
+  ]
   const calls = [], unexpected = []
   vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
     const u = new URL(String(input), location.origin)
@@ -42,7 +46,7 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
       case 'PUT /api/ui/theme': data = JSON.parse(init.body); break
       case 'GET /api/instances': data = { default_id: 'local', instances: [{ id: 'local', name: 'Local', mode: 'local' }] }; break
       case 'GET /api/extra-system-prompt-presets': data = { presets: [] }; break
-      case 'GET /api/chat/sessions': data = { sessions: created ? [secondSession, session] : [session], projects: [] }; break
+      case 'GET /api/chat/sessions': data = { sessions: created ? [secondSession, session, ...ownershipSessions] : [session, ...ownershipSessions], projects: ['alpha'] }; break
       case 'GET /api/chat/session/s1': data = { ...session, messages: [{ id: 'm1', role: 'user', content: 'Retained fixture message' }], raw_history: [], settings: {}, queued_messages: [] }; break
       case 'POST /api/chat/s1':
         sent = JSON.parse(init.body)
@@ -60,6 +64,26 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   const settings = vi.fn()
   const { container } = render(<UiHost><PackageProbe/><ChatApp onOpenSettings={settings}/></UiHost>)
   const message = await screen.findByText('Retained fixture message', { selector: '.oa-msg-text' })
+  const recent = container.querySelector('#oa-sidebar-history-body')
+  const filter = within(recent).getByRole('combobox', { name: 'Filter recent sessions' })
+  expect(within(recent).getByText('Project fixture')).toBeTruthy()
+  expect(recent.querySelector('.oa-session-project-badge').textContent).toBe('Alpha')
+  expect(recent.querySelector('.oa-session-conductor-badge')).toBeTruthy()
+  for (const [value, titles] of [
+    ['project', ['Project fixture']],
+    ['conductor', ['Conductor fixture']],
+    ['chat', ['Fixture conversation']],
+    ['all', ['Fixture conversation', 'Project fixture', 'Conductor fixture']],
+  ]) {
+    fireEvent.change(filter, { target: { value } })
+    expect(Array.from(recent.querySelectorAll('.oa-session-title b')).map(node => node.textContent)).toEqual(titles)
+    expect(JSON.parse(localStorage.getItem('ga-chat-sidebar-preferences')).recentFilter).toBe(value)
+  }
+  const recentToggle = container.querySelector('[aria-controls="oa-sidebar-history-body"]')
+  fireEvent.click(recentToggle)
+  expect(recent.hidden).toBe(true)
+  expect(JSON.parse(localStorage.getItem('ga-chat-sidebar-preferences')).historyExpanded).toBe(false)
+  fireEvent.click(recentToggle)
   const composer = await screen.findByPlaceholderText(/Message GenericAgent/)
   fireEvent.change(composer, { target: { value: 'unsent draft survives' } })
   await waitFor(() => expect(sources.filter(s => !s.closed)).toHaveLength(1))
