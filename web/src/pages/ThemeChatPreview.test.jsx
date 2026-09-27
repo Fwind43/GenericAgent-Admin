@@ -52,3 +52,27 @@ it('updates isolated theme tokens in place, removes stale tokens and syncs late 
     expect(doc.head.querySelector('[data-preview-test="late"]')?.textContent).toContain('color: blue')
   } finally { unmount(); style.remove() }
 })
+
+it('tracks the preview viewport and removes its breakpoint listener on unmount', async () => {
+  const { unmount } = render(<ThemeChatPreview preset={THEMES[0]} variables={{}} zh={false}/> )
+  const frame = screen.getByTitle('Production chat preview')
+  let listener
+  const query = {
+    matches: true,
+    addEventListener: vi.fn((event, callback) => { listener = callback }),
+    removeEventListener: vi.fn(),
+  }
+  const matchMedia = vi.fn(() => query)
+  Object.defineProperty(frame.contentWindow, 'matchMedia', { configurable: true, value: matchMedia })
+  fireEvent.load(frame)
+  await waitFor(() => expect(frame.contentDocument.querySelector('.oa-chat.is-collapsed')).not.toBeNull())
+  expect(matchMedia).toHaveBeenCalledWith('(max-width: 900px)')
+  expect(frame.contentDocument.querySelector('.oa-sidebar.collapsed')).not.toBeNull()
+  act(() => { query.matches = false; listener() })
+  expect(frame.contentDocument.querySelector('.oa-chat.is-collapsed')).toBeNull()
+  expect(frame.contentDocument.querySelector('.oa-sidebar.collapsed')).toBeNull()
+  act(() => { query.matches = true; listener() })
+  expect(frame.contentDocument.querySelector('.oa-chat.is-collapsed')).not.toBeNull()
+  unmount()
+  expect(query.removeEventListener).toHaveBeenCalledWith('change', listener)
+})

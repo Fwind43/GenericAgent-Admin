@@ -10,7 +10,17 @@ const PREVIEW_DOCUMENT = '<!doctype html><html><head></head><body></body></html>
 
 // Render the production views, not ChatApp's session/network controller.
 // The inert boundary also prevents portals and file pickers escaping this document.
-function PreviewContent({ zh }) {
+function PreviewContent({ zh, doc }) {
+  const [collapsed, setCollapsed] = useState(false)
+  useLayoutEffect(() => {
+    // Match the production sidebar breakpoint using the preview's own viewport.
+    const query = doc.defaultView?.matchMedia?.('(max-width: 900px)')
+    if (!query) return
+    const sync = () => setCollapsed(query.matches)
+    sync()
+    query.addEventListener('change', sync)
+    return () => query.removeEventListener('change', sync)
+  }, [doc])
   const ct = (cn, en) => zh ? cn : en
   const threadRef = useRef(null)
   const promptRef = useRef(null)
@@ -23,9 +33,9 @@ function PreviewContent({ zh }) {
       '当然。先从最重要的一件事开始。\n\n**明确目标**，留出专注时间。\n\n- 拆分步骤，逐项推进\n- 检查结果，记录进展\n\n`status: ready`',
       'Of course. Start with the most important thing.\n\n**Define your goal** and make time to focus.\n\n- Break it into steps\n- Check results and record progress\n\n`status: ready`') },
   ]
-  return <div className="oa-chat" inert style={{ height: '100vh', minHeight: 0 }}>
+  return <div className={`oa-chat${collapsed ? ' is-collapsed' : ''}`} inert style={{ height: '100vh', minHeight: 0 }}>
     <ChatSidebar ct={ct} version="Preview" ProjectActionsMenu={ProjectActionsMenu}
-      renderSidebarProject={noop} renderSidebarTree={noop} collapsed={false} sidebarSearch="" sidebarSections={{ conductors: [] }}
+      renderSidebarProject={noop} renderSidebarTree={noop} collapsed={collapsed} sidebarSearch="" sidebarSections={{ conductors: [] }}
       sidebarPreferences={{ showProjects: true }} chatReadState={{ hasUnread: false, markAllRead: noop }}
       pinnedSessions={[]} pinnedProjectGroups={[]} regularProjectGroups={[]} projectSessionGroups={[]}
       recentSessions={[]} sessions={[]} chatInstances={[]} chatInstanceID=""
@@ -73,6 +83,6 @@ export default function ThemeChatPreview({ preset, variables, zh }) {
     doc.body.style.margin = '0'
   }, [doc, preset, variables, zh])
   return <iframe ref={ref} onLoad={ready} title={zh ? '真实组件聊天预览' : 'Production chat preview'} className="studio-real-preview" srcDoc={PREVIEW_DOCUMENT}>
-    {doc && createPortal(<PreviewContent zh={zh}/>, doc.body)}
+    {doc && createPortal(<PreviewContent zh={zh} doc={doc}/>, doc.body)}
   </iframe>
 }
