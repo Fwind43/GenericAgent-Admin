@@ -31,6 +31,27 @@ class ProjectMemoryTests(unittest.TestCase):
         self.req = {'project_provider': 'admin', 'project_id': 'test',
                     'project_memory_dir': self.tmp.name}
 
+    def test_current_project_identity_and_saved_facts_reach_model(self):
+        facts = Path(self.tmp.name, 'project_mem.txt')
+        facts.write_text('# Project Facts\nImplemented resume read receipts.', encoding='utf-8')
+        agent = SimpleNamespace(llmclient=object())
+        messages = [{'role': 'system', 'content': 'GLOBAL'}]
+
+        @self.decorate
+        def run(agent, req):
+            self.callbacks[0]({'client': agent.llmclient, 'messages': messages})
+            prompt = messages[0]['content']
+            self.assertIn('Current project ID: test', prompt)
+            self.assertIn('Implemented resume read receipts.', prompt)
+            self.assertIn('project_mem.txt', prompt)
+            facts.write_text('# Project Facts\nAdded project isolation.', encoding='utf-8')
+            self.callbacks[0]({'client': agent.llmclient, 'messages': messages})
+            self.assertIn('Added project isolation.', messages[0]['content'])
+            self.assertNotIn('Implemented resume read receipts.', messages[0]['content'])
+
+        run(agent, self.req)
+        self.assertEqual(messages, [{'role': 'system', 'content': 'GLOBAL'}])
+
     def test_refresh_preserves_global_and_cleans_exception(self):
         for base in ('GLOBAL', [{'type': 'text', 'text': 'GLOBAL'}]):
             with self.subTest(base=base):
@@ -141,6 +162,45 @@ class ProjectMemoryTests(unittest.TestCase):
         self.assertIn('30 lines', policy)
         self.assertIn('RULES', policy)
         self.assertFalse((Path(self.tmp.name) / 'l3').exists())
+
+    def test_bounded_history_missing_files_and_project_isolation(self):
+        agent = SimpleNamespace(llmclient=object())
+        messages = [{'role': 'system', 'content': 'GLOBAL'}]
+        workspace = Path(self.tmp.name) / 'workspace'
+        workspace.mkdir()
+        legacy = workspace / 'project_memory.md'
+        legacy.write_text('LEGACY_FACT\n' + 'x' * 6500 + 'LEGACY_TAIL', encoding='utf-8')
+        facts = Path(self.tmp.name) / 'project_mem.txt'
+        facts.write_text('SAVED_FACT\n' + 'y' * 10500 + 'FACT_TAIL', encoding='utf-8')
+        original_legacy = legacy.read_bytes()
+
+        @self.decorate
+        def run(agent, req):
+            self.callbacks[0]({'client': agent.llmclient, 'messages': messages})
+            content = messages[0]['content']
+            self.assertIn('Current project ID: ' + req['project_id'], content)
+            if req['project_id'] == 'alpha':
+                self.assertIn('SAVED_FACT', content)
+                self.assertIn('LEGACY_FACT', content)
+                self.assertNotIn('FACT_TAIL', content)
+                self.assertNotIn('LEGACY_TAIL', content)
+                self.assertEqual(content.count('Excerpt truncated'), 2)
+                facts.unlink()
+                self.callbacks[0]({'client': agent.llmclient, 'messages': messages})
+                self.assertIn('[Not saved:', messages[0]['content'])
+                self.assertNotIn('SAVED_FACT', messages[0]['content'])
+            else:
+                self.assertNotIn('SAVED_FACT', content)
+                self.assertNotIn('LEGACY_FACT', content)
+                self.assertNotIn('FIRST_RULE', content)
+
+        run(agent, {**self.req, 'project_id': 'alpha', 'project_workspace': str(workspace)})
+        self.assertEqual(legacy.read_bytes(), original_legacy)
+        self.assertEqual(messages, [{'role': 'system', 'content': 'GLOBAL'}])
+        run(agent, {**self.req, 'project_id': 'beta',
+                    'project_memory_dir': str(Path(self.tmp.name) / 'beta')})
+        self.assertEqual(messages, [{'role': 'system', 'content': 'GLOBAL'}])
+        self.assertEqual(self.callbacks, [])
 
     def test_official_bypasses_admin_hooks(self):
         @self.decorate

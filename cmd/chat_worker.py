@@ -2573,8 +2573,30 @@ def _admin_project_request(fn):
                 l1 = (memory / 'project_mem_insight.txt').read_text(encoding='utf-8')
             except (OSError, UnicodeError) as exc:
                 l1 = '[Project L1 unavailable: %s]' % exc
+            def memory_excerpt(path, limit):
+                try:
+                    with path.open('r', encoding='utf-8') as handle:
+                        content = handle.read(limit + 1)
+                except FileNotFoundError:
+                    return '[Not saved: %s]' % path
+                except (OSError, UnicodeError) as exc:
+                    return '[Unavailable: %s: %s]' % (path, exc)
+                if len(content) > limit:
+                    content = content[:limit] + '\n[Excerpt truncated; read the source for remaining history.]'
+                return 'Source: %s\n%s' % (path, content)
+
+            facts = memory_excerpt(memory / 'project_mem.txt', 10000)
+            legacy_facts = (memory_excerpt(Path(workspace) / 'project_memory.md', 6000)
+                            if workspace else '[No project workspace supplied.]')
             text = (
-                '[Admin project memory]\nProject: ' + str(req.get('project_id') or '')
+                '[Admin project memory]\nCurrent project ID: ' + str(req.get('project_id') or '')
+                + '\nProject workspace: ' + (workspace or '[Not supplied]')
+                + '\nThis conversation belongs to the current project above. Use this identity, '
+                'not a project inferred from global memory or previous conversation content. '
+                'The workspace is project context, not evidence of a repository location or a changed process cwd. '
+                'Saved facts below describe prior project work, not necessarily current deployment state. '
+                'Before answering questions about earlier work, read relevant L2/L3 sources and any truncated '
+                'history. Missing or partial memory does not mean no work was done. Never invent unsaved history.'
                 + '\nMemory directory: ' + str(memory)
                 + '\nL0: memory_management_sop.md; L1: project_mem_insight.txt; '
                 'L2: project_mem.txt; L3: topic SOP .md/.py files in this directory. No L4. '
@@ -2589,6 +2611,8 @@ def _admin_project_request(fn):
                    'knowledge into L1-L3 as needed): ' + str(Path(workspace) / 'project_memory.md')
                    if workspace else '')
                 + '\n[Project L1]\n' + l1
+                + '\n[Saved project facts — L2]\n' + facts
+                + '\n[Legacy project history — read-only source]\n' + legacy_facts
             )
             index = next((i for i, m in enumerate(messages) if m.get('role') == 'system'), None)
             original = messages[index] if index is not None else None
