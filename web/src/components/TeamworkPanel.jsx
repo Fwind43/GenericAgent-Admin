@@ -56,7 +56,7 @@ export default function TeamworkPanel({ detail, busy, request, onChanged, onOpen
     try {
       if (!await confirmDanger('conductor-enable', ct('\u542f\u7528\u4e3b\u63a7\u534f\u4f5c\uff1f\u4e3b\u63a7\u53ef\u6d3e\u53d1\u5b50\u4efb\u52a1\uff0c\u4fee\u6539\u5171\u4eab\u5de5\u4f5c\u76ee\u5f55\u5e76\u4ea7\u751f\u989d\u5916\u7528\u91cf\u3002', 'Enable lead coordination? The lead can dispatch tasks, modify the shared workspace, and incur additional usage.'))) return
       if (!alive.current) return
-      const result = await request(`${base}/enable`, { method: 'POST', body: { dangerous: true } })
+      const result = await request(`${base}/enable`, { method: 'POST', dangerous: true, body: JSON.stringify({ dangerous: true }) })
       if (alive.current) onChanged(result.conductor)
     } catch (err) { if (alive.current) setError(err.message) }
     finally { if (alive.current) setSaving(false) }
@@ -64,7 +64,7 @@ export default function TeamworkPanel({ detail, busy, request, onChanged, onOpen
   const save = async event => {
     event.preventDefault(); setSaving(true); setSaved(false); setError('')
     try {
-      const result = await request(`${base}/teamwork`, { method: 'POST', body: { members } })
+      const result = await request(`${base}/teamwork`, { method: 'POST', body: JSON.stringify({ members }) })
       if (alive.current) { onChanged(result.conductor); setMembers(result.conductor.team || []); setSaved(true) }
     } catch (err) { if (alive.current) setError(err.message) }
     finally { if (alive.current) setSaving(false) }
