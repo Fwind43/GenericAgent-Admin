@@ -145,3 +145,36 @@ test('filterRecentNodes tolerates malformed input', () => {
   assert.deepEqual(filterRecentNodes(null, null, true), [])
   assert.deepEqual(filterRecentNodes([{ session: null }], [], true).length, 1)
 })
+
+
+test('projects follow their newest session update, ahead of manual order', () => {
+  const sessions = [
+    { id: 'old', project_mode: 'A', updated_at: '2026-09-20T10:00:00Z' },
+    { id: 'middle', project_mode: 'B', updated_at: '2026-09-25T10:00:00Z' },
+    { id: 'new', project_mode: 'A', updated_at: '2026-09-27T10:00:00Z' },
+    { id: 'invalid', project_mode: 'Invalid', updated_at: 'bad-date' },
+  ]
+  const projects = ['Empty', 'B', 'A', 'Invalid']
+  const names = input => groupProjectSessions(projects, input, [], ['B', 'A']).map(g => g.name)
+  assert.deepEqual(names(sessions), ['A', 'B', 'Empty', 'Invalid'])
+  assert.deepEqual(names([...sessions, { project_mode: 'B', updated_at: '2026-09-28T10:00:00Z' }]), ['B', 'A', 'Empty', 'Invalid'])
+  assert.equal(sessions[0].id, 'old')
+})
+
+test('project activity sorting preserves pins and orders both groups by recency', () => {
+  const sessions = ['A', 'B', 'C', 'D'].map((name, i) => ({ project_mode: name, updated_at: `2026-09-${20 + i}T10:00:00Z` }))
+  assert.deepEqual(groupProjectSessions(['A', 'B', 'C', 'D'], sessions, ['A', 'B']).map(g => g.name), ['B', 'A', 'D', 'C'])
+})
+
+test('project activity supports ISO, seconds and milliseconds without mutating inputs', () => {
+  const projects = ['Invalid', 'ISO', 'Seconds', 'Millis', 'Empty']
+  const sessions = [
+    { project_mode: 'Invalid', updated_at: 'invalid' },
+    { project_mode: 'ISO', updated_at: '2026-09-20T10:00:00Z' },
+    { project_mode: 'Seconds', updated_at: String(Date.parse('2026-09-21T10:00:00Z') / 1000) },
+    { project_mode: 'Millis', updated_at: Date.parse('2026-09-22T10:00:00Z') },
+  ]
+  const before = JSON.stringify({ projects, sessions })
+  assert.deepEqual(groupProjectSessions(projects, sessions).map(g => g.name), ['Millis', 'Seconds', 'ISO', 'Invalid', 'Empty'])
+  assert.equal(JSON.stringify({ projects, sessions }), before)
+})

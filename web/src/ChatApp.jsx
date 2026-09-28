@@ -10,7 +10,6 @@ import FilePreviewLink from './components/FilePreviewLink'
 import { fileDownloadTarget } from './lib/fileDownload.js'
 import ProjectSessionPage from './components/ProjectSessionPage'
 import ProjectActionsMenu, { SidebarPreferenceSubmenu } from './components/ProjectActionsMenu'
-import ProjectDragHandle from './components/ProjectDragHandle'
 import React, { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import katex from 'katex'
@@ -4804,17 +4803,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const [projects, setProjects] = useState([])
   const [pinnedProjects, setPinnedProjects] = useState([])
   const [projectOrder, setProjectOrder] = useState([])
-  const [projectOrderSaving, setProjectOrderSaving] = useState(false)
-  const saveProjectOrder = async names => {
-    if (projectOrderSaving) return
-    setProjectOrderSaving(true)
-    try {
-      const d = await chatApi('/api/chat/projects/pin', { method:'PATCH', body:JSON.stringify({ order:names }) })
-      setProjectOrder(d.project_order || [])
-    } catch (e) { if (e.name !== 'AbortError') setErr(e.message || String(e)) }
-    finally { setProjectOrderSaving(false) }
-  }
-
   const [sidebarPreferences, setSidebarPreferences] = useState(() => readSidebarPreferences())
   const updateSidebarPreference = (key, value) => {
     setSidebarPreferences(current => {
@@ -4831,7 +4819,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const setConductorsExpanded = value => updateSidebarPreference('conductorsExpanded', value)
   const projectsExpanded = sidebarPreferences.projectsExpanded
   const setProjectsExpanded = value => updateSidebarPreference('projectsExpanded', value)
-  const [projectSortMode, setProjectSortMode] = useState(false)
   const [sidebarSearch, setSidebarSearch] = useState('')
   const showAllProjects = sidebarPreferences.showAllProjects
   const setShowAllProjects = value => updateSidebarPreference('showAllProjects', value)
@@ -7642,7 +7629,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
                   ? <FolderOpen size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>
                   : <Folder size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>}<b title={group.name}>{group.name}</b>
               </button>
-              {projectSortMode && <ProjectDragHandle name={projectKey} groups={projectSessionGroups} disabled={batchDeleting || projectOrderSaving} onReorder={saveProjectOrder} label={ct('长按拖动排序', 'Hold to reorder')}/>}
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.provider ? group : group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
               <button type="button" onClick={()=>createSession(group.provider ? group : group.name, { mode:'conductor' })} disabled={batchDeleting}><span className="oa-conductor-new-mark" aria-hidden="true">C</span>{ct('新建项目指挥家', 'New project Conductor')}</button>
@@ -7658,7 +7644,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }
 
   return <div ref={chatScope} className={`oa-chat ${collapsed ? 'is-collapsed' : ''}`}>
-    <UiSurface name="chat.sidebar" preserveMount viewProps={{ ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectOrderSaving, projectSessionGroups, projectSortMode, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectSortMode, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }}/>
+    <UiSurface name="chat.sidebar" preserveMount viewProps={{ ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectSessionGroups, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }}/>
     <div className={`oa-sidebar-backdrop ${collapsed ? '' : 'is-visible'}`} aria-hidden={collapsed} onClick={()=>setCollapsed(true)} />
 
     <main className="oa-main" data-ui-chat={uiPackage?.isDefaultSurface('chat.chrome') === false ? uiPackage.id : 'default'}>

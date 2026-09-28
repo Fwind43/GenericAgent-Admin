@@ -27,8 +27,17 @@ export function groupProjectSessions(projects, sessions, pinnedProjects, manualO
     return acc
   }, [])
 
-  // Pinned projects float to the top; everything else keeps the order the server
-  // sent, so the list stays stable as sessions come and go.
+  // Keep pins first, then follow the latest contained session update.
+  // Saved/server order only breaks ties (including projects without activity).
+  const latestUpdate = group => group.sessions.reduce((latest, session) => {
+    const value = session?.updated_at
+    if (value == null || value === '') return latest
+    const number = Number(value)
+    const time = Number.isFinite(number)
+      ? (Math.abs(number) < 1e12 ? number * 1000 : number)
+      : Date.parse(value)
+    return Number.isFinite(time) ? Math.max(latest, time) : latest
+  }, 0)
   const order = new Map((Array.isArray(manualOrder) ? manualOrder : []).map((name, index) => [name, index]))
   const manualRank = group => order.get(group.key || group.name)
     ?? order.get(`official:${group.id || group.name}`)
@@ -36,8 +45,8 @@ export function groupProjectSessions(projects, sessions, pinnedProjects, manualO
     ?? Number.MAX_SAFE_INTEGER
   const rank = (group) => group.pinned ? 0 : 1
   return groups
-    .map((group, index) => ({ group, index }))
-    .sort((a, b) => rank(a.group) - rank(b.group) || manualRank(a.group) - manualRank(b.group) || a.index - b.index)
+    .map((group, index) => ({ group, index, updatedAt: latestUpdate(group) }))
+    .sort((a, b) => rank(a.group) - rank(b.group) || b.updatedAt - a.updatedAt || manualRank(a.group) - manualRank(b.group) || a.index - b.index)
     .map(entry => entry.group)
 }
 

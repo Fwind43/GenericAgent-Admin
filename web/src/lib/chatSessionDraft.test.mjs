@@ -165,16 +165,13 @@ test('main chat wires reactive draft badges into persistence, sending, and delet
 })
 
 
-test('project drag handles are opt-in from the new-project toolbar', () => {
+test('project toolbar uses automatic ordering without manual drag controls or counts', () => {
   const main = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
-  assert.match(main, /\[projectSortMode, setProjectSortMode\] = useState\(false\)/)
+  assert.doesNotMatch(main, /projectSortMode|ProjectDragHandle|saveProjectOrder/)
   const toolbar = functionBlock(main, '<div className="oa-sidebar-view-actions">', '{(showAllProjects || sidebarSearch')
-  assert.match(toolbar, /aria-pressed=\{projectSortMode\}/)
-  assert.match(toolbar, /setProjectSortMode\(current => !current\)/)
   assert.match(toolbar, /setProjectsExpanded\(true\); openProjectDraft\(\)/)
-  const header = functionBlock(main, '<div className="oa-project-head">', '<div className="oa-project-body"')
-  assert.match(header, /\{projectSortMode && <ProjectDragHandle/)
-  assert.match(header, /onReorder=\{saveProjectOrder\}/)
+  assert.match(main, /'Show more projects'/)
+  assert.doesNotMatch(main, /Show \$\{regularProjectGroups\.length - 5\} more projects/)
 })
 
 
