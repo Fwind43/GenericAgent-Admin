@@ -93,6 +93,8 @@
 /* A dedicated activator keeps editing and destructive actions out of drag gestures. */
 .model-provider-nav-entry > .model-provider-drag-handle {
   position: absolute;
+  /* Stay above the sibling card's global button:hover transform. */
+  z-index: 1;
   inset-inline-end: 6px;
   top: 6px;
   display: inline-flex;
