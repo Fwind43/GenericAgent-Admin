@@ -2791,11 +2791,6 @@ def _install_conductor_tools(agent, config):
         if not isinstance(session_id, str) or (session_id and not re.fullmatch(r'[A-Za-z0-9_-]+', session_id)):
             return dispatch_result({'ok': False, 'error': 'Invalid session_id'})
         overrides = {}
-        if 'member_id' in args:
-            member_id = args['member_id']
-            if not isinstance(member_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', member_id):
-                return dispatch_result({'ok': False, 'error': 'Invalid member_id'})
-            overrides['member_id'] = member_id
         # Legacy project_id is intentionally ignored; project context is server-owned.
         if 'llm_no' in args:
             value = args['llm_no']
@@ -2929,7 +2924,6 @@ def _install_conductor_tools(agent, config):
                 'evidence_ids': {'type': 'array', 'maxItems': 64,
                                  'items': {'type': 'string'}}})
         if name == 'conductor_dispatch':
-            properties['member_id'] = {'type': 'string', 'description': 'Teamwork roster member ID. Required when a team is configured; server selects that member model. Reuse only that same member conversation.'}
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
             properties['llm_no'] = {'type': 'integer', 'minimum': 0, 'description': 'Optional configured runtime model index (not a model name). Overrides this worker only; omitted uses parent subtask defaults, then inherits parent for new workers or retains reused settings.'}
             properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}

@@ -1,4 +1,3 @@
-import TeamworkPanel from './components/TeamworkPanel.jsx'
 import { ChatPackageBar } from './ui/chatChrome'
 import { UiSurface, useUiPackage } from './ui/UiHost'
 import { conductorSidebarSections } from './lib/chatConductor.js'
@@ -4768,8 +4767,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const uiPackage = useUiPackage()
   // Theme state: sync with localStorage and system preference
   const [conductorEventsOpen, setConductorEventsOpen] = useState(false)
-  const [teamworkTarget, setTeamworkTarget] = useState(null)
-  const closeTeamwork = useCallback(() => setTeamworkTarget(null), [])
   const [conductorWorkersOpen, setConductorWorkersOpen] = useState(false)
   const [conductorConflict, setConductorConflict] = useState(null)
   const [theme, setTheme] = useState(getInitialTheme)
@@ -7674,7 +7671,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
           </div>
           {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
           {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
-          <button type="button" className="oa-context-btn" disabled={!sid || sessionLoading || sessionLoadFailed || isConductorWorker(activeSessionDetail)} onClick={() => { setTeamworkTarget({ sid, instance: chatInstanceID }); setMobileToolsOpen(false) }}>Teamwork</button>
           <ThemePicker className="oa-topbar-theme" value={theme} onChange={setTheme} lang={chatLanguage()} variant="compact" />
         </div>
         <button
@@ -7711,7 +7707,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
           </button>
           {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorWorkersOpen ? 'is-open' : ''}`} aria-expanded={conductorWorkersOpen} aria-controls="oa-conductor-workers" onClick={()=>{setConductorWorkersOpen(v=>!v); setConductorEventsOpen(false)}}><PanelRightOpen size={16}/>Subagents</button>}
           {(isConductorParent(activeSessionDetail) || activeSessionDetail?.conductor_children?.length > 0) && <button type="button" className={`oa-context-btn ${conductorEventsOpen ? 'is-open' : ''}`} aria-expanded={conductorEventsOpen} aria-controls="oa-conductor-events" onClick={()=>{setConductorEventsOpen(v=>!v); setConductorWorkersOpen(false)}}><PanelRightOpen size={16}/>{ct('任务事件', 'Task events')}</button>}
-          <button type="button" className="oa-context-btn" disabled={!sid || sessionLoading || sessionLoadFailed || isConductorWorker(activeSessionDetail)} onClick={() => { setTeamworkTarget({ sid, instance: chatInstanceID }); setMobileToolsOpen(false) }}>Teamwork</button>
           <ThemePicker
             className="oa-mobile-tools-theme"
             value={theme}
@@ -7734,13 +7729,6 @@ export default function ChatApp({ onOpenSettings } = {}) {
           <details className="oa-context-raw"><summary>{ct('原始 JSON', 'Raw JSON')}</summary><pre className="oa-context-raw-json">{contextJson}</pre></details>
         </>}
       </aside>}
-      {teamworkTarget?.sid === sid && teamworkTarget?.instance === chatInstanceID && activeSessionDetail?.id === sid && !sessionLoading && <TeamworkPanel
-        key={`${chatInstanceID}:${sid}`} detail={activeSessionDetail} busy={isCurrentRunning} request={chatApi} ct={ct}
-        onClose={closeTeamwork} onOpen={openSession}
-        onChanged={conductor => {
-          setSessions(items => items.map(item => item.id === sid ? { ...item, conductor } : item))
-          setActiveSessionDetail(item => item?.id === sid ? { ...item, conductor } : item)
-        }}/>}
       {worldlineOpen && <WorldlinePanel
         state={worldlineForView}
         loading={worldlineLoading}
