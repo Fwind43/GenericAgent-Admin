@@ -1,0 +1,51 @@
+/* The editor is rendered in a body portal, outside .models-page. */
+.model-failover-editor {
+  --failover-line: var(--border, #8884);
+  display: grid; gap: 24px; min-width: 0; color: var(--text);
+}
+.model-failover-editor *, .model-failover-editor *::before { box-sizing: border-box; }
+.model-failover-editor .model-failover-identity { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.model-failover-editor .model-field { display: grid; align-content: start; gap: 8px; min-width: 0; margin: 0; }
+.model-failover-editor .model-field-label { font-size: 12px; font-weight: 600; }
+.model-failover-editor .model-field small { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.model-failover-editor .model-subsection { margin: 0; padding: 20px 0 0; border-top: 1px solid var(--failover-line); min-width: 0; }
+.model-failover-editor .model-subsection-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.model-failover-editor .model-subsection-head strong { font-size: 14px; }
+.model-failover-editor .model-subsection-head > span { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.model-failover-editor .model-subsection-help { color: var(--muted); font-size: 12px; line-height: 1.6; margin: 0 0 14px; }
+.model-failover-editor .model-failover-priority { display: grid; gap: 8px; }
+.model-failover-editor .model-failover-priority-row { display: grid; grid-template-columns: 18px 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px 10px; border: 1px solid var(--failover-line); border-radius: 8px; }
+.model-failover-editor .model-failover-priority-row:first-child { border-left: 3px solid var(--accent); padding-left: 8px; }
+.model-failover-editor .model-failover-priority-row.is-missing { border-color: var(--danger, #c95050); }
+.model-failover-editor .model-failover-priority-row > .ant-tag { grid-column: 3; justify-self: start; white-space: normal; }
+.model-failover-editor .model-failover-priority-row > .ant-space { grid-column: 4; grid-row: 1; }
+.model-failover-editor .model-failover-priority-index { font-size: 12px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.model-failover-editor .model-failover-priority-copy, .model-failover-editor .model-failover-candidate > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.model-failover-editor .model-failover-priority-copy strong, .model-failover-editor .model-failover-candidate strong { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.model-failover-editor .model-failover-priority-copy small, .model-failover-editor .model-failover-candidate small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.model-failover-editor .model-drag-handle { display: flex; align-items: center; color: var(--muted); cursor: grab; touch-action: none; }
+.model-failover-editor .model-failover-providers { display: grid; margin-top: 12px; max-height: 360px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--failover-line) transparent; }
+.model-failover-editor .model-failover-provider { min-width: 0; border-bottom: 1px solid var(--failover-line); }
+.model-failover-editor .model-failover-provider-toggle { width: 100%; border: 0; background: transparent; color: inherit; padding: 12px 2px; text-align: left; cursor: pointer; margin: 0; }
+.model-failover-editor .model-failover-provider-toggle strong { display: flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
+.model-failover-editor .model-failover-candidates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 2px 12px; }
+.model-failover-editor .model-failover-candidate { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--failover-line); border-radius: 6px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.model-failover-editor .model-failover-candidate:hover:not(:disabled), .model-failover-editor .model-failover-candidate.is-selected { border-color: var(--accent); background: var(--accent-soft, #8881); }
+.model-failover-editor .model-failover-candidate:disabled { opacity: .45; cursor: not-allowed; }
+.model-failover-editor .model-failover-check { display: grid; place-items: center; width: 16px; height: 16px; color: var(--accent); border: 1px solid var(--failover-line); border-radius: 4px; }
+.model-failover-editor .is-selected .model-failover-check { border-color: transparent; }
+.model-failover-editor button:focus-visible, .model-failover-editor summary:focus-visible, .model-failover-editor .model-drag-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.model-failover-editor .model-hint-block { padding: 20px 12px; text-align: center; background: var(--accent-soft, #8881); border-radius: 6px; color: var(--muted); font-size: 12px; }
+.model-failover-editor .model-failover-warning { color: var(--danger, #c95050); font-size: 12px; margin: 0 0 12px; }
+.model-failover-editor .model-failover-policy > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; cursor: pointer; list-style: none; }
+.model-failover-editor .model-failover-policy > summary::-webkit-details-marker { display: none; }
+.model-failover-editor .model-failover-policy > summary strong { font-size: 14px; }
+.model-failover-editor .model-failover-policy > summary span { color: var(--muted); font-size: 12px; }
+.model-failover-editor .model-failover-policy > summary svg { margin-left: auto; }
+.model-failover-editor .model-failover-policy[open] > summary svg { transform: rotate(180deg); }
+.model-failover-editor .model-params-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 20px; }
+@media (max-width: 540px) {
+  .model-failover-editor .model-failover-identity, .model-failover-editor .model-params-grid, .model-failover-editor .model-failover-candidates { grid-template-columns: minmax(0, 1fr); }
+  .model-failover-editor .model-failover-priority-row { gap: 6px; padding: 10px 6px; grid-template-columns: 16px 18px minmax(0, 1fr) auto; }
+  .model-failover-editor .model-failover-priority-row:first-child { padding-left: 4px; }
+}

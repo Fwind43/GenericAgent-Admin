@@ -1,6 +1,7 @@
 import ModelDiscoveryList from './ModelDiscoveryList'
 import './models-workbench.css'
 import './models-redesign.css'
+import './models-failover.css'
 import { modelAdvancedView } from './modelsAdvancedView'
 import { modelRiskView } from './modelsRiskView'
 import { UiSurface } from '../ui/UiHost'
@@ -270,6 +271,8 @@ function SortableMemberRow({ member, memberIndex, groupIndex, groupLength, candi
 
 export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap, sensors, patchGroup, toggleMember, moveMember, removeMember, text }) {
   const [expandedProviders, setExpandedProviders] = useState({})
+  const [search, setSearch] = useState('')
+  const query = search.trim().toLocaleLowerCase()
   const providerGroups = Array.from(candidates.reduce((groups, candidate) => {
     const key = candidate.providerVarName
     if (!groups.has(key)) groups.set(key, { key, name: candidate.providerName || text.unnamed, candidates: [] })
@@ -282,61 +285,27 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
     .filter(Boolean))
 
   return (
-    <div className="model-row-body">
-      <label className="model-field">
-        <span className="model-field-label">{text.displayName}</span>
-        <Input value={group.display_name || ''} onChange={event => patchGroup(groupIndex, { display_name: event.target.value })} placeholder={group.var_name} />
-      </label>
-      <label className="model-field">
-        <span className="model-field-label">{text.varName}</span>
-        <Input
-          addonBefore={FAILOVER_VAR_PREFIX}
-          value={failoverGroupSuffix(group.var_name)}
-          onChange={event => patchGroup(groupIndex, { var_name: failoverGroupVarName(event.target.value) })}
-        />
-      </label>
+    <div className="model-row-body model-failover-editor">
+      <div className="model-failover-identity">
+        <label className="model-field">
+          <span className="model-field-label">{text.displayName}</span>
+          <Input value={group.display_name || ''} onChange={event => patchGroup(groupIndex, { display_name: event.target.value })} placeholder={group.var_name} />
+        </label>
+        <label className="model-field">
+          <span className="model-field-label">{text.varName}</span>
+          <Input
+            addonBefore={FAILOVER_VAR_PREFIX}
+            value={failoverGroupSuffix(group.var_name)}
+            onChange={event => patchGroup(groupIndex, { var_name: failoverGroupVarName(event.target.value) })}
+          />
+        </label>
 
-      <div className="model-subsection">
-        <div className="model-subsection-head">
-          <strong>{text.failoverCandidates}</strong>
-          <span>{group.members?.length || 0} / {candidates.length}</span>
-        </div>
-        <p className="model-subsection-help">{text.failoverCandidatesHelp}</p>
-        <div className="model-failover-providers">
-          {providerGroups.length ? providerGroups.map(provider => (
-            <section className="model-failover-provider" key={provider.key} aria-label={provider.name}>
-              <button type="button" className="model-subsection-head model-failover-provider-toggle" aria-expanded={!!expandedProviders[provider.key]} onClick={() => setExpandedProviders(current => ({ ...current, [provider.key]: !current[provider.key] }))}>
-                <strong><span aria-hidden="true">{expandedProviders[provider.key] ? '▾' : '▸'}</span><Building2 size={14} aria-hidden="true" /> {provider.name}</strong>
-                <span>{provider.candidates.filter(candidate => selectedKeys.has(memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model }))).length} / {provider.candidates.length}</span>
-              </button>
-              {expandedProviders[provider.key] && <div className="model-failover-candidates">
-          {provider.candidates.map(candidate => {
-            const key = memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model })
-            const selected = selectedKeys.has(key)
-            const locked = selectedFamilies.size > 0 && !selectedFamilies.has(candidate.family)
-            return (
-              <button
-                type="button"
-                key={candidate.id}
-                className={`model-failover-candidate${selected ? ' is-selected' : ''}`}
-                disabled={locked && !selected}
-                aria-pressed={selected}
-                onClick={() => toggleMember(groupIndex, candidate)}
-              >
-                <span className="model-failover-check">{selected ? <CheckCircle2 size={15} /> : null}</span>
-                <span><strong>{candidate.model || text.missingModelId}</strong><small>{candidate.providerName || text.unnamed} · {candidate.protocol}</small></span>
-              </button>
-            )
-          })}
-              </div>}
-            </section>
-          )) : <div className="model-hint-block">{text.failoverNoCandidates}</div>}
-        </div>
       </div>
 
-      <div className="model-subsection">
-        <div className="model-subsection-head"><strong>{text.failoverPriority}</strong></div>
+      <div className="model-subsection model-failover-chain">
+        <div className="model-subsection-head"><strong>{text.failoverPriority}</strong><span>{text.failoverMembersCount?.(group.members?.length || 0)}</span></div>
         <p className="model-subsection-help">{text.failoverPriorityHelp}</p>
+        {group.members?.length === 1 && <p className="model-failover-warning">{text.failoverNeedsTwo}</p>}
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -369,8 +338,53 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
         </DndContext>
       </div>
 
-      <div className="model-subsection">
-        <div className="model-subsection-head"><strong>{text.failoverPolicy}</strong></div>
+      <div className="model-subsection model-failover-picker">
+        <div className="model-subsection-head">
+          <strong>{text.failoverCandidates}</strong>
+          <span>{group.members?.length || 0} / {candidates.length}</span>
+        </div>
+        <p className="model-subsection-help">{text.failoverCandidatesHelp}</p>
+        <Input allowClear value={search} onChange={event => setSearch(event.target.value)} placeholder={text.failoverSearch} aria-label={text.failoverSearch} />
+        <div className="model-failover-providers">
+          {providerGroups.length ? providerGroups.map(provider => {
+            const visible = provider.candidates.filter(candidate => !query || [candidate.model, candidate.displayName, candidate.providerName, candidate.protocol].filter(Boolean).join(' ').toLocaleLowerCase().includes(query))
+            if (!visible.length) return null
+            const open = !!query || !!expandedProviders[provider.key]
+            return (
+            <section className="model-failover-provider" key={provider.key} aria-label={provider.name}>
+              <button type="button" className="model-subsection-head model-failover-provider-toggle" aria-expanded={open} onClick={() => setExpandedProviders(current => ({ ...current, [provider.key]: !current[provider.key] }))}>
+                <strong><span aria-hidden="true">{open ? '▾' : '▸'}</span><Building2 size={14} aria-hidden="true" /> {provider.name}</strong>
+                <span>{provider.candidates.filter(candidate => selectedKeys.has(memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model }))).length} / {provider.candidates.length}</span>
+              </button>
+              {open && <div className="model-failover-candidates">
+          {visible.map(candidate => {
+            const key = memberKeyOf({ instance_id: candidate.instanceId, provider_var_name: candidate.providerVarName, model: candidate.model })
+            const selected = selectedKeys.has(key)
+            const locked = selectedFamilies.size > 0 && !selectedFamilies.has(candidate.family)
+            return (
+              <button
+                type="button"
+                key={candidate.id}
+                className={`model-failover-candidate${selected ? ' is-selected' : ''}`}
+                title={locked && !selected ? text.failoverSameFamily : candidate.model}
+                disabled={locked && !selected}
+                aria-pressed={selected}
+                onClick={() => toggleMember(groupIndex, candidate)}
+              >
+                <span className="model-failover-check">{selected ? <CheckCircle2 size={15} /> : null}</span>
+                <span><strong>{candidate.displayName || candidate.model || text.missingModelId}</strong><small>{candidate.providerName || text.unnamed} · {candidate.protocol}</small></span>
+              </button>
+            )
+          })}
+              </div>}
+            </section>
+          )}) : <div className="model-hint-block">{text.failoverNoCandidates}</div>}
+          {!!query && candidates.length > 0 && !candidates.some(candidate => [candidate.model, candidate.displayName, candidate.providerName, candidate.protocol].filter(Boolean).join(' ').toLocaleLowerCase().includes(query)) && <div className="model-hint-block" role="status">{text.failoverNoResults}</div>}
+        </div>
+      </div>
+
+      <details className="model-subsection model-failover-policy">
+        <summary><strong>{text.failoverPolicy}</strong><span>{text.failoverPolicyHint}</span><ChevronDown size={16} aria-hidden="true" /></summary>
         <div className="model-params-grid">
           <label className="model-field">
             <span className="model-field-label">{text.failoverRetries}</span>
@@ -388,7 +402,7 @@ export function FailoverGroupBody({ group, groupIndex, candidates, candidateMap,
             <small>{text.failoverSpringHelp}</small>
           </label>
         </div>
-      </div>
+      </details>
     </div>
   )
 }
