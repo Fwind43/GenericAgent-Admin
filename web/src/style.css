@@ -18700,6 +18700,7 @@ html[data-color-scheme="dark"] .oa-sidebar {
   color: var(--accent);
   vertical-align: middle;
 }
+.oa-sidebar .oa-project-running .oa-session-running-wave,
 .oa-sidebar .oa-session-row .oa-session .oa-session-running-wave {
   display: inline-flex;
   align-items: center;

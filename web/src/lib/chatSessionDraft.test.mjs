@@ -186,3 +186,14 @@ test('project folder action uses selected instance and confirmed folder opening'
   const routes = readFileSync(new URL('../../../internal/api/api.go', import.meta.url), 'utf8')
   assert.ok(routes.includes('s.requireDangerousConfirm(s.withChatInstance((*Server).filesOpen))'))
 })
+
+test('project activity stays in the header independently of filtered sessions', () => {
+  const source = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  assert.match(source, /const runningProjects = runningProjectKeys\(sessions, waitingSessionIds\)/)
+  const header = functionBlock(source, '<div className="oa-project-head">', '<div className="oa-project-body"')
+  assert.match(header, /runningProjects\.has\(projectKey\)/)
+  assert.match(header, /oa-project-running/)
+  assert.match(header, /role="img"/)
+  const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
+  assert.match(css, /\.oa-sidebar \.oa-project-running \.oa-session-running-wave,/)
+})

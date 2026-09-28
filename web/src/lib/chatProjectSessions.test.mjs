@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { filterRecentNodes, excludeProjectSessions, groupProjectSessions, isProjectSession, moveProjectOrder, projectSessionKeys } from './chatProjectSessions.js'
+import { runningProjectKeys, filterRecentNodes, excludeProjectSessions, groupProjectSessions, isProjectSession, moveProjectOrder, projectSessionKeys } from './chatProjectSessions.js'
 
 test('qualified ordering isolates names and supports legacy official order', () => {
   const projects = [
@@ -177,4 +177,20 @@ test('project activity supports ISO, seconds and milliseconds without mutating i
   const before = JSON.stringify({ projects, sessions })
   assert.deepEqual(groupProjectSessions(projects, sessions).map(g => g.name), ['Millis', 'Seconds', 'ISO', 'Invalid', 'Empty'])
   assert.equal(JSON.stringify({ projects, sessions }), before)
+})
+
+test('running projects include all active sessions, deduplicate and respect project IDs', () => {
+  const sessions = [
+    { id: '1', project_id: 'admin-a', project_mode: 'Same name', running: true },
+    { id: '2', project_mode: 'Legacy', running: true },
+    { id: '3', project_id: 'admin-a', running: true },
+    { id: '4', project_id: 'Idle', running: false },
+    { id: '5', running: true },
+    { id: '6', project_id: 'Waiting', running: true },
+    { id: '7', project_id: 'Conductor', running: true, mode: 'conductor' },
+    null,
+  ]
+  assert.deepEqual([...runningProjectKeys(sessions, new Set(['6']))], ['admin-a', 'Legacy', 'Conductor'])
+  assert.deepEqual([...runningProjectKeys(null)], [])
+  assert.deepEqual([...runningProjectKeys(sessions.map(s => s && ({ ...s, running: false })))], [])
 })

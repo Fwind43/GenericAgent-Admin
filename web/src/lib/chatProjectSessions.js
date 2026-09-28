@@ -1,3 +1,14 @@
+// Read all sessions, independently of sidebar search, pagination or folding.
+export function runningProjectKeys(sessions, waitingSessionIds = new Set()) {
+  const keys = new Set()
+  for (const session of Array.isArray(sessions) ? sessions : []) {
+    if (!session?.running || waitingSessionIds.has(session.id)) continue
+    const key = String(session.project_id || session.project_mode || '').trim()
+    if (key) keys.add(key)
+  }
+  return keys
+}
+
 export function groupProjectSessions(projects, sessions, pinnedProjects, manualOrder = []) {
   const sourceProjects = Array.isArray(projects) ? projects : []
   const sourceSessions = Array.isArray(sessions) ? sessions : []

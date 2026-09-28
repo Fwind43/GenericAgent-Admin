@@ -55,7 +55,7 @@ import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ult
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
 import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
-import { groupProjectSessions } from './lib/chatProjectSessions.js'
+import { groupProjectSessions, runningProjectKeys } from './lib/chatProjectSessions.js'
 import { useRuntimeModelRefresh } from './lib/useRuntimeModelRefresh.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
@@ -5058,6 +5058,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     sessions, sid, liveState: taskbarState, liveRunning: busy && streamingSid === sid,
   })
   const waitingSessionIds = new Set(waitingSessions.map(session => session.id))
+  const runningProjects = runningProjectKeys(sessions, waitingSessionIds)
   const aggregateTaskbarState = aggregateChatTaskbarState({
     sid, liveRunning: busy && streamingSid === sid, liveState: taskbarState,
     sessions, unread: new Set(sessions.filter(chatReadState.unread).map(session => session.id)),
@@ -7629,6 +7630,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
                   ? <FolderOpen size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>
                   : <Folder size={17} strokeWidth={1.5} className="oa-project-folder" aria-hidden="true"/>}<b title={group.name}>{group.name}</b>
               </button>
+              {runningProjects.has(projectKey) && <span className="oa-session-running-label oa-project-running" role="img" aria-label={ct("\u9879\u76ee\u8fd0\u884c\u4e2d", "Project running")} title={ct("\u6709\u4f1a\u8bdd\u6b63\u5728\u8fd0\u884c", "A project session is running")} style={{ flexShrink: 0 }}><span className="oa-session-running-wave" aria-hidden="true"><i/><i/><i/><i/></span></span>}
               <button className="oa-project-add" type="button" onClick={()=>newProjectSession(group.provider ? group : group.name)} disabled={batchDeleting} title={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)} aria-label={ct(`在 ${group.name} 中新建对话`, `Start a chat in ${group.name}`)}><Plus size={15}/></button>
               <ProjectActionsMenu label={ct('项目操作', 'Project actions')}>
               <button type="button" onClick={()=>createSession(group.provider ? group : group.name, { mode:'conductor' })} disabled={batchDeleting}><span className="oa-conductor-new-mark" aria-hidden="true">C</span>{ct('新建项目指挥家', 'New project Conductor')}</button>
