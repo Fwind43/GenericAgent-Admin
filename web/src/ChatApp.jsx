@@ -3535,8 +3535,11 @@ export const buildChatStats = (messages = [], now = Date.now(), running = false)
   const usages = turns.flatMap(m => Array.isArray(m.usages) && m.usages.length ? m.usages : (m.usage ? [m.usage] : []))
   const total = sumUsages(usages)
   const elapsedMs = turns.reduce((sum, m, index) => sum + getElapsedMs(m, now, index === activeIndex), 0)
-  const llmElapsedMs = turns.reduce((sum, m) => sum + Math.max(0, Number(m.llm_elapsed_ms) || 0), 0)
-  const liveLlmElapsedMs = activeIndex >= 0 ? getElapsedMs(turns[activeIndex], now, true) : 0
+  // Apply the legacy elapsed fallback per reply so a new live clock cannot hide history.
+  const llmElapsedMs = turns.reduce((sum, m, index) => {
+    const measuredMs = Math.max(0, Number(m.llm_elapsed_ms) || 0)
+    return sum + (measuredMs || getElapsedMs(m, now, index === activeIndex))
+  }, 0)
   const toolElapsedMs = turns.reduce((sum, m, index) => {
     const terminalMs = Math.max(0, Number(m.tool_elapsed_ms) || 0)
     const liveMs = Math.max(0, Number(m.tool_live_elapsed_ms) || 0)
@@ -3558,7 +3561,7 @@ export const buildChatStats = (messages = [], now = Date.now(), running = false)
     rounds: turns.length,
     steps: usages.length,
     elapsedMs,
-    llmElapsedMs: llmElapsedMs + liveLlmElapsedMs,
+    llmElapsedMs,
     toolElapsedMs,
     firstTokenMs,
     firstTokenSamples: firstTokenValues.length,
@@ -3575,7 +3578,7 @@ export const ChatStats = memo(function ChatStats({ messages = [], now = Date.now
   return <div className="oa-chat-stats" aria-label="对话统计">
     <span>{stats.rounds} 轮 · {stats.steps} 步</span>
     <i aria-hidden="true">|</i>
-    <span>LLM {formatElapsedMs(stats.llmElapsedMs || stats.elapsedMs)} · 工具调用 {formatElapsedMs(stats.toolElapsedMs)}</span>
+    <span>LLM {formatElapsedMs(stats.llmElapsedMs)} · 工具调用 {formatElapsedMs(stats.toolElapsedMs)}</span>
     <i aria-hidden="true">|</i>
     <span>{stats.firstTokenIsModelTTFT ? '模型 TTFT 中位' : '首 token 中位'} {stats.firstTokenMs > 0 ? `${(stats.firstTokenMs / 1000).toFixed(1)}s · ${stats.firstTokenSamples}次` : '—'} · {stats.outputRate > 0 ? `${stats.outputRate.toFixed(1)} tok/s` : '— tok/s'}</span>
     <i aria-hidden="true">|</i>

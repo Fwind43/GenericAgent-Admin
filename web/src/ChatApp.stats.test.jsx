@@ -33,6 +33,34 @@ describe('chat stats', () => {
     expect(container.querySelector('.oa-chat-stats')?.textContent).toContain('LLM 3s · 工具调用 0.0s')
   })
 
+  test('keeps historical timing when a new reply starts and finishes', () => {
+    const history = [{ role: 'assistant', elapsed_ms: 9_000 }]
+    const active = { role: 'assistant', run_started_at_ms: 20_000 }
+    const { container, rerender } = render(<ChatStats messages={history} now={20_000} />)
+    const text = () => container.querySelector('.oa-chat-stats').textContent
+    expect(text()).toContain('LLM 9s')
+    rerender(<ChatStats messages={[...history, active]} now={20_000} running />)
+    expect(text()).toContain('LLM 9s')
+    rerender(<ChatStats messages={[...history, active]} now={21_000} running />)
+    expect(text()).toContain('LLM 10s')
+    rerender(<ChatStats messages={[...history, { ...active, elapsed_ms: 2_000 }]} now={22_000} />)
+    expect(text()).toContain('LLM 11s')
+  })
+
+  test('combines legacy fallback and measured durations per reply', () => {
+    const messages = [
+      { role: 'assistant', elapsed_ms: 9_000 },
+      { role: 'assistant', elapsed_ms: 8_000, llm_elapsed_ms: 3_000 },
+      { role: 'assistant', run_started_at_ms: 20_000 },
+    ]
+    expect(buildChatStats(messages, 21_000, true).llmElapsedMs).toBe(13_000)
+  })
+
+  test('does not count measured active timing twice', () => {
+    const messages = [{ role: 'assistant', run_started_at_ms: 20_000, llm_elapsed_ms: 500 }]
+    expect(buildChatStats(messages, 21_000, true).llmElapsedMs).toBe(500)
+  })
+
   test('projects an active tool timer from the latest server snapshot', () => {
     const stats = buildChatStats([{
       role: 'assistant', run_started_at_ms: 1_000,
