@@ -89,3 +89,29 @@
  .models-page .model-call-actions { flex-wrap: wrap; }
  .models-page .model-call-actions .ant-btn { min-height: 44px; width: auto; }
 }
+
+/* A dedicated activator keeps editing and destructive actions out of drag gestures. */
+.model-provider-nav-entry > .model-provider-drag-handle {
+  position: absolute;
+  inset-inline-end: 6px;
+  top: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.model-provider-nav-entry > .model-provider-drag-handle:active { cursor: grabbing; }
+.model-provider-nav-entry > .model-provider-drag-handle:disabled { cursor: default; opacity: .4; }
+.model-provider-nav-entry > .model-provider-nav-select { padding-inline-end: 46px; }
+.model-provider-reorder-help { flex-shrink: 0; margin: 0 0 12px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 800px) {
+  .model-provider-nav-entry > .model-provider-drag-handle { width: 44px; min-height: 44px; top: 0; inset-inline-end: 0; }
+  .model-provider-nav-entry > .model-provider-nav-select { padding-inline-end: 50px; }
+}

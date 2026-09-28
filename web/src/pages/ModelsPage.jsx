@@ -1206,6 +1206,7 @@ export function Models({
             addLabel: text.addProvider, emptyLabel: text.noProvidersHelp,
             editLabel: text.configure, addModelLabel: text.addModel, deleteLabel: t.delete,
             reorderingDisabled: saving,
+            reorderLabel: text.reorderProvider, reorderHelp: text.providerOrderHelp,
             columns: { name: text.name, endpoint: 'BaseURL', protocol: text.protocol, models: text.model },
             providers: profiles.map((profile, index) => {
               const state = providerState(validation[index])

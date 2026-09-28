@@ -45,7 +45,7 @@ async function ready(id = 'default') {
   await waitFor(() => expect(directory()).not.toBeNull())
 }
 const requests = path => api.mock.calls.filter(([url]) => url === path)
-const open = async () => { fireEvent.click(within(directory()).getByRole('button', { name: /Synthetic provider/ })); return document.querySelector('.model-settings-detail') }
+const open = async () => { fireEvent.click(within(directory()).getByRole('button', { name: /^Synthetic provider/ })); return document.querySelector('.model-settings-detail') }
 beforeEach(() => {
   localStorage.clear(); vi.clearAllMocks(); captured = null
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden') }))
@@ -220,4 +220,20 @@ it('reorders providers without moving model slots, retains the editor, saves and
   act(() => host.discardDraft())
   expect(host.profiles.map(p => p.display_name)).toEqual(['Provider 1', 'Provider 2', 'Provider 0'])
   expect(host.changes.total).toBe(0)
+})
+
+it.each(['default', 'studio'])('exposes a dedicated provider drag handle and Chat order help in %s', async id => {
+  mount(); await ready(id)
+  const first = within(directory()).getByRole('button', { name: `${t.models.reorderProvider}: Synthetic provider` })
+  expect(first.disabled).toBe(true)
+  act(() => host.setProfiles([0, 1].map(index => ({ ...host.profiles[0], var_name: `api_demo_${index}`, display_name: `Provider ${index}` }))))
+  expect(within(directory()).getByText(t.models.providerOrderHelp)).toBeTruthy()
+  const handle = within(directory()).getByRole('button', { name: `${t.models.reorderProvider}: Provider 0` })
+  expect(handle.disabled).toBe(false)
+  expect(handle.getAttribute('aria-roledescription')).toBe('sortable')
+  expect(handle.closest('.model-provider-nav-entry').hasAttribute('tabindex')).toBe(false)
+  fireEvent.click(within(directory()).getByRole('button', { name: /^Provider 0/ }))
+  expect(screen.getByDisplayValue('Provider 0')).toBeTruthy()
+  expect(host.profiles.map(p => p.display_name)).toEqual(['Provider 0', 'Provider 1'])
+  expect(requests('/api/models/export')).toHaveLength(0)
 })
