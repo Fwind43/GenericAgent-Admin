@@ -41,10 +41,14 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
   const key = chatReadKey(instance, sid, result)
   const currentNeedsReceipt = needsReceipt(summary)
   const currentUnread = unread(summary)
+  const receiptRef = useRef({ summary, result })
+  useEffect(() => { receiptRef.current = { summary, result } })
+  const visibleRevision = result?.visible_revision
   useEffect(() => {
     if (!eligible || !currentNeedsReceipt) return undefined
-    const tick = createReadDwell(() => { void markRef.current([summary], true) })
-    const check = () => tick(isChatResultVisible(threadRef.current, result), performance.now())
+    // Equivalent list/snapshot refreshes must not restart the reading dwell.
+    const tick = createReadDwell(() => { void markRef.current([receiptRef.current.summary], true) })
+    const check = () => tick(isChatResultVisible(threadRef.current, receiptRef.current.result), performance.now())
     const reset = () => tick(false, performance.now())
     const timer = window.setInterval(check, 100)
     const thread = threadRef.current
@@ -58,7 +62,7 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
       window.removeEventListener('blur', reset)
       document.removeEventListener('visibilitychange', reset)
     }
-  }, [eligible, currentNeedsReceipt, key, result, summary, threadRef])
+  }, [eligible, currentNeedsReceipt, key, visibleRevision, threadRef])
   return {
     unread, currentUnread, hasUnread: sessions.some(unread),
     markSessionRead: sessionID => mark(sessions.filter(session => session.id === sessionID)),

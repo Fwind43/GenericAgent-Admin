@@ -127,3 +127,25 @@ test('visible final result marks read after dwell, never while covered', async (
   expect(props.api).toHaveBeenCalledTimes(1)
   expect(h.result.current.currentUnread).toBe(false)
 })
+
+test('equivalent session refreshes do not restart visible result dwell', async () => {
+  const h = setup()
+  for (let i = 0; i < 6; i++) {
+    await act(async () => { vi.advanceTimersByTime(300) })
+    h.rerender({ ...props, snapshot: { ...props.snapshot, result: { ...answer } }, sessions: [{ ...props.sessions[0], result: { ...answer } }] })
+  }
+  expect(props.api).toHaveBeenCalledTimes(1)
+  expect(h.result.current.currentUnread).toBe(false)
+})
+
+test('a changed result revision starts a new reading dwell', async () => {
+  const h = setup()
+  await act(async () => { vi.advanceTimersByTime(700) })
+  const next = { ...answer, revision: 'v2', visible_revision: 'visible-2' }
+  h.rerender({ ...props, snapshot: { id: 's', result: next }, messages: [{ id: 'a', content_revision: 'v2' }], sessions: [{ id: 's', result: next, unread: true }] })
+  await act(async () => { vi.advanceTimersByTime(400) })
+  expect(props.api).not.toHaveBeenCalled()
+  await act(async () => { vi.advanceTimersByTime(700) })
+  expect(props.api).toHaveBeenCalledTimes(1)
+  expect(JSON.parse(props.api.mock.calls[0][1].body).receipts).toEqual([{ sid: 's', result: next }])
+})
