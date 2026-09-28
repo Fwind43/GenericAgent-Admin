@@ -246,3 +246,11 @@
   overflow: hidden; text-overflow: ellipsis;
 }
 .oa-chat .oa-sidebar .oa-session-project-badge svg { flex-shrink: 0; }
+
+/* Outdent section labels without moving their content or sticky offsets. */
+.oa-chat .oa-sidebar .oa-sidebar-section-head {
+  box-shadow: inset 0 -1px color-mix(in srgb, var(--text) 8%, transparent);
+}
+.oa-chat .oa-sidebar .oa-sidebar-section-head > .oa-sidebar-section-toggle {
+  padding-inline: 4px;
+}
