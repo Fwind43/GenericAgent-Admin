@@ -77,6 +77,40 @@ it.each(['default', 'studio'])('opens host editor, edits draft and saves only th
   await waitFor(() => expect(host.changes.total).toBe(0))
   expect(requests('/api/models/raw')).toHaveLength(0)
 })
+it.each(['default', 'studio'])('reveals the full key without changing the masked draft in %s', async id => {
+  const masked = 'sk-****demo'
+  let fullKey = 'synthetic-full-key'
+  api.mockImplementation(async url => {
+    if (url === '/api/models/import-mykey') {
+      const data = fixture()
+      data.profiles[0].apikey = masked
+      return data
+    }
+    if (url === '/api/chat/state') return { llms: [] }
+    if (url === '/api/models/raw') return { profiles: [{ var_name: 'api_demo', apikey: fullKey }] }
+    throw new Error(`Unmocked endpoint ${url}`)
+  })
+  mount(); await ready(id)
+  const dialog = await open()
+  const input = within(dialog).getByDisplayValue(masked)
+  expect(input.type).toBe('password')
+  expect(requests('/api/models/raw')).toHaveLength(0)
+  fireEvent.click(within(dialog).getByRole('button', { name: t.show, exact: true }))
+  await waitFor(() => expect(input.value).toBe(fullKey))
+  expect(input.type).toBe('text')
+  expect(host.profiles[0].apikey).toBe(masked)
+  expect(host.changes.total).toBe(0)
+  fullKey = 'synthetic-refreshed-key'
+  fireEvent.click(within(dialog).getByRole('button', { name: `${t.models.reread} API Key`, exact: true }))
+  await waitFor(() => expect(input.value).toBe(fullKey))
+  fireEvent.click(within(dialog).getByRole('button', { name: t.hide, exact: true }))
+  await waitFor(() => expect(input.type).toBe('password'))
+  expect(input.value).toBe(masked)
+  expect(host.profiles[0].apikey).toBe(masked)
+  expect(host.changes.total).toBe(0)
+  expect(requests('/api/models/raw')).toHaveLength(2)
+  expect(requests('/api/models/export')).toHaveLength(0)
+})
 it('passes a narrow redacted directory contract and keeps drafts/editor through switches', async () => {
   mount(); await ready('studio')
   expect(Object.keys(captured).sort()).toEqual(['actions', 'layout', 'model'])

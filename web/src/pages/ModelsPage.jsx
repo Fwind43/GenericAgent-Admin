@@ -505,7 +505,7 @@ function ProviderModal({
           <span className="model-field-label">API Key <em>{creating ? text.optionalKey : revealed ? text.tempShown : text.hiddenByDefault}</em></span>
           <Input
             type={creating || revealed ? 'text' : 'password'}
-            value={profile?.apikey ?? ''}
+            value={revealed ? revealedKey : (profile?.apikey ?? '')}
             onChange={event => {
               if (!creating) onClearRevealedKey?.(index, profile)
               onChange({ apikey: event.target.value })
