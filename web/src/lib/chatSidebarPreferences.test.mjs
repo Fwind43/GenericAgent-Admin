@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readSidebarPreferences, sortSidebarSessions, sidebarPreferenceDefaults, filterSidebarRecentNodes } from './chatSidebarPreferences.js'
+import { readSidebarPreferences, sortSidebarSessions, sidebarPreferenceDefaults, filterSidebarRecentNodes, normalizeRecentFilter } from './chatSidebarPreferences.js'
 test('preferences tolerate invalid and unavailable storage', () => {
   for (const raw of ['null', '{}', 'invalid']) assert.deepEqual(readSidebarPreferences({getItem:()=>raw}), {...sidebarPreferenceDefaults,showProjects:true,showConductor:true,sort:'updated'})
   assert.deepEqual(readSidebarPreferences({getItem:()=>'{"layout":"list","sort":"priority"}'}), {...sidebarPreferenceDefaults,showProjects:false,showConductor:true,sort:'priority'})
@@ -47,10 +47,23 @@ test('filters and collapsed sections survive storage round trips independently',
     const saved = {...sidebarPreferenceDefaults, recentFilter, historyExpanded:false,
       pinnedExpanded:false, projectsExpanded:false, conductorsExpanded:true,
       showAllProjects:true, expandedProjectNames:['A','B']}
-    assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(saved)}), saved)
+    assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(saved)}), {...saved, recentFilter: normalizeRecentFilter(recentFilter)})
   }
   const invalid = readSidebarPreferences({getItem:()=>JSON.stringify({recentFilter:'bad',historyExpanded:'false',expandedProjectNames:['A',4,'A']})})
-  assert.equal(invalid.recentFilter,'all')
+  assert.deepEqual(invalid.recentFilter,['chat','project','conductor'])
   assert.equal(invalid.historyExpanded,true)
   assert.deepEqual(invalid.expandedProjectNames,['A'])
+})
+
+test('recent selections accept every subset and persist empty selections', () => {
+  const keys = ['chat','project','conductor']
+  const nodes = [{session:{id:'chat'}},{session:{id:'project',project_id:'p'}},{session:{id:'conductor',conductor:{role:'parent'}}}]
+  for (let mask=0; mask<8; mask++) {
+    const selected = keys.filter((_,i) => mask & (1 << i))
+    assert.deepEqual(filterSidebarRecentNodes(nodes,selected).map(n=>n.session.id),selected)
+    assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify({recentFilter:selected})}).recentFilter,selected)
+  }
+  assert.deepEqual(normalizeRecentFilter(['project','bad','project']),['project'])
+  const both = {session:{project_id:'p',conductor:{role:'parent'}}}
+  assert.deepEqual(filterSidebarRecentNodes([both],['project','conductor']),[both])
 })

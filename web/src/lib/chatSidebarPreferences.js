@@ -1,5 +1,12 @@
+export const recentFilterOptions = ['chat', 'project', 'conductor']
+
+export function normalizeRecentFilter(value) {
+  if (Array.isArray(value)) return recentFilterOptions.filter(key => value.includes(key))
+  return recentFilterOptions.includes(value) ? [value] : [...recentFilterOptions]
+}
+
 export const sidebarPreferenceDefaults = {
-  showProjects: true, showConductor: true, sort: 'updated', recentFilter: 'all',
+  showProjects: true, showConductor: true, sort: 'updated', recentFilter: [...recentFilterOptions],
   historyExpanded: true, pinnedExpanded: true, conductorsExpanded: false, projectsExpanded: true,
   showAllProjects: false, expandedProjectNames: [],
 }
@@ -13,7 +20,7 @@ export function readSidebarPreferences(storage) {
     }
     if (typeof value?.showProjects !== 'boolean') next.showProjects = value?.layout !== 'list'
     if (value?.sort === 'priority') next.sort = 'priority'
-    if (['all', 'chat', 'project', 'conductor'].includes(value?.recentFilter)) next.recentFilter = value.recentFilter
+    next.recentFilter = normalizeRecentFilter(value?.recentFilter)
     if (Array.isArray(value?.expandedProjectNames)) next.expandedProjectNames = [...new Set(value.expandedProjectNames.filter(name => typeof name === 'string'))]
     return next
   } catch { return { ...sidebarPreferenceDefaults } }
@@ -29,13 +36,13 @@ export function sortSidebarSessions(sessions, mode) {
 }
 
 export function filterSidebarRecentNodes(nodes, filter = 'all') {
+  const selected = normalizeRecentFilter(filter)
   return (Array.isArray(nodes) ? nodes : []).filter(node => {
     const session = node?.session
     const conductor = ['parent', 'worker'].includes(session?.conductor?.role) || Boolean(node?.workers?.length)
     const project = Boolean(session?.project_id || session?.project_mode || session?.project_name)
-    if (filter === 'project') return project
-    if (filter === 'conductor') return conductor
-    if (filter === 'chat') return !project && !conductor
-    return true
+    return (selected.includes('project') && project) ||
+      (selected.includes('conductor') && conductor) ||
+      (selected.includes('chat') && !project && !conductor)
   })
 }

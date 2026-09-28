@@ -1,3 +1,4 @@
+import { normalizeRecentFilter } from '../lib/chatSidebarPreferences.js'
 import ProjectSessionPage from '../components/ProjectSessionPage'
 import ChatVersionBadge from '../components/ChatVersionBadge'
 import { SidebarPreferenceSubmenu } from '../components/ProjectActionsMenu'
@@ -126,13 +127,12 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
               aria-label={ct('一键已读', 'Mark all as read')}
             ><CheckCheck size={16}/></button>
             <ProjectActionsMenu label={ct('最近更多', 'More recent options')}>
-              <SidebarPreferenceSubmenu label={ct('最近显示', 'Show recent')} value={sidebarPreferences.recentFilter}
+              <SidebarPreferenceSubmenu multiple label={ct('最近显示', 'Show recent')} value={normalizeRecentFilter(sidebarPreferences.recentFilter)}
                 options={[
-                  { value: 'all', label: ct('所有对话', 'All conversations') },
                   { value: 'chat', label: ct('普通对话', 'Regular chats') },
                   { value: 'project', label: ct('项目对话', 'Project chats') },
                   { value: 'conductor', label: ct('指挥家对话', 'Conductor chats') },
-                ]} onChange={value=>updateSidebarPreference('recentFilter', value)}/>
+                ]} onChange={value=>updateSidebarPreference('recentFilter', current => { const selected = normalizeRecentFilter(current); return selected.includes(value) ? selected.filter(key => key !== value) : [...selected, value] })}/>
               {sidebarPreferenceMenu}
               <button type="button" onClick={openSessionManager} disabled={!sessions.length}>{ct('管理会话', 'Manage sessions')}</button>
             </ProjectActionsMenu>
@@ -142,7 +142,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           <div id="oa-sidebar-history-body" hidden={!historyExpanded}>
         <div className="oa-session-list">
           <ProjectSessionPage key={`${chatInstanceID}:${sidebarSearch}:${sidebarPreferences.recentFilter}`} items={recentSessions} renderItem={renderSidebarTree} ct={ct} expandLabel={remaining => ct(`展开其余 ${remaining} 个...`, `Expand ${remaining} more...`)}/>
-          {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch || (sidebarPreferences.recentFilter && sidebarPreferences.recentFilter !== 'all') ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
+          {!recentSessions.length && <div className="oa-empty-list">{sidebarSearch || normalizeRecentFilter(sidebarPreferences.recentFilter).length !== 3 ? ct('无匹配会话', 'No matching sessions') : ct('暂无历史会话', 'No session history')}</div>}
         </div>
           </div>
         </section>

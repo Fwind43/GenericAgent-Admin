@@ -30,7 +30,7 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   let sent = null, created = false
   const secondSession = { id: 's2', title: 'New fixture conversation', count: 0 }
   const ownershipSessions = [
-    { id: 'project-only', title: 'Project fixture', project_id: 'alpha', project_name: 'Alpha', count: 0 },
+    { id: 'project-only', title: 'Project fixture', project_id: 'alpha', count: 0 },
     { id: 'conductor-only', title: 'Conductor fixture', conductor: { role: 'parent' }, count: 0 },
   ]
   const calls = [], unexpected = []
@@ -46,7 +46,7 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
       case 'PUT /api/ui/theme': data = JSON.parse(init.body); break
       case 'GET /api/instances': data = { default_id: 'local', instances: [{ id: 'local', name: 'Local', mode: 'local' }] }; break
       case 'GET /api/extra-system-prompt-presets': data = { presets: [] }; break
-      case 'GET /api/chat/sessions': data = { sessions: created ? [secondSession, session, ...ownershipSessions] : [session, ...ownershipSessions], projects: ['alpha'] }; break
+      case 'GET /api/chat/sessions': data = { sessions: created ? [secondSession, session, ...ownershipSessions] : [session, ...ownershipSessions], projects: [{id:'alpha', name:'Alpha', provider:'admin'}] }; break
       case 'GET /api/chat/session/s1': data = { ...session, messages: [{ id: 'm1', role: 'user', content: 'Retained fixture message' }], raw_history: [], settings: {}, queued_messages: [] }; break
       case 'POST /api/chat/s1':
         sent = JSON.parse(init.body)
@@ -70,27 +70,29 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   expect(within(recent).getByText('Project fixture')).toBeTruthy()
   expect(recent.querySelector('.oa-session-project-badge').textContent).toBe('Alpha')
   expect(recent.querySelector('.oa-session-conductor-badge')).toBeTruthy()
-  for (const [value, titles] of [
-    ['project', ['Project fixture']],
-    ['conductor', ['Conductor fixture']],
-    ['chat', ['Fixture conversation']],
-    ['all', ['Fixture conversation', 'Project fixture', 'Conductor fixture']],
+  fireEvent.click(screen.getByRole('button', { name: 'More recent options' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Show recent' }))
+  for (const [label, titles] of [
+    ['Regular chats', ['Project fixture', 'Conductor fixture']],
+    ['Conductor chats', ['Project fixture']],
+    ['Project chats', []],
+    ['Regular chats', ['Fixture conversation']],
+    ['Project chats', ['Fixture conversation', 'Project fixture']],
+    ['Conductor chats', ['Fixture conversation', 'Project fixture', 'Conductor fixture']],
   ]) {
-    fireEvent.click(screen.getByRole('button', { name: 'More recent options' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Show recent' }))
-    const labels = { all: 'All conversations', chat: 'Regular chats', project: 'Project chats', conductor: 'Conductor chats' }
-    fireEvent.click(screen.getByRole('menuitemradio', { name: labels[value] }))
-    expect(screen.queryByRole('menu', { name: 'Show recent' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: label }))
+    expect(screen.getByRole('menu', { name: 'Show recent' })).toBeTruthy()
     expect(Array.from(recent.querySelectorAll('.oa-session-title b')).map(node => node.textContent)).toEqual(titles)
-    expect(JSON.parse(localStorage.getItem('ga-chat-sidebar-preferences')).recentFilter).toBe(value)
+    expect(JSON.parse(localStorage.getItem('ga-chat-sidebar-preferences')).recentFilter.length).toBe(titles.length)
   }
+  fireEvent.keyDown(document, { key: 'Escape' })
   const recentToggle = container.querySelector('[aria-controls="oa-sidebar-history-body"]')
   fireEvent.click(recentToggle)
   expect(recent.hidden).toBe(true)
   expect(JSON.parse(localStorage.getItem('ga-chat-sidebar-preferences')).historyExpanded).toBe(false)
   fireEvent.click(screen.getByRole('button', { name: 'More recent options' }))
   fireEvent.click(screen.getByRole('button', { name: 'Show recent' }))
-  expect(screen.getByRole('menuitemradio', { name: 'All conversations' }).getAttribute('aria-checked')).toBe('true')
+  for (const label of ['Regular chats','Project chats','Conductor chats']) expect(screen.getByRole('menuitemcheckbox', { name: label }).getAttribute('aria-checked')).toBe('true')
   fireEvent.keyDown(document, { key: 'Escape' })
   fireEvent.click(recentToggle)
   const composer = await screen.findByPlaceholderText(/Message GenericAgent/)
