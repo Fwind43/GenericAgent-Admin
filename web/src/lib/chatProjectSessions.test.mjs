@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { runningProjectKeys, filterRecentNodes, excludeProjectSessions, groupProjectSessions, isProjectSession, moveProjectOrder, projectSessionKeys } from './chatProjectSessions.js'
+import { projectSessionLabel, runningProjectKeys, filterRecentNodes, excludeProjectSessions, groupProjectSessions, isProjectSession, moveProjectOrder, projectSessionKeys } from './chatProjectSessions.js'
 
 test('qualified ordering isolates names and supports legacy official order', () => {
   const projects = [
@@ -193,4 +193,15 @@ test('running projects include all active sessions, deduplicate and respect proj
   assert.deepEqual([...runningProjectKeys(sessions, new Set(['6']))], ['admin-a', 'Legacy', 'Conductor'])
   assert.deepEqual([...runningProjectKeys(null)], [])
   assert.deepEqual([...runningProjectKeys(sessions.map(s => s && ({ ...s, running: false })))], [])
+})
+
+test('project labels resolve ID-only, legacy, unknown and ordinary sessions', () => {
+  const projects = [{id:'p',name:'Alpha'}, {key:'q',name:'Beta'}]
+  assert.equal(projectSessionLabel({project_id:'p'},projects),'Alpha')
+  assert.equal(projectSessionLabel({project_id:'q'},projects),'Beta')
+  assert.equal(projectSessionLabel({project_id:'p',project_name:'Explicit'},projects),'Explicit')
+  assert.equal(projectSessionLabel({project_mode:'Legacy'},['Legacy']),'Legacy')
+  assert.equal(projectSessionLabel({project_id:'missing'},projects),'missing')
+  assert.equal(projectSessionLabel({},projects),'')
+  assert.equal(projectSessionLabel(null,null),'')
 })

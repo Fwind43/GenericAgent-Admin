@@ -1,3 +1,13 @@
+export function projectSessionLabel(session, projects = []) {
+  const name = String(session?.project_name || '').trim()
+  if (name) return name
+  const id = String(session?.project_id || session?.project_mode || '').trim()
+  if (!id) return ''
+  const project = (Array.isArray(projects) ? projects : []).find(project =>
+    typeof project === 'string' ? project === id : String(project?.id || project?.key || project?.name || '').trim() === id)
+  return String(typeof project === 'string' ? project : project?.name || session?.project_mode || id).trim()
+}
+
 // Read all sessions, independently of sidebar search, pagination or folding.
 export function runningProjectKeys(sessions, waitingSessionIds = new Set()) {
   const keys = new Set()
