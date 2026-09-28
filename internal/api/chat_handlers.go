@@ -164,6 +164,16 @@ func (s *Server) chatHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "conductor":
+		if len(parts) == 3 && parts[2] == "models" && r.Method == http.MethodGet {
+			rows, err := s.conductorModels()
+			if err != nil { bad(w, http.StatusServiceUnavailable, err.Error()); return }
+			writeJSON(w, map[string]interface{}{"models": rows})
+			return
+		}
+		if len(parts) == 3 && parts[2] == "teamwork" && r.Method == http.MethodPost {
+			s.chatTeamwork(w, r, parts[1])
+			return
+		}
 		if len(parts) == 3 && parts[2] == "recover" && r.Method == http.MethodPost {
 			s.chatConductorRecover(w, r, parts[1])
 			return

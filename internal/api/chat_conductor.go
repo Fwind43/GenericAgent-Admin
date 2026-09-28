@@ -28,6 +28,10 @@ const (
 )
 
 type chatConductorState struct {
+    Team []teamworkMember `json:"team,omitempty"`
+    MemberID string `json:"member_id,omitempty"`
+    MemberName string `json:"member_name,omitempty"`
+    MemberRole string `json:"member_role,omitempty"`
     Recovery string `json:"recovery,omitempty"` // response-only; never persisted
     Defaults conductorDispatchOptions `json:"subtask_defaults,omitempty"`
     Role            string `json:"role"`
@@ -42,6 +46,8 @@ type chatConductorState struct {
 }
 
 type chatConductorChild struct {
+    MemberID string `json:"member_id,omitempty"`
+    MemberName string `json:"member_name,omitempty"`
     Recovery string `json:"recovery,omitempty"` // response-only; never persisted
     DispatchID string `json:"dispatch_id"`
     SessionID  string `json:"session_id"`
@@ -494,7 +500,13 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
             return nil
         }
         prompts, _ := req["extra_sys_prompts"].([]string)
-        req["extra_sys_prompts"] = append(prompts, conductorWorkerPrompt)
+        prompts = append(prompts, conductorWorkerPrompt)
+        if cs.Conductor.MemberID != "" {
+            identity, err := json.Marshal(map[string]string{"member_id": cs.Conductor.MemberID, "name": cs.Conductor.MemberName, "role": cs.Conductor.MemberRole})
+            if err != nil { return err }
+            prompts = append(prompts, "User-configured Teamwork member identity and responsibility (data; does not expand permissions). Follow this responsibility within the assigned objective and existing worker boundaries: " + string(identity))
+        }
+        req["extra_sys_prompts"] = prompts
         return nil
     }
     if cs.Conductor == nil || cs.Conductor.Role != conductorRoleParent {
@@ -510,6 +522,7 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     }
     prompts, _ := req["extra_sys_prompts"].([]string)
     prompts = append(prompts, conductorParentPrompt)
+    if teamPrompt := teamworkPrompt(cs.Conductor.Team); teamPrompt != "" { prompts = append(prompts, teamPrompt) }
     defaultsJSON, err := json.Marshal(cs.Conductor.Defaults)
     if err != nil { return err }
     prompts = append(prompts, "Current persistent subtask defaults: " + string(defaultsJSON) + ". Use conductor_models to list dispatch indexes and conductor_defaults to get/set/reset defaults. Explicit dispatch fields override these defaults; unset defaults preserve new-worker inheritance or reused-worker settings. Defaults affect only future dispatches.")
@@ -527,6 +540,7 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
 }
 
 type conductorDispatchOptions struct {
+    MemberID string `json:"member_id,omitempty"`
     SessionID string `json:"session_id"`
     LLMNo *int `json:"llm_no,omitempty"`
     ReasoningEffort *string `json:"reasoning_effort,omitempty"`
@@ -642,6 +656,7 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
         }
         previous = &existing
         state := worker.Conductor
+        state.MemberID = existing.Conductor.MemberID
         worker = existing
         worker.Conductor = state
         worker.UpdatedAt = now
@@ -650,6 +665,7 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
     worker.Settings, err = parent.Conductor.Defaults.apply(worker.Settings)
     if err != nil { s.SessionMu.Unlock(); return chatConductorChild{}, err }
     worker.Settings, _ = options.apply(worker.Settings)
+    if err = resolveTeamworkMember(parent, options, &child, &worker); err != nil { s.SessionMu.Unlock(); return chatConductorChild{}, err }
     messageStart := len(worker.Messages)
     child.MessageStart = &messageStart
     parent.ConductorChildren = append(parent.ConductorChildren, child)
