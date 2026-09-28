@@ -70,6 +70,13 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   expect(within(recent).getByText('Project fixture')).toBeTruthy()
   expect(recent.querySelector('.oa-session-project-badge').textContent).toBe('Alpha')
   expect(recent.querySelector('.oa-session-conductor-badge')).toBeTruthy()
+  const projectGroup = container.querySelector('.oa-project-group')
+  expect(projectGroup).toBeTruthy()
+  const projectToggle = projectGroup.querySelector('.oa-project-toggle')
+  if (projectToggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(projectToggle)
+  expect(within(projectGroup).getByText('Project fixture')).toBeTruthy()
+  expect(projectGroup.querySelector('.oa-session-project-badge')).toBeNull()
+  expect(recent.querySelector('.oa-session-project-badge').textContent).toBe('Alpha')
   fireEvent.click(screen.getByRole('button', { name: 'More recent options' }))
   fireEvent.click(screen.getByRole('button', { name: 'Show recent' }))
   for (const [label, titles] of [

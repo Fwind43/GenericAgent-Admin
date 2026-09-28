@@ -7588,7 +7588,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const renderSidebarSession = (session, options = {}) => <SidebarSessionRow
     key={session.id}
     session={session}
-    projectLabel={projectSessionLabel(session, projectSessionGroups)}
+    projectLabel={options.hideProjectLabel ? '' : projectSessionLabel(session, projectSessionGroups)}
     active={session.id === sid}
     editing={editing === session.id}
     menuOpen={menuOpen === session.id}
@@ -7641,7 +7641,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
               </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>
-              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessions} renderItem={renderSidebarSession} ct={ct}/>
+              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessions} renderItem={session => renderSidebarSession(session, { hideProjectLabel: true })} ct={ct}/>
               {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
             </div>
           </section>
