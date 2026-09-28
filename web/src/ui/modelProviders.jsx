@@ -15,7 +15,9 @@ function SortableProvider({ provider, disabled, reorderLabel, children }) {
 
 // Presentation only: configuration and secrets remain in the host editor.
 function ProviderDirectory({ model, actions, layout }) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { delay: 350, tolerance: 8 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
+  // The dedicated handle does not compete with card clicks or touch scrolling.
+  // A hold delay cancels ordinary drags when the pointer moves before activation.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
   const reorder = ({ active, over }) => {
     if (over && active.id !== over.id && !model.reorderingDisabled) actions.reorderProviders?.(active.id, over.id)
   }
