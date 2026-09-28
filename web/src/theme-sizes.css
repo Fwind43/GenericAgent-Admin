@@ -3,7 +3,9 @@ html[style*="--size-"] .oa-chat { --oa-chat-measure:var(--size-contentWidth); fo
 html[style*="--size-"] .oa-chat .oa-content,
 html[style*="--size-"] .oa-chat .oa-answer-text,
 html[style*="--size-"] .oa-chat .oa-content .oa-md { font-size:var(--size-chatFont) !important; line-height:var(--size-lineHeight) !important; }
-html[style*="--size-"] .oa-chat .oa-message { max-width:var(--size-contentWidth) !important; padding-block:var(--size-spacing); }
+/* User messages reserve their own bottom space for the action toolbar. */
+html[style*="--size-"] .oa-chat .oa-message { max-width:var(--size-contentWidth) !important; padding-top:var(--size-spacing); }
+html[style*="--size-"] .oa-chat .oa-message:not(.user) { padding-bottom:var(--size-spacing); }
 html[style*="--size-"] .oa-chat .oa-sidebar { width:min(var(--size-sidebarWidth), calc(100vw - 40px)) !important; flex-basis:var(--size-sidebarWidth); }
 html[style*="--size-"] .oa-chat .oa-sidebar button,
 html[style*="--size-"] .oa-chat .oa-sidebar input { font-size:var(--size-uiFont); min-height:var(--size-controlHeight); }

@@ -6,7 +6,21 @@ import { dirname, resolve } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(resolve(here, '../style.css'), 'utf8').replace(/\r\n?/g, '\n')
+const sizeCss = readFileSync(resolve(here, '../theme-sizes.css'), 'utf8').replace(/\r\n?/g, '\n')
 const mainSource = readFileSync(resolve(here, '../themes.js'), 'utf8').replace(/\r\n?/g, '\n')
+
+test('custom message spacing preserves the user action toolbar clearance', () => {
+  const selector = 'html[style*="--size-"] .oa-chat .oa-message'
+  const common = sizeCss.split(`${selector} {`)[1]?.split('}')[0]
+  const nonUser = sizeCss.split(`${selector}:not(.user) {`)[1]?.split('}')[0]
+  assert.ok(common, 'custom dimensions must retain the shared message rule')
+  assert.match(common, /padding-top:\s*var\(--size-spacing\)/)
+  assert.doesNotMatch(common, /(?:^|;)\s*padding(?:-block(?:-end)?|-bottom)?\s*:/)
+  assert.ok(nonUser, 'bottom spacing overrides must exclude user messages')
+  assert.match(nonUser, /padding-bottom:\s*var\(--size-spacing\)/)
+  assert.match(css, /\.oa-message\.user\s*\{[^}]*padding:\s*11px 0 32px/s)
+  assert.match(css, /@media\s*\(max-width:620px\)\s*\{\s*\.oa-message\.user\s*\{\s*padding-bottom:35px/)
+})
 const chatSource = readFileSync(resolve(here, '../ChatApp.jsx'), 'utf8').replace(/\r\n?/g, '\n')
 
 const ruleBodies = (selector) => {
