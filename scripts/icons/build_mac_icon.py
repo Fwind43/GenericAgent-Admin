@@ -59,12 +59,15 @@ DOT_OFFSET = 0.30
 
 def star_points(cx: float, cy: float, radius: float, waist: float) -> list[tuple[float, float]]:
     """A four-point star: long arms up/down/left/right, concave diagonals."""
-    points: list[tuple[float, float]] = []
-    for x, y in ((0, -1), (1, 0), (0, 1), (-1, 0)):
-        points.append((cx + x * radius, cy + y * radius))
-    for dx, dy in ((1, 1), (1, -1), (-1, -1), (-1, 1)):
-        points.append((cx + dx * radius * waist, cy + dy * radius * waist))
-    return points
+    # Walk the perimeter clockwise, alternating outer tips and inner waists.
+    # Grouping tips before waists creates crossing edges and a broken left arm.
+    return [
+        (cx + x * radius, cy + y * radius)
+        for x, y in (
+            (0, -1), (waist, -waist), (1, 0), (waist, waist),
+            (0, 1), (-waist, waist), (-1, 0), (-waist, -waist),
+        )
+    ]
 
 
 def draw(side: int, variant: str) -> Image.Image:
