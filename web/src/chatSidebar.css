@@ -149,8 +149,8 @@
   .oa-chat .oa-sidebar .oa-project-head:hover > .oa-project-add,
   .oa-chat .oa-sidebar .oa-project-head:focus-within > .oa-project-add { opacity: 1; }
 }
-/* Static metadata stays quiet; expandable conductors have a button affordance. */
-.oa-chat .oa-sidebar .oa-session-conductor-badge {
+/* Match project metadata styling; arrows distinguish expandable conductors. */
+.oa-chat .oa-sidebar .oa-session-title .oa-session-conductor-badge {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
   width: auto; min-width: 0; height: 18px; min-height: 18px; padding: 0 5px;
   border: 0; border-radius: 4px; box-shadow: none;
@@ -158,19 +158,17 @@
   font-family: inherit; font-size: 10px; font-weight: 400; line-height: 18px;
   letter-spacing: 0; white-space: nowrap;
 }
-.oa-chat .oa-sidebar .oa-conductor-badge-toggle {
-  cursor: pointer; gap: 3px; height: 20px; min-height: 20px;
-  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
-  color: var(--text); font-weight: 500;
+.oa-chat .oa-sidebar .oa-session-title .oa-conductor-badge-toggle {
+  cursor: pointer; gap: 3px;
 }
-.oa-chat .oa-sidebar .oa-conductor-badge-toggle > svg { flex: 0 0 auto; }
-.oa-chat .oa-sidebar .oa-conductor-badge-toggle[aria-expanded="true"] {
-  background: var(--oa-side-hover); border-color: var(--muted);
+.oa-chat .oa-sidebar .oa-session-title .oa-conductor-badge-toggle > svg { flex: 0 0 auto; }
+.oa-chat .oa-sidebar .oa-session-title .oa-conductor-badge-toggle[aria-expanded="true"] {
+  background: var(--oa-side-hover);
 }
-.oa-chat .oa-sidebar .oa-conductor-badge-toggle:hover {
+.oa-chat .oa-sidebar .oa-session-title .oa-conductor-badge-toggle:hover {
   background: var(--oa-side-hover); color: var(--text);
 }
-.oa-chat .oa-sidebar .oa-conductor-badge-toggle:focus-visible {
+.oa-chat .oa-sidebar .oa-session-title .oa-conductor-badge-toggle:focus-visible {
   outline: 2px solid var(--muted); outline-offset: 2px;
 }
 /* One quiet indentation level, without file-tree elbows or a second heading. */
@@ -249,7 +247,7 @@
 .oa-chat .oa-sidebar .oa-recent-filter select:focus-visible {
   outline: 2px solid var(--green); outline-offset: 2px;
 }
-.oa-chat .oa-sidebar .oa-session-project-badge {
+.oa-chat .oa-sidebar .oa-session-title .oa-session-project-badge {
   display: inline-flex; align-items: center; gap: 3px; flex: 0 1 auto;
   max-width: 84px; min-width: 0; padding: 0 5px; border-radius: 4px;
   background: color-mix(in srgb, var(--text) 5%, transparent); color: var(--muted);

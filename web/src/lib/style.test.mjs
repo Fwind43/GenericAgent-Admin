@@ -14,6 +14,23 @@ test('session badges reserve the trailing menu slot including running rows', () 
   assert.match(sidebarCss, /\.oa-chat \.oa-sidebar \.oa-session-row \.oa-session,\s*\.oa-chat \.oa-sidebar \.oa-session-row\.is-running \.oa-session\s*\{\s*padding-right:\s*40px\s*!important;\s*\}/)
 })
 
+test('sidebar metadata badges share typography and quiet toggle styling', () => {
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  const body = selector => sidebarCss.split(`${selector} {`)[1]?.split('}')[0]
+  for (const kind of ['project', 'conductor']) {
+    const badge = body(`.oa-chat .oa-sidebar .oa-session-title .oa-session-${kind}-badge`)
+    assert.ok(badge)
+    assert.match(badge, /font-size:\s*10px/)
+    assert.match(badge, /font-weight:\s*400/)
+    assert.match(badge, /line-height:\s*18px/)
+    assert.match(badge, /border-radius:\s*4px/)
+    assert.match(badge, /color:\s*var\(--muted\)/)
+  }
+  const toggle = body('.oa-chat .oa-sidebar .oa-session-title .oa-conductor-badge-toggle')
+  assert.match(toggle, /cursor:\s*pointer/)
+  assert.doesNotMatch(toggle, /(?:border|height|font-weight|color)\s*:/)
+})
+
 test('custom message spacing preserves the user action toolbar clearance', () => {
   const selector = 'html[style*="--size-"] .oa-chat .oa-message'
   const common = sizeCss.split(`${selector} {`)[1]?.split('}')[0]
