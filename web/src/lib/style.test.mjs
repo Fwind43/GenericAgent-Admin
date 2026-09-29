@@ -596,3 +596,15 @@ test('file summary keeps compact vertical spacing and copy targets', () => {
   assert.match(rule('.oa-file-summary-item .oa-mini-copy'), /width:22px;height:22px;min-width:22px;min-height:22px;/)
   assert.match(rule('.oa-file-summary-header.collapsed'), /margin-bottom:0/)
 })
+
+test('reasoning menu uses readable text and solid effort indicators', () => {
+  const rule = selector => css.split(`${selector} {`)[1]?.split('}')[0]
+  const option = rule('.oa-reasoning-options button')
+  assert.match(option, /color: var\(--text\);/)
+  assert.match(option, /font-size: 12px;/)
+  assert.match(option, /font-weight: 500;/)
+  assert.match(option, /line-height: 16px;/)
+  assert.match(rule('.oa-reasoning-hint'), /font-size: 11px;/)
+  assert.match(rule('.oa-model-picker-reasoning .oa-reasoning-options button'), /font-size: 12px;/)
+  assert.match(rule('.oa-reasoning-meter > span'), /background: var\(--muted\);/)
+})

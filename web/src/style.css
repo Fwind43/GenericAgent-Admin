@@ -6868,11 +6868,12 @@ html[data-color-scheme="dark"] .oa-tools-act:hover:not(:disabled) { background: 
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 0 7px;
-  color: var(--muted);
+  color: var(--text);
   background: transparent;
   font: inherit;
-  font-size: 10.5px;
-  line-height: 1;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
   text-align: left;
   cursor: pointer;
   transition: color .14s ease, border-color .14s ease, background .14s ease;
@@ -6909,7 +6910,8 @@ html[data-color-scheme="dark"] .oa-tools-act:hover:not(:disabled) { background: 
 .oa-reasoning-hint {
   overflow: hidden;
   color: var(--muted);
-  font-size: 8.5px;
+  font-size: 11px;
+  line-height: 14px;
   font-weight: 500;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -6928,7 +6930,7 @@ html[data-color-scheme="dark"] .oa-tools-act:hover:not(:disabled) { background: 
   width: var(--oa-reasoning-fill);
   height: 100%;
   border-radius: inherit;
-  background: color-mix(in srgb, var(--muted) 58%, transparent);
+  background: var(--muted);
   transition: width .16s ease, background .14s ease;
 }
 .oa-reasoning-options button:hover .oa-reasoning-meter > span {
@@ -6998,7 +7000,7 @@ html[data-color-scheme="dark"] .oa-cascade-reasoning button:hover { background: 
   width: 560px;
   max-width: min(560px, calc(100vw - 24px));
   height: clamp(300px, 44vh, 430px);
-  grid-template-columns: minmax(0, 1fr) 126px;
+  grid-template-columns: minmax(0, 1fr) 148px;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   padding: 7px;
@@ -7453,7 +7455,7 @@ html[data-color-scheme="dark"] .oa-cascade-group-models button:hover { backgroun
 }
 .oa-model-picker-reasoning .oa-reasoning-options {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 6px;
 }
 .oa-model-picker-reasoning .oa-reasoning-options button {
@@ -7466,7 +7468,7 @@ html[data-color-scheme="dark"] .oa-cascade-group-models button:hover { backgroun
   border-color: var(--border);
   border-radius: 9px;
   background: var(--surface-soft);
-  font-size: 10px;
+  font-size: 12px;
 }
 .oa-model-picker-reasoning .oa-reasoning-options button.oa-reasoning-default {
   grid-column: 1 / -1;
