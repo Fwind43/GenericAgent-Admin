@@ -9,6 +9,11 @@ const css = readFileSync(resolve(here, '../style.css'), 'utf8').replace(/\r\n?/g
 const sizeCss = readFileSync(resolve(here, '../theme-sizes.css'), 'utf8').replace(/\r\n?/g, '\n')
 const mainSource = readFileSync(resolve(here, '../themes.js'), 'utf8').replace(/\r\n?/g, '\n')
 
+test('session badges reserve the trailing menu slot including running rows', () => {
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  assert.match(sidebarCss, /\.oa-chat \.oa-sidebar \.oa-session-row \.oa-session,\s*\.oa-chat \.oa-sidebar \.oa-session-row\.is-running \.oa-session\s*\{\s*padding-right:\s*40px\s*!important;\s*\}/)
+})
+
 test('custom message spacing preserves the user action toolbar clearance', () => {
   const selector = 'html[style*="--size-"] .oa-chat .oa-message'
   const common = sizeCss.split(`${selector} {`)[1]?.split('}')[0]
