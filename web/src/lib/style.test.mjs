@@ -586,3 +586,13 @@ test('project badge stays compact, semantic, and readable under title pressure',
   assert.match(label, /text-overflow\s*:\s*ellipsis/i)
   assert.match(collapsed, /max-width\s*:\s*min\(180px,50%\)/i)
 })
+
+test('file summary keeps compact vertical spacing and copy targets', () => {
+  const rule = selector => css.split(`${selector}{`)[1]?.split('}')[0]
+  assert.match(rule('.oa-file-summary'), /margin-top:8px;padding:4px 11px;/)
+  assert.match(rule('.oa-file-summary-header'), /margin:0 0 2px;/)
+  assert.match(rule('.oa-file-summary-item'), /min-height:24px;/)
+  assert.match(rule('.oa-file-summary-item'), /padding:1px 0;/)
+  assert.match(rule('.oa-file-summary-item .oa-mini-copy'), /width:22px;height:22px;min-width:22px;min-height:22px;/)
+  assert.match(rule('.oa-file-summary-header.collapsed'), /margin-bottom:0/)
+})
