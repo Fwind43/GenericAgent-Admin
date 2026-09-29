@@ -149,7 +149,7 @@
   .oa-chat .oa-sidebar .oa-project-head:hover > .oa-project-add,
   .oa-chat .oa-sidebar .oa-project-head:focus-within > .oa-project-add { opacity: 1; }
 }
-/* Quiet metadata badge; same treatment for static and expandable conductors. */
+/* Static metadata stays quiet; expandable conductors have a button affordance. */
 .oa-chat .oa-sidebar .oa-session-conductor-badge {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
   width: auto; min-width: 0; height: 18px; min-height: 18px; padding: 0 5px;
@@ -158,7 +158,15 @@
   font-family: inherit; font-size: 10px; font-weight: 400; line-height: 18px;
   letter-spacing: 0; white-space: nowrap;
 }
-.oa-chat .oa-sidebar .oa-conductor-badge-toggle { cursor: pointer; }
+.oa-chat .oa-sidebar .oa-conductor-badge-toggle {
+  cursor: pointer; gap: 3px; height: 20px; min-height: 20px;
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+  color: var(--text); font-weight: 500;
+}
+.oa-chat .oa-sidebar .oa-conductor-badge-toggle > svg { flex: 0 0 auto; }
+.oa-chat .oa-sidebar .oa-conductor-badge-toggle[aria-expanded="true"] {
+  background: var(--oa-side-hover); border-color: var(--muted);
+}
 .oa-chat .oa-sidebar .oa-conductor-badge-toggle:hover {
   background: var(--oa-side-hover); color: var(--text);
 }

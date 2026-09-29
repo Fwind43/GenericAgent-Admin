@@ -32,6 +32,7 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   const ownershipSessions = [
     { id: 'project-only', title: 'Project fixture', project_id: 'alpha', count: 0 },
     { id: 'conductor-only', title: 'Conductor fixture', conductor: { role: 'parent' }, count: 0 },
+    { id: 'conductor-child', title: 'Child fixture', parent_session_id: 'conductor-only', conductor: { role: 'worker', status: 'succeeded' }, count: 0 },
   ]
   const calls = [], unexpected = []
   vi.stubGlobal('fetch', vi.fn(async (input, init = {}) => {
@@ -69,7 +70,20 @@ it('body layouts retain roots, draft, scroll and queue subscription across switc
   expect(screen.queryByRole('button', { name: 'Show recent' })).toBeNull()
   expect(within(recent).getByText('Project fixture')).toBeTruthy()
   expect(recent.querySelector('.oa-session-project-badge').textContent).toBe('Alpha')
-  expect(recent.querySelector('.oa-session-conductor-badge')).toBeTruthy()
+  const conductorToggle = within(recent).getByRole('button', { name: 'Conductor: expand child sessions' })
+  expect(conductorToggle.getAttribute('aria-expanded')).toBe('false')
+  expect(conductorToggle.querySelector('.lucide-chevron-right')).toBeTruthy()
+  expect(conductorToggle.title).toBe('Click to expand child sessions')
+  fireEvent.click(conductorToggle)
+  expect(conductorToggle.getAttribute('aria-expanded')).toBe('true')
+  expect(conductorToggle.querySelector('.lucide-chevron-down')).toBeTruthy()
+  expect(conductorToggle.title).toBe('Collapse child sessions')
+  fireEvent.keyDown(conductorToggle, { key: 'Enter' })
+  expect(conductorToggle.getAttribute('aria-expanded')).toBe('false')
+  fireEvent.keyDown(conductorToggle, { key: ' ' })
+  expect(conductorToggle.getAttribute('aria-expanded')).toBe('true')
+  fireEvent.click(conductorToggle)
+  expect(calls).not.toContain('GET /api/chat/session/conductor-only')
   const projectGroup = container.querySelector('.oa-project-group')
   expect(projectGroup).toBeTruthy()
   const projectToggle = projectGroup.querySelector('.oa-project-toggle')
