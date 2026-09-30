@@ -45,7 +45,7 @@ import { createThreadFollowScheduler } from './lib/chatFollowScheduler.js'
 import { loopSidebarView, updateSessionLoop } from './lib/chatLoopSidebar.js'
 import { normalizeLoopRecords } from './lib/chatLoopRecords.js'
 import { confirmDanger, showAppAlert } from './lib/danger'
-import { formatDuration, fuzzyMatch, goalBudgetPercent, goalTurnPercent } from './lib/format'
+import { copyText, formatDuration, fuzzyMatch, goalBudgetPercent, goalTurnPercent } from './lib/format'
 import { JSON_TREE_CHILD_LIMIT, JSON_TREE_STRING_LIMIT, LIST_ITEM_LIMIT, LONG_TEXT_PREVIEW_CHARS, MARKDOWN_BLOCK_LIMIT, MARKDOWN_CHAR_LIMIT, MARKDOWN_LINE_LIMIT, assistantTurnFallbackTitle, isToolResultText, createAssistantContentParser, previewLongText, splitMarkdownParts, textRenderStats } from './lib/chatTextSafety'
 import { parseStructuredContent } from './lib/structuredContent'
 import { segmentAgentProtocolBlocks } from './lib/agentProtocol'
@@ -4896,6 +4896,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }, [])
   const [collapsed, setCollapsed] = useState(() => isNarrowChatViewport())
   const [notice, setNotice] = useState('')
+  const [sessionCopyNotice, setSessionCopyNotice] = useState('')
   const [llms, setLlms] = useState([])
   const [chatBackend, setChatBackend] = useState(null)
   const [depsRepairing, setDepsRepairing] = useState(false)
@@ -6371,6 +6372,19 @@ export default function ChatApp({ onOpenSettings } = {}) {
     }
   }, [menuOpen])
 
+  const copySessionId = async (sessionId) => {
+    if (!sessionId) return
+    closeSessionMenu({ restoreFocus: true })
+    setErr('')
+    setSessionCopyNotice('')
+    try {
+      await copyText(sessionId)
+      setSessionCopyNotice(ct('会话ID已复制', 'Session ID copied'))
+    } catch {
+      setSessionCopyNotice(ct('复制会话ID失败，请检查剪贴板权限后重试', 'Could not copy session ID. Check clipboard permissions and try again.'))
+    }
+  }
+
   const startRename = (s) => { setEditing(s.id); setDraftTitle(shortTitle(s)); setMenuOpen(''); setMenuPos(null) }
   const saveRename = async (id) => {
     const title = draftTitle.trim()
@@ -7582,7 +7596,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
       if (menuOpen === sessionId) { closeSessionMenu(); return }
       const rect = event.currentTarget.getBoundingClientRect()
       menuTriggerRef.current = event.currentTarget
-      setMenuPos({ top: Math.max(8, rect.top - 78), left: Math.max(8, rect.right - 136) })
+      setMenuPos({ top: Math.max(8, Math.min(rect.top - 78, window.innerHeight - 202)), left: Math.max(8, Math.min(rect.right - 164, window.innerWidth - 172)) })
       setMenuOpen(sessionId)
     },
   }
@@ -7650,7 +7664,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }
 
   return <div ref={chatScope} className={`oa-chat ${collapsed ? 'is-collapsed' : ''}`}>
-    <UiSurface name="chat.sidebar" preserveMount viewProps={{ ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectSessionGroups, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }}/>
+    <UiSurface name="chat.sidebar" preserveMount viewProps={{ ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, copySessionId, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectSessionGroups, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }}/>
     <div className={`oa-sidebar-backdrop ${collapsed ? '' : 'is-visible'}`} aria-hidden={collapsed} onClick={()=>setCollapsed(true)} />
 
     <main className="oa-main" data-ui-chat={uiPackage?.isDefaultSurface('chat.chrome') === false ? uiPackage.id : 'default'}>
@@ -7740,6 +7754,10 @@ export default function ChatApp({ onOpenSettings } = {}) {
         onSwitch={switchWorldline}
       />}
       <div className="oa-banner-slot">
+        {sessionCopyNotice && createPortal(<div className="oa-session-copy-notice" role="status">
+          <span>{sessionCopyNotice}</span>
+          <button type="button" className="oa-icon-btn" onClick={() => setSessionCopyNotice('')} aria-label={ct('关闭复制提示', 'Dismiss copy notification')}><X size={16}/></button>
+        </div>, document.body)}
         {err && <div className="oa-banner error">
           <span>{err}</span>
           <button type="button" onClick={() => setErr('')} style={{ marginLeft: 'auto', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '18px', lineHeight: '1', padding: '0 4px' }} aria-label="关闭">&times;</button>

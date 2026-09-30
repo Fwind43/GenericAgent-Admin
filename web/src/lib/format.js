@@ -36,9 +36,12 @@ export const copyText = async (text) => {
   el.style.position = 'fixed'
   el.style.left = '-9999px'
   document.body.appendChild(el)
-  el.select()
-  document.execCommand('copy')
-  document.body.removeChild(el)
+  try {
+    el.select()
+    if (!document.execCommand('copy')) throw new Error('Clipboard copy failed')
+  } finally {
+    document.body.removeChild(el)
+  }
 }
 
 const clampPercent = (value) => Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0))

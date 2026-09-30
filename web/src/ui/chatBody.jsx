@@ -3,11 +3,11 @@ import ProjectSessionPage from '../components/ProjectSessionPage'
 import ChatVersionBadge from '../components/ChatVersionBadge'
 import { SidebarPreferenceSubmenu } from '../components/ProjectActionsMenu'
 import React from 'react'
-import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
+import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Copy, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
 
 // Stateless views; ChatApp owns all data, drafts, refs, actions and subscriptions.
-export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectSessionGroups, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
+export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, copySessionId, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectSessionGroups, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
   return (<aside data-ui-surface="chat.sidebar" data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-sidebar-brand">GenericAgent <span>Admin</span><ChatVersionBadge version={version}/></div>
@@ -151,6 +151,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
         const s = sessions.find(x => x.id === menuOpen)
         if (!s) return null
         return <div ref={menuRef} className="oa-session-menu" style={{ top: menuPos.top, left: menuPos.left }} onClick={e=>e.stopPropagation()}>
+          <button onClick={()=>copySessionId(s.id)}><Copy size={14}/>{ct('复制会话ID', 'Copy session ID')}</button>
           <button onClick={()=>startRename(s)}><Edit3 size={14}/>{ct('重命名', 'Rename')}</button>
           <button onClick={()=>setSessionPinned(s)}><Pin size={14}/>{s.pinned ? ct('\u53d6\u6d88\u7f6e\u9876', 'Unpin') : ct('\u7f6e\u9876', 'Pin')}</button>
           <button onClick={()=>setSessionHubEnabled(s)}><Bot size={14}/>{s.hub_enabled ? ct('退出 Hub', 'Leave Hub') : ct('入驻 Hub', 'Join Hub')}</button>
