@@ -14,6 +14,15 @@ test('session badges reserve the trailing menu slot including running rows', () 
   assert.match(sidebarCss, /\.oa-chat \.oa-sidebar \.oa-session-row \.oa-session,\s*\.oa-chat \.oa-sidebar \.oa-session-row\.is-running \.oa-session\s*\{\s*padding-right:\s*40px\s*!important;\s*\}/)
 })
 
+test('sidebar titles retain readable space when metadata wraps', () => {
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  const title = sidebarCss.split('.oa-chat .oa-sidebar .oa-session-title b {')[1]?.split('}')[0]
+  assert.match(sidebarCss, /\.oa-chat \.oa-sidebar \.oa-session \.oa-session-title\s*\{[^}]*flex-wrap:\s*wrap;[^}]*row-gap:\s*3px;/)
+  assert.match(title, /flex:\s*1 1 8ch/)
+  assert.match(title, /min-width:\s*min\(8ch, 100%\)/)
+  assert.match(title, /text-overflow:\s*ellipsis/)
+})
+
 test('sidebar metadata badges share typography and quiet toggle styling', () => {
   const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
   const body = selector => sidebarCss.split(`${selector} {`)[1]?.split('}')[0]

@@ -94,7 +94,9 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.oa-chat .oa-sidebar .oa-session-title b { flex: 1 1 0%; font-size: 13px; font-weight: 400; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; mask-image: none; }
+/* Keep titles readable when optional metadata no longer fits on one line. */
+.oa-chat .oa-sidebar .oa-session .oa-session-title { flex-wrap: wrap; row-gap: 3px; }
+.oa-chat .oa-sidebar .oa-session-title b { flex: 1 1 8ch; min-width: min(8ch, 100%); font-size: 13px; font-weight: 400; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; mask-image: none; }
 .oa-chat .oa-sidebar .oa-project-head { background: transparent; border: 0; box-shadow: none; }
 .oa-chat .oa-sidebar .oa-project-toggle b { font-size: 13px; font-weight: 450; }
 .oa-chat .oa-sidebar .oa-project-toggle small { font-weight: 400; opacity: .55; }
