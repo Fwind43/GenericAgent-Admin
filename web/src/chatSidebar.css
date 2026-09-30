@@ -87,10 +87,10 @@
   .oa-chat .oa-sidebar .oa-session-row .oa-session,
   .oa-chat .oa-sidebar .oa-session-row.is-running .oa-session { padding-right: 40px !important; }
 }
-/* Keep relative ages in one stable trailing column, independent of title length. */
+/* Only the 28px running indicator remains here; ages live in the tooltip. */
 .oa-chat .oa-sidebar .oa-session > small {
-  flex: 0 0 56px;
-  width: 56px;
+  flex: 0 0 28px;
+  width: 28px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
