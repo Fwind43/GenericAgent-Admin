@@ -16,14 +16,15 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
     try {
       const response = await api('/api/chat/read', { method: 'POST', body: JSON.stringify({ receipts: selected.map(session => ({ sid: session.id, result: session.result })) }) })
       const accepted = new Set(keys)
+      const confirmed = new Set((response.receipts || []).map(receipt => chatReadKey(instance, receipt.sid, receipt.result)))
       setReadKeys(previous => {
         const next = new Set(previous)
-        for (const receipt of response.receipts || []) {
-          const key = chatReadKey(instance, receipt.sid, receipt.result)
+        for (const key of confirmed) {
           if (accepted.has(key)) next.add(key)
         }
         return next
       })
+      return keys.every(key => confirmed.has(key))
     } catch (error) {
       if (error?.name !== 'AbortError') onError?.(error.message)
     } finally {
@@ -47,7 +48,17 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
   useEffect(() => {
     if (!eligible || !currentNeedsReceipt) return undefined
     // Equivalent list/snapshot refreshes must not restart the reading dwell.
-    const tick = createReadDwell(() => { void markRef.current([receiptRef.current.summary], true) })
+    // A failed/unconfirmed receipt must not permanently consume that dwell.
+    let cancelled = false
+    let retryDelay = 1000
+    const attempt = async () => {
+      const confirmed = await markRef.current([receiptRef.current.summary], true)
+      if (!confirmed && !cancelled) {
+        tick = createReadDwell(attempt, retryDelay)
+        retryDelay = Math.min(retryDelay * 2, 30000)
+      }
+    }
+    let tick = createReadDwell(attempt)
     const check = () => tick(isChatResultVisible(threadRef.current, receiptRef.current.result), performance.now())
     const reset = () => tick(false, performance.now())
     const timer = window.setInterval(check, 100)
@@ -57,6 +68,7 @@ export function useChatReadState({ instance, sid, snapshot, messages, sessions, 
     document.addEventListener('visibilitychange', reset)
     check()
     return () => {
+      cancelled = true
       window.clearInterval(timer)
       thread?.removeEventListener('scroll', check)
       window.removeEventListener('blur', reset)
