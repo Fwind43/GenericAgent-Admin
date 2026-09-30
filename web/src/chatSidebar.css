@@ -76,9 +76,17 @@
 .oa-chat .oa-sidebar .oa-recent-group-head { min-height: 22px; padding: 6px 10px 3px; font-size: 10px; font-weight: 400; color: var(--muted); opacity: .7; }
 .oa-chat .oa-sidebar .oa-recent-group-head small { display: none; }
 .oa-chat .oa-sidebar .oa-session-row .oa-session { min-height: 34px; padding-top: 7px; padding-bottom: 7px; padding-left: 10px; gap: 4px; }
-/* Reserve the absolute menu's trailing slot even when it is hidden. */
+/* Reserve trailing space only while the absolute action button is visible. */
 .oa-chat .oa-sidebar .oa-session-row .oa-session,
-.oa-chat .oa-sidebar .oa-session-row.is-running .oa-session { padding-right: 40px !important; }
+.oa-chat .oa-sidebar .oa-session-row.is-running .oa-session { padding-right: 10px !important; }
+.oa-chat .oa-sidebar .oa-session-row:hover .oa-session,
+.oa-chat .oa-sidebar .oa-session-row.active .oa-session,
+.oa-chat .oa-sidebar .oa-session-row:focus-within .oa-session,
+.oa-chat .oa-sidebar .oa-session-row:has(.oa-session-more.is-open) .oa-session { padding-right: 40px !important; }
+@media (max-width: 920px), (hover: none) {
+  .oa-chat .oa-sidebar .oa-session-row .oa-session,
+  .oa-chat .oa-sidebar .oa-session-row.is-running .oa-session { padding-right: 40px !important; }
+}
 /* Keep relative ages in one stable trailing column, independent of title length. */
 .oa-chat .oa-sidebar .oa-session > small {
   flex: 0 0 56px;
