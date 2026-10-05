@@ -21,9 +21,9 @@
 /* Preview internals keep their own spacing; do not style every nested span. */
 @media (max-width: 760px) {
  .app .general-workbench { gap: 14px; }
- .app .general-index { gap: 2px; }
- .app .general-index button { flex: 1 0 auto; padding-inline: 10px; min-height: 44px; }
- .app .general-index p { flex-basis: 100%; margin: 0; padding: 4px 10px; text-align: right; }
+ .app .general-index { gap: 2px; flex-wrap: nowrap; max-width: 100%; min-width: 0; box-sizing: border-box; overflow-x: auto; overscroll-behavior-x: contain; }
+ .app .general-index button { flex: 0 0 auto; width: auto; white-space: nowrap; padding-inline: 12px; min-height: 44px; }
+ .app .general-index p { flex: 0 0 auto; margin: 0 0 0 auto; padding: 4px 10px; text-align: right; }
  .app .general-detail .set-row { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 12px; }
  .app .general-detail .set-card-head { padding: 18px 16px; }
  .app .general-detail .set-card-footer { padding: 14px 16px; }
