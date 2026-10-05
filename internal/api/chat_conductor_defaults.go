@@ -130,11 +130,17 @@ func (s *Server) handleConductorSettingsEvent(parentID string, ev map[string]int
 	reply := map[string]interface{}{"ok": false, "request_id": requestID}
 	_, err := s.conductorDefaults(parentID, map[string]interface{}{"action": "get"})
 	if err == nil {
-		if ev["type"] == "conductor_models" {
+		switch ev["type"] {
+		case "conductor_models":
 			reply["models"], err = s.conductorModels()
-		} else {
+		case "conductor_defaults":
 			args, _ := ev["args"].(map[string]interface{})
 			reply["defaults"], err = s.conductorDefaults(parentID, args)
+		case "conductor_model_strategy":
+			args, _ := ev["args"].(map[string]interface{})
+			reply["strategy"], err = s.conductorModelStrategy(parentID, args)
+		default:
+			err = errors.New("unknown Conductor settings request")
 		}
 	}
 	if err != nil {

@@ -166,6 +166,10 @@ Loop spends one extra full-context controller call per round, so keep the round 
 
 Use Conductor when a parent task should delegate bounded work to child sessions and collect their results. Unlike Loop's round controller, Conductor coordinates parent/worker sessions; execution completion is not delivery verification.
 
+**Session model-selection strategy:** Tell the parent, for example, "Remember for this session: use model A for lookup and simple summaries, model B for complex design; ask me if unavailable." `conductor_model_strategy` supports `set/get/reset`; `set` fully replaces a policy of up to 8192 characters. A successful receipt applies it in the current turn, and it is freshly injected into every subsequent parent request, independently of trimmed history and after reopening. Save only user-provided or user-approved policy changes.
+
+This is a routing preference, not an automatic backend router: the parent checks `conductor_models` and explicitly selects `llm_no` / `reasoning_effort` in `conductor_dispatch`. Explicit per-task choices take priority. Reset restores subtask defaults/inheritance. The policy does not alter the parent's model, permissions, other sessions, or queued/running workers, and is not written to global memory.
+
 Project context is server-owned. New workers inherit the parent session project binding and workspace; the existing request-time resolver applies the current application project mode without rewriting session provenance. `conductor_dispatch` exposes no project selector. Legacy `project_id` arguments (including malformed values) are ignored by both adapter and server and cannot override this binding. Reuse preserves the worker context, but rejects an effective project or workspace mismatch with the parent before mutation; omit `session_id` to create a new inherited worker instead. Switching the global project mode follows the existing per-request behavior for both parent and worker, not a dispatch-specific migration.
 
 - Successful execution starts as **Pending review**. **Verified (parent review)** requires a concrete review basis; `evidence_ids` is optional. Explain the review method and supporting artifact paths, URLs, command output, or verification steps in `basis`, and state unverified boundaries. When citing the optional evidence ledger, copy IDs from `conductor_collect`'s `evidence[]`; an empty ledger does not block a basis-only review. `result_receipt` is a read acknowledgment, not an evidence ID. **Needs work** means the delivery needs correction, not that evidence bookkeeping is absent. Worker claims or tool execution alone do not establish correctness, and parent review is not an independent guarantee. Single-worker tasks use lightweight review by default; high-risk or multi-worker work calls for stronger checks.
@@ -455,6 +459,10 @@ Loop 每轮会额外花一次全量上下文的控制模型调用，轮次上限
 ### Conductor：任务分派与交付核验
 
 需要父任务拆分工作、交给子会话执行并收集结果时使用 Conductor。它负责父子任务协作，不等同于 Loop 的逐轮控制；执行结束不代表成果已核验。
+
+**会话级模型选择策略：** 可以直接告诉指挥家：“记住本会话的选模策略：查询和简单整理用模型 A，复杂设计用模型 B；模型不可用时先问我。”指挥家可用 `conductor_model_strategy` 的 `set/get/reset` 保存、查看或清除策略；`set` 完整替换策略，最多 8192 字符。保存后通过工具回执在当前轮生效，并在该父会话后续每次请求中重新注入系统提示，独立于对话历史裁剪，重开会话仍保留。只保存用户提供或授权修订的策略，不得自行覆盖。
+
+策略是选模偏好，不是后端自动路由器：指挥家通过 `conductor_models` 查询现有模型，再在 `conductor_dispatch` 中显式选择 `llm_no` / `reasoning_effort`。单任务明确选模优先；清除策略后使用子任务默认值或继承规则。策略不改变父会话模型、权限、其他会话或已排队/运行的 worker，也不自动写入全局记忆。
 
 - 执行成功后默认**待核验**。**已核验（父任务审阅）**必须提供具体的 `basis`，`evidence_ids` 可选：依据应说明审阅方式、产物路径、URL、命令输出或复验步骤，并写明未验证范围。引用工具证据时，只能使用 `conductor_collect` 返回的 `evidence[]` ID；证据列表为空也可依据实际交付进行轻验收。`result_receipt` 是已读回执，不是证据 ID。**需返工**表示交付质量需要修正，不表示缺少证据记账。worker 自述或工具执行本身不保证正确性，父任务审阅也不是独立的正确性保证。单 worker 任务默认轻验收，高风险、多 worker 或用户明确要求时加强核验。
 - 父任务面板分列父任务、已封存子任务及已记录合计的输入/输出 Token。缺失快照不等于零消耗；运行中用量不完整，子任务仅计入已保存的终态快照，不是实时账单。

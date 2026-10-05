@@ -284,7 +284,12 @@ class ConductorToolBoundaryTest(unittest.TestCase):
             try:
                 self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA},
                                  {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel', 'conductor_review',
-                                  'conductor_tasks', 'conductor_defaults', 'conductor_models'})
+                                  'conductor_tasks', 'conductor_defaults', 'conductor_models', 'conductor_model_strategy'})
+                strategy_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_model_strategy')
+                self.assertEqual(strategy_schema['required'], ['action'])
+                self.assertEqual(strategy_schema['properties']['action']['enum'], ['get', 'set', 'reset'])
+                self.assertEqual(strategy_schema['properties']['strategy']['maxLength'], 8192)
+                self.assertFalse(strategy_schema['additionalProperties'])
                 review_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_review')
                 self.assertEqual(set(review_schema['required']), {'dispatch_id', 'status', 'basis'})
                 self.assertIn('evidence_ids', review_schema['properties'])
@@ -377,6 +382,37 @@ class ConductorCoreContractTest(ConductorDispatchOptionsTest):
         self.assertEqual(len(reads), 2 if first_args is None else 1)
         # Receipt data belongs in tool_results, not a second copy in streamed text.
         self.assertNotIn(json.dumps(reply), ''.join(output))
+
+    def test_real_loop_model_strategy_receipts(self):
+        import json
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        installer = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+        nodes = [n for n in installer.body if isinstance(n, ast.FunctionDef) and n.name in {'settings_tool', 'strategy_tool'}]
+        self.assertEqual(len(nodes), 2)
+        self.env['json'] = json
+        exec(compile(ast.Module(body=nodes, type_ignores=[]), '<strategy-tools>', 'exec'), self.env)
+        for action, reply in [('set', {'ok': True, 'strategy': 'Use model A for lookup; model B for design.'}),
+                              ('get', {'ok': True, 'strategy': 'Saved policy'}),
+                              ('reset', {'ok': True, 'strategy': ''}),
+                              ('set', {'ok': False, 'error': 'invalid strategy'}),
+                              ('get', {'ok': False, 'pending': True, 'error': 'timeout'})]:
+            with self.subTest(action=action, reply=reply):
+                events = []
+                self.env['emit'] = events.append
+                def dispatch(handler, args, response):
+                    outcome = self.env['strategy_tool'](handler, args, response)
+                    if reply.get('ok'):
+                        self.assertIn(json.dumps(reply['strategy']), outcome.next_prompt)
+                        self.assertIn('queued/running workers are unchanged', outcome.next_prompt)
+                    return outcome
+                self.env['dispatch'] = dispatch
+                args = {'action': action, '_index': 0, '_tool_num': 2}
+                if action == 'set':
+                    args['strategy'] = 'User-approved replacement'
+                self.exercise_loop(reply, receipt_args=args)
+                self.assertEqual(len(events), 2)
+                self.assertTrue(all(e['type'] == 'conductor_model_strategy' for e in events))
+                self.assertTrue(all(e['args'] == {k: v for k, v in args.items() if not k.startswith('_')} for e in events))
 
     def test_real_loop_review_cancel_receipts(self):
         tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))

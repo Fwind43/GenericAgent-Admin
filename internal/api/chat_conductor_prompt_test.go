@@ -47,7 +47,7 @@ func TestConductorParentPromptInjection(t *testing.T) {
 				}
 				return
 			}
-			if len(prompts) != 4 || prompts[0] != "existing" || prompts[1] != conductorParentPrompt || !strings.Contains(prompts[2], "conductor_defaults") || !strings.Contains(prompts[2], "conductor_models") {
+			if len(prompts) != 5 || prompts[0] != "existing" || prompts[1] != conductorParentPrompt || !strings.Contains(prompts[2], "conductor_defaults") || !strings.Contains(prompts[2], "conductor_models") || !strings.Contains(prompts[3], "conductor_model_strategy") || !strings.Contains(prompts[4], "Current dispatch overview") {
 				t.Fatalf("wrong prompts: %v", prompts)
 			}
 			config := req["conductor"].(map[string]interface{})
