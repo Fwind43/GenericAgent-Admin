@@ -927,6 +927,7 @@ func (s *Server) finishConductorChild(parentID, dispatchID, status, result, reas
     // Persist the inbox event with the terminal transition. Replayed terminal
     // callbacks return above, so they cannot enqueue duplicate wakeups.
     if status != conductorCancelled {
+        resumeConductorParent(&parent)
         payload, _ := json.Marshal(child)
         parent.QueuedMessages = append(parent.QueuedMessages, chatQueuedMessage{
             ID: "conductor-" + dispatchID, QueuedAt: now, Kind: "conductor_completion",
@@ -952,7 +953,7 @@ func (s *Server) finishConductorChild(parentID, dispatchID, status, result, reas
     s.publishChatRun(parentID, map[string]interface{}{"type": "conductor_child", "child": event})
     s.writeConductorOutcome(parentID, event)
     s.scheduleConductorChildren(parentID)
-    if status != conductorCancelled && !parent.Conductor.AutoResumePaused {
+    if status != conductorCancelled {
         go s.processNextQueuedMessage(parentID)
     }
 }
@@ -996,6 +997,16 @@ func conductorParentPaused(cs chatSession) bool {
     return cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent && cs.Conductor.AutoResumePaused
 }
 
+// A stop blocks blind Loop/Autorun restarts, but never a durable completion
+// inbox. Also accept receipts saved by older versions while the parent paused.
+func conductorParentQueuePaused(cs chatSession) bool {
+    if !conductorParentPaused(cs) { return false }
+    for _, item := range cs.QueuedMessages {
+        if item.Kind == "conductor_completion" { return false }
+    }
+    return true
+}
+
 func resumeConductorParent(cs *chatSession) {
     if cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent {
         cs.Conductor.AutoResumePaused = false
@@ -1016,8 +1027,8 @@ func (s *Server) saveConductorUserAdmissionLocked(cs *chatSession, exact bool) e
     return saveChatSessionLocked(s.CfgStore.Snapshot(), *cs)
 }
 
-// Caller holds SessionMu. Pausing only affects parent wakeups, never workers
-// or durable completion receipts. Explicit user admission clears the pause.
+// Caller holds SessionMu. A stop blocks blind restarts, never workers or
+// durable completion receipts. A receipt or explicit user admission resumes it.
 func (s *Server) setConductorParentPausedLocked(sid string, paused bool) (bool, error) {
     cs, err := loadChatSession(s.CfgStore.Snapshot(), safeChatID(sid))
     if err != nil { return false, err }
@@ -1025,6 +1036,19 @@ func (s *Server) setConductorParentPausedLocked(sid string, paused bool) (bool, 
     if cs.Conductor.AutoResumePaused == paused { return true, nil }
     cs.Conductor.AutoResumePaused = paused
     return true, saveChatSessionPreserveUpdatedAtLocked(s.CfgStore.Snapshot(), cs)
+}
+
+func (s *Server) processPendingConductorCompletions(sid string) {
+    s.SessionMu.Lock()
+    cs, err := loadChatSession(s.CfgStore.Snapshot(), safeChatID(sid))
+    pending := false
+    if err == nil && cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent {
+        for _, item := range cs.QueuedMessages {
+            if item.Kind == "conductor_completion" { pending = true; break }
+        }
+    }
+    s.SessionMu.Unlock()
+    if pending { s.processNextQueuedMessage(sid) }
 }
 
 func (s *Server) cancelConductorSession(sid string) {

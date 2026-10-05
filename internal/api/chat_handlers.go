@@ -1435,6 +1435,11 @@ func (s *Server) chatCancel(w http.ResponseWriter, r *http.Request, sid string) 
 		bad(w, http.StatusInternalServerError, fmt.Sprintf("chat canceled but failed to persist partial output: %v", err))
 		return
 	}
+	if parent {
+		// Retry receipts that arrived while cancellation still owned the run.
+		// Keep this out of cancelChatRun: guide reserves a specific queue item.
+		go s.processPendingConductorCompletions(sid)
+	}
 	writeJSON(w, map[string]interface{}{"ok": true, "running": running && s.chatRunActive(sid)})
 }
 

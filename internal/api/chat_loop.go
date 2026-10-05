@@ -849,7 +849,7 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 
 	s.SessionMu.Lock()
 	cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)
-	if err != nil || len(cs.QueuedMessages) == 0 || !s.conductorChatRunnable(cs, "user") || (queueID == "" && conductorParentPaused(cs)) {
+	if err != nil || len(cs.QueuedMessages) == 0 || !s.conductorChatRunnable(cs, "user") || (queueID == "" && conductorParentQueuePaused(cs)) {
 		s.SessionMu.Unlock()
 		s.endChatRunOwned(sid, token)
 		return false
@@ -893,7 +893,7 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 	// the lock was released to publish the token identity.
 	s.SessionMu.Lock()
 	cs, err = loadChatSession(s.CfgStore.Snapshot(), sid)
-	if err != nil || (queueID == "" && conductorParentPaused(cs)) {
+	if err != nil || (queueID == "" && conductorParentQueuePaused(cs)) {
 		s.SessionMu.Unlock()
 		s.endChatRunOwned(sid, token)
 		return false
@@ -994,9 +994,10 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		if err != nil {
 			return err
 		}
-		if queueID == "" && conductorParentPaused(latest) {
+		if queueID == "" && conductorParentQueuePaused(latest) {
 			return errors.New("Conductor parent is paused")
 		}
+		resumeForCompletion := conductorParentPaused(latest) && !conductorParentQueuePaused(latest)
 		// Preserve late completions, removing only the admitted batch.
 		preserveLatestChatUserMetadata(&cs, latest)
 		if internalCompletion && cs.Loop.Enabled {
@@ -1018,7 +1019,7 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 			}
 		}
 		cs.QueuedMessages = remaining
-		if queueID != "" {
+		if queueID != "" || resumeForCompletion {
 			resumeConductorParent(&cs)
 		}
 		return saveChatSessionLocked(s.CfgStore.Snapshot(), cs)

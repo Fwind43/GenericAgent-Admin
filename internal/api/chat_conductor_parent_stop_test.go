@@ -19,7 +19,7 @@ func TestConductorParentCancelPreservesWorkersAndReceipts(t *testing.T) {
 		{DispatchID: "failed", SessionID: "failed-worker", Status: conductorRunning},
 		{DispatchID: "waiting", SessionID: "waiting-worker", Status: conductorQueued},
 	}
-	inbox := chatQueuedMessage{ID: "older-receipt", Kind: "conductor_completion", Text: "older result"}
+	inbox := chatQueuedMessage{ID: "older-request", Text: "older question"}
 	saveChatLoopTestSession(t, s, chatSession{ID: parentID, Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: children, QueuedMessages: []chatQueuedMessage{inbox}})
 	before := map[string][]byte{}
 	for _, child := range children {
@@ -66,18 +66,23 @@ func TestConductorParentCancelPreservesWorkersAndReceipts(t *testing.T) {
 			}
 		}
 	}
-	// Both successful and failed late results remain durable, without waking the parent.
+	// Keep a new run reserved so both late outcomes remain in the durable inbox.
+	blocker := s.beginChatRun(parentID)
+	if blocker == nil {
+		t.Fatal("could not reserve parent")
+	}
+	defer s.endChatRunOwned(parentID, blocker)
 	s.finishConductorChild(parentID, "ok", conductorSucceeded, "late answer", "")
 	s.finishConductorChild(parentID, "failed", conductorFailed, "", "late failure")
 	parent, err = loadChatSession(s.CfgStore.Snapshot(), parentID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !conductorParentPaused(parent) || len(parent.QueuedMessages) != 3 || parent.QueuedMessages[0].ID != inbox.ID || parent.ConductorChildren[0].Result != "late answer" || parent.ConductorChildren[1].Error != "late failure" || parent.ConductorChildren[2].Status != conductorQueued {
+	if conductorParentPaused(parent) || len(parent.QueuedMessages) != 3 || parent.QueuedMessages[0].ID != inbox.ID || parent.ConductorChildren[0].Result != "late answer" || parent.ConductorChildren[1].Error != "late failure" || parent.ConductorChildren[2].Status != conductorQueued {
 		t.Fatalf("late receipt lost: %+v", parent)
 	}
-	if s.processNextQueuedMessage(parentID) || s.chatRunActive(parentID) {
-		t.Fatal("late receipt revived stopped parent")
+	if s.processNextQueuedMessage(parentID) || !s.chatRunActive(parentID) {
+		t.Fatal("late receipt replaced an active parent run")
 	}
 	path := chatSessionPath(s.CfgStore.Snapshot(), parentID)
 	first, err := os.ReadFile(path)
@@ -86,14 +91,171 @@ func TestConductorParentCancelPreservesWorkersAndReceipts(t *testing.T) {
 	}
 	s.finishConductorChild(parentID, "ok", conductorSucceeded, "duplicate", "")
 	s.finishConductorChild(parentID, "failed", conductorFailed, "", "duplicate")
-	rr := httptest.NewRecorder()
-	s.chatCancel(rr, httptest.NewRequest(http.MethodPost, "/", nil), parentID)
 	second, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(first, second) {
 		t.Fatal("repeated terminal callbacks or stop changed durable state")
+	}
+}
+
+func waitConductorCompletionQueueStart(t *testing.T, s *Server, sid, queueID string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		s.ChatMu.Lock()
+		run := s.ChatRuns[sid]
+		started := run != nil && !run.Done && !run.Canceled && run.PendingAssistantID != "" && chatRunContainsQueueID(run, queueID)
+		s.ChatMu.Unlock()
+		if started {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("completion queue %q did not automatically start for %q", queueID, sid)
+}
+
+func TestConductorLateCompletionAutomaticallyResumesStoppedParent(t *testing.T) {
+	for _, status := range []string{conductorSucceeded, conductorFailed} {
+		t.Run(status, func(t *testing.T) {
+			s := newChatLoopTestServer(t)
+			parentID, workerID, dispatchID := "late-parent", "late-worker", "late-dispatch"
+			blockChatLoopTestWorker(t, s, parentID)
+			child := chatConductorChild{SessionID: workerID, DispatchID: dispatchID, Status: conductorRunning}
+			saveChatLoopTestSession(t, s, chatSession{ID: parentID, Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: []chatConductorChild{child}})
+			saveChatLoopTestSession(t, s, chatSession{ID: workerID, Conductor: &chatConductorState{Role: conductorRoleWorker, ParentSessionID: parentID, DispatchID: dispatchID, Status: conductorRunning}})
+			s.beginChatRun(workerID)
+			s.beginChatRun(parentID)
+			rr := httptest.NewRecorder()
+			s.chatCancel(rr, httptest.NewRequest(http.MethodPost, "/", nil), parentID)
+			if rr.Code != http.StatusOK || s.chatRunCanceled(workerID) {
+				t.Fatal("parent stop cancelled delegation", rr.Code, rr.Body.String())
+			}
+			s.finishConductorChild(parentID, dispatchID, status, "late answer", "late failure")
+			waitConductorCompletionQueueStart(t, s, parentID, "conductor-"+dispatchID)
+			got, err := loadChatSession(s.CfgStore.Snapshot(), parentID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if conductorParentPaused(got) || len(got.QueuedMessages) != 0 || len(got.Messages) != 1 || got.ConductorChildren[0].Status != status {
+				t.Fatalf("late result not admitted automatically: %+v", got)
+			}
+			path := chatSessionPath(s.CfgStore.Snapshot(), parentID)
+			before, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.finishConductorChild(parentID, dispatchID, status, "duplicate", "duplicate")
+			after, err := os.ReadFile(path)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatal("duplicate callback changed durable parent", err)
+			}
+		})
+	}
+}
+
+func TestConductorCompletionDuringCancelHandshakeRetriesAfterPartialSave(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	parentID, workerID, dispatchID := "handshake-parent", "handshake-worker", "handshake-dispatch"
+	blockChatLoopTestWorker(t, s, parentID)
+	saveChatLoopTestSession(t, s, chatSession{ID: parentID, Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: []chatConductorChild{{SessionID: workerID, DispatchID: dispatchID, Status: conductorRunning}}, Messages: []chatMessage{{ID: "partial", Role: "assistant"}}})
+	saveChatLoopTestSession(t, s, chatSession{ID: workerID, Conductor: &chatConductorState{Role: conductorRoleWorker, ParentSessionID: parentID, DispatchID: dispatchID, Status: conductorRunning}})
+	token := s.beginChatRun(parentID)
+	s.ChatMu.Lock()
+	token.PendingAssistantID = "partial"
+	token.RunStartedAtMS = time.Now().UnixMilli()
+	token.Events = [][]byte{[]byte(`{"type":"delta","delta":"interrupted output"}`)}
+	worker := &chatWorker{}
+	worker.Mu.Lock()
+	s.ChatWorkers[parentID] = worker
+	s.ChatMu.Unlock()
+	locked := true
+	defer func() {
+		if locked {
+			worker.Mu.Unlock()
+		}
+	}()
+	rr := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		s.chatCancel(rr, httptest.NewRequest(http.MethodPost, "/", nil), parentID)
+		close(done)
+	}()
+	deadline := time.Now().Add(2 * time.Second)
+	for !s.chatRunCanceled(parentID) && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !s.chatRunCanceled(parentID) {
+		t.Fatal("cancel did not reach worker handshake")
+	}
+	s.finishConductorChild(parentID, dispatchID, conductorSucceeded, "late answer", "")
+	if s.processNextQueuedMessage(parentID) {
+		t.Fatal("receipt admitted before cancelled output was saved")
+	}
+	worker.Mu.Unlock()
+	locked = false
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancel handshake did not complete")
+	}
+	if rr.Code != http.StatusOK {
+		t.Fatal(rr.Code, rr.Body.String())
+	}
+	waitConductorCompletionQueueStart(t, s, parentID, "conductor-"+dispatchID)
+	got, err := loadChatSession(s.CfgStore.Snapshot(), parentID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conductorParentPaused(got) || len(got.QueuedMessages) != 0 || len(got.Messages) != 2 || got.Messages[0].ID != "partial" || !strings.Contains(got.Messages[0].Content, "interrupted output") || got.Messages[0].ElapsedMS <= 0 {
+		t.Fatalf("partial output or late receipt lost during handshake: %+v", got)
+	}
+}
+
+func TestConductorPersistedCompletionResumesPausedQueueInFIFOOrder(t *testing.T) {
+	for _, olderUser := range []bool{false, true} {
+		name := "completion-first"
+		if olderUser {
+			name = "user-first"
+		}
+		t.Run(name, func(t *testing.T) {
+			s := newChatLoopTestServer(t)
+			sid := "persisted-parent"
+			blockChatLoopTestWorker(t, s, sid)
+			queue := []chatQueuedMessage{{ID: "receipt-a", Kind: "conductor_completion", Text: "A"}, {ID: "receipt-b", Kind: "conductor_completion", Text: "B"}}
+			firstID, remaining := "receipt-a", 0
+			if olderUser {
+				queue = append([]chatQueuedMessage{{ID: "older-user", Text: "older question"}}, queue...)
+				firstID, remaining = "older-user", 2
+			}
+			saveChatLoopTestSession(t, s, chatSession{ID: sid, Conductor: &chatConductorState{Role: conductorRoleParent, AutoResumePaused: true}, QueuedMessages: queue})
+			rr := httptest.NewRecorder()
+			s.chatCancel(rr, httptest.NewRequest(http.MethodPost, "/", nil), sid)
+			if rr.Code != http.StatusOK {
+				t.Fatal(rr.Code, rr.Body.String())
+			}
+			waitConductorCompletionQueueStart(t, s, sid, firstID)
+			got, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if conductorParentPaused(got) || len(got.QueuedMessages) != remaining {
+				t.Fatalf("durable completion did not unblock FIFO: %+v", got)
+			}
+			if olderUser {
+				if !reflect.DeepEqual(got.QueuedMessages, queue[1:]) {
+					t.Fatalf("FIFO receipt order changed: %+v", got.QueuedMessages)
+				}
+			} else {
+				s.ChatMu.Lock()
+				batched := chatRunContainsQueueID(s.ChatRuns[sid], "receipt-b")
+				s.ChatMu.Unlock()
+				if !batched {
+					t.Fatal("adjacent persisted completions were not batched")
+				}
+			}
+		})
 	}
 }
 
@@ -147,8 +309,10 @@ func TestConductorExplicitAdmissionResumesPausedParent(t *testing.T) {
 				queue = append(queue, chatQueuedMessage{ID: "manual-guide", Text: "continue"})
 			}
 			saveChatLoopTestSession(t, s, chatSession{ID: sid, Conductor: &chatConductorState{Role: conductorRoleParent, AutoResumePaused: true}, QueuedMessages: queue})
-			if s.processNextQueuedMessage(sid) {
-				t.Fatal("automatic receipt consumption ignored pause")
+			if method == "guide" {
+				// Guide cancels this run, then must reserve its requested item
+				// rather than losing the reservation to the completion inbox.
+				s.beginChatRun(sid)
 			}
 			rr := httptest.NewRecorder()
 			if method == "post" {
