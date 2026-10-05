@@ -2816,6 +2816,11 @@ def _install_conductor_tools(agent, config):
             if not isinstance(value, str) or value.strip().lower() not in ('off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'):
                 return dispatch_result({'ok': False, 'error': 'Invalid reasoning_effort'})
             overrides['reasoning_effort'] = value.strip().lower()
+        if 'additional_prompt' in args:
+            value = args['additional_prompt']
+            if not isinstance(value, str) or len(value) > 8192:
+                return dispatch_result({'ok': False, 'error': 'additional_prompt must be a string of at most 8192 characters'})
+            overrides['additional_prompt'] = value
         request_id = uuid.uuid4().hex
         emit({'type': 'conductor_dispatch', 'request_id': request_id,
               'broker_dir': str(broker), 'objective': objective.strip(), 'session_id': session_id, **overrides})
@@ -2888,7 +2893,7 @@ def _install_conductor_tools(agent, config):
 
     specs.append(('conductor_tasks', tasks, 'Read the parent-request dispatch snapshot, 48 per page. Start at offset 0, follow next_offset. Use collect for live status. New dispatches this turn are in receipts.', 'offset'))
     specs.extend([('conductor_model_strategy', strategy_tool, 'Get/set/reset this parent session model-selection policy. On a user request, save task-to-model routing, escalation and fallback preferences as a strategy string (1-8192 characters). Do not invent or rewrite user policy without authorization. Saved policy is injected on every parent request; successful updates apply this turn via receipt. It guides explicit dispatch fields, never grants permissions or changes parent/queued/running models. get reads; set replaces; reset clears.', 'action'),
-                  ('conductor_defaults', defaults_tool, 'Get/set/reset persistent parent subtask defaults. set preserves omitted fields; null clears; reset clears both. Explicit dispatch overrides defaults; defaults override inherited/reused settings. Queued/running tasks unchanged.', 'action'),
+                  ('conductor_defaults', defaults_tool, 'Get/set/reset persistent parent subtask defaults (llm_no, reasoning_effort, additional_prompt). set preserves omitted fields; null clears; reset clears all. Explicit dispatch overrides defaults; model defaults override inherited/reused settings. Prompt defaults apply only to future dispatches, never grant permissions. Queued/running tasks unchanged.', 'action'),
                   ('conductor_models', models_tool, 'List available runtime model indexes and public identifiers.', None)])
     allowed = {'ask_user', 'update_working_checkpoint', 'no_tool'}
     def denied(self, args, response):
@@ -2932,7 +2937,8 @@ def _install_conductor_tools(agent, config):
         if name == 'conductor_defaults':
             properties = {'action': {'type': 'string', 'enum': ['get', 'set', 'reset']},
                           'llm_no': {'type': ['integer', 'null'], 'minimum': 0},
-                          'reasoning_effort': {'type': ['string', 'null'], 'enum': [None, 'off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']}}
+                          'reasoning_effort': {'type': ['string', 'null'], 'enum': [None, 'off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']},
+                          'additional_prompt': {'type': ['string', 'null'], 'maxLength': 8192, 'description': 'Default extra instructions for future subagents; null clears this default. Does not affect queued/running workers or grant permissions.'}}
         if name == 'conductor_tasks':
             properties['offset'] = {'type': 'integer', 'minimum': 0}
         if name == 'conductor_review':
@@ -2946,6 +2952,7 @@ def _install_conductor_tools(agent, config):
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
             properties['llm_no'] = {'type': 'integer', 'minimum': 0, 'description': 'Optional configured runtime model index (not a model name). Overrides this worker only; omitted uses parent subtask defaults, then inherits parent for new workers or retains reused settings.'}
             properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}
+            properties['additional_prompt'] = {'type': 'string', 'maxLength': 8192, 'description': 'Extra instructions for this dispatch, appended without replacing system rules. Omit to use parent defaults; empty string disables it. Reuse replaces the previous dispatch prompt, never accumulates it or grants permissions.'}
         schema.append({'type': 'function', 'function': {'name': name, 'description': description,
                        'parameters': {'type': 'object', 'properties': properties,
                                       'required': ([parameter, 'status', 'basis'] if name == 'conductor_review' else ([parameter] if parameter else [])), 'additionalProperties': False}}})

@@ -101,7 +101,7 @@ class InstallationTest(unittest.TestCase):
                             reply = {'ok': True, 'models': [{'index': 7, 'model': 'fake'}]}
                         elif event['type'] == 'conductor_defaults':
                             if args.get('action') == 'set':
-                                defaults.update(llm_no=args['llm_no'], reasoning_effort=args['reasoning_effort'])
+                                defaults.update(llm_no=args['llm_no'], reasoning_effort=args['reasoning_effort'], additional_prompt=args['additional_prompt'])
                             reply = {'ok': True, 'defaults': dict(defaults)}
                         else:
                             reply = {'ok': True, 'dispatch_id': 'fake-dispatch', 'session_id': 'fake-worker', 'status': 'queued'}
@@ -110,13 +110,17 @@ class InstallationTest(unittest.TestCase):
                     scope['emit'] = emit
                     # The last defaults call mirrors what core dispatch really sends: nullable fields as
                     # explicit nulls plus the private transport keys _index/_tool_num injected upstream.
-                    calls = [('conductor_models', {}), ('conductor_defaults', {'action': 'set', 'llm_no': 7, 'reasoning_effort': 'low'}), ('conductor_defaults', {'action': 'get', 'llm_no': None, 'reasoning_effort': None, '_index': 0, '_tool_num': 1}), ('conductor_dispatch', {'objective': 'isolated fake'})]
+                    calls = [('conductor_models', {}), ('conductor_defaults', {'action': 'set', 'llm_no': 7, 'reasoning_effort': 'low', 'additional_prompt': 'default-extra'}), ('conductor_defaults', {'action': 'get', 'llm_no': None, 'reasoning_effort': None, 'additional_prompt': None, '_index': 0, '_tool_num': 1}), ('conductor_dispatch', {'objective': 'isolated fake', 'additional_prompt': 'dispatch-extra'})]
                     class SettingsModel:
                         turn = 0
                         def chat(self, messages, tools):
                             names = {t['function']['name']: t['function'] for t in tools}
                             owner.assertIn('conductor_models', names)
                             owner.assertEqual(names['conductor_defaults']['parameters']['required'], ['action'])
+                            owner.assertEqual(names['conductor_defaults']['parameters']['properties']['additional_prompt']['type'], ['string', 'null'])
+                            owner.assertEqual(names['conductor_dispatch']['parameters']['properties']['additional_prompt']['type'], 'string')
+                            for name in ('conductor_defaults', 'conductor_dispatch'):
+                                owner.assertEqual(names[name]['parameters']['properties']['additional_prompt']['maxLength'], 8192)
                             if self.turn:
                                 owner.assertTrue(json.loads(messages[-1]['tool_results'][0]['content'])['ok'], messages[-1])
                             tool_calls = []
@@ -130,17 +134,18 @@ class InstallationTest(unittest.TestCase):
                     settings_model = SettingsModel()
                     result = loop.exhaust(loop.agent_runner_loop(settings_model, 'test', 'test', Handler(), fake.TOOLS_SCHEMA, max_turns=6))
                     self.assertEqual(settings_model.turn, 5)
-                    self.assertEqual(defaults, {'llm_no': 7, 'reasoning_effort': 'low'})
+                    self.assertEqual(defaults, {'llm_no': 7, 'reasoning_effort': 'low', 'additional_prompt': 'default-extra'})
+                    self.assertEqual(events[-1]['additional_prompt'], 'dispatch-extra')
                     self.assertEqual(len(events), 4)
                     private = [e for e in events if e['type'] == 'conductor_defaults'][-1]
-                    self.assertEqual(private['args'], {'action': 'get', 'llm_no': None, 'reasoning_effort': None})
+                    self.assertEqual(private['args'], {'action': 'get', 'llm_no': None, 'reasoning_effort': None, 'additional_prompt': None})
                     # Core dispatch mutates the args dict in place before calling the handler; the
                     # broker payload must not contain those transport keys, and the caller's dict
                     # must stay untouched.
-                    injected = {'action': 'get', 'llm_no': None, 'reasoning_effort': None, '_index': 0, '_tool_num': 1}
+                    injected = {'action': 'get', 'llm_no': None, 'reasoning_effort': None, 'additional_prompt': None, '_index': 0, '_tool_num': 1}
                     stream = Handler().do_conductor_defaults(injected, None)
                     next(stream)
-                    self.assertEqual(events[-1]['args'], {'action': 'get', 'llm_no': None, 'reasoning_effort': None})
+                    self.assertEqual(events[-1]['args'], {'action': 'get', 'llm_no': None, 'reasoning_effort': None, 'additional_prompt': None})
                     self.assertEqual(injected['_index'], 0)
                     self.assertEqual(injected['_tool_num'], 1)
                     self.assertEqual(len(events), 5)

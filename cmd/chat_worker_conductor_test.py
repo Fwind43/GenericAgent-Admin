@@ -25,6 +25,17 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
         self.assertNotIn('llm_no', self.events[0])
         self.assertNotIn('reasoning_effort', self.events[0])
 
+    def test_additional_prompt_forwarded_and_validated(self):
+        for prompt in ('', 'Return sources\\nDo not change files', '\U0001f642' * 8192):
+            self.assertTrue(self.call(additional_prompt=prompt)['ok'])
+            self.assertEqual(self.events[-1]['additional_prompt'], prompt)
+        before = len(self.events)
+        for prompt in (None, 3, {}, '\U0001f642' * 8193):
+            self.assertFalse(self.call(additional_prompt=prompt)['ok'])
+        self.assertEqual(len(self.events), before)
+        self.assertTrue(self.call()['ok'])
+        self.assertNotIn('additional_prompt', self.events[-1])
+
     def test_null_inherits_and_allows_reuse(self):
         for options in ({'project_id': None}, {'project_id': None, 'session_id': 'worker'}):
             self.assertTrue(self.call(**options)['ok'])

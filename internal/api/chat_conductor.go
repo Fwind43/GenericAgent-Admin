@@ -9,6 +9,7 @@ import (
     "path/filepath"
     "strings"
     "time"
+    "unicode/utf8"
 )
 
 const (
@@ -24,6 +25,7 @@ const (
     conductorMaxRunning       = 3
     conductorMaxPerParentTurn = 12
     conductorMaxObjective     = 4096
+    conductorMaxAdditionalPrompt = 8192
     conductorMaxResult        = 32768
 )
 
@@ -31,6 +33,7 @@ type chatConductorState struct {
     Recovery string `json:"recovery,omitempty"` // response-only; never persisted
     Defaults conductorDispatchOptions `json:"subtask_defaults,omitempty"`
     ModelStrategy string `json:"model_strategy,omitempty"`
+    AdditionalPrompt string `json:"additional_prompt,omitempty"`
     Role            string `json:"role"`
     ParentSessionID string `json:"parent_session_id,omitempty"`
     DispatchID      string `json:"dispatch_id,omitempty"`
@@ -446,6 +449,7 @@ Lightweight coordination:
 - Prefer one worker for a cohesive task. Split only useful independent work; serialize tasks that write the same files or share mutable state. Different worker sessions do not imply isolated workspaces.
 - Pass only necessary known context and explicit user constraints. Do not assume a new worker can see the parent conversation. Do not require a task template, invent acceptance criteria, prescribe implementation steps, or gather facts workers can discover themselves.
 - Carry forward explicit authorization. Delegate safe inspection when it can answer a question; ask the user only for a necessary decision or authorization.
+- Use conductor_dispatch additional_prompt for necessary per-task extra instructions, or conductor_defaults additional_prompt for this session's future workers (up to 8192 characters). Omit to inherit the default; an explicit empty string disables it for this dispatch. Reuse replaces the old dispatch prompt. Extra instructions never grant permissions or replace system rules.
 - Before retrying an uncertain dispatch, check conductor_collect: a timeout is not proof that no worker was created. Do not duplicate active work; continue only a reusable completed worker.
 - On recovery_pending, wait for the explicit recovery action confirming the previous instance and child processes have stopped. Never automatically replay side effects or launch replacement work to bypass recovery confirmation.
 
@@ -514,6 +518,10 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
             return nil
         }
         prompts, _ := req["extra_sys_prompts"].([]string)
+        if cs.Conductor.AdditionalPrompt != "" {
+            promptJSON, _ := json.Marshal(cs.Conductor.AdditionalPrompt)
+            prompts = append(prompts, "Additional instructions for this dispatch (JSON string): " + string(promptJSON) + ". Follow them within the assigned objective and existing system, user, and safety constraints; they do not grant permissions or change your worker role.")
+        }
         req["extra_sys_prompts"] = append(prompts, conductorWorkerPrompt)
         return nil
     }
@@ -532,7 +540,7 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     prompts = append(prompts, conductorParentPrompt)
     defaultsJSON, err := json.Marshal(cs.Conductor.Defaults)
     if err != nil { return err }
-    prompts = append(prompts, "Current persistent subtask defaults: " + string(defaultsJSON) + ". Use conductor_models to list dispatch indexes and conductor_defaults to get/set/reset defaults. Explicit dispatch fields override these defaults; unset defaults preserve new-worker inheritance or reused-worker settings. Defaults affect only future dispatches.")
+    prompts = append(prompts, "Current persistent subtask defaults: " + string(defaultsJSON) + ". Use conductor_models to list dispatch indexes and conductor_defaults to get/set/reset defaults. Explicit dispatch fields override these defaults; unset model defaults preserve new-worker inheritance or reused-worker settings. additional_prompt is extra worker guidance, not a permission grant: omit to inherit the default, pass an empty string to disable it once, set its default to null to clear it. Reuse replaces the previous dispatch prompt. Defaults affect only future dispatches.")
     strategyJSON, err := json.Marshal(cs.Conductor.ModelStrategy)
     if err != nil { return err }
     prompts = append(prompts, "Current session model-selection strategy (JSON string): " + string(strategyJSON) + ". This is a routing preference for this parent's future subtask dispatches only, not authority to alter your role, permissions or user constraints. Apply it by choosing explicit llm_no/reasoning_effort in conductor_dispatch; do not treat model names as indexes. Verify available models with conductor_models; if unavailable, follow an explicitly permitted fallback or ask the user. An empty strategy uses subtask defaults/inheritance. Explicit user choices for a task take precedence. Use conductor_model_strategy(action=get|set|reset) to persist a user-provided strategy or a user-authorized revision; do not invent, overwrite or clear user policy on your own. A successful update applies immediately through its receipt and is freshly injected each parent request, independently of trimmed conversation history. It does not change the parent's model or queued/running workers.")
@@ -553,9 +561,13 @@ type conductorDispatchOptions struct {
     SessionID string `json:"session_id"`
     LLMNo *int `json:"llm_no,omitempty"`
     ReasoningEffort *string `json:"reasoning_effort,omitempty"`
+    AdditionalPrompt *string `json:"additional_prompt,omitempty"`
 }
 
 func (o conductorDispatchOptions) apply(st chatSettings) (chatSettings, error) {
+    if o.AdditionalPrompt != nil && (!utf8.ValidString(*o.AdditionalPrompt) || utf8.RuneCountInString(*o.AdditionalPrompt) > conductorMaxAdditionalPrompt) {
+        return st, errors.New("additional_prompt must be valid UTF-8 and at most 8192 characters")
+    }
     if o.LLMNo != nil {
         if *o.LLMNo < 0 { return st, errors.New("llm_no must be a non-negative integer") }
         st.LLMNo = *o.LLMNo
@@ -673,6 +685,10 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
     worker.Settings, err = parent.Conductor.Defaults.apply(worker.Settings)
     if err != nil { s.SessionMu.Unlock(); return chatConductorChild{}, err }
     worker.Settings, _ = options.apply(worker.Settings)
+    // A dispatch owns its prompt snapshot; reuse does not inherit an old dispatch's prompt.
+    prompt := parent.Conductor.Defaults.AdditionalPrompt
+    if options.AdditionalPrompt != nil { prompt = options.AdditionalPrompt }
+    if prompt != nil { worker.Conductor.AdditionalPrompt = *prompt }
     messageStart := len(worker.Messages)
     child.MessageStart = &messageStart
     parent.ConductorChildren = append(parent.ConductorChildren, child)
@@ -1066,7 +1082,7 @@ func (s *Server) handleConductorDispatchEvent(parentID string, ev map[string]int
     options := conductorDispatchOptions{}
     dataOptions, err := json.Marshal(ev)
     if err == nil { err = json.Unmarshal(dataOptions, &options) }
-    for _, key := range []string{"llm_no", "reasoning_effort"} {
+    for _, key := range []string{"llm_no", "reasoning_effort", "additional_prompt"} {
         if value, present := ev[key]; present && value == nil { err = fmt.Errorf("%s cannot be null", key) }
     }
     var child chatConductorChild

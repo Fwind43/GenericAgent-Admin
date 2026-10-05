@@ -45,12 +45,12 @@ func (s *Server) conductorDefaults(parentID string, args map[string]interface{})
 		if strings.HasPrefix(key, "_") {
 			continue
 		}
-		if key != "action" && key != "llm_no" && key != "reasoning_effort" {
+		if key != "action" && key != "llm_no" && key != "reasoning_effort" && key != "additional_prompt" {
 			return patch, errors.New("unknown defaults field")
 		}
 		filtered[key] = value
 	}
-	// The exposed schema marks llm_no/reasoning_effort nullable, so read/reset callers may send
+	// The exposed schema marks optional defaults nullable, so read/reset callers may send
 	// explicit nulls; for those actions null is the same as omitted. set keeps null as a clear.
 	if action != "set" {
 		for key, value := range filtered {
@@ -108,6 +108,9 @@ func (s *Server) conductorDefaults(parentID string, args map[string]interface{})
 		}
 		if _, ok := args["reasoning_effort"]; ok {
 			current.ReasoningEffort = patch.ReasoningEffort
+		}
+		if _, ok := args["additional_prompt"]; ok {
+			current.AdditionalPrompt = patch.AdditionalPrompt
 		}
 	}
 	parent.Conductor.Defaults = current
