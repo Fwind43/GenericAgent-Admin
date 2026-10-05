@@ -240,6 +240,8 @@ func TestConductorCollectReplaysPersistedOutcome(t *testing.T) {
 
 func TestConductorInvalidRelationshipDoesNotMutateWorker(t *testing.T) {
  s := newChatLoopTestServer(t)
+ // Keep the parent busy so terminal callbacks cannot launch an unrelated review worker.
+ if s.beginChatRun("parent") == nil { t.Fatal("parent run not started") }
  saveChatLoopTestSession(t, s, chatSession{ID: "parent", Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: []chatConductorChild{{DispatchID: "dispatch", SessionID: "foreign", Status: conductorRunning}}})
  saveChatLoopTestSession(t, s, chatSession{ID: "foreign", Conductor: &chatConductorState{Role: conductorRoleWorker, ParentSessionID: "other-parent", DispatchID: "other-dispatch", Status: conductorRunning}})
  s.finishConductorChild("parent", "dispatch", conductorSucceeded, "must not leak", "")
