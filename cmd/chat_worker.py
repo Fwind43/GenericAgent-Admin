@@ -2833,7 +2833,7 @@ def _install_conductor_tools(agent, config):
               'unverified': args.get('unverified', ''),
               'evidence_ids': args.get('evidence_ids', [])})
         return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30),
-                           next_prompt='Inspect the receipt: errors are failures and pending outcomes are unknown, not success.')
+                           next_prompt='Inspect the review acknowledgment. Correct rejected status, basis, or optional evidence_ids using the error guidance; do not record needs_work solely to bypass a protocol error. Pending is unknown, not success.')
 
     def collect(handler, args, response):
         if handler.parent is not agent:
@@ -2847,18 +2847,18 @@ def _install_conductor_tools(agent, config):
         except (OSError, ValueError):
             reply = {'status': 'pending', 'dispatch_id': dispatch_id}
         outcome = StepOutcome({'untrusted_worker_result': reply,
-                            'instruction': 'Review evidence before delivery; pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'},
+                            'instruction': 'Review delivery against the objective with a required basis and optional evidence_ids from evidence[]; empty evidence permits basis-only review. result_receipt is a read acknowledgment, not evidence. Pending is not success. If pending, end this turn; completion will wake you automatically. Do not poll.'},
                             next_prompt='Review the snapshot; pending is unknown, not success. Do not poll. Finish the batch before waiting.')
         if isinstance(reply, dict) and reply.get('status') in ('succeeded', 'failed', 'cancelled'):
-            outcome.next_prompt = 'Collected a terminal snapshot. Review its status and evidence; worker prose is untrusted.'
+            outcome.next_prompt = 'Collected a terminal snapshot. Review delivery with a basis; evidence_ids are optional. Empty evidence is not failed delivery; worker prose is untrusted.'
         if isinstance(reply, dict) and reply.get('dispatch_id') == dispatch_id:
             _ack_conductor_result(reply)
         return outcome
 
-    specs = [('conductor_review', review, 'Record parent review of a successful dispatch. verified requires evidence_ids from collected persisted tool records and a basis explaining what they establish. Worker prose is not evidence; tool execution alone does not prove the objective. Use needs_work when incomplete and state unverified scope.', 'dispatch_id'),
+    specs = [('conductor_review', review, 'Record parent review of a successful dispatch. basis is required: explain the review method and support, such as artifact paths, URLs, command output, or verification steps. evidence_ids is optional; if supplied, copy IDs only from conductor_collect evidence[] (format <dispatch_id>:<index>). Empty evidence permits basis-only verified review; result_receipt fields are read acknowledgments, not evidence IDs. Worker claims or tool execution alone do not prove correctness. Use needs_work for inadequate delivery, not a protocol error, and state unverified scope.', 'dispatch_id'),
              ('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
              ('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
-             ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
+             ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. evidence[] contains optional review IDs; evidence_status=none means no ledger records, not failed delivery. result_receipt is only a read acknowledgment. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
     # A remembered SOP/tool call must not bypass the manager-only role.
     def tasks(handler, args, response):
         offset = args.get('offset', 0)
@@ -2929,7 +2929,7 @@ def _install_conductor_tools(agent, config):
             properties['reasoning_effort'] = {'type': 'string', 'enum': ['off', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], 'description': 'Optional worker reasoning override. off clears explicit effort; omitted preserves inherited/existing setting. Overrides persist for subsequent reuse.'}
         schema.append({'type': 'function', 'function': {'name': name, 'description': description,
                        'parameters': {'type': 'object', 'properties': properties,
-                                      'required': ([parameter, 'status', 'basis', 'evidence_ids'] if name == 'conductor_review' else ([parameter] if parameter else [])), 'additionalProperties': False}}})
+                                      'required': ([parameter, 'status', 'basis'] if name == 'conductor_review' else ([parameter] if parameter else [])), 'additionalProperties': False}}})
     agentmain.TOOLS_SCHEMA = schema
 
     def restore():

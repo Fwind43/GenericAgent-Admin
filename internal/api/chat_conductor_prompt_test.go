@@ -70,6 +70,7 @@ func TestConductorWorkflowContract(t *testing.T) {
         "authorization": {"Carry forward explicit authorization", "Delegate safe inspection", "Do not automatically restart canceled work"},
         "recovery": {"timeout is not proof that no worker was created", "reusable completed worker", "recovery_pending", "previous instance and child processes have stopped", "automatically replay side effects"},
         "bounded_correction": {"failed worker may already have changed external state", "If corrections repeat without progress", "smallest decision or input needed"},
+        "lightweight_review": {"basis is required; evidence_ids are optional", "Empty evidence is not a reason to reject", "result_receipt fields are read acknowledgments", "A review protocol error is not a quality verdict", "Use lightweight review by default", "stronger checks for high-risk", "Do not dispatch extra workers solely to investigate optional evidence bookkeeping"},
         "delivery": {"one dispatch, not the whole user request", "required work is pending", "Synthesize one concise delivery against the user's original goal"},
     }
     for _, obsolete := range []string{"Every objective must be self-contained", "two consecutive corrections"} {

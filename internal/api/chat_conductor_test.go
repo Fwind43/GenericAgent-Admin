@@ -121,7 +121,7 @@ func TestConductorReviewPersistsAndCollects(t *testing.T) {
  before, err := os.ReadFile(path)
  if err != nil { t.Fatal(err) }
  for _, review := range []conductorReview{
-  {Status: "verified", Basis: "worker says done"},
+  {Status: "verified", Basis: "   "},
   {Status: "verified", Basis: "forged", EvidenceIDs: []string{"other:0"}},
   {Status: "verified", EvidenceIDs: []string{"dispatch:0"}},
  } {
@@ -138,6 +138,70 @@ func TestConductorReviewPersistsAndCollects(t *testing.T) {
  outcome := filepath.Join(chatConductorBrokerDirForSession(chatSessionDir(cfg), "review-parent"), "dispatch.outcome.json")
  data, err := os.ReadFile(outcome)
  if err != nil || !bytes.Contains(data, []byte("parent_agent")) || !bytes.Contains(data, []byte("Production not exercised")) { t.Fatalf("collect lost review: %s %v", data, err) }
+}
+
+func TestConductorBasisOnlyReview(t *testing.T) {
+ s := newChatLoopTestServer(t)
+ if s.beginChatRun("light-parent") == nil { t.Fatal("parent run not started") }
+ child := chatConductorChild{DispatchID: "light", SessionID: "worker", Status: conductorSucceeded,
+  Review: conductorInitialReview(conductorSucceeded), Result: "Artifact is ready"}
+ saveChatLoopTestSession(t, s, chatSession{ID: "light-parent", Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: []chatConductorChild{child}})
+ cfg := s.CfgStore.Snapshot()
+ path := chatSessionPath(cfg, "light-parent")
+ before, err := os.ReadFile(path)
+ if err != nil { t.Fatal(err) }
+ for _, status := range []string{"verified", "needs_work"} {
+  if _, err := s.reviewConductorChild("light-parent", "light", conductorReview{Status: status, Basis: " \n\t"}); err == nil { t.Fatalf("accepted empty basis for %s", status) }
+ }
+ for _, id := range []string{"receipt-id", "visible-revision", "other:0", "light:0"} {
+  _, err := s.reviewConductorChild("light-parent", "light", conductorReview{Status: "verified", Basis: "reviewed", EvidenceIDs: []string{id}})
+  if err == nil { t.Fatalf("accepted unknown evidence ID %q", id) }
+  for _, hint := range []string{"no evidence records", "conductor_collect evidence[]", "<dispatch_id>:<index>", "omit evidence_ids", "result_receipt"} {
+   if !strings.Contains(err.Error(), hint) { t.Fatalf("missing recovery hint %q: %v", hint, err) }
+  }
+ }
+ after, err := os.ReadFile(path)
+ if err != nil || !bytes.Equal(before, after) { t.Fatal("rejected lightweight reviews mutated session") }
+ review := conductorReview{Status: "verified", Basis: "Reviewed artifact.txt and its reported test output", Unverified: "Production not exercised"}
+ dir := chatConductorBrokerDirForSession(chatSessionDir(cfg), "light-parent")
+ for i := 0; i < 2; i++ {
+  requestID := "light-review"
+  s.handleConductorReviewEvent("light-parent", map[string]interface{}{"request_id": requestID, "broker_dir": dir,
+   "dispatch_id": "light", "status": review.Status, "basis": review.Basis, "unverified": review.Unverified})
+  data, err := os.ReadFile(filepath.Join(dir, requestID+".response.json"))
+  var ack struct { OK bool `json:"ok"`; Child conductorOutcome `json:"child"` }
+  if err != nil { t.Fatal(err) }
+  if err := json.Unmarshal(data, &ack); err != nil { t.Fatal(err) }
+  if !ack.OK || ack.Child.Review == nil || ack.Child.Review.Status != "verified" || ack.Child.Review.Reviewer != "parent_agent" || ack.Child.Review.Basis != review.Basis || ack.Child.Review.Unverified != review.Unverified {
+   t.Fatalf("basis-only review failed: %s", data)
+  }
+  if ack.Child.Evidence == nil || len(ack.Child.Evidence) != 0 || ack.Child.EvidenceStatus != "none" { t.Fatalf("missing evidence empty state: %s", data) }
+  saved, err := loadChatSession(cfg, "light-parent")
+  if err != nil { t.Fatal(err) }
+  if len(saved.ConductorChildren[0].Evidence) != 0 || saved.ConductorChildren[0].Review.Status != "verified" { t.Fatal("review fabricated evidence or was not persisted") }
+  after, err = os.ReadFile(path)
+  if err != nil { t.Fatal(err) }
+  if i == 0 { before = after } else if !bytes.Equal(before, after) { t.Fatal("basis-only replay changed persistent session") }
+ }
+ s.handleConductorCollectEvent("light-parent", map[string]interface{}{"dispatch_id": "light"})
+ data, err := os.ReadFile(filepath.Join(dir, "light.outcome.json"))
+ if err != nil || !bytes.Contains(data, []byte(`"evidence":[]`)) || !bytes.Contains(data, []byte(`"evidence_status":"none"`)) { t.Fatalf("collect outcome lost explicit empty ledger: %s %v", data, err) }
+}
+
+func TestConductorReviewRejectsUnsuccessfulDispatch(t *testing.T) {
+ for _, status := range []string{conductorQueued, conductorRunning, conductorFailed, conductorCancelled} {
+  t.Run(status, func(t *testing.T) {
+   s := newChatLoopTestServer(t)
+   saveChatLoopTestSession(t, s, chatSession{ID: "parent", Conductor: &chatConductorState{Role: conductorRoleParent}, ConductorChildren: []chatConductorChild{{DispatchID: "dispatch", Status: status}}})
+   path := chatSessionPath(s.CfgStore.Snapshot(), "parent")
+   before, err := os.ReadFile(path)
+   if err != nil { t.Fatal(err) }
+   if s.beginChatRun("parent") == nil { t.Fatal("parent run not started") }
+   if _, err := s.reviewConductorChild("parent", "dispatch", conductorReview{Status: "verified", Basis: "reviewed"}); err == nil || !strings.Contains(err.Error(), "only successful execution") { t.Fatalf("accepted unsuccessful delivery or wrong rejection: %v", err) }
+   after, err := os.ReadFile(path)
+   if err != nil || !bytes.Equal(before, after) { t.Fatal("rejection changed session") }
+  })
+ }
 }
 
 func TestConductorReviewBrokerReplayPreservesSession(t *testing.T) {

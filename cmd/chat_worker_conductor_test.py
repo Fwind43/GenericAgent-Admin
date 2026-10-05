@@ -160,6 +160,50 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
 
 
 class ConductorReviewTest(unittest.TestCase):
+    def test_basis_only_review_and_guidance(self):
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        installer = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+        node = next(n for n in installer.body if isinstance(n, ast.FunctionDef) and n.name == 'review')
+        agent, events = object(), []
+        env = dict(agent=agent, StepOutcome=lambda data, **kw: SimpleNamespace(data=data, **kw),
+                   uuid=__import__('uuid'), broker=Path('broker'),
+                   emit=events.append, read_reply=lambda *args: {'ok': True})
+        exec(compile(ast.Module(body=[node], type_ignores=[]), '<review>', 'exec'), env)
+        args = dict(dispatch_id='d', status='verified', basis='Reviewed artifact.txt and reported test output',
+                    unverified='Production not exercised')
+        result = env['review'](SimpleNamespace(parent=agent), args, None)
+        self.assertTrue(result.data['ok'])
+        self.assertEqual(events[0]['evidence_ids'], [])
+        for key, value in args.items():
+            self.assertEqual(events[0][key], value)
+        self.assertIn('optional evidence_ids', result.next_prompt)
+        self.assertIn('do not record needs_work solely', result.next_prompt)
+
+    def test_review_schema_and_description(self):
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        installer = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+        specs = next(n for n in installer.body if isinstance(n, ast.Assign)
+                     and any(isinstance(t, ast.Name) and t.id == 'specs' for t in n.targets))
+        descriptions = {row.elts[0].value: row.elts[2].value for row in specs.value.elts}
+        review = descriptions['conductor_review']
+        for rule in ('basis is required', 'evidence_ids is optional', 'conductor_collect evidence[]',
+                     '<dispatch_id>:<index>', 'result_receipt fields are read acknowledgments',
+                     'not a protocol error', 'state unverified scope'):
+            self.assertIn(rule, review)
+        self.assertNotIn('verified requires evidence_ids', review)
+        self.assertIn('evidence_status=none', descriptions['conductor_collect'])
+        loop = next(n for n in installer.body if isinstance(n, ast.For)
+                    and isinstance(n.target, ast.Tuple)
+                    and [e.id for e in n.target.elts] == ['name', 'method', 'description', 'parameter'])
+        env = dict(specs=[('conductor_review', None, review, 'dispatch_id')],
+                   originals={'do_conductor_review': None}, handler_type=SimpleNamespace(),
+                   displayed=lambda method: method, schema=[])
+        exec(compile(ast.Module(body=[loop], type_ignores=[]), '<review-schema>', 'exec'), env)
+        schema = env['schema'][0]['function']['parameters']
+        self.assertEqual(set(schema['required']), {'dispatch_id', 'status', 'basis'})
+        self.assertIn('evidence_ids', schema['properties'])
+        self.assertNotIn('evidence_ids', schema['required'])
+
     def test_review_and_cancel_receipts_have_continuation(self):
         tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
         installer = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
@@ -242,7 +286,8 @@ class ConductorToolBoundaryTest(unittest.TestCase):
                                  {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel', 'conductor_review',
                                   'conductor_tasks', 'conductor_defaults', 'conductor_models'})
                 review_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_review')
-                self.assertEqual(set(review_schema['required']), {'dispatch_id', 'status', 'basis', 'evidence_ids'})
+                self.assertEqual(set(review_schema['required']), {'dispatch_id', 'status', 'basis'})
+                self.assertIn('evidence_ids', review_schema['properties'])
                 self.assertEqual(review_schema['properties']['status']['enum'], ['verified', 'needs_work'])
                 self.assertFalse(review_schema['additionalProperties'])
                 handler = Handler()

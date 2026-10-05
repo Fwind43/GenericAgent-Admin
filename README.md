@@ -168,7 +168,7 @@ Use Conductor when a parent task should delegate bounded work to child sessions 
 
 Project context is server-owned. New workers inherit the parent session project binding and workspace; the existing request-time resolver applies the current application project mode without rewriting session provenance. `conductor_dispatch` exposes no project selector. Legacy `project_id` arguments (including malformed values) are ignored by both adapter and server and cannot override this binding. Reuse preserves the worker context, but rejects an effective project or workspace mismatch with the parent before mutation; omit `session_id` to create a new inherited worker instead. Switching the global project mode follows the existing per-request behavior for both parent and worker, not a dispatch-specific migration.
 
-- Successful execution starts as **Pending review**. **Verified (parent review)** requires a review basis and references to persisted tool evidence belonging to that dispatch. **Needs work** records an unsuccessful review. Worker prose alone cannot satisfy the evidence requirement; parent review is not an independent guarantee of correctness. Inspect the basis, tool records, and unverified boundaries.
+- Successful execution starts as **Pending review**. **Verified (parent review)** requires a concrete review basis; `evidence_ids` is optional. Explain the review method and supporting artifact paths, URLs, command output, or verification steps in `basis`, and state unverified boundaries. When citing the optional evidence ledger, copy IDs from `conductor_collect`'s `evidence[]`; an empty ledger does not block a basis-only review. `result_receipt` is a read acknowledgment, not an evidence ID. **Needs work** means the delivery needs correction, not that evidence bookkeeping is absent. Worker claims or tool execution alone do not establish correctness, and parent review is not an independent guarantee. Single-worker tasks use lightweight review by default; high-risk or multi-worker work calls for stronger checks.
 - The parent workspace shows input/output tokens for the parent, finalized child snapshots, and their recorded total. Missing snapshots are not zero usage. Running usage is incomplete; child totals include only saved terminal snapshots, not live consumption or a billing estimate.
 - Each parent session accepts at most **48 cumulative dispatches**, including reused workers and completed, failed, or cancelled dispatches. Dispatch 49 is rejected before session mutation. This is a dispatch-count limit, not a token, cost, or wall-clock budget. Existing concurrency (3 running) and nonterminal (12) limits still apply.
 
@@ -456,7 +456,7 @@ Loop 每轮会额外花一次全量上下文的控制模型调用，轮次上限
 
 需要父任务拆分工作、交给子会话执行并收集结果时使用 Conductor。它负责父子任务协作，不等同于 Loop 的逐轮控制；执行结束不代表成果已核验。
 
-- 执行成功后默认**待核验**。**已核验（父任务审阅）**必须提供依据并引用本次派发已持久化的工具证据；**需返工**表示审阅未通过。worker 自述完成不能替代工具证据，父任务审阅也不是独立的正确性保证，请结合依据、工具记录和未验证边界判断。
+- 执行成功后默认**待核验**。**已核验（父任务审阅）**必须提供具体的 `basis`，`evidence_ids` 可选：依据应说明审阅方式、产物路径、URL、命令输出或复验步骤，并写明未验证范围。引用工具证据时，只能使用 `conductor_collect` 返回的 `evidence[]` ID；证据列表为空也可依据实际交付进行轻验收。`result_receipt` 是已读回执，不是证据 ID。**需返工**表示交付质量需要修正，不表示缺少证据记账。worker 自述或工具执行本身不保证正确性，父任务审阅也不是独立的正确性保证。单 worker 任务默认轻验收，高风险、多 worker 或用户明确要求时加强核验。
 - 父任务面板分列父任务、已封存子任务及已记录合计的输入/输出 Token。缺失快照不等于零消耗；运行中用量不完整，子任务仅计入已保存的终态快照，不是实时账单。
 - 每个父会话累计最多接受 **48 次派发**，复用 worker 及已完成、失败、取消的派发均计数。第 49 次在修改会话前拒绝。这是派发次数上限，不是 Token、费用或运行时长预算；原有最多 3 个运行中、12 个未终结任务限制仍有效。
 
