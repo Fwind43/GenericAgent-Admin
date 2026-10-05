@@ -372,7 +372,7 @@ func TestConductorCancelQueuedChildPersists(t *testing.T) {
  var finished int64
  for i := 0; i < 2; i++ {
   w := httptest.NewRecorder()
-  s.chatCancel(w, httptest.NewRequest(http.MethodPost, "/api/chat/cancel/parent", nil), "parent")
+  s.chatCancel(w, httptest.NewRequest(http.MethodPost, "/api/chat/cancel/worker", nil), "worker")
   if w.Code != http.StatusOK { t.Fatalf("cancel: %d %s", w.Code, w.Body.String()) }
   parent, err := loadChatSession(s.CfgStore.Snapshot(), "parent")
   if err != nil { t.Fatal(err) }

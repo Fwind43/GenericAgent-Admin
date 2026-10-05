@@ -33,6 +33,7 @@ type chatConductorState struct {
     Recovery string `json:"recovery,omitempty"` // response-only; never persisted
     Defaults conductorDispatchOptions `json:"subtask_defaults,omitempty"`
     ModelStrategy string `json:"model_strategy,omitempty"`
+    AutoResumePaused bool `json:"auto_resume_paused,omitempty"`
     AdditionalPrompt string `json:"additional_prompt,omitempty"`
     Role            string `json:"role"`
     ParentSessionID string `json:"parent_session_id,omitempty"`
@@ -476,8 +477,7 @@ func (s *Server) conductorChatRunnable(cs chatSession, sender string) bool {
     if sender == "user" {
         return conductorTerminal(cs.Conductor.Status)
     }
-    return sender == "conductor" && cs.Conductor.Status == conductorRunning &&
-        !s.chatRunCanceled(cs.Conductor.ParentSessionID)
+    return sender == "conductor" && cs.Conductor.Status == conductorRunning
 }
 
 // Projection only: session history never implies that an earlier objective was resolved.
@@ -728,10 +728,7 @@ func (s *Server) scheduleConductorChildren(parentID string) {
         s.SessionMu.Unlock()
         return
     }
-    if s.chatRunCanceled(parentID) {
-        s.SessionMu.Unlock()
-        return
-    }
+    // Delegated work survives cancellation of the parent's current run.
     // Unknown dispatches may belong to another live process. Neither replay
     // their queues nor assume their concurrency slots are free.
     for _, child := range parent.ConductorChildren {
@@ -816,7 +813,7 @@ func (s *Server) startConductorChild(parentID string, child chatConductorChild) 
         parent.Conductor != nil && parent.Conductor.Role == conductorRoleParent &&
         worker.Conductor != nil && worker.Conductor.Role == conductorRoleWorker &&
         worker.Conductor.ParentSessionID == parentID && worker.Conductor.DispatchID == child.DispatchID &&
-        worker.Conductor.Status == conductorRunning && !s.chatRunCanceled(parentID)
+        worker.Conductor.Status == conductorRunning
     s.SessionMu.Unlock()
     if !valid {
         s.finishConductorChild(parentID, child.DispatchID, conductorCancelled, "", "dispatch cancelled before launch")
@@ -929,7 +926,7 @@ func (s *Server) finishConductorChild(parentID, dispatchID, status, result, reas
     parent.ConductorChildren[idx] = child
     // Persist the inbox event with the terminal transition. Replayed terminal
     // callbacks return above, so they cannot enqueue duplicate wakeups.
-    if status != conductorCancelled && !s.chatRunCanceled(parentID) {
+    if status != conductorCancelled {
         payload, _ := json.Marshal(child)
         parent.QueuedMessages = append(parent.QueuedMessages, chatQueuedMessage{
             ID: "conductor-" + dispatchID, QueuedAt: now, Kind: "conductor_completion",
@@ -955,7 +952,7 @@ func (s *Server) finishConductorChild(parentID, dispatchID, status, result, reas
     s.publishChatRun(parentID, map[string]interface{}{"type": "conductor_child", "child": event})
     s.writeConductorOutcome(parentID, event)
     s.scheduleConductorChildren(parentID)
-    if status != conductorCancelled && !s.chatRunCanceled(parentID) {
+    if status != conductorCancelled && !parent.Conductor.AutoResumePaused {
         go s.processNextQueuedMessage(parentID)
     }
 }
@@ -993,6 +990,41 @@ func (s *Server) writeConductorOutcome(parentID string, child chatConductorChild
         return
     }
     _ = writeChatFileAtomic(filepath.Join(dir, safeChatID(child.DispatchID)+".outcome.json"), data, 0600)
+}
+
+func conductorParentPaused(cs chatSession) bool {
+    return cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent && cs.Conductor.AutoResumePaused
+}
+
+func resumeConductorParent(cs *chatSession) {
+    if cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent {
+        cs.Conductor.AutoResumePaused = false
+    }
+}
+
+// Caller holds SessionMu; pending admission also owns ChatMu. Resume in the
+// same write as user admission, after merging the latest session-owned receipts.
+func (s *Server) saveConductorUserAdmissionLocked(cs *chatSession, exact bool) error {
+    if exact && s.chatExactSaveHook != nil {
+        if err := s.chatExactSaveHook(*cs); err != nil { return err }
+    }
+    latest, err := loadChatSession(s.CfgStore.Snapshot(), cs.ID)
+    if err != nil { return err }
+    if !exact { cs.Messages = mergeChatMessageLists(latest.Messages, cs.Messages) }
+    preserveLatestChatUserMetadata(cs, latest)
+    resumeConductorParent(cs)
+    return saveChatSessionLocked(s.CfgStore.Snapshot(), *cs)
+}
+
+// Caller holds SessionMu. Pausing only affects parent wakeups, never workers
+// or durable completion receipts. Explicit user admission clears the pause.
+func (s *Server) setConductorParentPausedLocked(sid string, paused bool) (bool, error) {
+    cs, err := loadChatSession(s.CfgStore.Snapshot(), safeChatID(sid))
+    if err != nil { return false, err }
+    if cs.Conductor == nil || cs.Conductor.Role != conductorRoleParent { return false, nil }
+    if cs.Conductor.AutoResumePaused == paused { return true, nil }
+    cs.Conductor.AutoResumePaused = paused
+    return true, saveChatSessionPreserveUpdatedAtLocked(s.CfgStore.Snapshot(), cs)
 }
 
 func (s *Server) cancelConductorSession(sid string) {

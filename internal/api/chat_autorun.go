@@ -141,7 +141,7 @@ func (s *Server) dispatchChatAutorun(sid string, now int64) bool {
 	}
 	s.SessionMu.Lock()
 	cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)
-	if err != nil || !cs.Autorun.Enabled || cs.Autorun.NextRunAt > now || cs.Loop.Enabled || len(cs.QueuedMessages) > 0 {
+	if err != nil || conductorParentPaused(cs) || !cs.Autorun.Enabled || cs.Autorun.NextRunAt > now || cs.Loop.Enabled || len(cs.QueuedMessages) > 0 {
 		s.SessionMu.Unlock()
 		s.endChatRunOwned(sid, token)
 		return false
@@ -217,6 +217,9 @@ func (s *Server) dispatchChatAutorun(sid string, now int64) bool {
 		latest, err := loadChatSession(s.CfgStore.Snapshot(), sid)
 		if err != nil {
 			return err
+		}
+		if conductorParentPaused(latest) {
+			return errChatLoopStale
 		}
 		preserveLatestChatUserMetadata(&cs, latest)
 		return saveChatSessionLocked(s.CfgStore.Snapshot(), cs)
