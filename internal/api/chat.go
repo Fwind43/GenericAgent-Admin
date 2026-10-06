@@ -576,6 +576,10 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 			s.handleConductorDispatchEvent(sid, ev)
 			continue
 		}
+		if ev["type"] == "conductor_resolve" {
+			s.handleConductorResolveEvent(sid, ev)
+			continue
+		}
 		if ev["type"] == "conductor_review" {
 			s.handleConductorReviewEvent(sid, ev)
 			continue

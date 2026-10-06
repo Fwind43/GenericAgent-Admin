@@ -42,6 +42,17 @@ class ConductorPagingTest(unittest.TestCase):
         self.assertEqual(json.dumps(reply), original)
         self.assertGreater(len(chunks), 1)
 
+    def test_large_summary_preserves_explicit_resolution(self):
+        reply = dict(dispatch_id='d', status='failed', result='x' * 20000,
+                     review=None, resolution=dict(status='superseded',
+                     replacement_dispatch_id='new', basis='Retry replaces this attempt'))
+        summary = self.page(reply, {})
+        self.assertTrue(summary['summary_only'])
+        self.assertEqual(summary['status'], 'failed')
+        self.assertEqual(summary['resolution_status'], 'superseded')
+        self.assertEqual(summary['replacement_dispatch_id'], 'new')
+        self.assertNotIn('review_status', summary)
+
     def test_invalid_offsets_and_stale_snapshot_fail_closed(self):
         reply = dict(dispatch_id='d', status='succeeded', result='\U0001f680' * 6000)
         first = self.page(reply, dict(detail=True))

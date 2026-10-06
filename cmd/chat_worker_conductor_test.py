@@ -269,6 +269,27 @@ class ConductorReviewTest(unittest.TestCase):
         self.assertEqual(replies, [(Path('broker') / (events[0]['request_id'] + '.response.json'), 30)])
 
 
+class ConductorResolutionTest(unittest.TestCase):
+    def test_resolution_forwards_and_rejects_wrong_parent(self):
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        node = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'resolve' and any(isinstance(x, ast.Constant) and x.value == 'conductor_resolve' for x in ast.walk(n)))
+        agent, events, replies = object(), [], []
+        def read_reply(path, timeout):
+            replies.append((path, timeout))
+            return {'ok': True, 'resolved': True}
+        env = dict(agent=agent, StepOutcome=lambda value, **kwargs: value,
+                   uuid=__import__('uuid'), broker=Path('broker'),
+                   emit=events.append, read_reply=read_reply)
+        exec(compile(ast.Module(body=[node], type_ignores=[]), '<resolve>', 'exec'), env)
+        args = dict(dispatch_id='old', status='superseded', basis='Same objective replaced', replacement_dispatch_id='new')
+        self.assertFalse(env['resolve'](SimpleNamespace(parent=object()), args, None)['ok'])
+        self.assertEqual(events, [])
+        self.assertTrue(env['resolve'](SimpleNamespace(parent=agent), args, None)['resolved'])
+        for key, value in args.items():
+            self.assertEqual(events[0][key], value)
+        self.assertEqual(replies, [(Path('broker') / (events[0]['request_id'] + '.response.json'), 30)])
+
+
 class ConductorToolBoundaryTest(unittest.TestCase):
     def test_parent_denies_execution_and_restores_inherited_tools(self):
         import sys
@@ -306,7 +327,7 @@ class ConductorToolBoundaryTest(unittest.TestCase):
             try:
                 self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA},
                                  {'ask_user', 'conductor_dispatch', 'conductor_collect', 'conductor_cancel', 'conductor_review',
-                                  'conductor_tasks', 'conductor_defaults', 'conductor_models', 'conductor_model_strategy'})
+                                  'conductor_tasks', 'conductor_defaults', 'conductor_models', 'conductor_model_strategy', 'conductor_resolve'})
                 strategy_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_model_strategy')
                 self.assertEqual(strategy_schema['required'], ['action'])
                 self.assertEqual(strategy_schema['properties']['action']['enum'], ['get', 'set', 'reset'])
@@ -317,6 +338,11 @@ class ConductorToolBoundaryTest(unittest.TestCase):
                 self.assertIn('evidence_ids', review_schema['properties'])
                 self.assertEqual(review_schema['properties']['status']['enum'], ['verified', 'needs_work'])
                 self.assertFalse(review_schema['additionalProperties'])
+                resolve_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_resolve')
+                self.assertEqual(set(resolve_schema['required']), {'dispatch_id', 'status', 'basis'})
+                self.assertEqual(resolve_schema['properties']['status']['enum'], ['closed', 'superseded'])
+                self.assertIn('replacement_dispatch_id', resolve_schema['properties'])
+                self.assertFalse(resolve_schema['additionalProperties'])
                 handler = Handler()
                 for name, args in [('code_run', {'script': 'python agentmain.py --task task'}), ('file_read', {'path': 'subagent_sop.md'})]:
                     result = getattr(handler, 'do_' + name)(args, None)
@@ -459,7 +485,8 @@ class ConductorCoreContractTest(ConductorDispatchOptionsTest):
         tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
         installer = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
         ack = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_ack_conductor_result')
-        exec(compile(ast.Module(body=[ack], type_ignores=[]), '<ack>', 'exec'), self.env)
+        page = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_conductor_collect_page')
+        exec(compile(ast.Module(body=[ack, page], type_ignores=[]), '<ack>', 'exec'), self.env)
         import tempfile
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

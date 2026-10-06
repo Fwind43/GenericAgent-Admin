@@ -2700,6 +2700,10 @@ def _conductor_collect_page(reply, args):
     review = reply.get('review')
     if isinstance(review, dict):
         summary['review_status'] = review.get('status')
+    resolution = reply.get('resolution')
+    if isinstance(resolution, dict):
+        summary['resolution_status'] = resolution.get('status')
+        summary['replacement_dispatch_id'] = resolution.get('replacement_dispatch_id', '')
     summary.update(summary_only=True, snapshot_id=snapshot, evidence_count=len(reply.get('evidence') or []),
                    detail_hint='Use detail=true, offset=0; follow next_offset with snapshot_id. Concatenate json_chunk to reconstruct the complete JSON. Do not treat an excerpt as complete evidence.')
     return summary
@@ -2899,6 +2903,17 @@ def _install_conductor_tools(agent, config):
         return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30),
                            next_prompt='Inspect the review acknowledgment. Correct rejected status, basis, or optional evidence_ids using the error guidance; do not record needs_work solely to bypass a protocol error. Pending is unknown, not success.')
 
+    def resolve(handler, args, response):
+        if handler.parent is not agent:
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Request failed; inspect the receipt before continuing.')
+        request_id = uuid.uuid4().hex
+        emit({'type': 'conductor_resolve', 'request_id': request_id,
+              'broker_dir': str(broker), 'dispatch_id': args.get('dispatch_id'),
+              'status': args.get('status'), 'basis': args.get('basis'),
+              'replacement_dispatch_id': args.get('replacement_dispatch_id', '')})
+        return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30),
+                           next_prompt='Inspect the resolution acknowledgment; errors change nothing. Successful receipts update the earlier task snapshot for this dispatch only. Closed/superseded is an explicit disposition, not successful execution or verified delivery. Replacement work remains independently unresolved until reviewed or explicitly resolved.')
+
     def collect(handler, args, response):
         if handler.parent is not agent:
             return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Request failed; inspect the receipt before continuing.')
@@ -2924,6 +2939,7 @@ def _install_conductor_tools(agent, config):
              ('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
              ('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
              ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. evidence[] contains optional review IDs; evidence_status=none means no ledger records, not failed delivery. result_receipt is only a read acknowledgment. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
+    specs.append(('conductor_resolve', resolve, 'Explicitly close a terminal dispatch with a basis, or supersede it with a newer dispatch owned by this parent. Use only for an authorized disposition or a real replacement of the same objective. Never infer it from session reuse. Does not change execution/review or make replacement work resolved; cannot close active work.', 'dispatch_id'))
     # A remembered SOP/tool call must not bypass the manager-only role.
     def tasks(handler, args, response):
         offset = args.get('offset', 0)
@@ -2998,6 +3014,10 @@ def _install_conductor_tools(agent, config):
                 'unverified': {'type': 'string'},
                 'evidence_ids': {'type': 'array', 'maxItems': 64,
                                  'items': {'type': 'string'}}})
+        if name == 'conductor_resolve':
+            properties.update(status={'type': 'string', 'enum': ['closed', 'superseded']},
+                              basis={'type': 'string', 'minLength': 1, 'maxLength': 4096},
+                              replacement_dispatch_id={'type': 'string', 'description': 'Required only for superseded: a newer dispatch owned by this parent.'})
         if name == 'conductor_dispatch':
             properties['session_id'] = {'type': 'string', 'description': 'Optional owned completed worker session ID. Reuse its history for follow-up work; omit to create a new worker.'}
             properties['llm_no'] = {'type': 'integer', 'minimum': 0, 'description': 'Optional configured runtime model index (not a model name). Overrides this worker only; omitted uses parent subtask defaults, then inherits parent for new workers or retains reused settings.'}
@@ -3005,7 +3025,7 @@ def _install_conductor_tools(agent, config):
             properties['additional_prompt'] = {'type': 'string', 'maxLength': 8192, 'description': 'Extra instructions for this dispatch, appended without replacing system rules. Omit to use parent defaults; empty string disables it. Reuse replaces the previous dispatch prompt, never accumulates it or grants permissions.'}
         schema.append({'type': 'function', 'function': {'name': name, 'description': description,
                        'parameters': {'type': 'object', 'properties': properties,
-                                      'required': ([parameter, 'status', 'basis'] if name == 'conductor_review' else ([parameter] if parameter else [])), 'additionalProperties': False}}})
+                                      'required': ([parameter, 'status', 'basis'] if name in ('conductor_review', 'conductor_resolve') else ([parameter] if parameter else [])), 'additionalProperties': False}}})
     agentmain.TOOLS_SCHEMA = schema
 
     def restore():
