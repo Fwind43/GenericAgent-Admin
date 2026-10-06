@@ -2768,10 +2768,9 @@ def _install_conductor_tools(agent, config):
             return StepOutcome(reply, next_prompt=(
                 'Current session model-selection strategy (JSON string): '
                 + json.dumps(strategy, ensure_ascii=False)
-                + '. This replaces any earlier strategy snapshot for future dispatches, including this turn. '
-                'Use it only for model routing under existing role, permissions and user constraints. '
-                'Choose explicit llm_no/reasoning_effort after checking conductor_models. '
-                'Empty means use subtask defaults/inheritance; queued/running workers are unchanged.'))
+                + '. Replaces earlier snapshots this turn; future subtask routing only, no permission grant. '
+                'Explicit user choices win. Use conductor_models indexes for llm_no/reasoning_effort; '
+                'empty=defaults/inheritance; queued/running workers are unchanged.'))
         return StepOutcome(reply, next_prompt='Inspect the Conductor configuration result and continue the parent task.')
 
     def strategy_tool(self, args, response):
