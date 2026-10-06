@@ -578,9 +578,12 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
     if _, err := options.apply(chatSettings{}); err != nil { return chatConductorChild{}, err }
 
     parentID = safeChatID(parentID)
-    objective = boundedConductorText(objective, conductorMaxObjective)
+    objective = strings.TrimSpace(objective)
     if objective == "" {
         return chatConductorChild{}, errors.New("objective is required")
+    }
+    if utf8.RuneCountInString(objective) > conductorMaxObjective {
+        return chatConductorChild{}, fmt.Errorf("objective exceeds %d characters; shorten it or reference a file; no worker created", conductorMaxObjective)
     }
 
     now := time.Now().Unix()
@@ -1118,10 +1121,11 @@ func (s *Server) handleConductorDispatchEvent(parentID string, ev map[string]int
         return
     }
     response := conductorDispatchResponse{}
-    objective := boundedConductorText(fmt.Sprint(ev["objective"]), conductorMaxObjective)
+    objective, objectiveOK := ev["objective"].(string)
     options := conductorDispatchOptions{}
     dataOptions, err := json.Marshal(ev)
     if err == nil { err = json.Unmarshal(dataOptions, &options) }
+    if !objectiveOK { err = errors.New("objective must be a string") }
     for _, key := range []string{"llm_no", "reasoning_effort", "additional_prompt"} {
         if value, present := ev[key]; present && value == nil { err = fmt.Errorf("%s cannot be null", key) }
     }

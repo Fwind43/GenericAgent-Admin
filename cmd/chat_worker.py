@@ -2801,6 +2801,9 @@ def _install_conductor_tools(agent, config):
         objective = args.get('objective')
         if not isinstance(objective, str) or not objective.strip():
             return dispatch_result({'ok': False, 'error': 'objective is required'})
+        if len(objective.strip()) > 4096:
+            return dispatch_result({'ok': False, 'error': 'objective exceeds 4096 characters; shorten it or reference a file; no worker created',
+                                    'worker_created': False})
         session_id = args.get('session_id', '')
         if not isinstance(session_id, str) or (session_id and not re.fullmatch(r'[A-Za-z0-9_-]+', session_id)):
             return dispatch_result({'ok': False, 'error': 'Invalid session_id'})

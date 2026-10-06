@@ -19,6 +19,17 @@ class ConductorDispatchOptionsTest(unittest.TestCase):
     def call(self, **options):
         return self.env['dispatch'](SimpleNamespace(parent=self.agent), {'objective': 'task', **options}, None)
 
+    def test_objective_length_boundary(self):
+        for value in ('a' * 4097, '\u754c' * 4097):
+            result = self.call(objective=value)
+            self.assertFalse(result['ok'])
+            self.assertFalse(result['worker_created'])
+            self.assertIn('exceeds 4096 characters', result['error'])
+        self.assertEqual(self.events, [])
+        value = '\u754c' * 4095 + '!'
+        self.assertTrue(self.call(objective='  ' + value + '  ')['ok'])
+        self.assertEqual(self.events[0]['objective'], value)
+
     def test_omitted_preserves_absence(self):
         self.assertTrue(self.call()['ok'])
         self.assertNotIn('project_id', self.events[0])
