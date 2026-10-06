@@ -8,7 +8,7 @@ from types import SimpleNamespace
 class ConductorReadTest(unittest.TestCase):
     def setUp(self):
         tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
-        names = {'_ack_conductor_result', '_prepare_conductor_completion'}
+        names = {'_conductor_collect_page', '_ack_conductor_result', '_prepare_conductor_completion'}
         nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
         collect = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == 'collect' and any(isinstance(x, ast.Constant) and x.value == 'conductor_collect' for x in ast.walk(n)))
         self.events = []
