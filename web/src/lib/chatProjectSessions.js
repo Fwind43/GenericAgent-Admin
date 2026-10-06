@@ -1,3 +1,17 @@
+import { conductorSessionTree } from './chatConductor.js'
+
+// Project membership is established before folding workers under their parent.
+// Keep sessions flat for management; sidebar pagination counts visible tree roots.
+export function projectSidebarGroups(groups, query = '') {
+  const q = String(query || '').trim().toLowerCase()
+  const matches = session => String(session?.title || '').toLowerCase().includes(q)
+  return (Array.isArray(groups) ? groups : []).map(group => ({
+    ...group,
+    sessionTrees: conductorSessionTree(group.sessions).filter(node =>
+      !q || matches(node.session) || node.workers.some(matches)),
+  })).filter(group => !q || group.name.toLowerCase().includes(q) || group.sessionTrees.length > 0)
+}
+
 export function projectSessionLabel(session, projects = []) {
   const name = String(session?.project_name || '').trim()
   if (name) return name

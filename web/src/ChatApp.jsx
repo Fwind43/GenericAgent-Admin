@@ -56,7 +56,7 @@ import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ult
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
 import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
-import { projectSessionLabel, groupProjectSessions, runningProjectKeys } from './lib/chatProjectSessions.js'
+import { projectSessionLabel, projectSidebarGroups, groupProjectSessions, runningProjectKeys } from './lib/chatProjectSessions.js'
 import { useRuntimeModelRefresh } from './lib/useRuntimeModelRefresh.js'
 import { hubSessions } from './lib/chatHubSessions.js'
 import { groupRecentSessions, sessionAge } from './lib/chatSessionGroups.js'
@@ -7512,7 +7512,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
       onChange={value=>updateSidebarPreference('sort', value)}/>
   </>
 
-  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions.filter(session => !isConductorParent(session) && !isConductorWorker(session)), pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
+  const projectSessionGroups = useMemo(() => groupProjectSessions(projects, sortedSidebarSessions, pinnedProjects, projectOrder), [projects, sortedSidebarSessions, pinnedProjects, projectOrder])
   const sidebarSections = useMemo(() => conductorSidebarSections(sortedSidebarSessions, sidebarSearch, sidebarPreferences.showConductor), [sortedSidebarSessions, sidebarSearch, sidebarPreferences.showConductor])
   const recentGroupLabels = {
     pinned: ct('\u7f6e\u9876', 'Pinned'),
@@ -7542,11 +7542,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     })
   }
   const managedSessionGroupLabels = { ...recentGroupLabels }
-  const filteredProjectGroups = useMemo(() => {
-    if (!sidebarSearch.trim()) return projectSessionGroups
-    const q = sidebarSearch.trim().toLowerCase()
-    return projectSessionGroups.map(g => ({ ...g, sessions: g.sessions.filter(s => (s.title || '').toLowerCase().includes(q)) })).filter(g => g.name.toLowerCase().includes(q) || g.sessions.length > 0)
-  }, [projectSessionGroups, sidebarSearch])
+  const filteredProjectGroups = useMemo(() => projectSidebarGroups(projectSessionGroups, sidebarSearch), [projectSessionGroups, sidebarSearch])
   const selectedSessionIdSet = useMemo(() => new Set(selectedSessionIds), [selectedSessionIds])
   const selectedSessionCount = sessions.reduce((count, session) => count + (selectedSessionIdSet.has(session.id) ? 1 : 0), 0)
   const visibleSelectedSessionCount = managedSessions.reduce((count, session) => count + (selectedSessionIdSet.has(session.id) ? 1 : 0), 0)
@@ -7625,9 +7621,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const recentSessions = filterSidebarRecentNodes(
     conductorSidebarSections(sortedSidebarSessions, sidebarSearch, false).recent, sidebarPreferences.recentFilter,
   )
-  const renderSidebarTree = node => node.workers.length
-    ? <ConductorSessionTree key={node.session.id} session={node.session} workers={node.workers} renderSession={renderSidebarSession} activeSessionId={sid}/>
-    : renderSidebarSession(node.session)
+  const renderSidebarTree = (node, options = {}) => node.workers.length
+    ? <ConductorSessionTree key={node.session.id} session={node.session} workers={node.workers} renderSession={(session, treeOptions) => renderSidebarSession(session, { ...options, ...treeOptions })} activeSessionId={sid}/>
+    : renderSidebarSession(node.session, options)
   const renderSidebarProject = (group, index) => {
           const projectKey = group.key || group.name
           const expanded = expandedProjectNames.has(projectKey)
@@ -7657,8 +7653,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
               </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>
-              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessions} renderItem={session => renderSidebarSession(session, { hideProjectLabel: true })} ct={ct}/>
-              {!group.sessions.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
+              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessionTrees} renderItem={node => renderSidebarTree(node, { hideProjectLabel: true })} ct={ct}/>
+              {!group.sessionTrees.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
             </div>
           </section>
   }

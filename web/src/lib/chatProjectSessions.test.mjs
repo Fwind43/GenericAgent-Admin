@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { projectSessionLabel, runningProjectKeys, filterRecentNodes, excludeProjectSessions, groupProjectSessions, isProjectSession, moveProjectOrder, projectSessionKeys } from './chatProjectSessions.js'
+import { projectSessionLabel, projectSidebarGroups, runningProjectKeys, filterRecentNodes, excludeProjectSessions, groupProjectSessions, isProjectSession, moveProjectOrder, projectSessionKeys } from './chatProjectSessions.js'
 
 test('qualified ordering isolates names and supports legacy official order', () => {
   const projects = [
@@ -204,4 +204,33 @@ test('project labels resolve ID-only, legacy, unknown and ordinary sessions', ()
   assert.equal(projectSessionLabel({project_id:'missing'},projects),'missing')
   assert.equal(projectSessionLabel({},projects),'')
   assert.equal(projectSessionLabel(null,null),'')
+})
+
+
+test('project sidebar includes conductor parents, folds workers and keeps flat management data', () => {
+  const parent = { id: 'p', title: 'Leader', project_id: 'a', conductor: { role: 'parent' } }
+  const worker = { id: 'w', title: 'Research', project_id: 'a', conductor: { role: 'worker', parent_session_id: 'p' } }
+  const ordinary = { id: 'o', title: 'Chat', project_id: 'a' }
+  const groups = groupProjectSessions([{ id: 'a', name: 'Alpha', provider: 'admin' }, { id: 'b', name: 'Empty', provider: 'official' }], [worker, parent, ordinary], ['a'])
+  const before = JSON.stringify(groups)
+  const result = projectSidebarGroups(groups)
+  assert.equal(result[0].pinned, true)
+  assert.deepEqual(result[0].sessions, [worker, parent, ordinary])
+  assert.deepEqual(result[0].sessionTrees, [{ session: parent, workers: [worker] }, { session: ordinary, workers: [] }])
+  assert.deepEqual(result[1].sessionTrees, [])
+  assert.equal(JSON.stringify(groups), before)
+  assert.deepEqual(projectSidebarGroups(groups, ' RESEARCH ')[0].sessionTrees, [{ session: parent, workers: [worker] }])
+  assert.equal(projectSidebarGroups(groups, 'leader')[0].sessionTrees[0].session.id, 'p')
+  assert.deepEqual(projectSidebarGroups(groups, 'alpha')[0].sessionTrees, [])
+  assert.deepEqual(projectSidebarGroups(groups, 'missing'), [])
+})
+
+test('project sidebar retains standalone workers and does not fold across project boundaries', () => {
+  const parent = { id: 'p', project_mode: 'Alpha', conductor: { role: 'parent' } }
+  const worker = { id: 'w', project_mode: 'Beta', conductor: { role: 'worker', parent_session_id: 'p' } }
+  const orphan = { id: 'orphan', project_mode: 'Beta', conductor: { role: 'worker', parent_session_id: 'deleted' } }
+  const groups = projectSidebarGroups(groupProjectSessions(['Alpha', 'Beta'], [parent, worker, orphan]))
+  assert.deepEqual(groups[0].sessionTrees, [{ session: parent, workers: [] }])
+  assert.deepEqual(groups[1].sessionTrees.map(node => node.session.id), ['w', 'orphan'])
+  assert.deepEqual(projectSidebarGroups(null), [])
 })
