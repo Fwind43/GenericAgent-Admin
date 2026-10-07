@@ -434,19 +434,29 @@ test.each([
   const { container } = render(<ChatApp />)
   const parentRow = () => [...container.querySelectorAll('.oa-sidebar .oa-session-row')]
     .find(row => row.querySelector('.oa-session-title b')?.textContent === parent.title)
-  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-child-activity')?.textContent).toBe('Workers2 running1 queued'))
+  await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Child tasks running"]')).toBeTruthy())
   expect(parentRow().classList.contains('is-running')).toBe(true)
-  expect(parentRow().querySelector('[aria-label="2 child tasks running"]')).toBeTruthy()
+  expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(1)
+  expect(parentRow().querySelector('.oa-session-child-activity')).toBeNull()
+  expect(parentRow().textContent).not.toMatch(/\d+ (running|queued)/)
   expect(parent.running).toBe(false)
 
   children = [child('live', 'succeeded'), child('manual', 'failed'), child('queued', 'queued')]
   fireEvent(window, new Event('online'))
-  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-child-activity')?.textContent).toBe('Workers1 queued'))
+  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-running-label')).toBeNull())
+  expect(parentRow().querySelector('.oa-session-child-activity')).toBeNull()
   expect(parentRow().classList.contains('is-running')).toBe(false)
   expect(parentRow().querySelector('.oa-session-running-label')).toBeNull()
 
   children = [child('live', 'succeeded'), child('manual', 'failed'), child('queued', 'cancelled')]
   fireEvent(window, new Event('online'))
-  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-child-activity')).toBeNull())
-  expect(parentRow().querySelector('.oa-session-running-label')).toBeNull()
+  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-running-label')).toBeNull())
+  expect(parentRow().classList.contains('is-running')).toBe(false)
+
+  parent.running = true
+  children = [child('live', 'running')]
+  fireEvent(window, new Event('online'))
+  await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Running"]')).toBeTruthy())
+  expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(1)
+  expect(parentRow().querySelector('[aria-label="Child tasks running"]')).toBeNull()
 })
