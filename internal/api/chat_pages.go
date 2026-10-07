@@ -21,6 +21,19 @@ type chatPageMessage struct {
 	chatMessage
 	ContentRevision string `json:"content_revision"`
 }
+
+func (m chatPageMessage) MarshalJSON() ([]byte, error) {
+	// Do not promote chatMessage.MarshalJSON: it drops the page-only revision.
+	// A method-free alias retains the message fields and attachment contract.
+	type plain chatMessage
+	message := m.chatMessage
+	message.Files = normalizeChatAttachmentMaps(message.Files)
+	return json.Marshal(struct {
+		plain
+		ContentRevision string `json:"content_revision"`
+	}{plain: plain(message), ContentRevision: m.ContentRevision})
+}
+
 type chatPageCursor struct {
 	End    int    `json:"end"`
 	Prefix string `json:"prefix"`

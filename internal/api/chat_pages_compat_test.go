@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -57,11 +58,44 @@ func TestChatPagesCompatibilityBytes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			digest := fmt.Sprintf("%x", sha256.Sum256(b))
-			if digest != golden[fmt.Sprintf("%d/%d", n, i)] {
-				t.Fatalf("serialized response changed: %d/%d %s", n, i, digest)
+			// The page-only revision is intentionally new. Preserve the old wire
+			// contract for every existing message field and all page metadata.
+			legacyPage := make(map[string]interface{}, len(page))
+			for key, value := range page {
+				legacyPage[key] = value
 			}
-			t.Logf("fixture=%d page=%d bytes=%d sha256=%s", n, i, len(b), digest)
+			messages := page["messages"].([]chatPageMessage)
+			legacyMessages := make([]chatMessage, len(messages))
+			for j, message := range messages {
+				legacyMessages[j] = message.chatMessage
+			}
+			legacyPage["messages"] = legacyMessages
+			legacyBytes, err := json.Marshal(legacyPage)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var wirePage, legacyWirePage map[string]interface{}
+			if err := json.Unmarshal(b, &wirePage); err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(legacyBytes, &legacyWirePage); err != nil {
+				t.Fatal(err)
+			}
+			for _, item := range wirePage["messages"].([]interface{}) {
+				message := item.(map[string]interface{})
+				if revision, ok := message["content_revision"].(string); !ok || revision == "" {
+					t.Fatalf("page message %v lost content_revision", message["id"])
+				}
+				delete(message, "content_revision")
+			}
+			if !reflect.DeepEqual(wirePage, legacyWirePage) {
+				t.Fatalf("serialized page changed fields other than content_revision: %d/%d", n, i)
+			}
+			digest := fmt.Sprintf("%x", sha256.Sum256(legacyBytes))
+			if digest != golden[fmt.Sprintf("%d/%d", n, i)] {
+				t.Fatalf("existing serialized fields changed: %d/%d %s", n, i, digest)
+			}
+			t.Logf("fixture=%d page=%d bytes=%d legacy-sha256=%s", n, i, len(b), digest)
 			if i > 0 && len(page) != 4 {
 				t.Fatal("history metadata leaked")
 			}

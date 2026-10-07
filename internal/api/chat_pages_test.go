@@ -1,14 +1,18 @@
 package api
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"unicode/utf8"
+
+	"genericagent-admin-go/internal/config"
 )
 
 func pageFixture(n int) chatSession {
@@ -27,6 +31,105 @@ func requirePage(t *testing.T, cs chatSession, query string) map[string]interfac
 		t.Fatalf("page: status=%d err=%v", status, err)
 	}
 	return value.(map[string]interface{})
+}
+
+func TestChatPageHTTPPreservesMessageRevision(t *testing.T) {
+	s := newGoalTestServer(t, t.TempDir())
+	updateTestConfig(t, s.CfgStore, func(cfg *config.AppConfig) {
+		cfg.ChatDataDir = filepath.Join(t.TempDir(), "chat")
+	})
+	cs := pageFixture(45)
+	cs.RawHistory = nil
+	for i := range cs.Messages {
+		cs.Messages[i].Files = []map[string]interface{}{{
+			"name": "receipt.txt", "data_url": "data:text/plain;base64,eA==", "path": "keep",
+		}}
+	}
+	if err := saveChatSessionLocked(s.CfgStore.Snapshot(), cs); err != nil {
+		t.Fatal(err)
+	}
+
+	get := func(t *testing.T, query string) map[string]json.RawMessage {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		s.chatHandler(rec, httptest.NewRequest("GET", "/api/chat/session/"+cs.ID+query, nil))
+		if rec.Code != 200 {
+			t.Fatalf("GET %s: %d %s", query, rec.Code, rec.Body.String())
+		}
+		var body map[string]json.RawMessage
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+			t.Fatal(err)
+		}
+		return body
+	}
+	checkMessage := func(t *testing.T, fields map[string]json.RawMessage) {
+		t.Helper()
+		var id, revision string
+		if err := json.Unmarshal(fields["id"], &id); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(fields["content_revision"], &revision); err != nil {
+			t.Fatalf("HTTP message %s lost content_revision: %v", id, err)
+		}
+		var original *chatMessage
+		for i := range cs.Messages {
+			if cs.Messages[i].ID == id {
+				original = &cs.Messages[i]
+				break
+			}
+		}
+		if original == nil {
+			t.Fatalf("unknown message %q", id)
+		}
+		canonical, err := json.Marshal(original)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if expected := fmt.Sprintf("%x", sha256.Sum256(canonical)); revision != expected {
+			t.Fatalf("HTTP message %s revision=%q want %q", id, revision, expected)
+		}
+		delete(fields, "content_revision")
+		var expected map[string]json.RawMessage
+		if err := json.Unmarshal(canonical, &expected); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(fields, expected) {
+			t.Fatalf("HTTP message %s changed fields or attachment normalization", id)
+		}
+	}
+
+	first := get(t, "?view=page")
+	var result chatSessionResult
+	if err := json.Unmarshal(first["result"], &result); err != nil {
+		t.Fatal(err)
+	}
+	var before string
+	if err := json.Unmarshal(first["before"], &before); err != nil {
+		t.Fatal(err)
+	}
+	for name, page := range map[string]map[string]json.RawMessage{
+		"initial": first, "older": get(t, "?view=page&before="+url.QueryEscape(before)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			var messages []map[string]json.RawMessage
+			if err := json.Unmarshal(page["messages"], &messages); err != nil {
+				t.Fatal(err)
+			}
+			if len(messages) == 0 {
+				t.Fatal("empty page")
+			}
+			for _, message := range messages {
+				checkMessage(t, message)
+			}
+		})
+	}
+	t.Run("single", func(t *testing.T) {
+		message := get(t, "?view=message&message_id="+result.ID+"&revision="+result.Revision)
+		checkMessage(t, message)
+	})
+	if cs.Messages[0].Files[0]["data_url"] == nil {
+		t.Fatal("serialization mutated source attachments")
+	}
 }
 
 func TestChatPagesPreserveConductor(t *testing.T) {
