@@ -777,14 +777,14 @@ function FileAttachment({ path }) {
       {isImage && <img src={imageUrl} alt="" loading="lazy" onError={(e)=>{ e.currentTarget.style.display='none' }} />}
     </button>
     <span className="oa-file-meta">
-      <span className="oa-file-name-row"><FilePreviewLink href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title="预览文件"><b>{name}</b></FilePreviewLink><small>{extension}</small></span>
-      <em>{directory || ct('本地文件', 'Local file')}</em>
+      <span className="oa-file-name-row"><FilePreviewLink className="oa-file-name-link" href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title={ct(`预览文件 ${name}`, `Preview file ${name}`)}><b>{name}</b></FilePreviewLink></span>
+      <span className="oa-file-detail"><small>{extension}</small><em title={directory}>{directory || ct('本地文件', 'Local file')}</em></span>
     </span>
     <span className="oa-file-actions">
-      <FileDownloadLink href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title="下载文件" aria-label={`下载文件 ${name}`}><Download size={15}/></FileDownloadLink>
-      <button type="button" onClick={() => open('file')} title={ct('打开文件', 'Open file')} aria-label={`打开文件 ${name}`}><ExternalLink size={15}/></button>
-      <button type="button" onClick={() => open('folder')} title={ct('打开所在位置', 'Open containing folder')} aria-label={`打开 ${name} 所在位置`}><FolderOpen size={15}/></button>
-      <CopyButton text={clean} compact />
+      <FileDownloadLink href={`/api/files/download?path=${encodeURIComponent(clean)}`} download={name} title={ct('下载文件', 'Download file')} aria-label={ct(`下载文件 ${name}`, `Download file ${name}`)}><Download size={15}/></FileDownloadLink>
+      <button type="button" onClick={() => open('file')} title={ct('打开文件', 'Open file')} aria-label={ct(`打开文件 ${name}`, `Open file ${name}`)}><ExternalLink size={15}/></button>
+      <button type="button" onClick={() => open('folder')} title={ct('打开所在位置', 'Open containing folder')} aria-label={ct(`打开 ${name} 所在位置`, `Open containing folder for ${name}`)}><FolderOpen size={15}/></button>
+      <CopyButton text={clean} compact label={ct('复制路径', 'Copy path')} copiedLabel={ct('路径已复制', 'Path copied')} />
     </span>
   </span>
 }

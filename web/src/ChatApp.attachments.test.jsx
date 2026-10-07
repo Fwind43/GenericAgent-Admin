@@ -65,6 +65,30 @@ describe('chat file attachments', () => {
     expect(download.getAttribute('download')).toBe('report.pdf')
   })
 
+  test.each(['user', 'assistant'])('keeps the full long filename and separates detail/actions for %s', role => {
+    const directory = 'C:/Downloads/insurance/' + 'long-folder/'.repeat(6)
+    const name = '179126367865143258000_' + 'insurance_policy_'.repeat(12) + '.pdf'
+    const path = directory + name
+    const { container } = render(
+      <ChatMessage
+        message={{ id:`${role}-long-file`, role, content:`Review\n\n[FILE:${path}]`, files:[], created_at:0 }}
+        pending={false}
+        onAskReply={vi.fn()}
+      />,
+    )
+    const card = container.querySelector('.oa-file-card')
+    const preview = card.querySelector('.oa-file-name-link')
+    expect(preview.textContent).toBe(name)
+    expect(preview.title).toContain(name)
+    expect(preview.getAttribute('download')).toBe(name)
+    expect(preview.getAttribute('href')).toBe(`/api/files/download?path=${encodeURIComponent(path)}`)
+    expect(card.querySelector('.oa-file-detail small').textContent).toBe('PDF')
+    expect(card.querySelector('.oa-file-detail em').title).toBe(directory.slice(0, -1))
+    expect(card.querySelector('.oa-file-name-row small')).toBeNull()
+    expect(card.querySelectorAll('.oa-file-actions > a, .oa-file-actions > button')).toHaveLength(4)
+    expect(card.querySelector('.oa-mini-copy').title).toBe('\u590d\u5236\u8def\u5f84')
+  })
+
   test('renders markdown link with local path as a downloadable link with action buttons', () => {
     const { container } = render(
       <ChatMessage
