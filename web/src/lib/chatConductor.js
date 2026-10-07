@@ -76,6 +76,14 @@ export const conductorWorkers = (session, sessions = []) => {
   return [...workers.values()]
 }
 
+// Sidebar activity follows existing worker sessions, including manual reruns.
+export const conductorSidebarActivity = workers => (Array.isArray(workers) ? workers : []).reduce((activity, worker) => {
+  const status = workerStatus(worker)
+  if (worker?.running || status === 'running') activity.running += 1
+  else if (status === 'queued') activity.queued += 1
+  return activity
+}, { running: 0, queued: 0 })
+
 // Search whole trees so a matching worker never loses its parent context.
 export const conductorSidebarSections = (sessions, query = '', showConductor = true) => {
   const q = query.trim().toLowerCase()

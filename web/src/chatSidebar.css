@@ -101,6 +101,27 @@
 .oa-chat .oa-sidebar .oa-project-toggle b { font-size: 13px; font-weight: 450; }
 .oa-chat .oa-sidebar .oa-project-toggle small { font-weight: 400; opacity: .55; }
 
+.oa-chat .oa-sidebar .oa-session-child-activity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 4px;
+  color: var(--oa-session-live);
+  background: color-mix(in srgb, var(--oa-session-live) 10%, transparent);
+  font-size: 10px;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 18px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.oa-chat .oa-sidebar .oa-session-child-activity.is-queued {
+  color: var(--muted);
+  background: var(--surface-strong);
+}
+
 /* Style the actual scrolling container, not the non-scrolling lists. */
 .oa-chat .oa-sidebar .oa-sidebar-sections {
   --sidebar-scroll-thumb: var(--scrollbar-thumb);

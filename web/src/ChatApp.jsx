@@ -1,6 +1,6 @@
 import { ChatPackageBar } from './ui/chatChrome'
 import { UiSurface, useUiPackage } from './ui/UiHost'
-import { conductorSidebarSections } from './lib/chatConductor.js'
+import { conductorSidebarActivity, conductorSidebarSections, conductorSessionTree } from './lib/chatConductor.js'
 import { readSidebarPreferences, sortSidebarSessions, filterSidebarRecentNodes } from './lib/chatSidebarPreferences.js'
 import { normalizeChatAttachments, chatAttachmentSource } from './lib/chatAttachments.js'
 import './conductor.css'
@@ -295,6 +295,8 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   ageText = '',
   unread = false,
   waiting = false,
+  childRunning = 0,
+  childQueued = 0,
   nested = false,
   treeExpanded,
   onToggleTree,
@@ -303,13 +305,18 @@ const SidebarSessionRow = memo(function SidebarSessionRow({
   const sidebarLoop = loopSidebarView(session.loop)
   const title = shortTitle(session)
   const conductorKind = isConductorParent(session) ? 'parent' : (isConductorWorker(session) ? 'worker' : '')
-  return <div className={`oa-session-row ${active?'active':''} ${session.running?'is-running':''} ${session.pinned?'is-pinned':''} ${nested?'is-conductor-worker':''}`}>
+  const childrenRunning = conductorKind === 'parent' ? childRunning : 0
+  const childrenQueued = conductorKind === 'parent' ? childQueued : 0
+  const runningLabel = session.running && !waiting
+    ? ct('运行中', 'Running')
+    : ct(`子任务运行中：${childrenRunning}`, `${childrenRunning} child tasks running`)
+  return <div className={`oa-session-row ${active?'active':''} ${session.running || childrenRunning > 0 ? 'is-running' : ''} ${session.pinned?'is-pinned':''} ${nested?'is-conductor-worker':''}`}>
     {editing ? <div className="oa-rename">
       <input value={draftTitle} autoFocus aria-label={ct('会话标题', 'Session title')} onChange={event=>actionsRef.current.setDraftTitle(event.target.value)} onKeyDown={event=>{ if(event.key==='Enter') actionsRef.current.saveRename(session.id); if(event.key==='Escape') actionsRef.current.cancelRename() }}/>
       <button onClick={()=>actionsRef.current.saveRename(session.id)} aria-label={ct('保存标题', 'Save title')}><Check size={14}/></button><button onClick={()=>actionsRef.current.cancelRename()} aria-label={ct('取消重命名', 'Cancel rename')}><X size={14}/></button>
     </div> : <SessionTimeTooltip title={title} timeLabel={session.updated_at ? `${ct('更新时间', 'Updated')}: ${ageText} · ${fmtTime(session.updated_at)}` : ''}><button className="oa-session" onClick={()=>actionsRef.current.openSession(session.id)}>
-      <span className="oa-session-title">{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{projectLabel && <span className="oa-session-project-badge" title={ct(`项目：${projectLabel}`, `Project: ${projectLabel}`)}><Folder size={10} aria-hidden="true"/>{projectLabel}</span>}{conductorKind === 'parent' && <span role={onToggleTree ? 'button' : undefined} tabIndex={onToggleTree ? 0 : undefined} aria-expanded={onToggleTree ? treeExpanded : undefined} onClick={onToggleTree ? event=>{ event.stopPropagation(); onToggleTree(event) } : undefined} onKeyDown={onToggleTree ? event=>{ if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onToggleTree(event) } } : undefined} className={`oa-session-conductor-badge ${onToggleTree ? 'oa-conductor-badge-toggle' : ''}`} title={onToggleTree ? (treeExpanded ? ct('收起子会话', 'Collapse child sessions') : ct('点击展开子会话', 'Click to expand child sessions')) : ct('指挥家会话', 'Conductor session')} aria-label={onToggleTree ? (treeExpanded ? ct('指挥家：收起子会话', 'Conductor: collapse child sessions') : ct('指挥家：展开子会话', 'Conductor: expand child sessions')) : ct('指挥家会话', 'Conductor session')}>{ct('指挥家', 'Conductor')}{onToggleTree && (treeExpanded ? <ChevronDown size={12} aria-hidden="true"/> : <ChevronRight size={12} aria-hidden="true"/>)}</span>}{conductorKind === 'worker' && !nested && <em className="oa-conductor-role is-worker">{ct('子任务', 'Worker')}</em>}{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
-      {session.running && !waiting && <small> <em className="oa-session-running-label" role="img" aria-label={ct('运行中', 'Running')} title={ct('运行中', 'Running')}><span className="oa-session-running-wave" style={{ '--oa-wave-phase': `${-(Array.from(String(session.id)).reduce((hash, char)=> (hash * 31 + char.charCodeAt(0)) % 2400, 0) / 1000)}s` }} aria-hidden="true"><i/><i/><i/><i/></span></em></small>}
+      <span className="oa-session-title">{session.pinned && <Pin className="oa-session-pin" size={12} aria-label={ct('\u5df2\u7f6e\u9876', 'Pinned')}/>}<b>{title}</b>{projectLabel && <span className="oa-session-project-badge" title={ct(`项目：${projectLabel}`, `Project: ${projectLabel}`)}><Folder size={10} aria-hidden="true"/>{projectLabel}</span>}{conductorKind === 'parent' && <span role={onToggleTree ? 'button' : undefined} tabIndex={onToggleTree ? 0 : undefined} aria-expanded={onToggleTree ? treeExpanded : undefined} onClick={onToggleTree ? event=>{ event.stopPropagation(); onToggleTree(event) } : undefined} onKeyDown={onToggleTree ? event=>{ if(event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onToggleTree(event) } } : undefined} className={`oa-session-conductor-badge ${onToggleTree ? 'oa-conductor-badge-toggle' : ''}`} title={onToggleTree ? (treeExpanded ? ct('收起子会话', 'Collapse child sessions') : ct('点击展开子会话', 'Click to expand child sessions')) : ct('指挥家会话', 'Conductor session')} aria-label={onToggleTree ? (treeExpanded ? ct('指挥家：收起子会话', 'Conductor: collapse child sessions') : ct('指挥家：展开子会话', 'Conductor: expand child sessions')) : ct('指挥家会话', 'Conductor session')}>{ct('指挥家', 'Conductor')}{onToggleTree && (treeExpanded ? <ChevronDown size={12} aria-hidden="true"/> : <ChevronRight size={12} aria-hidden="true"/>)}</span>}{(childrenRunning > 0 || childrenQueued > 0) && <em className={`oa-session-child-activity ${childrenRunning ? 'is-running' : 'is-queued'}`} title={ct(`子任务：${childrenRunning} 个运行中，${childrenQueued} 个排队中`, `Child tasks: ${childrenRunning} running, ${childrenQueued} queued`)}>{ct('子任务', 'Workers')}{childrenRunning > 0 && <span>{ct(`${childrenRunning} 运行`, `${childrenRunning} running`)}</span>}{childrenQueued > 0 && <span>{ct(`${childrenQueued} 排队`, `${childrenQueued} queued`)}</span>}</em>}{conductorKind === 'worker' && !nested && <em className="oa-conductor-role is-worker">{ct('子任务', 'Worker')}</em>}{waiting && <em className="oa-session-waiting-label" title={ct('\u7b49\u5f85\u56de\u590d', 'Waiting for reply')}><CircleAlert size={12} aria-hidden="true"/>{ct('\u5f85\u56de\u590d', 'Waiting')}</em>}{unread && <em className="oa-session-unread-label">{ct('未读', 'Unread')}</em>}<SessionAutorunBadge enabled={Boolean(session.autorun?.enabled)} sessionId={session.id} targetSessionId={session.id}/>{sidebarLoop && <em className="oa-session-loop-badge" title={ct(`Loop 进行中 · 第 ${sidebarLoop.round} 轮`, `Loop active · round ${sidebarLoop.round}`)}>Loop {sidebarLoop.round}</em>}{session.hub_enabled && <em className="oa-session-hub-badge" title={ct('已入驻官方 Hub', 'Joined official Hub')}>Hub</em>}{hasDraft && <em className="oa-session-draft-badge">{ct('草稿', 'Draft')}</em>}</span>
+      {((session.running && !waiting) || childrenRunning > 0) && <small> <em className="oa-session-running-label" role="img" aria-label={runningLabel} title={runningLabel}><span className="oa-session-running-wave" style={{ '--oa-wave-phase': `${-(Array.from(String(session.id)).reduce((hash, char)=> (hash * 31 + char.charCodeAt(0)) % 2400, 0) / 1000)}s` }} aria-hidden="true"><i/><i/><i/><i/></span></em></small>}
     </button></SessionTimeTooltip>}
     {!editing && <button className={`oa-session-more ${menuOpen ? 'is-open' : ''}`} onClick={(event)=>actionsRef.current.toggleMenu(session.id, event)} aria-label={ct('会话操作', 'Session actions')}><MoreHorizontal size={16}/></button>}
   </div>
@@ -5063,6 +5070,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
   })
   const waitingSessionIds = new Set(waitingSessions.map(session => session.id))
   const runningProjects = runningProjectKeys(sessions, waitingSessionIds)
+  const conductorSidebarActivities = useMemo(() => new Map(
+    conductorSessionTree(sessions).map(node => [node.session.id, conductorSidebarActivity(node.workers)]),
+  ), [sessions])
   const aggregateTaskbarState = aggregateChatTaskbarState({
     sid, liveRunning: busy && streamingSid === sid, liveState: taskbarState,
     sessions, unread: new Set(sessions.filter(chatReadState.unread).map(session => session.id)),
@@ -7609,6 +7619,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
     ageText={sessionAgeText(session.updated_at)}
     unread={chatReadState.unread(session)}
     waiting={waitingSessionIds.has(session.id)}
+    childRunning={conductorSidebarActivities.get(session.id)?.running || 0}
+    childQueued={conductorSidebarActivities.get(session.id)?.queued || 0}
     treeExpanded={options.treeExpanded}
     onToggleTree={options.onToggleTree}
     nested={Boolean(options.nested)}

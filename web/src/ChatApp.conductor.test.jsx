@@ -118,7 +118,7 @@ test('real ChatApp renders a Conductor workspace and navigates and stops workers
 
   fireEvent.click(await screen.findByRole('button', { name: 'Subagents' }))
   const workspace = await screen.findByRole('complementary', { name: 'Subagents' })
-  const badge = within(document.getElementById('oa-sidebar-history-body')).getByLabelText('Conductor session')
+  const badge = within(document.getElementById('oa-sidebar-history-body')).getByLabelText('Conductor: expand child sessions')
   expect(badge.closest('.oa-session-row')).toBeTruthy()
   expect(badge.closest('.oa-session-title')).toBeTruthy()
   expect(badge.previousElementSibling.tagName).toBe('B')
@@ -404,4 +404,49 @@ test.each(['light', 'dark', 'warm'])('recovery pending remains explicit (%s)', a
     unregister()
   }
   delete document.documentElement.dataset.theme
+})
+
+test.each([
+  ['conductor', true, false],
+  ['pinned', true, true],
+  ['recent', false, false],
+])('sidebar child activity updates while the parent remains idle (%s)', async (_section, showConductor, pinned) => {
+  localStorage.setItem('ga-admin-lang', 'en')
+  sessionStorage.setItem('ga-admin-chat-session-selection-v1', JSON.stringify({ __default__: 'open' }))
+  localStorage.setItem('ga-chat-sidebar-preferences', JSON.stringify({ showConductor, conductorsExpanded: true }))
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }))
+  vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} })
+  Object.defineProperty(Element.prototype, 'scrollTo', { configurable: true, value: vi.fn() })
+  const parent = session('activity-parent', 'Activity leader', { pinned, conductor: { role: 'parent' } })
+  const open = session('open', 'Ordinary chat')
+  const child = (id, status, running = false) => session(id, id, {
+    running, conductor: { role: 'worker', parent_session_id: parent.id, status },
+  })
+  let children = [child('live', 'running'), child('manual', 'succeeded', true), child('queued', 'queued')]
+  vi.stubGlobal('fetch', vi.fn(async input => {
+    const path = new URL(String(input), 'http://localhost').pathname
+    let data = {}
+    if (path === '/api/chat/sessions') data = { sessions: [parent, ...children, open] }
+    else if (path === '/api/chat/session/open') data = { ...open, messages: [], queue: [] }
+    return new Response(JSON.stringify({ ok: true, ...data, data }), { headers: { 'Content-Type': 'application/json' } })
+  }))
+  const { container } = render(<ChatApp />)
+  const parentRow = () => [...container.querySelectorAll('.oa-sidebar .oa-session-row')]
+    .find(row => row.querySelector('.oa-session-title b')?.textContent === parent.title)
+  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-child-activity')?.textContent).toBe('Workers2 running1 queued'))
+  expect(parentRow().classList.contains('is-running')).toBe(true)
+  expect(parentRow().querySelector('[aria-label="2 child tasks running"]')).toBeTruthy()
+  expect(parent.running).toBe(false)
+
+  children = [child('live', 'succeeded'), child('manual', 'failed'), child('queued', 'queued')]
+  fireEvent(window, new Event('online'))
+  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-child-activity')?.textContent).toBe('Workers1 queued'))
+  expect(parentRow().classList.contains('is-running')).toBe(false)
+  expect(parentRow().querySelector('.oa-session-running-label')).toBeNull()
+
+  children = [child('live', 'succeeded'), child('manual', 'failed'), child('queued', 'cancelled')]
+  fireEvent(window, new Event('online'))
+  await waitFor(() => expect(parentRow()?.querySelector('.oa-session-child-activity')).toBeNull())
+  expect(parentRow().querySelector('.oa-session-running-label')).toBeNull()
 })
