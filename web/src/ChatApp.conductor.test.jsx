@@ -437,6 +437,8 @@ test.each([
   await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Child tasks running"]')).toBeTruthy())
   expect(parentRow().classList.contains('is-running')).toBe(true)
   expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(1)
+  expect(parentRow().querySelector('.oa-session-child-running-label svg.lucide-git-branch')).toBeTruthy()
+  expect(parentRow().querySelector('[aria-label="Conductor running"]')).toBeNull()
   expect(parentRow().querySelector('.oa-session-child-activity')).toBeNull()
   expect(parentRow().textContent).not.toMatch(/\d+ (running|queued)/)
   expect(parent.running).toBe(false)
@@ -456,7 +458,21 @@ test.each([
   parent.running = true
   children = [child('live', 'running')]
   fireEvent(window, new Event('online'))
-  await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Running"]')).toBeTruthy())
+  await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Conductor running"]')).toBeTruthy())
+  expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(2)
+  expect(parentRow().querySelector('[aria-label="Child tasks running"] svg.lucide-git-branch')).toBeTruthy()
+  expect(parentRow().querySelector('[aria-label="Conductor running"] svg')).toBeNull()
+
+  children = [child('live', 'succeeded')]
+  fireEvent(window, new Event('online'))
+  await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Child tasks running"]')).toBeNull())
+  expect(parentRow().querySelector('[aria-label="Conductor running"]')).toBeTruthy()
   expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(1)
-  expect(parentRow().querySelector('[aria-label="Child tasks running"]')).toBeNull()
+
+  parent.running = false
+  children = [child('live', 'running')]
+  fireEvent(window, new Event('online'))
+  await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Conductor running"]')).toBeNull())
+  expect(parentRow().querySelector('[aria-label="Child tasks running"] svg.lucide-git-branch')).toBeTruthy()
+  expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(1)
 })

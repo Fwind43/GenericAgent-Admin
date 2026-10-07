@@ -266,6 +266,16 @@
 }
 .oa-chat .oa-sidebar .oa-session-project-badge svg { flex-shrink: 0; }
 
+/* Separate the conductor's own activity from its workers without count badges. */
+.oa-chat .oa-sidebar .oa-session-row .oa-session:has(.oa-session-activity) { padding-right: 40px !important; }
+.oa-chat .oa-sidebar .oa-session-row .oa-session-activity {
+  display: inline-flex !important; align-items: center; gap: 6px; flex: 0 0 auto;
+  width: auto; max-width: none !important;
+}
+.oa-chat .oa-sidebar .oa-session-row .oa-session-running-label { width: 18px; flex: 0 0 auto; }
+.oa-chat .oa-sidebar .oa-session-row .oa-session-child-running-label { width: auto; gap: 3px; }
+.oa-chat .oa-sidebar .oa-session-child-running-label > svg { flex-shrink: 0; }
+
 /* Outdent section labels without moving their content or sticky offsets. */
 .oa-chat .oa-sidebar .oa-sidebar-section-head {
   box-shadow: inset 0 -1px color-mix(in srgb, var(--text) 8%, transparent);
