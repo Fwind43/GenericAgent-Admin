@@ -273,8 +273,18 @@
   width: auto; max-width: none !important;
 }
 .oa-chat .oa-sidebar .oa-session-row .oa-session-running-label { width: 18px; flex: 0 0 auto; }
-.oa-chat .oa-sidebar .oa-session-row .oa-session-child-running-label { width: auto; gap: 3px; }
-.oa-chat .oa-sidebar .oa-session-child-running-label > svg { flex-shrink: 0; }
+.oa-chat .oa-sidebar .oa-session-row .oa-session-child-running-label { width: 14px; justify-content: center; }
+.oa-chat .oa-sidebar .oa-session-child-running-label > svg {
+  flex-shrink: 0;
+  animation: oa-child-task-breathe 2.4s ease-in-out infinite;
+}
+@keyframes oa-child-task-breathe {
+  0%, 100% { opacity: .55; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oa-chat .oa-sidebar .oa-session-child-running-label > svg { animation: none; opacity: .85; }
+}
 
 /* Outdent section labels without moving their content or sticky offsets. */
 .oa-chat .oa-sidebar .oa-sidebar-section-head {

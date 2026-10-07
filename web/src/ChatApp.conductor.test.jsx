@@ -438,6 +438,8 @@ test.each([
   expect(parentRow().classList.contains('is-running')).toBe(true)
   expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(1)
   expect(parentRow().querySelector('.oa-session-child-running-label svg.lucide-git-branch')).toBeTruthy()
+  expect(parentRow().querySelector('.oa-session-child-running-label .oa-session-running-wave')).toBeNull()
+  expect(parentRow().querySelector('.oa-session-child-running-label').children).toHaveLength(1)
   expect(parentRow().querySelector('[aria-label="Conductor running"]')).toBeNull()
   expect(parentRow().querySelector('.oa-session-child-activity')).toBeNull()
   expect(parentRow().textContent).not.toMatch(/\d+ (running|queued)/)
@@ -461,6 +463,9 @@ test.each([
   await waitFor(() => expect(parentRow()?.querySelector('[aria-label="Conductor running"]')).toBeTruthy())
   expect(parentRow().querySelectorAll('.oa-session-running-label')).toHaveLength(2)
   expect(parentRow().querySelector('[aria-label="Child tasks running"] svg.lucide-git-branch')).toBeTruthy()
+  expect(parentRow().querySelector('[aria-label="Child tasks running"] .oa-session-running-wave')).toBeNull()
+  expect(parentRow().querySelector('[aria-label="Conductor running"] .oa-session-running-wave')).toBeTruthy()
+  expect(parentRow().querySelectorAll('.oa-session-running-wave')).toHaveLength(1)
   expect(parentRow().querySelector('[aria-label="Conductor running"] svg')).toBeNull()
 
   children = [child('live', 'succeeded')]
