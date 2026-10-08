@@ -2,6 +2,15 @@
 
 This file records manually curated release changes for GenericAgent Admin Go.
 
+## v0.3.20
+
+- **更新入口与弹窗**：新增独立、按更新状态呈现的弹窗，可从 Chat 左上角版本号打开；区分更新说明、日志、下载及已准备状态，安装与重启仍需明确确认。
+- **安全更新说明**：发布说明支持 Markdown 展示，过滤不安全的 HTML 与链接。
+- **吞吐统计修复**：输出 tok/s 使用完整模型请求耗时计算，避免与界面展示的模型耗时口径不一致。
+- **指挥家中途指导**：新增 `conductor_instruct`，向本父会话正在运行或排队的 worker 投递增量指令；在下一次模型调用边界送入，失败可重试，不中止 worker 或更换模型。
+- **指挥家进度查询**：新增 `conductor_inspect`，按需查看所属 worker 的公开阶段、步骤、摘要及活动工具耗时；进度不是交付或验收证据，终态结果仍通过 `conductor_collect` 获取。
+- **验证边界**：前端 lint、490 项库测试与构建，35 项相关 UI 回归，Python Conductor 33 项、协议 45 项、中途指令与真实 GA 循环安装夹具，以及 Go 专项与构建通过。Go 全量测试有 3 项 Windows 文件占用/重命名失败，隔离单跑均通过，不宣称全测通过；UI 全量测试亦有非本次范围失败，不宣称全量 UI 通过。真实 GA 循环覆盖使用假模型，不代表生产模型端到端验收。
+
 ## Unreleased
 
 ### v0.3.6 iteration (not released)
