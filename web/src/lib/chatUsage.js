@@ -39,19 +39,22 @@ export const cacheHitPercent = (usages) => {
     : 0
 }
 
-// Generation speed must use only calls with an observed first chunk -> Output
-// interval. Mixing request elapsed time or unmeasured calls would include TTFT,
-// tool execution and queueing, so those calls are deliberately excluded.
+// Provider output_tokens can include hidden reasoning and tool arguments that
+// never appear in raw_ask text chunks. Only full per-attempt request time has
+// matching coverage. This is observed request-average throughput (includes
+// TTFT/network), not decoder-only speed; tool execution is outside the attempt.
+// Old generation_ms-only records are intentionally not used to invent a rate.
 export const measuredOutputRate = (usages) => {
   if (!Array.isArray(usages)) return 0
   const measured = usages.reduce((acc, usage) => {
-    const generationMs = tokenCount(usage?.generation_ms)
-    if (generationMs <= 0) return acc
-    acc.generationMs += generationMs
-    acc.outputTokens += tokenCount(usage?.output_tokens)
+    const requestMs = tokenCount(usage?.request_elapsed_ms)
+    const outputTokens = tokenCount(usage?.output_tokens)
+    if (requestMs <= 0 || outputTokens <= 0) return acc
+    acc.requestMs += requestMs
+    acc.outputTokens += outputTokens
     return acc
-  }, { generationMs: 0, outputTokens: 0 })
-  return measured.generationMs > 0
-    ? measured.outputTokens / (measured.generationMs / 1000)
+  }, { requestMs: 0, outputTokens: 0 })
+  return measured.requestMs > 0
+    ? measured.outputTokens / (measured.requestMs / 1000)
     : 0
 }

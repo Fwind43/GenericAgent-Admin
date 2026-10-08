@@ -123,6 +123,29 @@ describe('chat stats', () => {
     expect(stats.firstTokenIsModelTTFT).toBe(false)
   })
 
+  test('uses complete measured model requests for throughput, not tool or reply wall time', () => {
+    const messages = [{
+      role: 'assistant',
+      elapsed_ms: 60000,
+      tool_elapsed_ms: 29500,
+      usages: [{ output_tokens: 2000, ttft_ms: 29500, generation_ms: 500, request_elapsed_ms: 30500 }],
+    }, {
+      role: 'assistant',
+      usages: [{ output_tokens: 100, request_elapsed_ms: 2000 }, { output_tokens: 900, generation_ms: 100 }],
+    }]
+    expect(buildChatStats(messages).outputRate).toBeCloseTo(2100 / 32.5)
+    const { container } = render(<ChatStats messages={messages} />)
+    expect(container.querySelector('.oa-chat-stats')?.textContent).toContain('64.6 tok/s')
+    expect(container.querySelector('.oa-chat-stats-rate')?.title).toContain('TTFT')
+  })
+
+  test('does not display a fabricated rate for legacy or unmeasured output', () => {
+    const messages = [{ role: 'assistant', elapsed_ms: 1000, usages: [{ output_tokens: 2000, generation_ms: 100 }] }]
+    expect(buildChatStats(messages).outputRate).toBe(0)
+    const { container } = render(<ChatStats messages={messages} />)
+    expect(container.querySelector('.oa-chat-stats')?.textContent).toContain('\u2014 tok/s')
+  })
+
   test('renders zero-value stats for a new conversation', () => {
     const { container } = render(<ChatStats messages={[]} />)
     const stats = container.querySelector('.oa-chat-stats')

@@ -114,22 +114,35 @@ _TURN_USAGES = []
 _GENERATION_STARTED_AT = None
 _GENERATION_LAST_AT = None
 _GENERATION_CHUNKS = 0
+# Complete attempt time matches provider output tokens, including hidden
+# reasoning/tool arguments and buffered output that raw_ask does not yield.
+_REQUEST_STARTED_AT = None
 # Latest context-size stats parsed from llmcore's [Debug] lines.
 _CTX_STATS = {'ctx_chars': 0, 'ctx_msgs': 0}
 
 
 def _clear_generation_timer_locked():
     """Clear the active generation timer while _USAGE_LOCK is held."""
-    global _GENERATION_STARTED_AT, _GENERATION_LAST_AT, _GENERATION_CHUNKS
+    global _GENERATION_STARTED_AT, _GENERATION_LAST_AT, _GENERATION_CHUNKS, _REQUEST_STARTED_AT
     _GENERATION_STARTED_AT = None
     _GENERATION_LAST_AT = None
     _GENERATION_CHUNKS = 0
+    _REQUEST_STARTED_AT = None
 
 
-def _reset_generation_timer():
-    """Start a fresh outbound-call timing scope without claiming a start yet."""
+def _reset_generation_timer(request_started_at=None):
+    """Start fresh per-attempt timing without claiming a visible text chunk."""
+    global _REQUEST_STARTED_AT
     with _USAGE_LOCK:
         _clear_generation_timer_locked()
+        _REQUEST_STARTED_AT = request_started_at
+
+
+def _request_elapsed_ms_locked():
+    """Measure full request time before usage consumes the active timing scope."""
+    if _REQUEST_STARTED_AT is None:
+        return 0
+    return max(0, int(round((time.perf_counter() - _REQUEST_STARTED_AT) * 1000)))
 
 
 def _mark_generation_started(item, request_started_at=None):
@@ -212,7 +225,10 @@ class _UsageCapturingStderr:
                 _CURRENT_USAGE['output_tokens'] = int(m.group(1))
                 # Snapshot this completed turn and reset the buffer for the next.
                 turn_snapshot = dict(_CURRENT_USAGE)
+                request_elapsed_ms = _request_elapsed_ms_locked()
                 generation_ms = _consume_generation_ms_locked()
+                if request_elapsed_ms > 0:
+                    turn_snapshot['request_elapsed_ms'] = request_elapsed_ms
                 if generation_ms > 0:
                     turn_snapshot['generation_ms'] = generation_ms
                 _TURN_USAGES.append(turn_snapshot)
@@ -542,7 +558,7 @@ def _track_outbound_attempt(result, request_started_at=None):
         request_started_at = time.perf_counter()
 
     def tracked():
-        _reset_generation_timer()
+        _reset_generation_timer(request_started_at)
         first_token_emitted = False
         while True:
             try:

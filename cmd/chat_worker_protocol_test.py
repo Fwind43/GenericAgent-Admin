@@ -316,6 +316,56 @@ class ChatWorkerProtocolTest(unittest.TestCase):
             "input_tokens_include_cache_read": 0,
         })
 
+    def test_output_rate_request_time_includes_hidden_reasoning_and_usage_completion(self):
+        chat_worker._reset_usage()
+        capture = chat_worker._UsageCapturingStderr(SimpleNamespace(write=lambda text: None, flush=lambda: None))
+
+        def response():
+            yield "first"
+            yield "last"
+            capture.write("[Output] tokens=2000\n")
+
+        with mock.patch.object(chat_worker.time, "perf_counter", side_effect=[39.5, 40.0, 40.5]):
+            list(chat_worker._track_outbound_attempt(response(), 10.0))
+        usage = chat_worker._snapshot_turn_usages()[0]
+        self.assertEqual(usage["ttft_ms"], 29500)
+        self.assertEqual(usage["generation_ms"], 500)
+        self.assertEqual(usage["request_elapsed_ms"], 30500)
+        self.assertNotIn("request_elapsed_ms", chat_worker._snapshot_usage())
+
+    def test_request_time_is_available_for_buffered_and_tool_only_output(self):
+        for chunks in [["buffered response"], []]:
+            with self.subTest(chunks=chunks):
+                chat_worker._reset_usage()
+                capture = chat_worker._UsageCapturingStderr(SimpleNamespace(write=lambda text: None, flush=lambda: None))
+
+                def response():
+                    yield from chunks
+                    capture.write("[Output] tokens=1000\n")
+
+                clock = [30.0, 30.0] if chunks else [30.0]
+                with mock.patch.object(chat_worker.time, "perf_counter", side_effect=clock):
+                    list(chat_worker._track_outbound_attempt(response(), 10.0))
+                usage = chat_worker._snapshot_turn_usages()[0]
+                self.assertEqual(usage["request_elapsed_ms"], 20000)
+                self.assertNotIn("generation_ms", usage)
+
+    def test_request_timer_is_not_reused_by_a_later_unhooked_output(self):
+        chat_worker._reset_usage()
+        capture = chat_worker._UsageCapturingStderr(SimpleNamespace(write=lambda text: None, flush=lambda: None))
+
+        def response():
+            capture.write("[Output] tokens=100\n")
+            if False:
+                yield ""
+
+        with mock.patch.object(chat_worker.time, "perf_counter", return_value=12.0):
+            list(chat_worker._track_outbound_attempt(response(), 10.0))
+        capture.write("[Output] tokens=50\n")
+        usages = chat_worker._snapshot_turn_usages()
+        self.assertEqual(usages[0]["request_elapsed_ms"], 2000)
+        self.assertNotIn("request_elapsed_ms", usages[1])
+
     def test_generation_rate_uses_last_text_not_usage_log_time(self):
         chat_worker._reset_usage()
         with mock.patch.object(chat_worker.time, "perf_counter", side_effect=[10.0, 10.5]):
@@ -383,7 +433,7 @@ class ChatWorkerProtocolTest(unittest.TestCase):
 
         self.assertEqual(chat_worker._snapshot_turn_usages(), [
             {"input_tokens": 100, "cache_creation_tokens": 20, "cache_read_tokens": 80, "output_tokens": 0, "cached_tokens": 0, "input_tokens_include_cache_read": 0},
-            {"input_tokens": 200, "cache_creation_tokens": 40, "cache_read_tokens": 160, "output_tokens": 30, "cached_tokens": 0, "input_tokens_include_cache_read": 0, "ttft_ms": 400},
+            {"input_tokens": 200, "cache_creation_tokens": 40, "cache_read_tokens": 160, "output_tokens": 30, "cached_tokens": 0, "input_tokens_include_cache_read": 0, "ttft_ms": 400, "request_elapsed_ms": 900},
         ])
         usage_events = [event for event in self.events if event.get("type") == "turn_usage"]
         self.assertEqual(usage_events[-2]["index"], 1)

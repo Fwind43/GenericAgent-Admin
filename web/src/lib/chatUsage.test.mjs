@@ -64,15 +64,35 @@ test('cacheHitPercent aggregates mixed provider turns using total prompt input',
   ]), 80)
 })
 
-test('measuredOutputRate divides only measured outputs by measured generation time', () => {
+test('measuredOutputRate uses complete model-call time, not the visible text tail', () => {
   assert.equal(measuredOutputRate([
-    { output_tokens: 100, generation_ms: 2000 },
-    { output_tokens: 900 },
-    { output_tokens: 50, generation_ms: 500 },
+    { output_tokens: 2000, ttft_ms: 29500, generation_ms: 500, request_elapsed_ms: 30500 },
+  ]), 2000 / 30.5)
+})
+
+test('measuredOutputRate weights measured calls and excludes legacy or missing timing', () => {
+  assert.equal(measuredOutputRate([
+    { output_tokens: 100, request_elapsed_ms: 2000 },
+    { output_tokens: 900, generation_ms: 100 },
+    { output_tokens: 50, request_elapsed_ms: 500 },
   ]), 60)
 })
 
-test('measuredOutputRate avoids false precision when no generation interval exists', () => {
-  assert.equal(measuredOutputRate([{ output_tokens: 100 }, { output_tokens: 20, generation_ms: 0 }]), 0)
+test('measuredOutputRate includes buffered and tool-only model outputs with measured request time', () => {
+  assert.equal(measuredOutputRate([
+    { output_tokens: 1000, ttft_ms: 20000, request_elapsed_ms: 20000 },
+    { output_tokens: 100, request_elapsed_ms: 2000 },
+  ]), 50)
+})
+
+test('measuredOutputRate rejects invalid or unpaired timing and output', () => {
+  assert.equal(measuredOutputRate([
+    { output_tokens: 100, request_elapsed_ms: 0 },
+    { output_tokens: 100, request_elapsed_ms: -10 },
+    { output_tokens: Infinity, request_elapsed_ms: 500 },
+    { output_tokens: 0, request_elapsed_ms: 500 },
+    { output_tokens: 100, request_elapsed_ms: Infinity },
+    { output_tokens: 100, generation_ms: 100 },
+  ]), 0)
   assert.equal(measuredOutputRate(null), 0)
 })
