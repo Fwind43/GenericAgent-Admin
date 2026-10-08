@@ -75,3 +75,13 @@ test('custom section visibility and order survive reload with invalid keys repai
   assert.deepEqual(prefs.sectionOrder, ['recent','projects','pinned','conductors'])
   assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}), prefs)
 })
+
+test('tab ownership and display counts round trip and repair orphaned tabs', () => {
+  const raw = {sectionLayout:{tabs:[{id:'work',name:'Work',hideName:true},{id:'work',name:'Duplicate'}],active:'work',sections:{projects:{tab:'work',count:20},recent:{tab:'missing',count:7}}}}
+  const prefs = readSidebarPreferences({getItem:()=>JSON.stringify(raw)})
+  assert.equal(prefs.sectionLayout.tabs.length,2)
+  assert.equal(prefs.sectionLayout.active,'work')
+  assert.deepEqual(prefs.sectionLayout.sections.projects,{tab:'work',count:20})
+  assert.deepEqual(prefs.sectionLayout.sections.recent,{tab:'home',count:10})
+  assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}),prefs)
+})

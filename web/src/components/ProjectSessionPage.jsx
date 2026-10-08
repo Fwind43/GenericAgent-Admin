@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 
-export default function ProjectSessionPage({ items, renderItem, ct, expandLabel }) {
-  const [limit, setLimit] = useState(10)
+export default function ProjectSessionPage({ items, renderItem, ct, expandLabel, initialLimit = 10 }) {
+  const [limit, setLimit] = useState(initialLimit)
   const remaining = Math.max(0, items.length - limit)
   return <>
     {items.slice(0, limit).map(renderItem)}

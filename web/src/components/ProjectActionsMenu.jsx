@@ -32,10 +32,10 @@ export default function ProjectActionsMenu({ label, children }) {
       onClick={e => {
         e.stopPropagation()
         const rect = e.currentTarget.getBoundingClientRect()
-        setPos(pos ? null : { top:Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 110)), left:Math.max(8, Math.min(rect.right - 190, window.innerWidth - 198)) })
+        setPos(pos ? null : { top:Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 340)), left:Math.max(8, Math.min(rect.right - 190, window.innerWidth - 198)) })
       }} style={{ cursor:'pointer' }}><MoreHorizontal size={16}/></button>
     {pos && createPortal(<div ref={menu} className="oa-session-menu" aria-label={label} style={{ position:'fixed', ...pos, width:190, zIndex:10000, overflow:'visible' }}
-      onClick={e => { e.stopPropagation(); if (e.target.closest('button:not(:disabled)')) { setPos(null); trigger.current?.focus() } }}>
+      onClick={e => { e.stopPropagation(); if (e.target.closest('button:not(:disabled):not([aria-haspopup="menu"])')) { setPos(null); trigger.current?.focus() } }}>
       {children}
     </div>, document.body)}
   </>
@@ -52,7 +52,7 @@ export function SidebarPreferenceSubmenu({ label, value, options, onChange, mult
   }
   return <div onMouseEnter={open} onMouseLeave={()=>setPos(null)} onBlur={e=>{ if (!e.currentTarget.contains(e.relatedTarget)) setPos(null) }}>
     <button ref={trigger} type="button" aria-haspopup="menu" aria-expanded={!!pos}
-      onClick={e=>{ e.stopPropagation(); if (pos) setPos(null); else open() }}
+      onClick={e=>{ e.stopPropagation(); open() }}
       onKeyDown={e=>{ if (e.key === 'ArrowRight') { e.preventDefault(); open(); requestAnimationFrame(()=>panel.current?.querySelector('button')?.focus()) } }}>
       <span style={{ flex:1 }}>{label}</span><ChevronRight size={14}/>
     </button>

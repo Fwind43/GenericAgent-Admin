@@ -1,3 +1,4 @@
+export const sidebarDisplayCounts = [5, 10, 15, 20, 50, 100]
 export const sidebarSectionKeys = ['pinned', 'conductors', 'projects', 'recent']
 export function normalizeSidebarOrder(value) {
   const valid = Array.isArray(value) ? [...new Set(value.filter(key => sidebarSectionKeys.includes(key)))] : []
@@ -15,6 +16,7 @@ export const sidebarPreferenceDefaults = {
   showProjects: true, showConductor: true, sort: 'updated', recentFilter: [...recentFilterOptions],
   historyExpanded: true, pinnedExpanded: true, conductorsExpanded: false, projectsExpanded: true,
   showAllProjects: false, expandedProjectNames: [],
+  sectionLayout: normalizeSidebarLayout(),
   showPinned: true, showRecent: true, sectionOrder: [...sidebarSectionKeys],
 }
 
@@ -27,6 +29,7 @@ export function readSidebarPreferences(storage) {
     }
     if (typeof value?.showProjects !== 'boolean') next.showProjects = value?.layout !== 'list'
     if (value?.sort === 'priority') next.sort = 'priority'
+    next.sectionLayout = normalizeSidebarLayout(value?.sectionLayout)
     next.sectionOrder = normalizeSidebarOrder(value?.sectionOrder)
     next.recentFilter = normalizeRecentFilter(value?.recentFilter)
     if (Array.isArray(value?.expandedProjectNames)) next.expandedProjectNames = [...new Set(value.expandedProjectNames.filter(name => typeof name === 'string'))]
@@ -53,4 +56,18 @@ export function filterSidebarRecentNodes(nodes, filter = 'all') {
       (selected.includes('conductor') && conductor) ||
       (selected.includes('chat') && !project && !conductor)
   })
+}
+
+export function normalizeSidebarLayout(value) {
+  const tabs = [{ id: 'home', name: 'Home' }]
+  for (const tab of Array.isArray(value?.tabs) ? value.tabs : []) {
+    if (tabs.length >= 12) break
+    if (typeof tab?.id !== 'string' || !tab.id || tabs.some(t => t.id === tab.id)) continue
+    if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), hideName: tab.hideName === true })
+  }
+  const sections = Object.fromEntries(sidebarSectionKeys.map(key => [key, {
+    tab: tabs.some(t => t.id === value?.sections?.[key]?.tab) ? value.sections[key].tab : 'home',
+    count: sidebarDisplayCounts.includes(value?.sections?.[key]?.count) ? value.sections[key].count : key === 'projects' ? 5 : 10,
+  }]))
+  return { tabs, sections, active: tabs.some(t => t.id === value?.active) ? value.active : 'home' }
 }
