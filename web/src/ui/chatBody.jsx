@@ -4,7 +4,7 @@ import ChatVersionBadge from '../components/ChatVersionBadge'
 import { SidebarPreferenceSubmenu } from '../components/ProjectActionsMenu'
 import React, { useState } from 'react'
 import SidebarCustomization, { SidebarSections, SidebarTabs, SidebarSectionOptions } from '../components/SidebarCustomization'
-import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Copy, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
+import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Copy, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Inbox, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
 
 // Stateless views; ChatApp owns all data, drafts, refs, actions and subscriptions.
@@ -15,14 +15,28 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
   return (<aside data-ui-surface="chat.sidebar" data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-sidebar-brand">GenericAgent <span>Admin</span><ChatVersionBadge version={version}/></div>
+        <button className="oa-icon-btn oa-sidebar-inbox" onClick={openSessionManager} title={ct('管理会话', 'Manage sessions')} aria-label={ct('管理会话', 'Manage sessions')}><Inbox size={19}/></button>
         <button
           className="oa-new-chat"
           onClick={newSession}
           disabled={batchDeleting}
           title={ct('新对话', 'New chat')}
           aria-label={ct('新对话', 'New chat')}
-        ><MessageSquarePlus size={16}/><span>{ct('新对话', 'New chat')}</span></button>
+        ><Edit3 size={19}/></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('收起侧栏', 'Collapse sidebar')} aria-label={ct('收起侧栏', 'Collapse sidebar')}><PanelLeftClose size={18} aria-hidden="true"/></button>
+      </div>
+      <div className="oa-sidebar-search-row">
+        <div className="oa-sidebar-search">
+          <Search size={15}/>
+          <input
+            type="text"
+            placeholder={ct('搜索会话...', 'Search sessions...')}
+            value={sidebarSearch}
+            onChange={(e)=>setSidebarSearch(e.target.value)}
+            aria-label={ct('搜索会话', 'Search sessions')}
+          />
+          {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
+        </div>
       </div>
       <SidebarTabs preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>
       {(customizing || !Object.entries(sectionLayout.sections).some(([key, value]) => value.tab === sectionLayout.active && sidebarPreferences[{pinned:"showPinned",conductors:"showConductor",projects:"showProjects",recent:"showRecent"}[key]] !== false)) && <SidebarCustomization preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>}
@@ -35,17 +49,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           title={ct('新建 Conductor', 'New Conductor')}
           aria-label={ct('新建 Conductor', 'New Conductor')}
         ><span className="oa-conductor-new-mark" aria-hidden="true">C</span><span>Conductor</span></button>}
-        <div className="oa-sidebar-search">
-          <Search size={15}/>
-          <input
-            type="text"
-            placeholder={ct('搜索会话...', 'Search sessions...')}
-            value={sidebarSearch}
-            onChange={(e)=>setSidebarSearch(e.target.value)}
-            aria-label={ct('搜索会话', 'Search sessions')}
-          />
-          {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
-        </div>
+
         </div>
         {sidebarPreferences.showPinned !== false && (pinnedSessions.length > 0 || pinnedProjectGroups.length > 0) && <section data-sidebar-section="pinned" className="oa-sidebar-section oa-sidebar-pinned">
           <div className="oa-sidebar-section-head">
