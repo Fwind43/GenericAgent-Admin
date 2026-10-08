@@ -30,8 +30,9 @@ func TestConductorParentPromptInjection(t *testing.T) {
 			}
 			prompts := req["extra_sys_prompts"].([]string)
             if role == conductorRoleWorker {
-                if len(prompts) != 2 || prompts[0] != "existing" || prompts[1] != conductorWorkerPrompt || req["conductor"] != nil {
-                    t.Fatal("worker objective prompt or tool isolation changed")
+                workerConfig, ok := req["conductor"].(map[string]interface{})
+                if len(prompts) != 2 || prompts[0] != "existing" || prompts[1] != conductorWorkerPrompt || !ok || workerConfig["role"] != conductorRoleWorker || workerConfig["broker_dir"] == "" {
+                    t.Fatal("worker objective prompt or instruction configuration changed")
                 }
                 if prompts[1] != "You are an Admin Conductor worker. Execute the assigned objective. Return a concise, evidence-based result for the parent." {
                     t.Fatal("worker prompt must contain only objective and reporting guidance")

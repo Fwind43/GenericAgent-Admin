@@ -69,8 +69,9 @@ func TestConductorAdditionalPromptDispatch(t *testing.T) {
 						t.Fatal(err)
 					}
 					prompts := req["extra_sys_prompts"].([]string)
-					if prompts[0] != "existing-system" || prompts[len(prompts)-1] != conductorWorkerPrompt || req["conductor"] != nil {
-						t.Fatal("system or role isolation changed")
+					workerConfig, ok := req["conductor"].(map[string]interface{})
+					if prompts[0] != "existing-system" || prompts[len(prompts)-1] != conductorWorkerPrompt || !ok || workerConfig["role"] != conductorRoleWorker || workerConfig["dispatch_id"] != receipt.DispatchID || workerConfig["broker_dir"] == "" {
+						t.Fatal("system or worker instruction configuration changed")
 					}
 					wantCount := 2
 					if want != "" {
