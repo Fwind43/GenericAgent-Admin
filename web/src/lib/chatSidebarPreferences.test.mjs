@@ -67,3 +67,11 @@ test('recent selections accept every subset and persist empty selections', () =>
   const both = {session:{project_id:'p',conductor:{role:'parent'}}}
   assert.deepEqual(filterSidebarRecentNodes([both],['project','conductor']),[both])
 })
+
+test('custom section visibility and order survive reload with invalid keys repaired', () => {
+  const prefs = readSidebarPreferences({getItem:()=>JSON.stringify({showPinned:false, showRecent:false, sectionOrder:['recent','recent','invalid','projects']})})
+  assert.equal(prefs.showPinned, false)
+  assert.equal(prefs.showRecent, false)
+  assert.deepEqual(prefs.sectionOrder, ['recent','projects','pinned','conductors'])
+  assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}), prefs)
+})

@@ -2,12 +2,14 @@ import { normalizeRecentFilter } from '../lib/chatSidebarPreferences.js'
 import ProjectSessionPage from '../components/ProjectSessionPage'
 import ChatVersionBadge from '../components/ChatVersionBadge'
 import { SidebarPreferenceSubmenu } from '../components/ProjectActionsMenu'
-import React from 'react'
+import React, { useState } from 'react'
+import SidebarCustomization, { SidebarSections } from '../components/SidebarCustomization'
 import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Copy, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
 
 // Stateless views; ChatApp owns all data, drafts, refs, actions and subscriptions.
 export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, batchDeleting, chatInstanceID, chatInstances, chatInstancesLoading, chatReadState, closeProjectDraft, collapsed, conductorsExpanded, copySessionId, createProject, ct, deleteSession, historyExpanded, menuOpen, menuPos, menuRef, newConductorSession, newSession, onOpenSettings, openProjectDraft, openSessionManager, pinnedExpanded, pinnedProjectGroups, pinnedSessions, projectCreating, projectDraftName, projectDraftOpen, projectSessionGroups, projectsExpanded, recentSessions, regularProjectGroups, renderSidebarProject, renderSidebarTree, sessionManagerOpen, sessions, setCollapsed, setConductorsExpanded, setHistoryExpanded, setPinnedExpanded, setProjectDraftName, setProjectsExpanded, setSessionHubEnabled, setSessionPinned, setShowAllProjects, setSidebarSearch, showAllProjects, sidebarPreferenceMenu, sidebarPreferences, updateSidebarPreference, sidebarSearch, sidebarSections, startRename, switchChatInstance }) {
+  const [customizing, setCustomizing] = useState(false)
   return (<aside data-ui-surface="chat.sidebar" data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
         <div className="oa-sidebar-brand">GenericAgent <span>Admin</span><ChatVersionBadge version={version}/></div>
@@ -20,7 +22,8 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
         ><MessageSquarePlus size={16}/><span>{ct('新对话', 'New chat')}</span></button>
         <button className="oa-icon-btn" onClick={()=>setCollapsed(true)} title={ct('收起侧栏', 'Collapse sidebar')} aria-label={ct('收起侧栏', 'Collapse sidebar')}><PanelLeftClose size={18} aria-hidden="true"/></button>
       </div>
-      <div className="oa-sidebar-sections">
+      {customizing && <SidebarCustomization preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>}
+      <SidebarSections order={sidebarPreferences.sectionOrder} customizing={customizing}>
         <div className="oa-sidebar-scroll-tools">
         {sidebarSections.conductors.length === 0 && <button
           className="oa-icon-btn oa-new-conductor"
@@ -41,7 +44,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
         </div>
         </div>
-        {(pinnedSessions.length > 0 || pinnedProjectGroups.length > 0) && <section className="oa-sidebar-section oa-sidebar-pinned">
+        {sidebarPreferences.showPinned !== false && (pinnedSessions.length > 0 || pinnedProjectGroups.length > 0) && <section data-sidebar-section="pinned" className="oa-sidebar-section oa-sidebar-pinned">
           <div className="oa-sidebar-section-head">
             <button type="button" className="oa-sidebar-section-toggle" aria-expanded={pinnedExpanded} aria-controls="oa-sidebar-pinned-body" onClick={()=>setPinnedExpanded(value => !value)}>
               <span aria-hidden="true">{pinnedExpanded ? '\u2304' : '\u203a'}</span>{ct('置顶', 'Pinned')}
@@ -55,7 +58,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
             <div className="oa-session-list oa-project-list">{pinnedProjectGroups.map(renderSidebarProject)}</div>
           </div>
         </section>}
-        {sidebarSections.conductors.length > 0 && <section className="oa-sidebar-section oa-sidebar-conductors">
+        {sidebarPreferences.showConductor !== false && sidebarSections.conductors.length > 0 && <section data-sidebar-section="conductors" className="oa-sidebar-section oa-sidebar-conductors">
           <div className="oa-sidebar-section-head">
             <button type="button" className="oa-sidebar-section-toggle" aria-expanded={conductorsExpanded} aria-controls="oa-sidebar-conductors-body" onClick={()=>setConductorsExpanded(value => !value)}>
               <span aria-hidden="true">{conductorsExpanded ? '\u2304' : '\u203a'}</span>{ct('指挥家', 'Conductors')}
@@ -69,7 +72,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
             <div className="oa-session-list">{sidebarSections.conductors.map(renderSidebarTree)}</div>
           </div>
         </section>}
-        <section className="oa-sidebar-section" hidden={!sidebarPreferences.showProjects}>
+        <section data-sidebar-section="projects" className="oa-sidebar-section" hidden={!sidebarPreferences.showProjects}>
           <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={projectsExpanded} aria-controls="oa-sidebar-projects-body" onClick={()=>setProjectsExpanded(value => !value)}>
             <span aria-hidden="true">{projectsExpanded ? '\u2304' : '\u203a'}</span>{ct('项目', 'Projects')}
@@ -112,7 +115,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
         </div>
           </div>
         </section>
-        <section className="oa-sidebar-section">
+        <section data-sidebar-section="recent" className="oa-sidebar-section" hidden={sidebarPreferences.showRecent === false}>
           <div className="oa-sidebar-section-head">
           <button type="button" className="oa-sidebar-section-toggle" aria-expanded={historyExpanded} aria-controls="oa-sidebar-history-body" onClick={()=>setHistoryExpanded(value => !value)}>
             <span aria-hidden="true">{historyExpanded ? '\u2304' : '\u203a'}</span>{ct('最近', 'Recent')}
@@ -146,7 +149,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
         </div>
           </div>
         </section>
-      </div>
+      </SidebarSections>
       {!sessionManagerOpen && menuOpen && menuPos && (() => {
         const s = sessions.find(x => x.id === menuOpen)
         if (!s) return null
@@ -159,6 +162,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
         </div>
       })()}
       <div className="oa-sidebar-foot">
+        <button type="button" className="oa-sidebar-customize-open" aria-pressed={customizing} onClick={()=>setCustomizing(value=>!value)}><Settings size={15}/>{customizing ? ct("已完成", "Done") : ct("自定义侧边栏", "Customize sidebar")}</button>
         <label className="oa-sidebar-instance" title={ct('切换实例会更新当前侧栏中的会话', 'Switching instances updates the sessions in this sidebar')}>
           <span>{ct('GA 实例', 'GA instance')}</span>
           <select

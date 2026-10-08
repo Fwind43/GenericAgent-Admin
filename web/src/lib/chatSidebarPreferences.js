@@ -1,3 +1,9 @@
+export const sidebarSectionKeys = ['pinned', 'conductors', 'projects', 'recent']
+export function normalizeSidebarOrder(value) {
+  const valid = Array.isArray(value) ? [...new Set(value.filter(key => sidebarSectionKeys.includes(key)))] : []
+  return [...valid, ...sidebarSectionKeys.filter(key => !valid.includes(key))]
+}
+
 export const recentFilterOptions = ['chat', 'project', 'conductor']
 
 export function normalizeRecentFilter(value) {
@@ -9,17 +15,19 @@ export const sidebarPreferenceDefaults = {
   showProjects: true, showConductor: true, sort: 'updated', recentFilter: [...recentFilterOptions],
   historyExpanded: true, pinnedExpanded: true, conductorsExpanded: false, projectsExpanded: true,
   showAllProjects: false, expandedProjectNames: [],
+  showPinned: true, showRecent: true, sectionOrder: [...sidebarSectionKeys],
 }
 
 export function readSidebarPreferences(storage) {
   try {
     const value = JSON.parse((storage ?? globalThis.localStorage).getItem('ga-chat-sidebar-preferences') || '{}')
     const next = { ...sidebarPreferenceDefaults }
-    for (const key of ['showProjects', 'showConductor', 'historyExpanded', 'pinnedExpanded', 'conductorsExpanded', 'projectsExpanded', 'showAllProjects']) {
+    for (const key of ['showPinned', 'showRecent', 'showProjects', 'showConductor', 'historyExpanded', 'pinnedExpanded', 'conductorsExpanded', 'projectsExpanded', 'showAllProjects']) {
       if (typeof value?.[key] === 'boolean') next[key] = value[key]
     }
     if (typeof value?.showProjects !== 'boolean') next.showProjects = value?.layout !== 'list'
     if (value?.sort === 'priority') next.sort = 'priority'
+    next.sectionOrder = normalizeSidebarOrder(value?.sectionOrder)
     next.recentFilter = normalizeRecentFilter(value?.recentFilter)
     if (Array.isArray(value?.expandedProjectNames)) next.expandedProjectNames = [...new Set(value.expandedProjectNames.filter(name => typeof name === 'string'))]
     return next
