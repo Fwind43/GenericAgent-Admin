@@ -17,6 +17,7 @@ const versionStub = (gitStatus) => ({
   gitBusy: false,
   gitStatus,
   autostart: { supported: true, enabled: false },
+  refreshStatus: vi.fn().mockResolvedValue({ stage: '', running: false }),
   checkVersion: vi.fn(),
   updateVersion: vi.fn(),
   restartVersion: vi.fn(),
@@ -41,7 +42,7 @@ const renderOverview = ({ lang = 'zh', gitStatus, observability, services = [], 
 describe('OverviewPage', () => {
   it('does not claim all clear before the first snapshot', () => {
     renderOverview()
-    expect(screen.getByRole('status').textContent).toContain(I18N.zh.overview.awaitingSnapshot)
+    expect(screen.getAllByRole('status').some(node => node.textContent.includes(I18N.zh.overview.awaitingSnapshot))).toBe(true)
     expect(screen.queryByText(I18N.zh.overview.allClear)).toBeNull()
   })
 
@@ -94,7 +95,10 @@ describe('OverviewPage', () => {
     prepared.status = { id: 'operation-1', running: true, stage: 'ready', progress: 90, message: 'ready' }
     renderOverview({ versionState: prepared })
 
-    const restart = screen.getByRole('button', { name: /重启并完成升级/i })
+    expect(screen.queryByRole('button', { name: /重启并生效/i })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /管理更新/i }))
+    const restart = screen.getByRole('button', { name: /重启并生效/i })
+    expect(restart.disabled).toBe(false)
     fireEvent.click(restart)
     expect(prepared.restartVersion).toHaveBeenCalledTimes(1)
   })

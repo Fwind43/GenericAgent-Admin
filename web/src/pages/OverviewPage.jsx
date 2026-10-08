@@ -2,6 +2,8 @@ import './overview-workbench.css'
 import React, { useEffect, useState } from 'react'
 import { Activity, CalendarClock, Download, FileCode2, MessageSquare, Play, Power, RefreshCw, Server, ShieldAlert } from 'lucide-react'
 import { navigateToNewChat } from '../lib/chatLaunchIntent'
+import SystemUpdateModal from '../components/SystemUpdateModal'
+import { updateText, versionUpdateView } from '../lib/versionUpdateView'
 
 const countOf = (items) => Array.isArray(items) ? items.length : 0
 
@@ -49,6 +51,7 @@ export function OverviewPage({
   githubMirror = '', onSaveGitHubMirror, onDraftStateChange,
 }) {
   const copy = t.overview
+  const [updateOpen, setUpdateOpen] = useState(false)
   const [mirrorDraft, setMirrorDraft] = useState(githubMirror)
   const [mirrorBaseline, setMirrorBaseline] = useState(githubMirror)
   const [mirrorSaving, setMirrorSaving] = useState(false)
@@ -76,8 +79,7 @@ export function OverviewPage({
       setMirrorSaving(false)
     }
   }
-  const { info, check, status, busy, gitBusy, gitStatus, autostart } = version
-  const updateMessage = status?.error || (status?.stage === 'queued' ? copy.updateQueued : (status?.message || status?.stage))
+  const { info, busy, gitBusy, gitStatus, autostart } = version
   const missingCore = observability?.missingCore || []
   const { sourceAvailable, sourceUnavailableReason, sourceState } = sourceAvailability(gitStatus, copy)
   const running = (services || []).filter(service => service.running)
@@ -94,6 +96,9 @@ export function OverviewPage({
   const displayedRoot = root || observability?.root || ''
 
   const english = t.refresh === 'Refresh'
+  const lang = english ? 'en' : 'zh'
+  const updateCopy = updateText(lang)
+  const updateView = versionUpdateView(version, lang)
   const labels = english
     ? { status: 'Runtime status', maintenance: 'Maintenance', network: 'Download network', scope: 'Saves only the GitHub mirror. Updates and startup are controlled separately.' }
     : { status: '运行状态', maintenance: '维护与更新', network: '下载网络', scope: '仅保存 GitHub 镜像，更新和开机启动需分别操作。' }
@@ -171,30 +176,14 @@ export function OverviewPage({
           <div className="version-head">
             <Download size={16} aria-hidden="true"/>
             <strong>GA Admin {info?.version || 'dev'}</strong>
-            <span className={check?.update ? 'warn' : ''}>
-              {check ? (check.update ? copy.updateAvailable : copy.current) : (info?.goos ? `${info.goos}/${info.goarch}` : t.empty)}
-            </span>
           </div>
-          <p className="muted">{copy.commit} {info?.commit || copy.unknown} · {info?.date || copy.unknown} · {copy.runtime} {info?.runtime || '-'}</p>
-          {info && !info.update_supported && <p className="warn">{copy.updateUnavailable}: {info.update_unsupported_reason || copy.platformUnsupported}</p>}
-          {check?.latest && <p>{copy.latestVersion}: <a href={check.latest.html_url} target="_blank" rel="noreferrer">{check.latest.tag_name}</a></p>}
-          {status?.stage && <div className="update-progress">
-            <div className="update-progress-head">
-              <span>{status.running ? copy.updateRunning : (status.error ? copy.updateFailed : copy.updateStatus)}</span>
-              <b>{status.progress || 0}%</b>
-            </div>
-            <div className="progress-bar"><span style={{ width: `${Math.max(0, Math.min(100, status.progress || 0))}%` }}/></div>
-            <p className={status.error ? 'err' : 'muted'}>{updateMessage}</p>
-            <code>{status.stage}</code>
-          </div>}
+          <p className={updateView.tone === 'error' ? 'err-text' : 'muted'} role="status">{updateView.label}</p>
+          {updateView.pending && <p className="muted">{updateCopy.pending}: {updateView.pending}</p>}
+          {info && !info.update_supported && <p className="muted">{copy.updateUnavailable}: {info.update_unsupported_reason || copy.platformUnsupported}</p>}
           <div className="overview-panel-actions">
-            <button type="button" onClick={version.checkVersion} disabled={busy || status?.running}>{busy ? t.busy : copy.checkUpdate}</button>
-            <button className="primary" type="button" onClick={version.updateVersion} disabled={busy || status?.running || !check?.update}>
-              <Download size={14} aria-hidden="true"/>{status?.running ? `${copy.updateRunning}…` : copy.oneClickUpdate}
+            <button type="button" className="primary" onClick={() => { setUpdateOpen(true); version.refreshStatus().catch(() => {}) }}>
+              <Download size={14} aria-hidden="true"/>{updateCopy.open}
             </button>
-            {status?.stage === 'ready' && <button className="danger" type="button" onClick={version.restartVersion} disabled={busy}>
-              <Power size={14} aria-hidden="true"/>{copy.restartToApply}
-            </button>}
           </div>
         </div>
       </Panel>
@@ -268,6 +257,7 @@ export function OverviewPage({
           </form>
       </Panel>
     </div>
+    <SystemUpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} version={version} lang={lang}/>
   </div>
 }
 

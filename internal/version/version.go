@@ -154,6 +154,7 @@ type Release struct {
 	TagName     string    `json:"tag_name"`
 	Name        string    `json:"name"`
 	HTMLURL     string    `json:"html_url"`
+	Body        string    `json:"body,omitempty"`
 	PublishedAt time.Time `json:"published_at"`
 	Prerelease  bool      `json:"prerelease"`
 	Draft       bool      `json:"draft"`
