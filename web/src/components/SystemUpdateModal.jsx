@@ -2,6 +2,7 @@ import React from 'react'
 import Modal from 'antd/es/modal'
 import { AlertCircle, CheckCircle2, Download, ExternalLink, RefreshCw, RotateCw } from 'lucide-react'
 import { updateText, versionUpdateView } from '../lib/versionUpdateView'
+import { MarkdownPreview } from './FilePreviewLink'
 import './system-update-modal.css'
 
 const dateLabel = (value, lang, fallback) => {
@@ -40,7 +41,7 @@ export default function SystemUpdateModal({ open, onClose, version, lang = 'zh' 
       <div className="system-update-content">
         <section className="system-update-notes"><header><h3>{text.notes}</h3>{release?.html_url && <a href={release.html_url} target="_blank" rel="noreferrer">{text.release}<ExternalLink size={13}/></a>}</header>
           {release?.published_at && <small>{text.published} {dateLabel(release.published_at, lang, text.unknown)}</small>}
-          {release?.body ? <div className="system-update-release-text">{release.body}</div> : <p className="system-update-empty">{release ? text.noNotes : text.notesUnchecked}</p>}
+          {release?.body ? <MarkdownPreview text={release.body} className="system-update-release-text" /> : <p className="system-update-empty">{release ? text.noNotes : text.notesUnchecked}</p>}
         </section>
         <section className="system-update-log"><header><h3>{text.log}</h3><button type="button" onClick={() => version.refreshStatus().catch(() => {})} disabled={version.busy}><RefreshCw size={13}/>{text.refresh}</button></header>
           {status?.log ? <pre tabIndex={0} aria-label={text.log}>{status.log}</pre> : <p className="system-update-empty">{text.noLog}</p>}

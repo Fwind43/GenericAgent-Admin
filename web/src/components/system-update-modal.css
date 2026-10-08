@@ -44,7 +44,32 @@
 .system-update-modal a { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 12px; text-decoration: none; }
 .system-update-modal a:hover { text-decoration: underline; }
 .system-update-modal .system-update-notes > small { color: var(--muted); font-size: 11px; }
-.system-update-modal .system-update-release-text { margin-top: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.75; }
+.system-update-modal .system-update-release-text { margin-top: 12px; white-space: normal; overflow-wrap: anywhere; font-size: 12px; line-height: 1.75; }
+.system-update-modal .system-update-release-text > :first-child { margin-top: 0; }
+.system-update-modal .system-update-release-text > :last-child { margin-bottom: 0; }
+.system-update-modal .system-update-release-text :is(h1,h2,h3,h4,h5,h6) { margin: 18px 0 8px; font-weight: 650; line-height: 1.4; }
+.system-update-modal .system-update-release-text h1 { font-size: 18px; }
+.system-update-modal .system-update-release-text h2 { font-size: 16px; }
+.system-update-modal .system-update-release-text :is(h3,h4,h5,h6) { font-size: 14px; }
+.system-update-modal .system-update-release-text p { margin: 0 0 10px; white-space: pre-line; }
+.system-update-modal .system-update-release-text :is(ul,ol) { margin: 8px 0 12px; padding-left: 22px; }
+.system-update-modal .system-update-release-text li { margin: 4px 0; }
+.system-update-modal .system-update-release-text li > p { margin: 0; }
+.system-update-modal .system-update-release-text li :is(ul,ol) { margin: 4px 0; }
+.system-update-modal .system-update-release-text input[type="checkbox"] { margin-right: 6px; accent-color: var(--accent); pointer-events: none; }
+.system-update-modal .system-update-release-text a { display: inline; font-size: inherit; text-underline-offset: 3px; }
+.system-update-modal .system-update-release-text code { padding: 2px 4px; border-radius: 4px; background: var(--surface-muted); font-size: 11px; }
+.system-update-modal .system-update-release-text pre { max-width: 100%; white-space: pre; overflow-wrap: normal; }
+.system-update-modal .system-update-release-text pre code { padding: 0; border-radius: 0; background: none; }
+.system-update-modal .system-update-release-text .file-preview-code { margin: 12px 0; min-width: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.system-update-modal .system-update-release-text .file-preview-code-label { padding: 5px 12px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+.system-update-modal .system-update-release-text blockquote { margin: 12px 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--border); color: var(--muted); }
+.system-update-modal .system-update-release-text blockquote > :last-child { margin-bottom: 0; }
+.system-update-modal .system-update-release-text hr { margin: 16px 0; border: 0; border-top: 1px solid var(--border); }
+.system-update-modal .system-update-release-text .file-preview-table-wrap { margin: 12px 0; max-width: 100%; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.system-update-modal .system-update-release-text table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.system-update-modal .system-update-release-text :is(th,td) { padding: 7px 10px; border: 1px solid var(--border); }
+.system-update-modal .system-update-release-text th { background: var(--surface-muted); font-weight: 600; }
 .system-update-modal .system-update-empty { color: var(--muted); font-size: 12px; padding: 12px 0; }
 .system-update-modal pre { margin: 0; padding: 12px; max-height: 280px; overflow: auto; background: var(--surface-muted); color: var(--text); font-size: 11px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 .system-update-modal button:not(.ant-modal-close) { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-strong); color: var(--text); font-size: 12px; line-height: 1.4; white-space: nowrap; cursor: pointer; }

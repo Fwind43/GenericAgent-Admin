@@ -65,9 +65,9 @@ function PreviewBlocks({ blocks = [] }) {
   })}</>
 }
 
-function MarkdownPreview({ text }) {
+export function MarkdownPreview({ text, className = 'file-preview-markdown' }) {
   const parts = useMemo(() => splitMarkdownParts(text).map(part => part.type === 'text' ? { ...part, blocks: parseBlocks(part.text) } : part), [text])
-  return <article className="file-preview-markdown">{parts.map((part, index) => part.type === 'code'
+  return <article className={className}>{parts.map((part, index) => part.type === 'code'
     ? <div className="file-preview-code" key={index}>{(part.filename || part.lang) && <div className="file-preview-code-label">{part.filename || part.lang}</div>}<pre><code>{part.text}</code></pre></div>
     : <PreviewBlocks key={index} blocks={part.blocks} />)}</article>
 }

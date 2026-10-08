@@ -110,3 +110,35 @@ it('shows prepared state, safe release text and distinct logs; closing does not 
   expect(close).toHaveBeenCalledTimes(1)
   expect(prepare).not.toHaveBeenCalled()
 })
+
+it('renders release Markdown without executing HTML or unsafe links', () => {
+  const body = [
+    '## Changes', '',
+    '- Fix **Markdown** and `inline code`',
+    '  - Nested *detail*', '',
+    '3. First step', '4. Next step', '',
+    '- [x] Verified', '',
+    '> Safe release notes', '',
+    '| Feature | Status |', '| --- | --- |', '| Rendering | Ready |', '',
+    '```sh', 'echo "ready"', '```', '',
+    '[Documentation](https://example.com/docs) [unsafe](javascript:alert(1))', '',
+    '<script>not executable</script>',
+  ].join('\n')
+  render(<SystemUpdateModal open onClose={vi.fn()} lang="en" version={{ info: { version: 'v1.2.2' }, check: { ...candidate, latest: { ...candidate.latest, body } }, status: {}, refreshStatus: vi.fn() }} />)
+  const notes = document.querySelector('.system-update-release-text')
+  expect(notes.querySelector('h2')?.textContent).toBe('Changes')
+  expect(notes.querySelector('strong')?.textContent).toBe('Markdown')
+  expect(notes.querySelector('em')?.textContent).toBe('detail')
+  expect(notes.querySelector('li li')?.textContent).toContain('Nested detail')
+  expect(notes.querySelector('ol')?.getAttribute('start')).toBe('3')
+  expect(notes.querySelector('input[type="checkbox"]')?.checked).toBe(true)
+  expect(notes.querySelector('blockquote')?.textContent).toBe('Safe release notes')
+  expect(notes.querySelector('table td')?.textContent).toBe('Rendering')
+  expect(notes.querySelector('pre code')?.textContent.trim()).toBe('echo "ready"')
+  const link = notes.querySelector('a[href="https://example.com/docs"]')
+  expect(link?.textContent).toBe('Documentation')
+  expect(link?.getAttribute('rel')).toContain('noopener')
+  expect(notes.querySelector('a[href^="javascript:"]')).toBeNull()
+  expect(notes.querySelector('script')).toBeNull()
+  expect(notes.textContent).toContain('<script>not executable</script>')
+})
