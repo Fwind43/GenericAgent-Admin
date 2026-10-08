@@ -1058,6 +1058,56 @@ func TestConductorLoopWaitsWithoutSpendingRounds(t *testing.T) {
 	}
 }
 
+func TestConductorLoopCannotCompleteUnresolvedDispatch(t *testing.T) {
+	oldContinue := continueChatLoopFunc
+	defer func() { continueChatLoopFunc = oldContinue }()
+	for _, status := range []string{conductorSucceeded, conductorFailed, conductorCancelled} {
+		t.Run(status, func(t *testing.T) {
+			s := newChatLoopTestServer(t)
+			sid := "loop-unresolved"
+			continued := false
+			continueChatLoopFunc = func(_ *Server, gotSID string, epoch int64, prompt string) {
+				continued = gotSID == sid && epoch == 7 && strings.Contains(prompt, "conductor")
+			}
+			saveChatLoopTestSession(t, s, chatSession{ID: sid,
+				Conductor:         &chatConductorState{Role: conductorRoleParent},
+				ConductorChildren: []chatConductorChild{{DispatchID: "d1", Status: status}},
+				Loop:              chatLoopState{Enabled: true, Status: chatLoopStatusEvaluating, Epoch: 7}})
+			s.finishChatLoop(sid, 7, chatLoopStatusCompleted, "controller_complete")
+			got, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !got.Loop.Enabled || got.Loop.Status != chatLoopStatusEvaluating || !continued {
+				t.Fatalf("unresolved dispatch completed: loop=%+v continued=%v", got.Loop, continued)
+			}
+		})
+	}
+}
+
+func TestConductorLoopCompletesResolvedDispatch(t *testing.T) {
+	for _, child := range []chatConductorChild{
+		{Status: conductorSucceeded, Review: &conductorReview{Status: "verified", Basis: "checked"}},
+		{Status: conductorFailed, Resolution: &conductorResolution{Status: "closed", Basis: "closed"}},
+		{Status: conductorCancelled, Resolution: &conductorResolution{Status: "superseded", Basis: "replaced"}},
+	} {
+		s := newChatLoopTestServer(t)
+		sid := "loop-resolved"
+		saveChatLoopTestSession(t, s, chatSession{ID: sid,
+			Conductor:         &chatConductorState{Role: conductorRoleParent},
+			ConductorChildren: []chatConductorChild{child},
+			Loop:              chatLoopState{Enabled: true, Status: chatLoopStatusEvaluating, Epoch: 7}})
+		s.finishChatLoop(sid, 7, chatLoopStatusCompleted, "controller_complete")
+		got, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Loop.Enabled || got.Loop.Status != chatLoopStatusCompleted {
+			t.Fatalf("resolved dispatch blocked completion: %+v", got.Loop)
+		}
+	}
+}
+
 func TestConductorLoopCompletionInvalidatesOldDecision(t *testing.T) {
 	s := newChatLoopTestServer(t)
 	sid := "loop-conductor-receipt"

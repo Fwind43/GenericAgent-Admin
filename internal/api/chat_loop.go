@@ -597,6 +597,27 @@ func (s *Server) finishChatLoop(sid string, epoch int64, status, reason string) 
 		}
 		return
 	}
+	if status == chatLoopStatusCompleted && cs.Conductor != nil && cs.Conductor.Role == conductorRoleParent {
+		unresolved := false
+		for _, child := range cs.ConductorChildren {
+			if !conductorChildResolved(child) {
+				unresolved = true
+				break
+			}
+		}
+		if unresolved {
+			cs.Loop.Status = chatLoopStatusEvaluating
+			cs.Loop.StopReason = ""
+			appendChatLoopRecord(&cs.Loop, "continue", "Completion rejected: unresolved Conductor dispatches remain.", "")
+			err = saveChatSessionLocked(s.CfgStore.Snapshot(), cs)
+			s.SessionMu.Unlock()
+			if err == nil {
+				s.publishChatLoopState(sid, cs.Loop)
+				continueChatLoopFunc(s, sid, epoch, "Loop completion was rejected because unresolved conductor dispatches remain. Use conductor_tasks and conductor_collect to review outstanding results against the objective. Record a supported conductor_review, dispatch follow-up work if needed, or use conductor_resolve only for an authorized closure or valid supersession. Do not invent acceptance or claim completion while unresolved items remain.")
+			}
+			return
+		}
+	}
 	cs.Loop.Enabled = false
 	cs.Loop.Status = status
 	cs.Loop.StopReason = reason
