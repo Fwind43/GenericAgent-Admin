@@ -101,6 +101,44 @@ func TestChatAutorunSchedulerLifecycle(t *testing.T) {
 	s.StopChatAutorun()
 }
 
+func TestChatAutorunUsesConversationContext(t *testing.T) {
+	for _, tc := range []struct {
+		language string
+		want     []string
+		legacy   string
+	}{
+		{"zh", []string{"当前会话内容", "最新用户目标", "已获授权", "不要转向无关任务", "不得自行恢复", "无可执行事项"}, "请阅读自动化 SOP，执行自动任务"},
+		{"en", []string{"current conversation", "latest user goals", "authorized next step", "unrelated tasks", "stopped or rejected", "no actionable work"}, "Read the automation SOP and execute automatic tasks"},
+	} {
+		t.Run(tc.language, func(t *testing.T) {
+			s := newChatLoopTestServer(t)
+			sid := "autorun-context-" + tc.language
+			blockChatLoopTestWorker(t, s, sid)
+			history := chatMessage{ID: "original-user", Role: "user", Content: "Continue the current project only."}
+			saveChatLoopTestSession(t, s, chatSession{ID: sid, Messages: []chatMessage{history}, Autorun: chatAutorunState{Enabled: true, NextRunAt: 1, Language: tc.language}})
+			if !s.dispatchChatAutorun(sid, time.Now().Unix()) {
+				t.Fatal("not dispatched")
+			}
+			cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(cs.Messages) != 3 || cs.Messages[0].ID != history.ID || cs.Messages[0].Content != history.Content {
+				t.Fatalf("history lost: %+v", cs.Messages)
+			}
+			prompt := cs.Messages[1].Content
+			for _, want := range tc.want {
+				if !bytes.Contains([]byte(prompt), []byte(want)) {
+					t.Fatalf("prompt missing %q: %s", want, prompt)
+				}
+			}
+			if bytes.Contains([]byte(prompt), []byte(tc.legacy)) {
+				t.Fatal("legacy exploration instruction remains")
+			}
+		})
+	}
+}
+
 func TestChatAutorunDispatchPersistsOneTurn(t *testing.T) {
 	s := newChatLoopTestServer(t)
 	sid := "autorun-dispatch"

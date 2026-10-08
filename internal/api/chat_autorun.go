@@ -153,9 +153,9 @@ func (s *Server) dispatchChatAutorun(sid string, now int64) bool {
 		s.endChatRunOwned(sid, token)
 		return false
 	}
-	prompt := "[AUTO] 用户已开启自主行动，请阅读自动化 SOP，执行自动任务。"
+	prompt := "[AUTO] 用户已开启本会话自主行动。请根据当前会话内容、最新用户目标与约束、已有结果及工作记忆，选择并推进仍未完成且已获授权的下一步。不要转向无关任务或重复已完成工作；不要把自主行动当作扩大权限，用户已停止或拒绝的事项不得自行恢复。若无可执行事项或仅剩待授权操作，请简要说明，不要凭空创建任务。仅在当前任务需要时读取相关 SOP，不要默认进入通用自主探索流程。"
 	if cs.Autorun.Language == "en" {
-		prompt = "[AUTO] Autonomous action is enabled. Read the automation SOP and execute automatic tasks."
+		prompt = "[AUTO] Autonomous action is enabled for this conversation. Use the current conversation, latest user goals and constraints, existing results, and working memory to select and advance an unfinished, authorized next step. Do not switch to unrelated tasks or repeat completed work. This trigger does not expand permission; do not resume work the user stopped or rejected. If no actionable work remains or further action requires authorization, briefly explain rather than invent tasks. Consult relevant SOPs only as needed for the current task; do not default to a generic autonomous exploration workflow."
 	}
 	queuedItem := chatQueuedMessage{Text: prompt}
 	cs.UpdatedAt = now
