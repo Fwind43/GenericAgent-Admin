@@ -1814,13 +1814,13 @@ html[data-color-scheme="dark"] .oa-cselect > ul li:hover{background:rgba(255,255
   cursor: wait;
 }
 .oa-md-table{width:100%;min-width:max(100%,520px);border-collapse:separate;border-spacing:0;font-size:14px;line-height:1.55;font-variant-numeric:tabular-nums}
-.oa-md-table th,.oa-md-table td{padding:10px 14px;border-bottom:1px solid var(--chat-table-border);vertical-align:top;white-space:normal;overflow-wrap:break-word;text-align:left}
+.oa-md-table th,.oa-md-table td{min-width:8em;padding:10px 14px;border-bottom:1px solid var(--chat-table-border);vertical-align:top;white-space:normal;word-break:normal;overflow-wrap:break-word;text-align:left}
 .oa-md-table tr:last-child td{border-bottom:0}
 .oa-md-table th{background:var(--chat-table-header-bg);color:var(--text);font-size:12px;font-weight:700;line-height:1.4;letter-spacing:.035em}
 .oa-md-table td{color:var(--text);transition:background-color .14s ease}
 .oa-md-table tbody tr:nth-child(even) td{background:var(--chat-table-row-alt)}
 .oa-md-table tbody tr:hover td{background:var(--chat-table-row-hover)}
-.oa-md-table code{white-space:nowrap}.oa-md-table p{margin:0}
+.oa-md-table code{white-space:normal;overflow-wrap:anywhere}.oa-md-table p{margin:0}
 @media(max-width:620px){
   .oa-table-wrap{margin:10px 0 14px;border-radius:8px}
   .oa-md-table{min-width:480px;font-size:13px;line-height:1.5}
