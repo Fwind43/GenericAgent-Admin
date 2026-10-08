@@ -34,5 +34,10 @@
     "globals": "^16.5.0",
     "jsdom": "^27.2.0",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "postcss": {
+      "nanoid": "3.3.18"
+    }
   }
 }
