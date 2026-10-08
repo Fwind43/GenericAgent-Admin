@@ -49,6 +49,14 @@ export function useVersionUpdates({ t, lang, setMsg, setBusy, active = true }) {
   // Loaded alongside the workspace boot sequence so the shell can render the
   // version card without a second round trip. The local git status comes along
   // because it decides whether the GA source card applies at all.
+  const loadUpdateSnapshot = async () => {
+    const results = await Promise.allSettled([
+      api('/api/version/info'),
+      refreshStatus(),
+    ])
+    if (results[0].status === 'fulfilled') setInfo(results[0].value)
+  }
+
   const loadSnapshot = async () => {
     const [auto, ver, stat, git] = await Promise.all([
       api('/api/autostart/status').catch(e => ({ supported:false, enabled:false, error:e.message })),
@@ -63,38 +71,43 @@ export function useVersionUpdates({ t, lang, setMsg, setBusy, active = true }) {
     return { autostart: auto, info: ver, status: stat, gitStatus: git }
   }
 
+  const latestReleaseTag = check?.latest?.tag_name || ''
   useEffect(() => {
     if (!active) return undefined
     let stopped = false
+    let inFlight = false
+    let reloadTimer
     const tick = async () => {
+      if (stopped || inFlight) return
+      inFlight = true
       try {
         const d = await refreshStatus()
+        if (stopped) return
         if (needsReload.current && shouldReloadAfterVersionUpdate(d, observedRunning.current)) {
           const current = await api('/api/version/info')
-          const expected = d?.check?.latest?.tag_name || check?.latest?.tag_name || ''
+          if (stopped) return
+          const expected = d?.check?.latest?.tag_name || latestReleaseTag
           if (versionMatchesExpectedRelease(current?.version, expected)) {
             needsReload.current = false
-            setTimeout(() => window.location.reload(), VERSION_RELOAD_DELAY_MS)
+            reloadTimer = setTimeout(() => window.location.reload(), VERSION_RELOAD_DELAY_MS)
             return
           }
         }
-        if (!stopped && (d?.running || needsReload.current)) setTimeout(tick, VERSION_RELOAD_RETRY_MS)
       } catch (err) {
+        if (stopped) return
         if (shouldReportVersionPollError(restartGraceUntil.current)) console.error('Version status poll error:', err)
-        if (!stopped) setTimeout(tick, VERSION_RELOAD_RETRY_MS)
+      } finally {
+        inFlight = false
       }
     }
-    tick()
-    return () => { stopped = true }
-  }, [check, status?.running, active])
-
-  useEffect(() => {
-    if (!active || !status?.running) return undefined
-    const timer = setInterval(() => refreshStatus().catch(e => {
-      if (shouldReportVersionPollError(restartGraceUntil.current)) setMsg(e.message)
-    }), VERSION_RELOAD_RETRY_MS)
-    return () => clearInterval(timer)
-  }, [status?.running, active])
+    void tick()
+    const pollTimer = setInterval(() => { void tick() }, VERSION_RELOAD_RETRY_MS)
+    return () => {
+      stopped = true
+      clearInterval(pollTimer)
+      clearTimeout(reloadTimer)
+    }
+  }, [latestReleaseTag, active])
 
   const currentView = () => versionUpdateView({ info, check, status, busy, checking, checkError, statusError }, lang)
   const checkVersion = async () => {
@@ -185,6 +198,6 @@ export function useVersionUpdates({ t, lang, setMsg, setBusy, active = true }) {
 
   return {
     info, check, status, busy, checking, checkError, statusError, actionError, gitBusy, gitStatus, autostart,
-    loadSnapshot, refreshStatus, checkVersion, updateVersion, restartVersion, checkSource, toggleAutostart,
+    loadSnapshot, loadUpdateSnapshot, refreshStatus, checkVersion, updateVersion, restartVersion, checkSource, toggleAutostart,
   }
 }
