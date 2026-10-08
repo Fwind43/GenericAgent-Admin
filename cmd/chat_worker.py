@@ -349,11 +349,13 @@ def _tool_timer_snapshot():
         active_count = 0
         for stack in _TOOL_TIMER_ACTIVE.values():
             active_count += len(stack)
-            total += sum(max(0.0, now - started_at) for started_at in stack)
+            total += sum(max(0.0, now - started_at) for started_at, _ in stack)
+        latest = max((entry for stack in _TOOL_TIMER_ACTIVE.values() for entry in stack), default=(0, ''))
         emitter = _TOOL_TIMER_EMITTER
     return emitter, {
         'tool_elapsed_ms': max(0, int(round(total * 1000))),
         'tool_active_count': active_count,
+        'tool_name': latest[1],
         'tool_timing_at_ms': int(time.time() * 1000),
     }
 
@@ -384,7 +386,10 @@ def _install_tool_timer_hook():
     def _before(ctx):
         thread_id = threading.get_ident()
         with _TOOL_TIMER_LOCK:
-            _TOOL_TIMER_ACTIVE.setdefault(thread_id, []).append(time.perf_counter())
+            name = ctx.get('tool_name')
+            if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', name):
+                name = ''
+            _TOOL_TIMER_ACTIVE.setdefault(thread_id, []).append((time.perf_counter(), name))
         _emit_tool_timing()
         return ctx
 
@@ -395,7 +400,8 @@ def _install_tool_timer_hook():
         with _TOOL_TIMER_LOCK:
             stack = _TOOL_TIMER_ACTIVE.get(thread_id)
             if stack:
-                _TOOL_TIMER_TOTAL_SECONDS += max(0.0, now - stack.pop())
+                started_at, _ = stack.pop()
+                _TOOL_TIMER_TOTAL_SECONDS += max(0.0, now - started_at)
                 if not stack:
                     _TOOL_TIMER_ACTIVE.pop(thread_id, None)
         _emit_tool_timing()
@@ -422,7 +428,7 @@ def _consume_tool_elapsed_ms():
     with _TOOL_TIMER_LOCK:
         total = _TOOL_TIMER_TOTAL_SECONDS
         for stack in _TOOL_TIMER_ACTIVE.values():
-            total += sum(max(0.0, now - started_at) for started_at in stack)
+            total += sum(max(0.0, now - started_at) for started_at, _ in stack)
         _TOOL_TIMER_ACTIVE.clear()
         _TOOL_TIMER_TOTAL_SECONDS = 0.0
     return max(1, int(round(total * 1000))) if total > 0 else 0
@@ -3061,6 +3067,17 @@ def _install_conductor_tools(agent, config):
         return StepOutcome(read_reply(broker / (request_id + '.response.json'), 30),
                            next_prompt='Inspect the resolution acknowledgment; errors change nothing. Successful receipts update the earlier task snapshot for this dispatch only. Closed/superseded is an explicit disposition, not successful execution or verified delivery. Replacement work remains independently unresolved until reviewed or explicitly resolved.')
 
+    def inspect(handler, args, response):
+        if handler.parent is not agent:
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Request failed; inspect the receipt before continuing.')
+        dispatch_id = args.get('dispatch_id')
+        if not isinstance(dispatch_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', dispatch_id):
+            return StepOutcome({'ok': False, 'error': 'Invalid dispatch id'}, next_prompt='Correct dispatch_id before retrying.')
+        request_id = uuid.uuid4().hex
+        emit({'type': 'conductor_inspect', 'request_id': request_id, 'broker_dir': str(broker), 'dispatch_id': dispatch_id})
+        reply = read_reply(broker / (request_id + '.response.json'), 30)
+        return StepOutcome({'untrusted_worker_progress': reply}, next_prompt='On-demand public progress only, not delivery or verification. No updates do not prove a hang. Do not poll; use conductor_collect for terminal results.')
+
     def collect(handler, args, response):
         if handler.parent is not agent:
             return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Request failed; inspect the receipt before continuing.')
@@ -3086,6 +3103,7 @@ def _install_conductor_tools(agent, config):
              ('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
              ('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
              ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. evidence[] contains optional review IDs; evidence_status=none means no ledger records, not failed delivery. result_receipt is only a read acknowledgment. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
+    specs.append(('conductor_inspect', inspect, 'Read on-demand live public progress for an owned dispatch: phase, completed steps, latest summary/output and active tool. Not a result receipt or evidence; no updates do not prove a hang. Do not poll. Use conductor_collect for terminal delivery.', 'dispatch_id'))
     specs.append(('conductor_resolve', resolve, 'Explicitly close a terminal dispatch with a basis, or supersede it with a newer dispatch owned by this parent. Use only for an authorized disposition or a real replacement of the same objective. Never infer it from session reuse. Does not change execution/review or make replacement work resolved; cannot close active work.', 'dispatch_id'))
     # A remembered SOP/tool call must not bypass the manager-only role.
     def tasks(handler, args, response):

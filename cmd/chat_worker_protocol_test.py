@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import queue
 import sys
@@ -152,6 +153,28 @@ class ToolTimerTests(unittest.TestCase):
         self.assertEqual(len(registry["tool_before"]), 1)
         self.assertEqual(len(registry["tool_after"]), 1)
         self.assertEqual(chat_worker._consume_tool_elapsed_ms(), 0)
+
+    def test_progress_names_follow_active_stack_without_private_arguments(self):
+        hooks, _ = self.install_fake_hooks()
+        events = []
+        chat_worker._set_tool_timer_emitter(events.append)
+        try:
+            hooks.trigger("tool_before", {"tool_name": "code_run", "args": {"script": "PRIVATE"}})
+            hooks.trigger("tool_before", {"tool_name": "file_read", "response": "PRIVATE"})
+            self.assertEqual(events[-1]["tool_name"], "file_read")
+            self.assertEqual(events[-1]["tool_active_count"], 2)
+            hooks.trigger("tool_after", {"tool_name": "file_read"})
+            self.assertEqual(events[-1]["tool_name"], "code_run")
+            hooks.trigger("tool_after", {"tool_name": "code_run"})
+            self.assertEqual(events[-1]["tool_name"], "")
+            self.assertEqual(events[-1]["tool_active_count"], 0)
+            hooks.trigger("tool_before", {"tool_name": "PRIVATE/path credential"})
+            self.assertEqual(events[-1]["tool_name"], "")
+            self.assertNotIn("PRIVATE", json.dumps(events))
+            chat_worker._reset_tool_elapsed()
+            self.assertEqual(chat_worker._tool_timer_snapshot()[1]["tool_name"], "")
+        finally:
+            chat_worker._clear_tool_timer_emitter()
 
 
 class ChatWorkerProtocolTest(unittest.TestCase):

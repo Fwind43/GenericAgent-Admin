@@ -37,11 +37,13 @@ class InstallationTest(unittest.TestCase):
             original = [{'type': 'function', 'function': {'name': 'no_tool'}}]
             fake.TOOLS_SCHEMA = original
             source = Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8')
-            function = next(n for n in ast.parse(source).body
-                            if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+            functions = [n for n in ast.parse(source).body
+                         if isinstance(n, ast.FunctionDef) and n.name in
+                         ('_install_conductor_tools', '_install_conductor_worker_instructions')]
             import re
-            scope = {'Path': Path, 'json': json, 're': re}
-            exec(compile(ast.Module(body=[function], type_ignores=[]), 'chat_worker.py', 'exec'), scope)
+            import time
+            scope = {'Path': Path, 'json': json, 're': re, 'time': time}
+            exec(compile(ast.Module(body=functions, type_ignores=[]), 'chat_worker.py', 'exec'), scope)
             rows = [{'dispatch_id': str(i), 'objective': 'task-' + str(i)} for i in range(113)]
             offsets = [-1, True, '48', 1.5, 0, 48, 96, 999]
             received = []
@@ -90,6 +92,8 @@ class InstallationTest(unittest.TestCase):
                     self.assertEqual(list(Path(broker).iterdir()), [])
                     import time
                     scope['time'] = time
+                    import uuid
+                    scope['uuid'] = uuid
                     defaults = {}
                     events = []
                     def emit(event):
@@ -150,11 +154,60 @@ class InstallationTest(unittest.TestCase):
                     self.assertEqual(injected['_tool_num'], 1)
                     self.assertEqual(len(events), 5)
                     print('settings schema/install/broker/continuation: 4 tool calls + injected transport keys, 5 fake-model turns PASS')
+                    # Inspect must survive the real GA dispatch/install path, not merely AST shape.
+                    broker_before_inspect = set(Path(broker).iterdir())
+                    snapshots = []
+                    inspect_events = []
+                    def inspect_emit(event):
+                        owner.assertEqual(event['type'], 'conductor_inspect')
+                        owner.assertEqual(event['dispatch_id'], 'fake-dispatch')
+                        owner.assertEqual(event['broker_dir'], broker)
+                        inspect_events.append(event)
+                        reply = {'ok': True, 'dispatch_id': 'fake-dispatch', 'status': 'running',
+                                 'progress': {'available': True, 'phase': 'tool', 'tool_name': 'code_run', 'step': 2}}
+                        (Path(broker) / (event['request_id'] + '.response.json')).write_text(json.dumps(reply))
+                    scope['emit'] = inspect_emit
+                    class InspectModel:
+                        turn = 0
+                        def chat(self, messages, tools):
+                            spec = next(t['function'] for t in tools if t['function']['name'] == 'conductor_inspect')
+                            owner.assertEqual(spec['parameters']['required'], ['dispatch_id'])
+                            owner.assertEqual(set(spec['parameters']['properties']), {'dispatch_id'})
+                            if self.turn:
+                                snapshots.append(json.loads(messages[-1]['tool_results'][0]['content']))
+                                owner.assertIn('not delivery or verification', messages[-1]['content'])
+                            self.turn += 1
+                            calls = [] if self.turn > 1 else [types.SimpleNamespace(id='inspect', function=types.SimpleNamespace(name='conductor_inspect', arguments=json.dumps({'dispatch_id': 'fake-dispatch'})))]
+                            if False: yield ''
+                            return types.SimpleNamespace(content='public', tool_calls=calls)
+                    loop.exhaust(loop.agent_runner_loop(InspectModel(), '', 'inspect', Handler(), fake.TOOLS_SCHEMA, verbose=False))
+                    self.assertEqual(snapshots[0]['untrusted_worker_progress']['progress']['tool_name'], 'code_run')
+                    self.assertEqual(len(inspect_events), 1)
+                    inspect_receipt = Path(broker) / (inspect_events[0]['request_id'] + '.response.json')
+                    self.assertEqual(set(Path(broker).iterdir()), broker_before_inspect | {inspect_receipt})
+                    print('inspect real-loop schema/broker/receipt: PASS')
                 finally:
                     restore()
                 self.assertIs(fake.TOOLS_SCHEMA, original)
                 self.assertFalse(hasattr(Handler, 'do_conductor_tasks'))
-                print('model calls=9; pages=48,48,17; rows=113; invalid offsets=4 recovered; broker files=0; restore=OK')
+                self.assertFalse(hasattr(Handler, 'do_conductor_inspect'))
+                # Role is a server-owned installation snapshot, not an agent attribute.
+                agent.llmclient = FakeModel()
+                original_dispatch = Handler.dispatch
+                original_chat = agent.llmclient.chat
+                worker_restore = scope['_install_conductor_tools'](agent, {
+                    'role': 'worker', 'broker_dir': broker, 'dispatch_id': 'worker-dispatch'})
+                try:
+                    self.assertIs(fake.TOOLS_SCHEMA, original)
+                    self.assertFalse(hasattr(Handler, 'do_conductor_inspect'))
+                    self.assertEqual(len(inspect_events), 1)
+                    self.assertEqual(set(Path(broker).iterdir()), broker_before_inspect | {inspect_receipt})
+                finally:
+                    worker_restore()
+                self.assertIs(Handler.dispatch, original_dispatch)
+                self.assertEqual(agent.llmclient.chat, original_chat)
+                print('worker inspect absent; schema/handlers restored: PASS')
+                print('model calls=9; pages=48,48,17; rows=113; invalid offsets=4 recovered; restore=OK')
 
 
 if __name__ == '__main__':

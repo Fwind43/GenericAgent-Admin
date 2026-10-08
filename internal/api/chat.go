@@ -292,6 +292,7 @@ type chatRun struct {
 	CancelReady        bool
 	PendingAssistantID string
 	RunStartedAtMS     int64
+	ConductorProgress  conductorRunProgress
 	Cmd                *exec.Cmd
 	Subscribers        map[chan []byte]bool
 }
@@ -596,6 +597,10 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 			if readErr := s.confirmConductorRead(sid, ev); readErr != nil {
 				s.publishChatRun(sid, map[string]interface{}{"type": "warning", "message": "Conductor read receipt persistence failed: " + readErr.Error()})
 			}
+			continue
+		}
+		if ev["type"] == "conductor_inspect" {
+			s.handleConductorInspectEvent(sid, ev)
 			continue
 		}
 		if ev["type"] == "conductor_collect" {
@@ -1443,6 +1448,7 @@ func (s *Server) publishChatLine(sid string, line []byte) {
 	}
 	b := append([]byte(nil), line...)
 	r.Events = append(r.Events, b)
+	r.updateConductorProgress(line)
 	var ev struct {
 		Delta string `json:"delta"`
 	}

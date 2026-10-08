@@ -326,7 +326,7 @@ class ConductorToolBoundaryTest(unittest.TestCase):
             restore = install(object(), {'role': 'parent', 'broker_dir': directory})
             try:
                 self.assertEqual({s['function']['name'] for s in module.TOOLS_SCHEMA},
-                                 {'ask_user', 'conductor_dispatch', 'conductor_instruct', 'conductor_collect', 'conductor_cancel', 'conductor_review',
+                                 {'ask_user', 'conductor_dispatch', 'conductor_instruct', 'conductor_inspect', 'conductor_collect', 'conductor_cancel', 'conductor_review',
                                   'conductor_tasks', 'conductor_defaults', 'conductor_models', 'conductor_model_strategy', 'conductor_resolve'})
                 strategy_schema = next(s['function']['parameters'] for s in module.TOOLS_SCHEMA if s['function']['name'] == 'conductor_model_strategy')
                 self.assertEqual(strategy_schema['required'], ['action'])
