@@ -334,7 +334,8 @@ func (s *Server) worldlineCommand(cs *chatSession, c immediateChatCommand, out m
 	if err != nil {
 		return fmt.Errorf("worldline worker: %w", err)
 	}
-	req := map[string]interface{}{"op": "worldline", "activate": true, "action": c.Mode, "sid": safeChatID(cs.ID), "ga_root": s.CfgStore.Snapshot().GARoot, "workspace": cs.Workspace}
+	req := map[string]interface{}{"op": "worldline", "activate": true, "action": c.Mode, "sid": safeChatID(cs.ID), "ga_root": s.CfgStore.Snapshot().GARoot, "workspace": cs.Workspace,
+		"history": cs.Messages, "raw_history": cs.RawHistory, "history_info": cs.HistoryInfo, "working": cs.Working}
 	if c.Mode == "restore" {
 		req["node_id"], req["mode"], req["to"] = c.Arg, c.RestoreMode, c.To
 	}
@@ -354,12 +355,24 @@ func (s *Server) worldlineCommand(cs *chatSession, c immediateChatCommand, out m
 				case "worldline":
 					out["action"], out["tree"], out["restore_result"] = ev["action"], ev["tree"], ev["result"]
 					if c.Mode == "restore" {
-						if raw, ok := ev["raw_history"].([]interface{}); ok {
-							cs.RawHistory = interfaceSliceToMaps(raw)
-							cs.Messages = visibleMessagesFromRaw(cs.RawHistory)
-						}
-						if hi, ok := ev["history_info"].([]interface{}); ok {
-							cs.HistoryInfo = hi
+						if c.RestoreMode != "code" {
+							if raw, ok := ev["raw_history"].([]interface{}); ok {
+								cs.RawHistory = interfaceSliceToMaps(raw)
+							}
+							result, _ := ev["result"].(map[string]interface{})
+							if display, ok := result["display_path"]; ok {
+								data, err := json.Marshal(display)
+								var messages []chatMessage
+								if err != nil || json.Unmarshal(data, &messages) != nil || messages == nil {
+									return fmt.Errorf("invalid worldline display path")
+								}
+								cs.Messages = messages
+							} else {
+								cs.Messages = visibleMessagesFromRaw(cs.RawHistory)
+							}
+							if hi, ok := ev["history_info"].([]interface{}); ok {
+								cs.HistoryInfo = hi
+							}
 						}
 						if working, ok := ev["working"].(map[string]interface{}); ok {
 							cs.Working = working

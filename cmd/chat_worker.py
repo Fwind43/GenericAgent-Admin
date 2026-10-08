@@ -2249,6 +2249,20 @@ def handle_worldline_request(agent, req):
         if result is None:
             raise ValueError('worldline node not found')
         _apply_worldline_restore(agent, result)
+        if core_mode != 'code':
+            binding = sidecar_before.get('bindings', {}).get(
+                _logical_worldline_node(sidecar_before, node_id), {})
+            display = binding.get('display_path')
+            if isinstance(display, list):
+                if to == 'before':
+                    user_id = binding.get('user_message_id')
+                    boundary = next((i for i, message in enumerate(display)
+                                     if isinstance(message, dict) and
+                                     message.get('id') == user_id and
+                                     message.get('role') == 'user'), None)
+                    display = display[:boundary] if boundary is not None else None
+                if display is not None:
+                    result['display_path'] = _json_clone(display, [])
         if logical_target is not None:
             _record_worldline_alias(root_for_req, sid, result.get('target'), logical_target)
     elif action not in ('state', 'list'):

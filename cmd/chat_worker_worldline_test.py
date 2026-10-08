@@ -599,6 +599,56 @@ class WorldlineSidecarTests(unittest.TestCase):
         self.assertEqual(status, 'ok')
         self.assertEqual(loaded['aliases']['bridge-before'], 'root')
 
+    def test_restore_full_user_display_at(self):
+        display = [{'id': 'old-u', 'role': 'user', 'content': 'not in raw history'}, {'id': 'u1', 'role': 'user', 'content': 'restored'}]
+        worker._bind_worldline_head(self.store, self.root, 'sid-1', {'node_id': 'b', 'turn_status': 'completed', 'has_final_answer': True, 'user_message_id': 'u1', 'assistant_message_id': 'a1', 'display_path': display})
+        emitted = []
+        restore_result = {'history': [{'role': 'user', 'content': 'restored'}], 'target': 'bridge-before'}
+        with mock.patch.object(worker, '_resolve_request_root', return_value=self.root), \
+             mock.patch.object(worker, '_apply_workspace', return_value=None), \
+             mock.patch.object(worker, '_ensure_worldline_store', return_value=self.store), \
+             mock.patch.object(worker, '_apply_worldline_restore') as apply_restore, \
+             mock.patch.object(worker, '_worldline_nodes', return_value={'nodes': []}), \
+             mock.patch.object(worker, '_snapshot_backend_history', return_value=[]), \
+             mock.patch.object(worker, '_snapshot_ga_state', return_value={}), \
+             mock.patch.object(worker, 'emit', side_effect=emitted.append), \
+             mock.patch('frontends.worldline.restore_plan', return_value=restore_result) as restore:
+            worker.handle_worldline_request(object(), {
+                'activate': True, 'action': 'restore', 'sid': 'sid-1', 'node_id': 'b',
+                'mode': 'conversation', 'to': 'at',
+            })
+        restore.assert_called_once_with(self.store, 'b', mode='conv', to='at')
+        apply_restore.assert_called_once_with(mock.ANY, restore_result)
+        self.assertEqual(emitted[0]['result'], restore_result)
+        loaded, status = worker._load_worldline_sidecar(self.root, 'sid-1')
+        self.assertEqual(status, 'ok')
+        self.assertEqual(emitted[0]['result']['display_path'], display)
+
+    def test_restore_full_user_display_before(self):
+        display = [{'id': 'old-u', 'role': 'user', 'content': 'not in raw history'}, {'id': 'u1', 'role': 'user', 'content': 'restored'}]
+        worker._bind_worldline_head(self.store, self.root, 'sid-1', {'node_id': 'b', 'turn_status': 'completed', 'has_final_answer': True, 'user_message_id': 'u1', 'assistant_message_id': 'a1', 'display_path': display})
+        emitted = []
+        restore_result = {'history': [{'role': 'user', 'content': 'restored'}], 'target': 'bridge-before'}
+        with mock.patch.object(worker, '_resolve_request_root', return_value=self.root), \
+             mock.patch.object(worker, '_apply_workspace', return_value=None), \
+             mock.patch.object(worker, '_ensure_worldline_store', return_value=self.store), \
+             mock.patch.object(worker, '_apply_worldline_restore') as apply_restore, \
+             mock.patch.object(worker, '_worldline_nodes', return_value={'nodes': []}), \
+             mock.patch.object(worker, '_snapshot_backend_history', return_value=[]), \
+             mock.patch.object(worker, '_snapshot_ga_state', return_value={}), \
+             mock.patch.object(worker, 'emit', side_effect=emitted.append), \
+             mock.patch('frontends.worldline.restore_plan', return_value=restore_result) as restore:
+            worker.handle_worldline_request(object(), {
+                'activate': True, 'action': 'restore', 'sid': 'sid-1', 'node_id': 'b',
+                'mode': 'conversation', 'to': 'before',
+            })
+        restore.assert_called_once_with(self.store, 'b', mode='conv', to='before')
+        apply_restore.assert_called_once_with(mock.ANY, restore_result)
+        self.assertEqual(emitted[0]['result'], restore_result)
+        loaded, status = worker._load_worldline_sidecar(self.root, 'sid-1')
+        self.assertEqual(status, 'ok')
+        self.assertEqual(emitted[0]['result']['display_path'], display[:1])
+
     def test_real_store_multi_hop_switch_commit_and_before_restore_stays_logical(self):
         from frontends.worldline import RewindStore
 
