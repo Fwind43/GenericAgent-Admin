@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Home, LayoutGrid, Plus } from 'lucide-react'
 import ProjectActionsMenu, { SidebarPreferenceSubmenu } from './ProjectActionsMenu'
 import { normalizeSidebarLayout, normalizeSidebarOrder, sidebarSectionKeys, sidebarDisplayCounts } from '../lib/chatSidebarPreferences.js'
 
@@ -36,14 +37,14 @@ export function SidebarTabs({ preferences, update, ct }) {
   return <div className="oa-sidebar-tab-area">
     <div className="oa-sidebar-tabs" role="tablist" aria-label={ct('侧栏选项卡', 'Sidebar tabs')}>
       {layout.tabs.map(tab => <div className="oa-sidebar-tab-item" key={tab.id}>
-        <button type="button" role="tab" aria-label={tab.id === 'home' ? ct('主页', 'Home') : tab.name} title={tab.name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', { ...layout, active: tab.id })}>{tab.id === 'home' ? ct('主页', 'Home') : tab.hideName ? tab.name.slice(0,1) : tab.name}</button>
+        <button type="button" role="tab" aria-label={tab.id === 'home' ? ct('主页', 'Home') : tab.name} title={tab.id === 'home' ? ct('主页', 'Home') : tab.name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', { ...layout, active: tab.id })}>{tab.id === 'home' ? <Home size={17} aria-hidden="true" /> : <LayoutGrid size={17} aria-hidden="true" />}{tab.id !== 'home' && !tab.hideName && <span>{tab.name}</span>}</button>
         {tab.id !== 'home' && <ProjectActionsMenu label={ct(`管理选项卡 ${tab.name}`, `Manage tab ${tab.name}`)}>
           <button type="button" onClick={()=>{setEditing(tab.id);setName(tab.name)}}>{ct('重命名', 'Rename')}</button>
           <button type="button" onClick={()=>update('sectionLayout', {...layout, tabs:layout.tabs.map(t=>t.id === tab.id ? {...t,hideName:!t.hideName} : t)})}>{tab.hideName ? ct('显示选项卡名称', 'Show tab name') : ct('隐藏选项卡名称', 'Hide tab name')}</button>
           <button type="button" onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}>{ct('删除选项卡（版块移回主页）', 'Delete tab (move sections home)')}</button>
         </ProjectActionsMenu>}
       </div>)}
-      <button type="button" className="oa-icon-btn" disabled={layout.tabs.length >= 12} aria-label={ct('新建选项卡', 'New tab')} onClick={()=>{setEditing('new');setName('')}}>+</button>
+      <button type="button" className="oa-icon-btn" disabled={layout.tabs.length >= 12} aria-label={ct('新建选项卡', 'New tab')} onClick={()=>{setEditing('new');setName('')}}><Plus size={16} aria-hidden="true" /></button>
     </div>
     {editing && <form className="oa-project-draft" onSubmit={e=>{e.preventDefault();save()}}><input autoFocus maxLength={40} aria-label={ct('选项卡名称', 'Tab name')} value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key === 'Escape')setEditing(null)}}/><button type="submit" disabled={!name.trim()}>{ct('保存', 'Save')}</button><button type="button" onClick={()=>setEditing(null)}>{ct('取消', 'Cancel')}</button></form>}
   </div>

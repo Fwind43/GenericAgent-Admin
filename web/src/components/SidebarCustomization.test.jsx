@@ -5,6 +5,17 @@ import SidebarCustomization, { SidebarSections, SidebarTabs, SidebarSectionOptio
 import { normalizeSidebarLayout } from '../lib/chatSidebarPreferences.js'
 const ct = (_, en) => en
 afterEach(cleanup)
+it('uses accessible icon tabs by default and honors explicit visible names', () => {
+  const layout = normalizeSidebarLayout({ tabs: [{ id: 'work', name: 'Work' }, { id: 'named', name: 'Named', hideName: false }] })
+  render(<SidebarTabs preferences={{sectionLayout:layout}} update={vi.fn()} ct={ct}/> )
+  for (const name of ['Home', 'Work']) {
+    const tab = screen.getByRole('tab', {name})
+    expect(tab.querySelector('svg')).not.toBeNull()
+    expect(tab.textContent).toBe('')
+    expect(tab.title).toBe(name)
+  }
+  expect(screen.getByRole('tab', {name:'Named'}).textContent).toBe('Named')
+})
 it('edits visibility and restores layout without deleting content', () => {
   const update = vi.fn()
   render(<SidebarCustomization preferences={{showProjects:true}} update={update} ct={ct}/> )

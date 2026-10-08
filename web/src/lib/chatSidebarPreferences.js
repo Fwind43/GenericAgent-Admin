@@ -63,7 +63,7 @@ export function normalizeSidebarLayout(value) {
   for (const tab of Array.isArray(value?.tabs) ? value.tabs : []) {
     if (tabs.length >= 12) break
     if (typeof tab?.id !== 'string' || !tab.id || tabs.some(t => t.id === tab.id)) continue
-    if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), hideName: tab.hideName === true })
+    if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), hideName: tab.hideName !== false })
   }
   const sections = Object.fromEntries(sidebarSectionKeys.map(key => [key, {
     tab: tabs.some(t => t.id === value?.sections?.[key]?.tab) ? value.sections[key].tab : 'home',
