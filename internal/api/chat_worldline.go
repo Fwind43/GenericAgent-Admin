@@ -302,7 +302,10 @@ func (s *Server) prepareChatWorldlineResend(sid string, token *chatRun, cs *chat
 	}
 	worker.Mu.Lock()
 	defer worker.Mu.Unlock()
-	state, err := s.chatWorldlineRPCLocked(sid, worker, strings.TrimSpace(cs.Workspace), map[string]interface{}{"action": "state", "activate": true})
+	state, err := s.chatWorldlineRPCLocked(sid, worker, strings.TrimSpace(cs.Workspace), map[string]interface{}{
+		"action": "state", "activate": true, "history": cs.Messages,
+		"raw_history": cs.RawHistory, "history_info": cs.HistoryInfo, "working": cs.Working,
+	})
 	if err != nil {
 		return err
 	}
@@ -349,8 +352,15 @@ func (s *Server) prepareChatWorldlineResend(sid string, token *chatRun, cs *chat
 	if !s.ownsChatRun(sid, token) {
 		return fmt.Errorf("worldline edit/resend lost ownership")
 	}
+	// Prefer the exact persisted boundary: worldline deltas may predate
+	// tool continuations or have been generated from trimmed model history.
+	currentRaw, currentRawErr := rawHistoryBeforeMessage(*cs, messageIndex)
+	useCurrentRaw := currentRawErr == nil && len(cs.RawHistory) > 0
 	cs.Messages = append([]chatMessage(nil), cs.Messages[:messageIndex]...)
 	cs.RawHistory = append([]map[string]interface{}(nil), restored.RawHistory...)
+	if useCurrentRaw {
+		cs.RawHistory = currentRaw
+	}
 	cs.HistoryInfo = append([]interface{}(nil), restored.HistoryInfo...)
 	cs.Working = mergeChatMaps(nil, restored.Working)
 	if restored.Tree.Head != nil {

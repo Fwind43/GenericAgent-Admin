@@ -618,6 +618,41 @@ func TestWorldlineEditResendAcceptsFoldedSourceOnSelectedPhysicalPath(t *testing
 	}
 }
 
+func TestWorldlineEditResendPreservesAskUserContext(t *testing.T) {
+	s := newChatCommandTestServer(t)
+	const sid = "edit-resend-folded"
+	ask := map[string]interface{}{"role": "assistant", "content": []interface{}{map[string]interface{}{"type": "tool_use", "id": "ask-1", "name": "ask_user", "input": map[string]interface{}{"question": "Which branch?"}}}}
+	answer := map[string]interface{}{"role": "user", "content": []interface{}{map[string]interface{}{"type": "tool_result", "tool_use_id": "ask-1", "content": "left"}}}
+	initial := chatSession{
+		ID: sid, Title: sid,
+		Messages:   []chatMessage{{ID: "u-first", Role: "user", Content: "first"}, {ID: "u-folded", Role: "user", Content: "old prompt"}},
+		RawHistory: []map[string]interface{}{rawUserItem("first"), ask, answer, rawUserItem("old prompt"), rawAssistantItem("discarded")},
+		Settings:   normalizeChatSettings(chatSettings{}),
+	}
+	if err := saveChatSession(s.CfgStore.Snapshot(), initial); err != nil {
+		t.Fatal(err)
+	}
+	installWorldlineTestWorker(t, s, sid)
+	token := s.beginChatRun(sid)
+	if token == nil {
+		t.Fatal("failed to acquire run")
+	}
+	defer s.endChatRunOwned(sid, token)
+	if err := s.prepareChatWorldlineResend(sid, token, &initial, "u-folded"); err != nil {
+		t.Fatal(err)
+	}
+	if len(initial.RawHistory) != 3 || initial.RawHistory[1]["role"] != "assistant" || initial.RawHistory[2]["role"] != "user" {
+		t.Fatalf("lost ask_user context: %+v", initial.RawHistory)
+	}
+	data, err := json.Marshal(initial.RawHistory)
+	if err != nil || !strings.Contains(string(data), "Which branch?") || !strings.Contains(string(data), "left") || strings.Contains(string(data), "discarded") {
+		t.Fatalf("wrong resend tool boundary: %s err=%v", data, err)
+	}
+	if initial.WorldlineHead != "folded" || len(initial.Messages) != 1 {
+		t.Fatalf("wrong branch: %+v", initial)
+	}
+}
+
 func TestWorldlineDeleteIsNarrowAndRejectsBusySession(t *testing.T) {
 	s := newChatCommandTestServer(t)
 	makeArtifacts := func(sid string) (string, string) {
