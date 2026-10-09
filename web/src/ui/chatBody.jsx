@@ -14,7 +14,6 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
   const sectionOptions = section => <SidebarSectionOptions section={section} preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>
   return (<aside data-ui-surface="chat.sidebar" data-ui-layout={layout} className={`oa-sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="oa-side-head">
-        <div className="oa-sidebar-brand">GenericAgent <span>Admin</span><ChatVersionBadge version={version}/></div>
         <button className="oa-icon-btn oa-sidebar-inbox" onClick={openSessionManager} title={ct('管理会话', 'Manage sessions')} aria-label={ct('管理会话', 'Manage sessions')}><Inbox size={19}/></button>
         <button
           className="oa-new-chat"
@@ -170,6 +169,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
       })()}
       <div className="oa-sidebar-foot">
         <button type="button" className="oa-sidebar-customize-open" aria-pressed={customizing} onClick={()=>setCustomizing(value=>!value)}><Settings size={15}/>{customizing ? ct("已完成", "Done") : ct("自定义侧边栏", "Customize sidebar")}</button>
+        <ChatVersionBadge version={version}>
         <label className="oa-sidebar-instance" title={ct('切换实例会更新当前侧栏中的会话', 'Switching instances updates the sessions in this sidebar')}>
           <span>{ct('GA 实例', 'GA instance')}</span>
           <select
@@ -183,7 +183,8 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
             {chatInstances.map(instance => <option key={instance.id} value={instance.id} disabled={instance.initializing}>{instance.name}{instance.initializing ? ct('（初始化中）', ' (initializing)') : ''}</option>)}
           </select>
         </label>
-        <button className="oa-sidebar-settings" onClick={()=>{ if (onOpenSettings) onOpenSettings(); else window.location.href = '/admin' }}><Settings size={15}/>{ct('设置', 'Settings')}</button>
+        <button type="button" className="oa-sidebar-settings" onClick={()=>{ if (onOpenSettings) onOpenSettings(); else window.location.href = '/admin' }}><Settings size={15}/>{ct('设置', 'Settings')}</button>
+        </ChatVersionBadge>
       </div>
     </aside>)
 }

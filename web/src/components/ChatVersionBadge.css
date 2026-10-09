@@ -1,39 +1,46 @@
-.oa-chat .oa-sidebar .oa-side-head .oa-sidebar-brand {
+/* Sidebar footer popover. Brand stays readable; only long versions truncate. */
+.oa-chat .oa-sidebar .oa-sidebar-admin { min-width: 0; }
+.oa-chat .oa-sidebar .oa-sidebar-foot .oa-sidebar-admin-toggle {
   display: flex;
-  align-items: baseline;
-  padding-right: 52px;
-  gap: 4px;
-  white-space: nowrap;
+  width: 100%;
   min-width: 0;
+  min-height: 32px;
+  padding: 6px 8px;
+  gap: 6px;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
 }
-.oa-sidebar-brand > span:not(.oa-chat-version) { flex-shrink: 0; }
-.oa-sidebar .oa-chat-version {
-  display: block;
-  margin: 0 0 0 4px;
-  flex: 0 1 auto;
+.oa-sidebar-admin-label { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.oa-sidebar-admin-label > span:first-child { flex: 0 0 auto; }
+.oa-sidebar-admin-label .oa-chat-version {
   min-width: 0;
-  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
-  font-weight: 400;
-  line-height: 1.5;
-  appearance: none;
-  padding: 2px 3px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
   color: var(--muted);
-  font-family: inherit;
-  cursor: pointer;
 }
-.oa-sidebar .oa-chat-version:hover,
-.oa-sidebar .oa-chat-version[aria-expanded="true"] {
-  color: var(--text);
-  background: var(--hover);
-}
-.oa-sidebar .oa-chat-version:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+.oa-chat .oa-sidebar .oa-sidebar-admin-toggle > svg { flex: 0 0 auto; transform: rotate(180deg); color: var(--muted); }
+.oa-chat .oa-sidebar .oa-sidebar-admin-toggle[aria-expanded="true"] > svg { transform: none; }
+.oa-chat .oa-sidebar .oa-sidebar-foot .oa-sidebar-admin-toggle:hover,
+.oa-chat .oa-sidebar .oa-sidebar-foot .oa-sidebar-admin-toggle[aria-expanded="true"] { background: var(--hover); color: var(--text); }
+.oa-chat .oa-sidebar .oa-sidebar-admin-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Portal styles deliberately do not depend on sidebar ancestry. */
+.oa-sidebar-admin-content { position: fixed; z-index: 1000; display: grid; box-sizing: border-box; min-width: 0; gap: 8px; padding: 10px; overflow: auto; background: var(--surface-strong); color: var(--text); border: 1px solid var(--n-e5e5e5); border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,.18); scrollbar-width: thin; scrollbar-color: var(--scrollbar-colors); }
+.oa-sidebar-admin-content .oa-sidebar-instance { display: grid; padding: 0; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 400; letter-spacing: 0; }
+.oa-sidebar-admin-content .oa-sidebar-instance select { box-sizing: border-box; width: 100%; height: 34px; padding: 0 8px; border: 1px solid var(--n-e5e5e5); border-radius: 6px; background: var(--surface-strong); color: var(--text); font: inherit; }
+.oa-sidebar-admin-content .oa-sidebar-settings { display: flex; align-items: center; justify-content: flex-start; gap: 8px; width: 100%; min-height: 34px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text); box-shadow: none; font-size: 13px; cursor: pointer; }
+.oa-sidebar-admin-content .oa-sidebar-settings:hover { background: var(--hover); }
+.oa-sidebar-admin-content :is(button, select):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.oa-sidebar-admin-content :disabled { opacity: .6; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+  .oa-chat .oa-sidebar .oa-sidebar-admin-toggle { transition: none; }
 }
