@@ -64,7 +64,9 @@
 .oa-chat .oa-sidebar .oa-sidebar-section-head { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0; position: sticky; top: 0; z-index: 4; background: color-mix(in srgb, var(--surface-muted) 96%, var(--surface-strong)); }
 .oa-chat .oa-sidebar .oa-sidebar-section-toggle { width: auto; flex: 1; min-width: 0; height: 32px; gap: 6px; padding: 0 10px; border-radius: 4px; font-size: 13px; font-weight: 450; background: transparent; }
 .oa-chat .oa-sidebar .oa-sidebar-section-toggle:hover { background: transparent; color: var(--text); }
-.oa-chat .oa-sidebar .oa-sidebar-section-toggle > span { order: 1; opacity: .65; }
+.oa-chat .oa-sidebar .oa-sidebar-section-toggle > span { order: 1; opacity: 0; }
+.oa-chat .oa-sidebar .oa-sidebar-section-head:hover .oa-sidebar-section-toggle > span,
+.oa-chat .oa-sidebar .oa-sidebar-section-head:focus-within .oa-sidebar-section-toggle > span { opacity: .65; }
 .oa-chat .oa-sidebar .oa-sidebar-section-toggle > span::before { width: 4px; height: 4px; }
 .oa-chat .oa-sidebar .oa-sidebar-section .oa-sidebar-view-actions { display: flex; align-items: center; flex: 0 0 auto; gap: 2px; margin: 0; }
 .oa-chat .oa-sidebar .oa-sidebar-section .oa-session-manage-open { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 5px; border-radius: 5px; font-weight: 400; }

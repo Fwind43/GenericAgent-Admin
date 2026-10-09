@@ -14,6 +14,18 @@ test('session badges reserve the trailing menu slot including running rows', () 
   assert.match(sidebarCss, /\.oa-chat \.oa-sidebar \.oa-session-row \.oa-session,\s*\.oa-chat \.oa-sidebar \.oa-session-row\.is-running \.oa-session\s*\{\s*padding-right:\s*40px\s*!important;\s*\}/)
 })
 
+test('sidebar section arrows stay quiet until hover or keyboard focus', () => {
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  const selector = '.oa-chat .oa-sidebar .oa-sidebar-section-toggle > span'
+  const arrowRules = sidebarCss.split(`${selector} {`).slice(1).map(rule => rule.split('}')[0])
+  assert.ok(arrowRules.length > 0)
+  assert.match(arrowRules.at(-1), /opacity:\s*0(?:;|\s*$)/)
+  assert.doesNotMatch(arrowRules.join('\n'), /display:\s*none|visibility:\s*hidden/)
+  assert.match(arrowRules.join('\n'), /flex:\s*0 0 12px/)
+  assert.match(sidebarCss, /\.oa-sidebar-section-head:hover \.oa-sidebar-section-toggle > span,\s*\.oa-chat \.oa-sidebar \.oa-sidebar-section-head:focus-within \.oa-sidebar-section-toggle > span\s*\{\s*opacity:\s*\.65;\s*\}/)
+  assert.match(sidebarCss, /\.oa-sidebar-section-toggle\[aria-expanded="true"\] > span::before\s*\{[^}]*transform:/)
+})
+
 test('sidebar titles retain readable space when metadata wraps', () => {
   const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
   const title = sidebarCss.split('.oa-chat .oa-sidebar .oa-session-title b {')[1]?.split('}')[0]
