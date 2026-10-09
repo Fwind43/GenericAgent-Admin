@@ -32,6 +32,44 @@ test('sidebar navigation icons use theme-muted color without fading labels or st
   assert.doesNotMatch(selector, /oa-session-(?:status|project-badge|conductor-badge)|danger/)
 })
 
+test('compact sidebar rows respect user dimensions and retain touch targets', () => {
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  const compact = sidebarCss.split('/* Compact rows, with quiet headings and stronger content labels. */')[1]
+  assert.ok(compact, 'compact overrides must be local to the chat sidebar')
+  assert.match(compact, /--oa-side-row-height:\s*max\(28px, calc\(var\(--size-controlHeight, 36px\) - 4px\)\)/)
+  assert.match(compact, /\.oa-chat \.oa-sidebar \.oa-sidebar-section\s*\{\s*margin-bottom:\s*8px;/)
+  for (const selector of [
+    '.oa-chat .oa-sidebar .oa-sidebar-section-head > .oa-sidebar-section-toggle',
+    '.oa-chat .oa-sidebar .oa-project-head > .oa-project-toggle',
+    '.oa-chat .oa-sidebar .oa-session-row .oa-session',
+  ]) {
+    const rule = compact.split(`${selector} {`)[1]?.split('}')[0]
+    assert.ok(rule, `missing compact row rule for ${selector}`)
+    assert.match(rule, /min-height:\s*var\(--oa-side-row-height\)/)
+  }
+  assert.match(compact, /\.oa-project-head\s*\{\s*top:\s*var\(--oa-side-row-height\)/)
+  const actions = compact.split('.oa-chat .oa-sidebar .oa-project-head > .oa-project-reorder {')[1]?.split('}')[0]
+  assert.ok(actions, 'sidebar action buttons must not stretch compact heading rows')
+  assert.match(actions, /height:\s*var\(--oa-side-row-height\); min-height:\s*var\(--oa-side-row-height\)/)
+  assert.match(actions, /width:\s*var\(--oa-side-row-height\); min-width:\s*var\(--oa-side-row-height\)/)
+  assert.match(compact, /@media \(max-width:\s*920px\), \(hover:\s*none\), \(pointer:\s*coarse\)/)
+  assert.match(compact, /--oa-side-row-height:\s*max\(44px, var\(--size-controlHeight, 36px\)\)/)
+  assert.doesNotMatch(compact, /!important|display:\s*none|overflow:\s*hidden/)
+})
+
+test('compact sidebar separates muted navigation from readable content', () => {
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  const compact = sidebarCss.split('/* Compact rows, with quiet headings and stronger content labels. */')[1]
+  const body = selector => compact.split(`${selector} {`)[1]?.split('}')[0]
+  assert.match(body('.oa-chat .oa-sidebar .oa-sidebar-section-head > .oa-sidebar-section-toggle'), /font-size:\s*max\(12px, calc\(var\(--size-uiFont, 14px\) - 2px\)\)/)
+  assert.match(body('.oa-chat .oa-sidebar .oa-sidebar-section-head > .oa-sidebar-section-toggle'), /color:\s*var\(--muted\)/)
+  assert.match(body('.oa-chat .oa-sidebar .oa-project-head > .oa-project-toggle'), /color:\s*var\(--text\)/)
+  assert.match(body('.oa-chat .oa-sidebar .oa-session-title b'), /color:\s*var\(--text\)/)
+  assert.match(body('.oa-chat .oa-sidebar .oa-sidebar-tabs button'), /color:\s*var\(--muted\)/)
+  assert.match(compact, /\.oa-sidebar-tabs button\.active,\s*\.oa-chat \.oa-sidebar \.oa-sidebar-tabs button:hover\s*\{\s*color:\s*var\(--text\)/)
+  assert.doesNotMatch(compact, /#[\da-fA-F]{3,8}|opacity:|filter:/)
+})
+
 test('sidebar section arrows stay quiet until hover or keyboard focus', () => {
   const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
   const selector = '.oa-chat .oa-sidebar .oa-sidebar-section-toggle > span'

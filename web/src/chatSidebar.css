@@ -306,3 +306,47 @@
 .oa-chat .oa-sidebar .oa-project-toggle > svg,
 .oa-chat .oa-sidebar .oa-sidebar-foot button > svg,
 .oa-chat .oa-collapsed-actions > .oa-icon-btn > svg { color: var(--muted); }
+
+/* Compact rows, with quiet headings and stronger content labels. */
+.oa-chat .oa-sidebar {
+  --oa-side-row-height: max(28px, calc(var(--size-controlHeight, 36px) - 4px));
+}
+.oa-chat .oa-sidebar .oa-sidebar-sections { padding-top: 0; }
+.oa-chat .oa-sidebar .oa-sidebar-section { margin-bottom: 8px; }
+.oa-chat .oa-sidebar .oa-sidebar-section-head {
+  min-height: var(--oa-side-row-height);
+}
+.oa-chat .oa-sidebar .oa-sidebar-section-head .oa-sidebar-view-actions > button,
+.oa-chat .oa-sidebar .oa-project-head > .oa-project-add,
+.oa-chat .oa-sidebar .oa-project-head > .oa-project-reorder {
+  height: var(--oa-side-row-height); min-height: var(--oa-side-row-height);
+  width: var(--oa-side-row-height); min-width: var(--oa-side-row-height);
+}
+.oa-chat .oa-sidebar .oa-sidebar-section-head > .oa-sidebar-section-toggle {
+  height: var(--oa-side-row-height); min-height: var(--oa-side-row-height);
+  font-size: max(12px, calc(var(--size-uiFont, 14px) - 2px));
+  font-weight: 500; color: var(--muted);
+}
+.oa-chat .oa-sidebar .oa-project-head {
+  top: var(--oa-side-row-height); min-height: var(--oa-side-row-height);
+}
+.oa-chat .oa-sidebar .oa-project-head > .oa-project-toggle {
+  height: auto; min-height: var(--oa-side-row-height); padding-block: 4px;
+  font-size: max(13px, calc(var(--size-uiFont, 14px) - 1px));
+  color: var(--text);
+}
+.oa-chat .oa-sidebar .oa-project-toggle b { font-size: inherit; font-weight: 400; }
+.oa-chat .oa-sidebar .oa-session-row .oa-session {
+  min-height: var(--oa-side-row-height); padding-block: 4px;
+}
+.oa-chat .oa-sidebar .oa-session-title b {
+  font-size: max(13px, calc(var(--size-uiFont, 14px) - 1px)); color: var(--text);
+}
+.oa-chat .oa-sidebar .oa-sidebar-section > .oa-project-list { padding-block: 2px; }
+.oa-chat .oa-sidebar .oa-recent-filter { margin-bottom: 4px; }
+.oa-chat .oa-sidebar .oa-sidebar-tabs button { color: var(--muted); font-weight: 400; }
+.oa-chat .oa-sidebar .oa-sidebar-tabs button.active,
+.oa-chat .oa-sidebar .oa-sidebar-tabs button:hover { color: var(--text); }
+@media (max-width: 920px), (hover: none), (pointer: coarse) {
+  .oa-chat .oa-sidebar { --oa-side-row-height: max(44px, var(--size-controlHeight, 36px)); }
+}
