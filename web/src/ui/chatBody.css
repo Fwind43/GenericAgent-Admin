@@ -98,3 +98,11 @@
 .oa-chat .oa-sidebar[data-ui-surface="chat.sidebar"] .oa-sidebar-tabs [role="tab"] { min-width: 30px; min-height: 30px; height: 30px; padding: 5px 6px; border-radius: 6px; }
 .oa-chat .oa-sidebar[data-ui-surface="chat.sidebar"] .oa-sidebar-tabs > .oa-icon-btn { width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; }
 .oa-chat .oa-sidebar[data-ui-surface="chat.sidebar"] .oa-sidebar-tabs [role="tab"] svg { width: 17px; height: 17px; }
+
+/* Tab editing floats above the sidebar instead of pushing its content down. */
+.oa-chat .oa-sidebar[data-ui-surface="chat.sidebar"] .oa-sidebar-tabs .oa-project-reorder { height: 30px; min-height: 30px; padding-block: 0; }
+.oa-sidebar-tab-editor { position: fixed; z-index: 10001; box-sizing: border-box; max-height: calc(100dvh - 16px); overflow: auto; margin: 0; padding: 8px; color: var(--text); background: var(--surface-strong); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .12); }
+.oa-sidebar-tab-editor-row { display: flex; align-items: center; gap: 8px; }
+.oa-sidebar-tab-editor-row > input { flex: 1; min-width: 0; width: 100%; height: 30px; box-sizing: border-box; padding: 4px 7px; border: 1px solid var(--border); border-radius: 5px; background: var(--input-bg); color: var(--text); font: inherit; font-size: 13px; }
+.oa-sidebar-tab-editor-row > input:focus { border-color: var(--accent); outline: 2px solid color-mix(in srgb, var(--accent) 20%, transparent); outline-offset: 1px; }
+@media (max-width: 640px) { .oa-sidebar-tab-editor-row > input { height: 34px; font-size: 16px; } }

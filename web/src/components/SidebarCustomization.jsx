@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Home, LayoutGrid, Plus, GripVertical, Pin, Bot, Folder, Clock } from 'lucide-react'
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -58,29 +59,82 @@ export default function SidebarCustomization({ preferences, update, ct }) {
     <button type="button" className="oa-sidebar-customize-reset" onClick={()=>{ update('sectionOrder', [...sidebarSectionKeys]); update('sectionLayout', normalizeSidebarLayout()); Object.values(flags).forEach(key=>update(key, true)) }}>{ct('恢复默认版块', 'Restore default sections')}</button>
   </div>
 }
+function SidebarTabNameEditor({ editing, ct, onSave, onClose }) {
+  const [name, setName] = useState(editing.name)
+  const input = useRef(null)
+  const panel = useRef(null)
+  const rect = editing.anchor.getBoundingClientRect()
+  const width = Math.min(248, window.innerWidth - 16)
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
+  const top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 66))
+  useEffect(() => {
+    input.current?.focus()
+    input.current?.select()
+  }, [editing])
+  useEffect(() => {
+    const outside = e => {
+      if (panel.current?.contains(e.target) || editing.anchor.contains(e.target)) return
+      if (name.trim()) onSave(name.trim(), false)
+      else onClose(false)
+    }
+    const key = e => {
+      if (e.key === 'Escape') {
+        e.preventDefault(); e.stopPropagation()
+        onClose(true)
+      }
+    }
+    const hide = e => { if (e.type === 'resize' || !(e.target instanceof Node) || !panel.current?.contains(e.target)) onClose(false) }
+    document.addEventListener('pointerdown', outside)
+    document.addEventListener('keydown', key)
+    window.addEventListener('resize', hide)
+    window.addEventListener('scroll', hide, true)
+    return () => {
+      document.removeEventListener('pointerdown', outside)
+      document.removeEventListener('keydown', key)
+      window.removeEventListener('resize', hide)
+      window.removeEventListener('scroll', hide, true)
+    }
+  }, [editing, name, onSave, onClose])
+  return createPortal(<form ref={panel} className="oa-sidebar-tab-editor" role="dialog" aria-label={editing.id === 'new' ? ct('新建选项卡', 'New tab') : ct('编辑选项卡', 'Edit tab')} style={{ top, left, width }}
+    onSubmit={e=>{ e.preventDefault(); if (name.trim()) onSave(name.trim(), true) }}>
+    <div className="oa-sidebar-tab-editor-row">
+    <input ref={input} maxLength={40} aria-label={ct('选项卡名称', 'Tab name')} title={ct('回车保存，Esc 取消', 'Enter to save, Esc to cancel')} value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{ if (e.key === 'Enter' && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault() }}/>
+    </div>
+  </form>, document.body)
+}
 export function SidebarTabs({ preferences, update, ct }) {
   const layout = normalizeSidebarLayout(preferences.sectionLayout)
   const [editing, setEditing] = useState(null)
-  const [name, setName] = useState('')
-  const save = () => {
-    if (!name.trim()) return
-    const id = editing === 'new' ? `tab-${globalThis.crypto.randomUUID()}` : editing
-    update('sectionLayout', { ...layout, active: id, tabs: editing === 'new' ? [...layout.tabs, { id, name: name.trim() }] : layout.tabs.map(t=>t.id === id ? { ...t, name: name.trim() } : t) })
+  const tabs = useRef(null)
+  const closeEditor = restoreFocus => {
+    if (restoreFocus && editing?.anchor.isConnected) editing.anchor.focus()
     setEditing(null)
   }
+  const save = (name, restoreFocus) => {
+    if (!editing || !name.trim()) return
+    if (editing.id === 'new' && layout.tabs.length >= 12) { closeEditor(restoreFocus); return }
+    if (editing.id !== 'new' && !layout.tabs.some(t=>t.id === editing.id)) { closeEditor(restoreFocus); return }
+    const id = editing.id === 'new' ? `tab-${globalThis.crypto.randomUUID()}` : editing.id
+    update('sectionLayout', { ...layout, active: id, tabs: editing.id === 'new' ? [...layout.tabs, { id, name: name.trim() }] : layout.tabs.map(t=>t.id === id ? { ...t, name: name.trim() } : t) })
+    closeEditor(restoreFocus)
+  }
+  const rename = tab => {
+    const anchor = Array.from(tabs.current.querySelectorAll('[role="tab"]')).find(button=>button.dataset.tabId === tab.id)
+    if (anchor) setEditing({ id: tab.id, name: tab.name, anchor })
+  }
   return <div className="oa-sidebar-tab-area">
-    <div className="oa-sidebar-tabs" role="tablist" aria-label={ct('侧栏选项卡', 'Sidebar tabs')}>
+    <div ref={tabs} className="oa-sidebar-tabs" role="tablist" aria-label={ct('侧栏选项卡', 'Sidebar tabs')}>
       {layout.tabs.map(tab => <div className="oa-sidebar-tab-item" key={tab.id}>
-        <button type="button" role="tab" aria-label={tab.id === 'home' ? ct('主页', 'Home') : tab.name} title={tab.id === 'home' ? ct('主页', 'Home') : tab.name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', { ...layout, active: tab.id })}>{tab.id === 'home' ? <Home size={17} aria-hidden="true" /> : <LayoutGrid size={17} aria-hidden="true" />}{tab.id !== 'home' && !tab.hideName && <span>{tab.name}</span>}</button>
+        <button type="button" role="tab" data-tab-id={tab.id} aria-label={tab.id === 'home' ? ct('主页', 'Home') : tab.name} title={tab.id === 'home' ? ct('主页', 'Home') : tab.name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))} onDoubleClick={()=>{ if (tab.id !== 'home') rename(tab) }}>{tab.id === 'home' ? <Home size={17} aria-hidden="true" /> : <LayoutGrid size={17} aria-hidden="true" />}{tab.id !== 'home' && !tab.hideName && <span>{tab.name}</span>}</button>
         {tab.id !== 'home' && <ProjectActionsMenu label={ct(`管理选项卡 ${tab.name}`, `Manage tab ${tab.name}`)}>
-          <button type="button" onClick={()=>{setEditing(tab.id);setName(tab.name)}}>{ct('重命名', 'Rename')}</button>
+          <button type="button" onClick={()=>rename(tab)}>{ct('重命名', 'Rename')}</button>
           <button type="button" onClick={()=>update('sectionLayout', {...layout, tabs:layout.tabs.map(t=>t.id === tab.id ? {...t,hideName:!t.hideName} : t)})}>{tab.hideName ? ct('显示选项卡名称', 'Show tab name') : ct('隐藏选项卡名称', 'Hide tab name')}</button>
           <button type="button" onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}>{ct('删除选项卡（版块移回主页）', 'Delete tab (move sections home)')}</button>
         </ProjectActionsMenu>}
       </div>)}
-      <button type="button" className="oa-icon-btn" disabled={layout.tabs.length >= 12} aria-label={ct('新建选项卡', 'New tab')} onClick={()=>{setEditing('new');setName('')}}><Plus size={16} aria-hidden="true" /></button>
+      <button type="button" className="oa-icon-btn" disabled={layout.tabs.length >= 12} aria-label={ct('新建选项卡', 'New tab')} onClick={e=>{ if (editing?.id === 'new') closeEditor(true); else setEditing({ id:'new', name:ct('新建选项卡', 'New tab'), anchor:e.currentTarget }) }}><Plus size={16} aria-hidden="true" /></button>
     </div>
-    {editing && <form className="oa-project-draft" onSubmit={e=>{e.preventDefault();save()}}><input autoFocus maxLength={40} aria-label={ct('选项卡名称', 'Tab name')} value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{if(e.key === 'Escape')setEditing(null)}}/><button type="submit" disabled={!name.trim()}>{ct('保存', 'Save')}</button><button type="button" onClick={()=>setEditing(null)}>{ct('取消', 'Cancel')}</button></form>}
+    {editing && <SidebarTabNameEditor key={editing.id} editing={editing} ct={ct} onSave={save} onClose={closeEditor}/>}
   </div>
 }
 export function SidebarSectionOptions({ section, preferences, update, ct }) {
