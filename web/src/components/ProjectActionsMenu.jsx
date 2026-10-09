@@ -5,7 +5,7 @@ import { MoreHorizontal, ChevronRight } from 'lucide-react'
 const ProjectMenuOwner = createContext(null)
 const belongsToOwner = (target, owner) => target.closest?.('[data-project-menu-owner]')?.getAttribute('data-project-menu-owner') === owner
 
-export default function ProjectActionsMenu({ label, children }) {
+export default function ProjectActionsMenu({ label, children, renderTrigger, className = '' }) {
   const [pos, setPos] = useState(null)
   const owner = useId()
   const trigger = useRef(null)
@@ -31,14 +31,17 @@ export default function ProjectActionsMenu({ label, children }) {
       window.removeEventListener('scroll', hide, true)
     }
   }, [pos, owner])
+  const closeMenu = () => setPos(null)
+  const toggleMenu = e => {
+    e.stopPropagation()
+    trigger.current = e.currentTarget
+    const rect = e.currentTarget.getBoundingClientRect()
+    setPos(pos ? null : { top:Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 340)), left:Math.max(8, Math.min(rect.right - 190, window.innerWidth - 198)) })
+  }
+  const triggerProps = { 'aria-expanded':!!pos, 'aria-haspopup':'true', 'data-project-menu-owner':owner, onClick:toggleMenu }
   return <ProjectMenuOwner.Provider value={owner}>
-    <button ref={trigger} type="button" className="oa-project-reorder" aria-label={label} title={label} aria-expanded={!!pos} aria-haspopup="true"
-      onClick={e => {
-        e.stopPropagation()
-        const rect = e.currentTarget.getBoundingClientRect()
-        setPos(pos ? null : { top:Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 340)), left:Math.max(8, Math.min(rect.right - 190, window.innerWidth - 198)) })
-      }} style={{ cursor:'pointer' }}><MoreHorizontal size={16}/></button>
-    {pos && createPortal(<div ref={menu} className="oa-session-menu" aria-label={label} style={{ position:'fixed', ...pos, width:190, zIndex:10000, overflow:'visible' }}
+    {renderTrigger ? renderTrigger({ triggerProps, closeMenu }) : <button ref={trigger} type="button" className="oa-project-reorder" aria-label={label} title={label} {...triggerProps} style={{ cursor:'pointer' }}><MoreHorizontal size={16}/></button>}
+    {pos && createPortal(<div ref={menu} className={`oa-session-menu ${className}`} aria-label={label} style={{ position:'fixed', ...pos, width:190, zIndex:10000, overflow:'visible' }}
       onClick={e => { e.stopPropagation(); if (e.target.closest('button:not(:disabled):not([aria-haspopup="menu"])')) { setPos(null); trigger.current?.focus() } }}>
       {children}
     </div>, document.body)}

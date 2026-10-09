@@ -99,3 +99,11 @@ test('tab icons survive storage reload and normalize unsupported or legacy value
   assert.equal(prefs.sectionLayout.sections.projects.tab,'work')
   assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}),prefs)
 })
+test('home preferences survive reload without allowing home removal or orphaned sections', () => {
+  const raw = {sectionLayout:{tabs:[{id:'home',name:'Inbox',hideName:false,icon:'message'},{id:'work',name:'Work',hideName:false}],active:'work',sections:{projects:{tab:'work',count:20}}}}
+  const prefs = readSidebarPreferences({getItem:()=>JSON.stringify(raw)})
+  assert.deepEqual(prefs.sectionLayout.tabs[0],{id:'home',name:'Inbox',hideName:false,icon:'message'})
+  assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}),prefs)
+  assert.deepEqual(normalizeSidebarLayout({tabs:[]}).tabs,[{id:'home',name:'Home'}])
+  assert.equal(normalizeSidebarLayout({tabs:[{id:'home',name:'   ',icon:'invalid'}]}).tabs[0].name,'Home')
+})

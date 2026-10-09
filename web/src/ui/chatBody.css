@@ -56,6 +56,12 @@
 .oa-sidebar-tabs [role="tab"] { border: 0; background: transparent; color: var(--muted); padding: 7px 8px; font: inherit; font-size: 12px; cursor: pointer; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oa-sidebar-tabs [aria-selected="true"] { color: var(--text); font-weight: 600; }
 .oa-sidebar-tab-item .oa-project-reorder { opacity: 1; width: 22px; }
+.oa-sidebar-tab-menu { border-color: var(--border); border-radius: 8px; padding: 4px; box-shadow: 0 4px 18px rgba(0,0,0,.12); }
+.oa-sidebar-tab-menu button { height: 32px; border-radius: 4px; padding: 0 8px; gap: 9px; font-weight: 400; }
+.oa-sidebar-tab-menu button svg { flex-shrink: 0; color: var(--muted); stroke-width: 1.7; }
+.oa-sidebar-tab-menu button:hover, .oa-sidebar-tab-menu button:focus-visible { background: var(--selected); }
+.oa-sidebar-tab-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.oa-sidebar-tab-menu-divider { height: 1px; background: var(--border); margin: 4px 4px; }
 .oa-sidebar-preference-menu { border-color: var(--border); }
 .oa-sidebar-preference-menu button { height: auto; min-height: 36px; padding-block: 6px; white-space: normal; overflow-wrap: anywhere; }
 .oa-sidebar-preference-menu button:hover, .oa-sidebar-preference-menu button:focus-visible { background: var(--selected); }

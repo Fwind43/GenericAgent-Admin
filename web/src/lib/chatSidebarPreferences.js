@@ -61,7 +61,11 @@ export function filterSidebarRecentNodes(nodes, filter = 'all') {
 
 
 export function normalizeSidebarLayout(value) {
-  const tabs = [{ id: 'home', name: 'Home' }]
+  const savedHome = Array.isArray(value?.tabs) ? value.tabs.find(tab => tab?.id === 'home') : null
+  const home = { id: 'home', name: typeof savedHome?.name === 'string' && savedHome.name.trim() ? savedHome.name.trim().slice(0, 40) : 'Home' }
+  if (savedHome?.hideName === false) home.hideName = false
+  if (sidebarTabIcons.includes(savedHome?.icon)) home.icon = savedHome.icon
+  const tabs = [home]
   for (const tab of Array.isArray(value?.tabs) ? value.tabs : []) {
     if (tabs.length >= 12) break
     if (typeof tab?.id !== 'string' || !tab.id || tabs.some(t => t.id === tab.id)) continue

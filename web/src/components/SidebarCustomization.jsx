@@ -1,6 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Home, LayoutGrid, Plus, GripVertical, Pin, Bot, Folder, Clock, Briefcase, Star, Heart, Code, Terminal, BookOpen, FileText, MessageSquare, Flag, Zap, Globe, Rocket, Music, Camera, Image, Coffee, Palette, Shield, Wrench, CalendarDays } from 'lucide-react'
+import { Home, LayoutGrid, Plus, GripVertical, Pin, Bot, Folder, Clock, Briefcase, Star, Heart, Code, Terminal, BookOpen, FileText, MessageSquare, Flag, Zap, Globe, Rocket, Music, Camera, Image, Coffee, Palette, Shield, Wrench, CalendarDays, Pencil, Trash2, Eye, EyeOff, SlidersHorizontal } from 'lucide-react'
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -68,7 +68,7 @@ export default function SidebarCustomization({ preferences, update, ct }) {
 }
 function SidebarTabNameEditor({ editing, ct, onSave, onClose }) {
   const [name, setName] = useState(editing.name)
-  const [icon, setIcon] = useState(editing.icon || 'grid')
+  const [icon, setIcon] = useState(editing.icon || (editing.id === 'home' ? undefined : 'grid'))
   const [showIcons, setShowIcons] = useState(Boolean(editing.showIcons))
   const input = useRef(null)
   const panel = useRef(null)
@@ -123,7 +123,7 @@ function SidebarTabNameEditor({ editing, ct, onSave, onClose }) {
   return createPortal(<form ref={panel} className="oa-sidebar-tab-editor" role="dialog" aria-label={editing.id === 'new' ? ct('新建选项卡', 'New tab') : ct('编辑选项卡', 'Edit tab')} style={{ top, left, width }}
     onSubmit={e=>{ e.preventDefault(); if (name.trim()) onSave(name.trim(), icon, true) }}>
     <div className="oa-sidebar-tab-editor-row">
-      <button type="button" className="oa-sidebar-tab-icon-trigger" aria-label={ct("选择图标", "Choose icon")} title={ct("选择图标", "Choose icon")} aria-expanded={showIcons} aria-controls={showIcons ? gridId : undefined} onClick={()=>setShowIcons(value=>!value)}><SidebarTabIcon icon={icon}/></button>
+      <button type="button" className="oa-sidebar-tab-icon-trigger" aria-label={ct("选择图标", "Choose icon")} title={ct("选择图标", "Choose icon")} aria-expanded={showIcons} aria-controls={showIcons ? gridId : undefined} onClick={()=>setShowIcons(value=>!value)}>{editing.id === 'home' && !icon ? <Home size={17} aria-hidden="true"/> : <SidebarTabIcon icon={icon}/>}</button>
     <input ref={input} maxLength={40} aria-label={ct('选项卡名称', 'Tab name')} title={ct('回车保存，Esc 取消', 'Enter to save, Esc to cancel')} value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{ if (e.key === 'Enter' && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault() }}/>
     </div>
     {showIcons && <div id={gridId} ref={grid} className="oa-sidebar-tab-icon-grid" role="group" aria-label={ct('选项卡图标', 'Tab icons')} onKeyDown={moveIconFocus}>
@@ -131,7 +131,7 @@ function SidebarTabNameEditor({ editing, ct, onSave, onClose }) {
     </div>}
   </form>, document.body)
 }
-export function SidebarTabs({ preferences, update, ct }) {
+export function SidebarTabs({ preferences, update, ct, onCustomize }) {
   const layout = normalizeSidebarLayout(preferences.sectionLayout)
   const [editing, setEditing] = useState(null)
   const tabs = useRef(null)
@@ -153,15 +153,20 @@ export function SidebarTabs({ preferences, update, ct }) {
   }
   return <div className="oa-sidebar-tab-area">
     <div ref={tabs} className="oa-sidebar-tabs" role="tablist" aria-label={ct('侧栏选项卡', 'Sidebar tabs')}>
-      {layout.tabs.map(tab => <div className="oa-sidebar-tab-item" key={tab.id}>
-        <button type="button" role="tab" data-tab-id={tab.id} aria-label={tab.id === 'home' ? ct('主页', 'Home') : tab.name} title={tab.id === 'home' ? ct('主页', 'Home') : tab.name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))} onDoubleClick={()=>{ if (tab.id !== 'home') rename(tab) }}>{tab.id === 'home' ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{tab.id !== 'home' && !tab.hideName && <span>{tab.name}</span>}</button>
-        {tab.id !== 'home' && <ProjectActionsMenu label={ct(`管理选项卡 ${tab.name}`, `Manage tab ${tab.name}`)}>
-          <button type="button" onClick={()=>rename(tab)}>{ct('重命名', 'Rename')}</button>
-          <button type="button" onClick={()=>rename(tab, true)}>{ct('更改图标', 'Change icon')}</button>
-          <button type="button" onClick={()=>update('sectionLayout', {...layout, tabs:layout.tabs.map(t=>t.id === tab.id ? {...t,hideName:!t.hideName} : t)})}>{tab.hideName ? ct('显示选项卡名称', 'Show tab name') : ct('隐藏选项卡名称', 'Hide tab name')}</button>
-          <button type="button" onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}>{ct('删除选项卡（版块移回主页）', 'Delete tab (move sections home)')}</button>
-        </ProjectActionsMenu>}
-      </div>)}
+      {layout.tabs.map(tab => {
+        const name = tab.id === 'home' && tab.name === 'Home' ? ct('主页', 'Home') : tab.name
+        const hideName = tab.hideName !== false
+        return <div className="oa-sidebar-tab-item" key={tab.id}>
+        <button type="button" role="tab" data-tab-id={tab.id} aria-label={name} title={name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))} onDoubleClick={()=>rename({...tab, name})}>{tab.id === 'home' && !tab.icon ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{!hideName && <span>{name}</span>}</button>
+        <ProjectActionsMenu className="oa-sidebar-tab-menu" label={ct(`管理选项卡 ${name}`, `Manage tab ${name}`)}>
+          <button type="button" onClick={()=>rename({...tab, name})}><Pencil size={15} aria-hidden="true"/>{ct('重命名', 'Rename')}</button>
+          <button type="button" onClick={()=>rename({...tab, name}, true)}><Palette size={15} aria-hidden="true"/>{ct('更改图标', 'Change icon')}</button>
+          {tab.id !== 'home' && <button type="button" title={ct('删除选项卡，版块移回主页，不删除会话', 'Move sections home without deleting conversations')} onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}><Trash2 size={15} aria-hidden="true"/>{ct('删除选项卡', 'Delete tab')}</button>}
+          <div className="oa-sidebar-tab-menu-divider" role="separator"/>
+          <button type="button" onClick={()=>update('sectionLayout', {...layout, tabs:layout.tabs.map(t=>t.id === tab.id ? {...t,hideName:!hideName} : t)})}>{hideName ? <Eye size={15} aria-hidden="true"/> : <EyeOff size={15} aria-hidden="true"/>}{hideName ? ct('显示选项卡名称', 'Show tab name') : ct('隐藏选项卡名称', 'Hide tab name')}</button>
+          {onCustomize && <><div className="oa-sidebar-tab-menu-divider" role="separator"/><button type="button" onClick={onCustomize}><SlidersHorizontal size={15} aria-hidden="true"/>{ct('自定义侧边栏', 'Customize sidebar')}</button></>}
+        </ProjectActionsMenu>
+      </div>})}
       <button type="button" className="oa-icon-btn" disabled={layout.tabs.length >= 12} aria-label={ct('新建选项卡', 'New tab')} onClick={e=>{ if (editing?.id === 'new') closeEditor(true); else setEditing({ id:'new', name:ct('新建选项卡', 'New tab'), anchor:e.currentTarget }) }}><Plus size={16} aria-hidden="true" /></button>
     </div>
     {editing && <SidebarTabNameEditor key={editing.id} editing={editing} ct={ct} onSave={save} onClose={closeEditor}/>}

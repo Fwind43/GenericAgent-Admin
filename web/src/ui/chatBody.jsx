@@ -37,7 +37,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           {sidebarSearch && <button className="oa-search-clear" onClick={()=>setSidebarSearch('')} aria-label={ct('清除搜索', 'Clear search')}><X size={14}/></button>}
         </div>
       </div>
-      <SidebarTabs preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>
+      <SidebarTabs preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct} onCustomize={()=>setCustomizing(true)}/>
       {(customizing || !Object.entries(sectionLayout.sections).some(([key, value]) => value.tab === sectionLayout.active && sidebarPreferences[{pinned:"showPinned",conductors:"showConductor",projects:"showProjects",recent:"showRecent"}[key]] !== false)) && <SidebarCustomization preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>}
       <SidebarSections hidden={customizing} order={sidebarPreferences.sectionOrder} layout={sectionLayout}>
         <div className="oa-sidebar-scroll-tools">
