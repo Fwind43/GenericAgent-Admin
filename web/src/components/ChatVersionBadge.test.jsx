@@ -29,6 +29,20 @@ it('starts closed, shows the real version, and toggles without fetching update s
   expect(api.mock.calls.map(([path]) => path)).toEqual(['/api/version/info'])
 })
 
+it('keeps pointer opening free of forced input focus', async () => {
+  const user = userEvent.setup()
+  render(<ChatVersionBadge version="Preview"><select aria-label="GA instance"><option>Default</option></select></ChatVersionBadge>)
+  const toggle = screen.getByRole('button', { name: 'GenericAgent Admin Preview' })
+  await user.click(toggle)
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(document.activeElement).toBe(toggle)
+  await user.tab()
+  expect(document.activeElement).toBe(screen.getByRole('combobox'))
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(document.activeElement).toBe(toggle)
+})
+
 it('supports keyboard, instance changes, action close, Escape and outside dismiss', async () => {
   const settings = vi.fn()
   const switchInstance = vi.fn()

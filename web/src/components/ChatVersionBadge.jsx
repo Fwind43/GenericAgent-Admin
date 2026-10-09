@@ -24,12 +24,13 @@ export default function ChatVersionBadge({ version: suppliedVersion, children } 
   const contentID = useId()
   const trigger = useRef(null)
   const panel = useRef(null)
+  const keyboardOpen = useRef(false)
   const [position, setPosition] = useState(null)
   useEffect(() => {
     if (!expanded) return
     const doc = trigger.current.ownerDocument
     const win = doc.defaultView
-    panel.current?.querySelector('select:not(:disabled), button:not(:disabled)')?.focus()
+    if (keyboardOpen.current) panel.current?.querySelector('select:not(:disabled), button:not(:disabled)')?.focus()
     const outside = event => {
       if (!panel.current?.contains(event.target) && !trigger.current?.contains(event.target)) setExpanded(false)
     }
@@ -50,7 +51,8 @@ export default function ChatVersionBadge({ version: suppliedVersion, children } 
       win.removeEventListener('scroll', hide, true)
     }
   }, [expanded])
-  const toggle = () => {
+  const toggle = event => {
+    keyboardOpen.current = event.detail === 0
     const rect = trigger.current.getBoundingClientRect()
     const win = trigger.current.ownerDocument.defaultView
     const width = Math.min(Math.max(rect.width, 220), win.innerWidth - 16)
