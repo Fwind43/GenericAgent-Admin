@@ -140,6 +140,20 @@ test('all color themes share one product font stack', () => {
   assert.doesNotMatch(mainSource, /fontFamily\s*:\s*['"]Inter\b/i)
 })
 
+test('light controls use neutral fills and a separate quiet selection surface', () => {
+  const light = ruleBodies('html[data-theme="light"]').join('\n')
+  assert.match(light, /--accent\s*:\s*#373737\s*;/i)
+  assert.match(light, /--accent-hover\s*:\s*#242424\s*;/i)
+  assert.match(light, /--text-on-accent\s*:\s*#ffffff\s*;/i)
+  const tokenCss = readFileSync(resolve(here, '../theme-tokens.css'), 'utf8')
+  const selection = tokenCss.match(/:root\[data-theme="light"\]\s*\{([^}]*)\}/)?.[1] || ''
+  assert.match(selection, /--selected\s*:\s*rgba\(13,\s*13,\s*13,\s*\.08\)\s*;/i)
+  assert.match(selection, /--selected-text\s*:\s*var\(--text\)\s*;/i)
+  assert.match(light, /--focus-ring\s*:\s*rgba\(55,\s*55,\s*55,\s*\.45\)\s*;/i)
+  assert.match(light, /--focus-glow\s*:\s*rgba\(55,\s*55,\s*55,\s*\.12\)\s*;/i)
+  assert.doesNotMatch(light, /#(?:C9A961|A8914F|866C36)|rgba\(201,\s*169,\s*97,/i)
+})
+
 test('chat markdown uses a scale-safe readable type hierarchy', () => {
   const prose = ruleBodies('.oa-md').join('\n')
   assert.match(prose, /font-size\s*:\s*16px/i)
