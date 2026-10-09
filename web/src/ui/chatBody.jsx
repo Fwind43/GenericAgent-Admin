@@ -39,7 +39,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
       </div>
       <SidebarTabs preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>
       {(customizing || !Object.entries(sectionLayout.sections).some(([key, value]) => value.tab === sectionLayout.active && sidebarPreferences[{pinned:"showPinned",conductors:"showConductor",projects:"showProjects",recent:"showRecent"}[key]] !== false)) && <SidebarCustomization preferences={sidebarPreferences} update={updateSidebarPreference} ct={ct}/>}
-      <SidebarSections order={sidebarPreferences.sectionOrder} layout={sectionLayout}>
+      <SidebarSections hidden={customizing} order={sidebarPreferences.sectionOrder} layout={sectionLayout}>
         <div className="oa-sidebar-scroll-tools">
         {sidebarSections.conductors.length === 0 && <button
           className="oa-icon-btn oa-new-conductor"
@@ -155,7 +155,6 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           </div>
         </section>
       </SidebarSections>
-      {customizing && <p className="oa-sidebar-edit-note">{ct("通过版块标题菜单调整数量、顺序和选项卡归属；不会删除内容。", "Use section menus to change count, order and tabs. Content is preserved.")}</p>}
       {!sessionManagerOpen && menuOpen && menuPos && (() => {
         const s = sessions.find(x => x.id === menuOpen)
         if (!s) return null
