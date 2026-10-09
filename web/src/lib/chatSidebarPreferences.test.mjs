@@ -1,6 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readSidebarPreferences, sortSidebarSessions, sidebarPreferenceDefaults, filterSidebarRecentNodes, normalizeRecentFilter } from './chatSidebarPreferences.js'
+import { readSidebarPreferences, sortSidebarSessions, sidebarPreferenceDefaults, filterSidebarRecentNodes, normalizeRecentFilter, normalizeSidebarLayout, sidebarTabIcons } from './chatSidebarPreferences.js'
+test('module initializes default sidebar layout with icon dependencies ready', () => {
+  assert.ok(sidebarTabIcons.includes('grid'))
+  assert.deepEqual(sidebarPreferenceDefaults.sectionLayout, normalizeSidebarLayout())
+  assert.equal(sidebarPreferenceDefaults.sectionLayout.active, 'home')
+  assert.deepEqual(sidebarPreferenceDefaults.sectionLayout.tabs, [{ id: 'home', name: 'Home' }])
+})
 test('preferences tolerate invalid and unavailable storage', () => {
   for (const raw of ['null', '{}', 'invalid']) assert.deepEqual(readSidebarPreferences({getItem:()=>raw}), {...sidebarPreferenceDefaults,showProjects:true,showConductor:true,sort:'updated'})
   assert.deepEqual(readSidebarPreferences({getItem:()=>'{"layout":"list","sort":"priority"}'}), {...sidebarPreferenceDefaults,showProjects:false,showConductor:true,sort:'priority'})

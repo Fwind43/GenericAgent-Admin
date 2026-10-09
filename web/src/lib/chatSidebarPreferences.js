@@ -1,5 +1,6 @@
 export const sidebarDisplayCounts = [5, 10, 15, 20, 50, 100]
 export const sidebarSectionKeys = ['pinned', 'conductors', 'projects', 'recent']
+export const sidebarTabIcons = ['grid', 'folder', 'briefcase', 'star', 'heart', 'code', 'terminal', 'book', 'file', 'message', 'bot', 'pin', 'flag', 'zap', 'globe', 'rocket', 'music', 'camera', 'image', 'coffee', 'palette', 'shield', 'wrench', 'calendar']
 export function normalizeSidebarOrder(value) {
   const valid = Array.isArray(value) ? [...new Set(value.filter(key => sidebarSectionKeys.includes(key)))] : []
   return [...valid, ...sidebarSectionKeys.filter(key => !valid.includes(key))]
@@ -58,7 +59,6 @@ export function filterSidebarRecentNodes(nodes, filter = 'all') {
   })
 }
 
-export const sidebarTabIcons = ['grid', 'folder', 'briefcase', 'star', 'heart', 'code', 'terminal', 'book', 'file', 'message', 'bot', 'pin', 'flag', 'zap', 'globe', 'rocket', 'music', 'camera', 'image', 'coffee', 'palette', 'shield', 'wrench', 'calendar']
 
 export function normalizeSidebarLayout(value) {
   const tabs = [{ id: 'home', name: 'Home' }]
