@@ -41,7 +41,8 @@
 .oa-sidebar .oa-sidebar-section { border: 0; box-shadow: none; }
 
 .oa-sidebar-tab-area { flex-shrink: 0; padding: 4px 10px 8px; border-bottom: 1px solid var(--border); }
-.oa-sidebar-tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; align-items: center; }
+.oa-sidebar-tabs { display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; align-items: center; }
+.oa-sidebar-tabs::-webkit-scrollbar { display: none; }
 .oa-sidebar-tab-item { display: flex; align-items: center; flex-shrink: 0; border-radius: 6px; }
 .oa-sidebar-tab-item:has([aria-selected="true"]) { background: var(--selected); }
 .oa-sidebar-tabs [role="tab"] { border: 0; background: transparent; color: var(--muted); padding: 7px 8px; font: inherit; font-size: 12px; cursor: pointer; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
