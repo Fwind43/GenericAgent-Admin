@@ -85,3 +85,11 @@ test('tab ownership and display counts round trip and repair orphaned tabs', () 
   assert.deepEqual(prefs.sectionLayout.sections.recent,{tab:'home',count:10})
   assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}),prefs)
 })
+test('tab icons survive storage reload and normalize unsupported or legacy values safely', () => {
+  const raw = {sectionLayout:{tabs:[{id:'legacy',name:'Legacy'},{id:'work',name:'Work',icon:'briefcase',hideName:false},{id:'unknown',name:'Unknown',icon:'not-an-icon'}],active:'work',sections:{projects:{tab:'work',count:20}}}}
+  const prefs = readSidebarPreferences({getItem:()=>JSON.stringify(raw)})
+  assert.deepEqual(prefs.sectionLayout.tabs.slice(1).map(tab=>tab.icon),['grid','briefcase','grid'])
+  assert.equal(prefs.sectionLayout.tabs[2].hideName,false)
+  assert.equal(prefs.sectionLayout.sections.projects.tab,'work')
+  assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}),prefs)
+})

@@ -58,12 +58,14 @@ export function filterSidebarRecentNodes(nodes, filter = 'all') {
   })
 }
 
+export const sidebarTabIcons = ['grid', 'folder', 'briefcase', 'star', 'heart', 'code', 'terminal', 'book', 'file', 'message', 'bot', 'pin', 'flag', 'zap', 'globe', 'rocket', 'music', 'camera', 'image', 'coffee', 'palette', 'shield', 'wrench', 'calendar']
+
 export function normalizeSidebarLayout(value) {
   const tabs = [{ id: 'home', name: 'Home' }]
   for (const tab of Array.isArray(value?.tabs) ? value.tabs : []) {
     if (tabs.length >= 12) break
     if (typeof tab?.id !== 'string' || !tab.id || tabs.some(t => t.id === tab.id)) continue
-    if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), hideName: tab.hideName !== false })
+    if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), hideName: tab.hideName !== false, icon: sidebarTabIcons.includes(tab.icon) ? tab.icon : 'grid' })
   }
   const sections = Object.fromEntries(sidebarSectionKeys.map(key => [key, {
     tab: tabs.some(t => t.id === value?.sections?.[key]?.tab) ? value.sections[key].tab : 'home',

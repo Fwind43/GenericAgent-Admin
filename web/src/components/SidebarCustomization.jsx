@@ -1,11 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Home, LayoutGrid, Plus, GripVertical, Pin, Bot, Folder, Clock } from 'lucide-react'
+import { Home, LayoutGrid, Plus, GripVertical, Pin, Bot, Folder, Clock, Briefcase, Star, Heart, Code, Terminal, BookOpen, FileText, MessageSquare, Flag, Zap, Globe, Rocket, Music, Camera, Image, Coffee, Palette, Shield, Wrench, CalendarDays } from 'lucide-react'
 import { DndContext, PointerSensor, KeyboardSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { SortableContext, useSortable, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProjectActionsMenu, { SidebarPreferenceSubmenu } from './ProjectActionsMenu'
-import { normalizeSidebarLayout, normalizeSidebarOrder, sidebarSectionKeys, sidebarDisplayCounts } from '../lib/chatSidebarPreferences.js'
+import { normalizeSidebarLayout, normalizeSidebarOrder, sidebarSectionKeys, sidebarDisplayCounts, sidebarTabIcons } from '../lib/chatSidebarPreferences.js'
+
+const tabIconComponents = { grid: LayoutGrid, folder: Folder, briefcase: Briefcase, star: Star, heart: Heart, code: Code, terminal: Terminal, book: BookOpen, file: FileText, message: MessageSquare, bot: Bot, pin: Pin, flag: Flag, zap: Zap, globe: Globe, rocket: Rocket, music: Music, camera: Camera, image: Image, coffee: Coffee, palette: Palette, shield: Shield, wrench: Wrench, calendar: CalendarDays }
+const tabIconLabels = { grid: ['网格', 'Grid'], folder: ['文件夹', 'Folder'], briefcase: ['公文包', 'Briefcase'], star: ['星标', 'Star'], heart: ['爱心', 'Heart'], code: ['代码', 'Code'], terminal: ['终端', 'Terminal'], book: ['书籍', 'Book'], file: ['文档', 'Document'], message: ['对话', 'Chat'], bot: ['机器人', 'Bot'], pin: ['图钉', 'Pin'], flag: ['旗帜', 'Flag'], zap: ['闪电', 'Lightning'], globe: ['地球', 'Globe'], rocket: ['火箭', 'Rocket'], music: ['音乐', 'Music'], camera: ['相机', 'Camera'], image: ['图片', 'Image'], coffee: ['咖啡', 'Coffee'], palette: ['调色盘', 'Palette'], shield: ['盾牌', 'Shield'], wrench: ['扳手', 'Wrench'], calendar: ['日历', 'Calendar'] }
+function SidebarTabIcon({ icon, size = 17 }) {
+  const Component = tabIconComponents[icon] || LayoutGrid
+  return <Component size={size} aria-hidden="true"/>
+}
 
 export function SidebarSections({ order, layout, children, hidden = false }) {
   const keys = normalizeSidebarOrder(order)
@@ -61,26 +68,35 @@ export default function SidebarCustomization({ preferences, update, ct }) {
 }
 function SidebarTabNameEditor({ editing, ct, onSave, onClose }) {
   const [name, setName] = useState(editing.name)
+  const [icon, setIcon] = useState(editing.icon || 'grid')
+  const [showIcons, setShowIcons] = useState(Boolean(editing.showIcons))
   const input = useRef(null)
   const panel = useRef(null)
+  const grid = useRef(null)
+  const gridId = useId()
   const rect = editing.anchor.getBoundingClientRect()
   const width = Math.min(248, window.innerWidth - 16)
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))
-  const top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 66))
+  const top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - (showIcons ? 232 : 66)))
   useEffect(() => {
+    if (editing.showIcons) return
     input.current?.focus()
     input.current?.select()
-  }, [editing])
+  }, [editing.showIcons])
+  useEffect(() => {
+    if (showIcons) grid.current?.querySelector('[aria-pressed="true"]')?.focus()
+  }, [showIcons])
   useEffect(() => {
     const outside = e => {
       if (panel.current?.contains(e.target) || editing.anchor.contains(e.target)) return
-      if (name.trim()) onSave(name.trim(), false)
+      if (name.trim()) onSave(name.trim(), icon, false)
       else onClose(false)
     }
     const key = e => {
       if (e.key === 'Escape') {
         e.preventDefault(); e.stopPropagation()
-        onClose(true)
+        if (showIcons) { setShowIcons(false); input.current?.focus() }
+        else onClose(true)
       }
     }
     const hide = e => { if (e.type === 'resize' || !(e.target instanceof Node) || !panel.current?.contains(e.target)) onClose(false) }
@@ -94,12 +110,25 @@ function SidebarTabNameEditor({ editing, ct, onSave, onClose }) {
       window.removeEventListener('resize', hide)
       window.removeEventListener('scroll', hide, true)
     }
-  }, [editing, name, onSave, onClose])
+  }, [editing, name, icon, showIcons, onSave, onClose])
+  const moveIconFocus = e => {
+    const buttons = Array.from(grid.current.querySelectorAll('button'))
+    const index = buttons.indexOf(e.target)
+    const delta = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 6, ArrowUp: -6 }[e.key]
+    if (index < 0 || (delta === undefined && !['Home', 'End'].includes(e.key))) return
+    e.preventDefault()
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? buttons.length - 1 : (index + delta + buttons.length) % buttons.length
+    buttons[next].focus()
+  }
   return createPortal(<form ref={panel} className="oa-sidebar-tab-editor" role="dialog" aria-label={editing.id === 'new' ? ct('新建选项卡', 'New tab') : ct('编辑选项卡', 'Edit tab')} style={{ top, left, width }}
-    onSubmit={e=>{ e.preventDefault(); if (name.trim()) onSave(name.trim(), true) }}>
+    onSubmit={e=>{ e.preventDefault(); if (name.trim()) onSave(name.trim(), icon, true) }}>
     <div className="oa-sidebar-tab-editor-row">
+      <button type="button" className="oa-sidebar-tab-icon-trigger" aria-label={ct("选择图标", "Choose icon")} title={ct("选择图标", "Choose icon")} aria-expanded={showIcons} aria-controls={showIcons ? gridId : undefined} onClick={()=>setShowIcons(value=>!value)}><SidebarTabIcon icon={icon}/></button>
     <input ref={input} maxLength={40} aria-label={ct('选项卡名称', 'Tab name')} title={ct('回车保存，Esc 取消', 'Enter to save, Esc to cancel')} value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>{ if (e.key === 'Enter' && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault() }}/>
     </div>
+    {showIcons && <div id={gridId} ref={grid} className="oa-sidebar-tab-icon-grid" role="group" aria-label={ct('选项卡图标', 'Tab icons')} onKeyDown={moveIconFocus}>
+      {sidebarTabIcons.map(key=><button key={key} type="button" className="oa-sidebar-tab-icon-option" aria-label={ct(...tabIconLabels[key])} title={ct(...tabIconLabels[key])} aria-pressed={icon === key} onClick={()=>{ setIcon(key); setShowIcons(false); input.current?.focus() }}><SidebarTabIcon icon={key} size={18}/></button>)}
+    </div>}
   </form>, document.body)
 }
 export function SidebarTabs({ preferences, update, ct }) {
@@ -110,24 +139,25 @@ export function SidebarTabs({ preferences, update, ct }) {
     if (restoreFocus && editing?.anchor.isConnected) editing.anchor.focus()
     setEditing(null)
   }
-  const save = (name, restoreFocus) => {
+  const save = (name, icon, restoreFocus) => {
     if (!editing || !name.trim()) return
     if (editing.id === 'new' && layout.tabs.length >= 12) { closeEditor(restoreFocus); return }
     if (editing.id !== 'new' && !layout.tabs.some(t=>t.id === editing.id)) { closeEditor(restoreFocus); return }
     const id = editing.id === 'new' ? `tab-${globalThis.crypto.randomUUID()}` : editing.id
-    update('sectionLayout', { ...layout, active: id, tabs: editing.id === 'new' ? [...layout.tabs, { id, name: name.trim() }] : layout.tabs.map(t=>t.id === id ? { ...t, name: name.trim() } : t) })
+    update('sectionLayout', { ...layout, active: id, tabs: editing.id === 'new' ? [...layout.tabs, { id, name: name.trim(), icon }] : layout.tabs.map(t=>t.id === id ? { ...t, name: name.trim(), icon } : t) })
     closeEditor(restoreFocus)
   }
-  const rename = tab => {
+  const rename = (tab, showIcons = false) => {
     const anchor = Array.from(tabs.current.querySelectorAll('[role="tab"]')).find(button=>button.dataset.tabId === tab.id)
-    if (anchor) setEditing({ id: tab.id, name: tab.name, anchor })
+    if (anchor) setEditing({ id: tab.id, name: tab.name, icon: tab.icon, showIcons, anchor })
   }
   return <div className="oa-sidebar-tab-area">
     <div ref={tabs} className="oa-sidebar-tabs" role="tablist" aria-label={ct('侧栏选项卡', 'Sidebar tabs')}>
       {layout.tabs.map(tab => <div className="oa-sidebar-tab-item" key={tab.id}>
-        <button type="button" role="tab" data-tab-id={tab.id} aria-label={tab.id === 'home' ? ct('主页', 'Home') : tab.name} title={tab.id === 'home' ? ct('主页', 'Home') : tab.name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))} onDoubleClick={()=>{ if (tab.id !== 'home') rename(tab) }}>{tab.id === 'home' ? <Home size={17} aria-hidden="true" /> : <LayoutGrid size={17} aria-hidden="true" />}{tab.id !== 'home' && !tab.hideName && <span>{tab.name}</span>}</button>
+        <button type="button" role="tab" data-tab-id={tab.id} aria-label={tab.id === 'home' ? ct('主页', 'Home') : tab.name} title={tab.id === 'home' ? ct('主页', 'Home') : tab.name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))} onDoubleClick={()=>{ if (tab.id !== 'home') rename(tab) }}>{tab.id === 'home' ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{tab.id !== 'home' && !tab.hideName && <span>{tab.name}</span>}</button>
         {tab.id !== 'home' && <ProjectActionsMenu label={ct(`管理选项卡 ${tab.name}`, `Manage tab ${tab.name}`)}>
           <button type="button" onClick={()=>rename(tab)}>{ct('重命名', 'Rename')}</button>
+          <button type="button" onClick={()=>rename(tab, true)}>{ct('更改图标', 'Change icon')}</button>
           <button type="button" onClick={()=>update('sectionLayout', {...layout, tabs:layout.tabs.map(t=>t.id === tab.id ? {...t,hideName:!t.hideName} : t)})}>{tab.hideName ? ct('显示选项卡名称', 'Show tab name') : ct('隐藏选项卡名称', 'Hide tab name')}</button>
           <button type="button" onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}>{ct('删除选项卡（版块移回主页）', 'Delete tab (move sections home)')}</button>
         </ProjectActionsMenu>}
