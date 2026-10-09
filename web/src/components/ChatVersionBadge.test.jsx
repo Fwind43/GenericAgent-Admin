@@ -66,5 +66,17 @@ it('does not fetch for supplied preview versions, and shows a safe fallback when
   render(<ChatVersionBadge/>)
   await waitFor(() => expect(screen.getByRole('button', { name: 'GenericAgent Admin ?' })).toBeTruthy())
   fireEvent.click(screen.getByRole('button', { name: 'GenericAgent Admin ?' }))
-  expect(screen.getByRole('button').getAttribute('aria-expanded')).toBe('true')
+  expect(screen.getByRole('button', { name: 'GenericAgent Admin ?' }).getAttribute('aria-expanded')).toBe('true')
 })
+
+ it('opens the existing update dialog only from the popover action', async () => {
+  api.mockResolvedValue({ version: 'v0.3.21' })
+  render(<ChatVersionBadge version="v0.3.21"/>)
+  fireEvent.click(screen.getByRole('button', { name: 'GenericAgent Admin v0.3.21' }))
+  expect(api).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '版本更新' }))
+  await waitFor(() => expect(api.mock.calls.some(([path]) => path === '/api/version/status')).toBe(true))
+  expect(document.querySelector('.oa-sidebar-admin-content')).toBeNull()
+  expect(screen.getByRole('dialog')).toBeTruthy()
+  expect(api.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
+ })

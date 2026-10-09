@@ -1,10 +1,24 @@
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Download } from 'lucide-react'
 import { api } from '../lib/api'
+import { I18N } from '../lib/i18n'
+import { useVersionUpdates } from '../hooks/useVersionUpdates'
+import SystemUpdateModal from './SystemUpdateModal'
 import './ChatVersionBadge.css'
 
+const noop = () => {}
+const chatLanguage = () => localStorage.getItem('ga-admin-lang') === 'en' ? 'en' : 'zh'
+
 export default function ChatVersionBadge({ version: suppliedVersion, children } = {}) {
+  const [updateOpen, setUpdateOpen] = useState(false)
+  const [lang, setLang] = useState(chatLanguage)
+  const updates = useVersionUpdates({ t: I18N[lang], lang, setMsg: noop, setBusy: noop, active: updateOpen })
+  useEffect(() => {
+    const sync = event => setLang(event.detail === 'en' ? 'en' : 'zh')
+    window.addEventListener('ga-admin-language-change', sync)
+    return () => window.removeEventListener('ga-admin-language-change', sync)
+  }, [])
   const [version, setVersion] = useState(null)
   const [expanded, setExpanded] = useState(false)
   const contentID = useId()
@@ -59,6 +73,9 @@ export default function ChatVersionBadge({ version: suppliedVersion, children } 
       <ChevronDown size={14} aria-hidden="true"/>
     </button>
     {expanded && createPortal(<div ref={panel} id={contentID} role="dialog" aria-label={title} className="oa-sidebar-admin-content" style={position}
-      onClick={event => { if (event.target.closest('button:not(:disabled)')) setExpanded(false) }}>{children}</div>, trigger.current.ownerDocument.body)}
+      onClick={event => { if (event.target.closest('button:not(:disabled)')) setExpanded(false) }}>{children}
+      <button type="button" className="oa-sidebar-settings" onClick={() => { setUpdateOpen(true); updates.loadUpdateSnapshot() }}><Download size={15}/>{lang === 'en' ? 'Version updates' : '版本更新'}</button>
+    </div>, trigger.current.ownerDocument.body)}
+    <SystemUpdateModal open={updateOpen} onClose={() => setUpdateOpen(false)} version={updates} lang={lang}/>
   </div>
 }
