@@ -50,7 +50,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
         ><span className="oa-conductor-new-mark" aria-hidden="true">C</span><span>Conductor</span></button>}
 
         </div>
-        {sidebarPreferences.showPinned !== false && (pinnedSessions.length > 0 || pinnedProjectGroups.length > 0) && <section data-sidebar-section="pinned" className="oa-sidebar-section oa-sidebar-pinned">
+        {sidebarPreferences.showPinned !== false && <section data-sidebar-section="pinned" className="oa-sidebar-section oa-sidebar-pinned">
           <div className="oa-sidebar-section-head">
             <button type="button" className="oa-sidebar-section-toggle" aria-expanded={pinnedExpanded} aria-controls="oa-sidebar-pinned-body" onClick={()=>setPinnedExpanded(value => !value)}>
               <span aria-hidden="true">{pinnedExpanded ? '\u2304' : '\u203a'}</span>{ct('置顶', 'Pinned')}
@@ -62,6 +62,9 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           <div id="oa-sidebar-pinned-body" hidden={!pinnedExpanded}>
             <div className="oa-session-list"><ProjectSessionPage key={`pinned:${sectionLayout.sections.pinned.count}`} initialLimit={sectionLayout.sections.pinned.count} items={pinnedSessions} renderItem={renderSidebarTree} ct={ct}/></div>
             <div className="oa-session-list oa-project-list"><ProjectSessionPage key={`pinned-projects:${sectionLayout.sections.pinned.count}`} initialLimit={sectionLayout.sections.pinned.count} items={pinnedProjectGroups} renderItem={renderSidebarProject} ct={ct}/></div>
+            {!pinnedSessions.length && !pinnedProjectGroups.length && <div className="oa-empty-list">
+              {sidebarSearch ? ct('\u65e0\u5339\u914d\u7684\u7f6e\u9876\u5185\u5bb9', 'No matching pinned items') : ct('\u6682\u65e0\u7f6e\u9876\u5185\u5bb9\uff0c\u53ef\u5728\u4f1a\u8bdd\u6216\u9879\u76ee\u7684\u66f4\u591a\u83dc\u5355\u4e2d\u7f6e\u9876\u3002', 'No pinned items yet. Pin a session or project from its menu.')}
+            </div>}
           </div>
         </section>}
         {sidebarPreferences.showConductor !== false && sidebarSections.conductors.length > 0 && <section data-sidebar-section="conductors" className="oa-sidebar-section oa-sidebar-conductors">
