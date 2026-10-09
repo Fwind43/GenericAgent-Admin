@@ -56,6 +56,9 @@
 .oa-sidebar-tabs [role="tab"] { border: 0; background: transparent; color: var(--muted); padding: 7px 8px; font: inherit; font-size: 12px; cursor: pointer; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .oa-sidebar-tabs [aria-selected="true"] { color: var(--text); font-weight: 600; }
 .oa-sidebar-tab-item .oa-project-reorder { opacity: 1; width: 22px; }
+.oa-sidebar-preference-menu { border-color: var(--border); }
+.oa-sidebar-preference-menu button { height: auto; min-height: 36px; padding-block: 6px; white-space: normal; overflow-wrap: anywhere; }
+.oa-sidebar-preference-menu button:hover, .oa-sidebar-preference-menu button:focus-visible { background: var(--selected); }
 .oa-sidebar .oa-sidebar-add-sections { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 12px; }
 .oa-sidebar .oa-sidebar-add-sections > div > button, .oa-sidebar .oa-sidebar-add-section-disabled { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 36px; padding: 6px 8px; background: transparent; border: 0; box-shadow: none; border-radius: 6px; color: var(--muted); font: inherit; font-size: 13px; text-align: left; transform: none; }
 .oa-sidebar .oa-sidebar-add-sections > div > button > span { display: flex; align-items: center; gap: 9px; }
