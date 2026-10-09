@@ -88,7 +88,7 @@
 .oa-chat .oa-sidebar .oa-sidebar-tabs button:hover { background: var(--oa-side-hover); color: var(--text); }
 .oa-chat .oa-sidebar .oa-sidebar-tab-item .oa-project-reorder { width: 20px; min-width: 20px; padding: 0; }
 @media (hover: hover) and (pointer: fine) {
-  .oa-chat .oa-sidebar .oa-sidebar-tab-item:not(:hover):not(:focus-within) .oa-project-menu-wrap { opacity: 0; }
+  .oa-chat .oa-sidebar .oa-sidebar-tab-item:not(:hover):not(:focus-within) .oa-project-reorder:not([aria-expanded="true"]) { opacity: 0; pointer-events: none; }
 }
 .oa-sidebar-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
