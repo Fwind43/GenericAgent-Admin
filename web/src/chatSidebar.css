@@ -298,3 +298,11 @@
 .oa-chat .oa-sidebar .oa-recent-filter { margin: 0 8px 6px; gap: 6px; }
 .oa-chat .oa-sidebar .oa-recent-filter select { border-color: transparent; background: transparent; height: 26px; color: var(--muted); }
 .oa-chat .oa-sidebar .oa-recent-filter select:hover { background: var(--oa-side-hover); color: var(--text); }
+
+/* Navigation glyphs are secondary to labels, including selected and hovered controls. */
+.oa-chat .oa-sidebar .oa-side-head > button > svg,
+.oa-chat .oa-sidebar .oa-sidebar-tabs button svg,
+.oa-chat .oa-sidebar .oa-sidebar-scroll-tools > .oa-new-conductor > svg,
+.oa-chat .oa-sidebar .oa-project-toggle > svg,
+.oa-chat .oa-sidebar .oa-sidebar-foot button > svg,
+.oa-chat .oa-collapsed-actions > .oa-icon-btn > svg { color: var(--muted); }

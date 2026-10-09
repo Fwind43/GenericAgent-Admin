@@ -14,6 +14,24 @@ test('session badges reserve the trailing menu slot including running rows', () 
   assert.match(sidebarCss, /\.oa-chat \.oa-sidebar \.oa-session-row \.oa-session,\s*\.oa-chat \.oa-sidebar \.oa-session-row\.is-running \.oa-session\s*\{\s*padding-right:\s*40px\s*!important;\s*\}/)
 })
 
+test('sidebar navigation icons use theme-muted color without fading labels or status glyphs', () => {
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  const navigationSelectors = [
+    '.oa-chat .oa-sidebar .oa-side-head > button > svg',
+    '.oa-chat .oa-sidebar .oa-sidebar-tabs button svg',
+    '.oa-chat .oa-sidebar .oa-sidebar-scroll-tools > .oa-new-conductor > svg',
+    '.oa-chat .oa-sidebar .oa-project-toggle > svg',
+    '.oa-chat .oa-sidebar .oa-sidebar-foot button > svg',
+    '.oa-chat .oa-collapsed-actions > .oa-icon-btn > svg',
+  ]
+  const selector = navigationSelectors.join(',\n')
+  const rule = sidebarCss.split(`${selector} {`)[1]?.split('}')[0]
+  assert.ok(rule, 'navigation icon overrides must remain scoped to glyphs')
+  assert.match(rule, /color:\s*var\(--muted\)/)
+  assert.doesNotMatch(rule, /opacity:|stroke:|fill:|filter:/)
+  assert.doesNotMatch(selector, /oa-session-(?:status|project-badge|conductor-badge)|danger/)
+})
+
 test('sidebar section arrows stay quiet until hover or keyboard focus', () => {
   const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
   const selector = '.oa-chat .oa-sidebar .oa-sidebar-section-toggle > span'
