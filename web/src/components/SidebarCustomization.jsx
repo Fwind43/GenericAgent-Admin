@@ -155,7 +155,7 @@ export function SidebarTabs({ preferences, update, ct, onCustomize }) {
     <div ref={tabs} className="oa-sidebar-tabs" role="tablist" aria-label={ct('侧栏选项卡', 'Sidebar tabs')}>
       {layout.tabs.map(tab => {
         const name = tab.id === 'home' && tab.name === 'Home' ? ct('主页', 'Home') : tab.name
-        const hideName = tab.hideName !== false
+        const showName = layout.active === tab.id && layout.showActiveTabName
         return <div className="oa-sidebar-tab-item" key={tab.id}>
         <ProjectActionsMenu className="oa-sidebar-tab-menu" label={ct(`管理选项卡 ${name}`, `Manage tab ${name}`)} renderTrigger={({ triggerProps, closeMenu }) => <button type="button" role="tab" data-tab-id={tab.id} aria-label={name} title={name} aria-selected={layout.active === tab.id} {...triggerProps} aria-haspopup="menu" onClick={e=>{
           if (layout.active === tab.id) triggerProps.onClick(e)
@@ -164,12 +164,12 @@ export function SidebarTabs({ preferences, update, ct, onCustomize }) {
             closeMenu()
             update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))
           }
-        }}>{tab.id === 'home' && !tab.icon ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{!hideName && <span>{name}</span>}</button>}>
+        }}>{tab.id === 'home' && !tab.icon ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{showName && <span>{name}</span>}</button>}>
           <button type="button" onClick={()=>rename({...tab, name})}><Pencil size={15} aria-hidden="true"/>{ct('重命名', 'Rename')}</button>
           <button type="button" onClick={()=>rename({...tab, name}, true)}><Palette size={15} aria-hidden="true"/>{ct('更改图标', 'Change icon')}</button>
           {tab.id !== 'home' && <button type="button" title={ct('删除选项卡，版块移回主页，不删除会话', 'Move sections home without deleting conversations')} onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}><Trash2 size={15} aria-hidden="true"/>{ct('删除选项卡', 'Delete tab')}</button>}
           <div className="oa-sidebar-tab-menu-divider" role="separator"/>
-          <button type="button" onClick={()=>update('sectionLayout', {...layout, tabs:layout.tabs.map(t=>t.id === tab.id ? {...t,hideName:!hideName} : t)})}>{hideName ? <Eye size={15} aria-hidden="true"/> : <EyeOff size={15} aria-hidden="true"/>}{hideName ? ct('显示选项卡名称', 'Show tab name') : ct('隐藏选项卡名称', 'Hide tab name')}</button>
+          <button type="button" onClick={()=>update('sectionLayout', {...layout, showActiveTabName:!layout.showActiveTabName})}>{layout.showActiveTabName ? <EyeOff size={15} aria-hidden="true"/> : <Eye size={15} aria-hidden="true"/>}{layout.showActiveTabName ? ct('隐藏选中选项卡名称', 'Hide selected tab name') : ct('显示选中选项卡名称', 'Show selected tab name')}</button>
           {onCustomize && <><div className="oa-sidebar-tab-menu-divider" role="separator"/><button type="button" onClick={onCustomize}><SlidersHorizontal size={15} aria-hidden="true"/>{ct('自定义侧边栏', 'Customize sidebar')}</button></>}
         </ProjectActionsMenu>
       </div>})}

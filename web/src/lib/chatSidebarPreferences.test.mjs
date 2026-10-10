@@ -95,15 +95,36 @@ test('tab icons survive storage reload and normalize unsupported or legacy value
   const raw = {sectionLayout:{tabs:[{id:'legacy',name:'Legacy'},{id:'work',name:'Work',icon:'briefcase',hideName:false},{id:'unknown',name:'Unknown',icon:'not-an-icon'}],active:'work',sections:{projects:{tab:'work',count:20}}}}
   const prefs = readSidebarPreferences({getItem:()=>JSON.stringify(raw)})
   assert.deepEqual(prefs.sectionLayout.tabs.slice(1).map(tab=>tab.icon),['grid','briefcase','grid'])
-  assert.equal(prefs.sectionLayout.tabs[2].hideName,false)
+  assert.equal(prefs.sectionLayout.showActiveTabName,true)
+  assert.ok(prefs.sectionLayout.tabs.every(tab=>!('hideName' in tab)))
   assert.equal(prefs.sectionLayout.sections.projects.tab,'work')
   assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}),prefs)
 })
 test('home preferences survive reload without allowing home removal or orphaned sections', () => {
   const raw = {sectionLayout:{tabs:[{id:'home',name:'Inbox',hideName:false,icon:'message'},{id:'work',name:'Work',hideName:false}],active:'work',sections:{projects:{tab:'work',count:20}}}}
   const prefs = readSidebarPreferences({getItem:()=>JSON.stringify(raw)})
-  assert.deepEqual(prefs.sectionLayout.tabs[0],{id:'home',name:'Inbox',hideName:false,icon:'message'})
+  assert.deepEqual(prefs.sectionLayout.tabs[0],{id:'home',name:'Inbox',icon:'message'})
   assert.deepEqual(readSidebarPreferences({getItem:()=>JSON.stringify(prefs)}),prefs)
   assert.deepEqual(normalizeSidebarLayout({tabs:[]}).tabs,[{id:'home',name:'Home'}])
   assert.equal(normalizeSidebarLayout({tabs:[{id:'home',name:'   ',icon:'invalid'}]}).tabs[0].name,'Home')
+})
+
+test('selected tab name visibility is shared, survives reload and migrates the active legacy preference', () => {
+  const tabs = [{id:'home',name:'Home',hideName:true},{id:'work',name:'Work',hideName:false}]
+  assert.equal(normalizeSidebarLayout().showActiveTabName,false)
+  assert.equal(normalizeSidebarLayout({tabs,active:'home'}).showActiveTabName,false)
+  const migrated = normalizeSidebarLayout({tabs,active:'work'})
+  assert.equal(migrated.showActiveTabName,true)
+  assert.ok(migrated.tabs.every(tab=>!('hideName' in tab)))
+  for (const showActiveTabName of [true,false]) {
+    const normalized = normalizeSidebarLayout({tabs,active:'work',showActiveTabName})
+    assert.equal(normalized.showActiveTabName,showActiveTabName)
+    for (const active of ['home','work','missing']) {
+      const layout = normalizeSidebarLayout({...normalized,active})
+      assert.equal(layout.showActiveTabName,showActiveTabName)
+      const prefs = readSidebarPreferences({getItem:()=>JSON.stringify({sectionLayout:layout})})
+      assert.deepEqual(prefs.sectionLayout,layout)
+      assert.deepEqual(normalizeSidebarLayout(layout),layout)
+    }
+  }
 })

@@ -39,7 +39,7 @@ it('selects inactive tabs first and opens the menu on a second click without a m
   expect(document.querySelector('.oa-sidebar-tab-menu')).toBeNull()
 })
 it('uses accessible icon tabs by default and honors explicit visible names', () => {
-  const layout = normalizeSidebarLayout({ tabs: [{ id: 'work', name: 'Work' }, { id: 'named', name: 'Named', hideName: false }] })
+  const layout = normalizeSidebarLayout({ tabs: [{ id: 'work', name: 'Work' }, { id: 'named', name: 'Named' }], active:'named', showActiveTabName:true })
   render(<SidebarTabs preferences={{sectionLayout:layout}} update={vi.fn()} ct={ct}/> )
   for (const name of ['Home', 'Work']) {
     const tab = screen.getByRole('tab', {name})
@@ -176,7 +176,7 @@ it('renames through the tab menu and prevents Enter during IME composition', () 
   expect(update).not.toHaveBeenCalled()
   fireEvent.change(input, {target:{value:'Office'}})
   fireEvent.submit(screen.getByRole('dialog'))
-  expect(update.mock.calls.at(-1)[1].tabs[1]).toEqual({id:'work',name:'Office',hideName:false,icon:'grid'})
+  expect(update.mock.calls.at(-1)[1].tabs[1]).toEqual({id:'work',name:'Office',icon:'grid'})
 })
 it('does not create beyond the tab limit even if it changes while naming', () => {
   const update = vi.fn()
@@ -238,7 +238,8 @@ it('changes an existing icon and preserves its name, visibility and assigned sec
   fireEvent.click(screen.getByRole('button', {name:'Rocket',exact:true}))
   fireEvent.pointerDown(document.body)
   const next = update.mock.calls.at(-1)[1]
-  expect(next.tabs[1]).toEqual({id:'work',name:'Work',hideName:false,icon:'rocket'})
+  expect(next.tabs[1]).toEqual({id:'work',name:'Work',icon:'rocket'})
+  expect(next.showActiveTabName).toBe(true)
   expect(next.sections).toEqual(layout.sections)
   expect(next.active).toBe('work')
 })
@@ -265,7 +266,7 @@ it('groups the tab menu and enters inline sidebar customization', () => {
   const menu = screen.getByLabelText('Manage tab Work', {selector:'.oa-sidebar-tab-menu'})
   expect(menu.parentElement).toBe(document.body)
   expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(2)
-  for (const name of ['Rename','Change icon','Delete tab','Hide tab name','Customize sidebar']) expect(screen.getByRole('button', {name,exact:true}).querySelector('svg')).not.toBeNull()
+  for (const name of ['Rename','Change icon','Delete tab','Hide selected tab name','Customize sidebar']) expect(screen.getByRole('button', {name,exact:true}).querySelector('svg')).not.toBeNull()
   fireEvent.click(screen.getByRole('button', {name:'Customize sidebar'}))
   expect(customize).toHaveBeenCalledTimes(1)
   expect(document.querySelector('.oa-sidebar-tab-menu')).toBeNull()
@@ -299,10 +300,10 @@ it('toggles names for home and custom tabs and preserves ownership through norma
   for (const name of ['Home','Work']) {
     openTabMenu(name)
     if (name === 'Home') expect(screen.queryByRole('button', {name:'Delete tab'})).toBeNull()
-    fireEvent.click(screen.getByRole('button', {name:'Show tab name'}))
+    fireEvent.click(screen.getByRole('button', {name:'Show selected tab name'}))
     expect(screen.getByRole('tab', {name}).textContent).toBe(name)
     openTabMenu(name)
-    fireEvent.click(screen.getByRole('button', {name:'Hide tab name'}))
+    fireEvent.click(screen.getByRole('button', {name:'Hide selected tab name'}))
     expect(screen.getByRole('tab', {name}).textContent).toBe('')
   }
   expect(screen.getByRole('tab', {name:'Work'}).getAttribute('aria-selected')).toBe('true')
@@ -310,4 +311,38 @@ it('toggles names for home and custom tabs and preserves ownership through norma
   fireEvent.click(screen.getByRole('button', {name:'Delete tab'}))
   expect(screen.queryByRole('tab', {name:'Work'})).toBeNull()
   expect(screen.getByRole('tab', {name:'Home'}).getAttribute('aria-selected')).toBe('true')
+})
+
+it('shows only the selected tab name and carries the global toggle through switching, creation and deletion', () => {
+  function Harness() {
+    const [layout, setLayout] = React.useState(() => normalizeSidebarLayout({tabs:[{id:'home',name:'Home',hideName:false},{id:'work',name:'Work',hideName:false}],active:'home',showActiveTabName:false}))
+    return <SidebarTabs preferences={{sectionLayout:layout}} update={(_, value)=>setLayout(current=>normalizeSidebarLayout(typeof value === 'function' ? value(current) : value))} ct={ct}/>
+  }
+  render(<Harness/> )
+  const check = (selected, show) => {
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab.textContent).toBe(show && tab.getAttribute('aria-label') === selected ? selected : '')
+      expect(tab.getAttribute('aria-selected')).toBe(String(tab.getAttribute('aria-label') === selected))
+    }
+  }
+  check('Home',false)
+  openTabMenu('Home')
+  fireEvent.click(screen.getByRole('button',{name:'Show selected tab name'}))
+  check('Home',true)
+  fireEvent.click(screen.getByRole('tab',{name:'Work'}))
+  check('Work',true)
+  openTabMenu('Work')
+  fireEvent.click(screen.getByRole('button',{name:'Hide selected tab name'}))
+  check('Work',false)
+  fireEvent.click(screen.getByRole('tab',{name:'Home'}))
+  check('Home',false)
+  openTabMenu('Home')
+  fireEvent.click(screen.getByRole('button',{name:'Show selected tab name'}))
+  fireEvent.click(screen.getByRole('button',{name:'New tab'}))
+  fireEvent.change(screen.getByLabelText('Tab name'),{target:{value:'Personal'}})
+  fireEvent.submit(screen.getByLabelText('Tab name').closest('form'))
+  check('Personal',true)
+  openTabMenu('Personal')
+  fireEvent.click(screen.getByRole('button',{name:'Delete tab'}))
+  check('Home',true)
 })

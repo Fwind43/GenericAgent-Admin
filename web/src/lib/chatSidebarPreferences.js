@@ -63,17 +63,19 @@ export function filterSidebarRecentNodes(nodes, filter = 'all') {
 export function normalizeSidebarLayout(value) {
   const savedHome = Array.isArray(value?.tabs) ? value.tabs.find(tab => tab?.id === 'home') : null
   const home = { id: 'home', name: typeof savedHome?.name === 'string' && savedHome.name.trim() ? savedHome.name.trim().slice(0, 40) : 'Home' }
-  if (savedHome?.hideName === false) home.hideName = false
   if (sidebarTabIcons.includes(savedHome?.icon)) home.icon = savedHome.icon
   const tabs = [home]
   for (const tab of Array.isArray(value?.tabs) ? value.tabs : []) {
     if (tabs.length >= 12) break
     if (typeof tab?.id !== 'string' || !tab.id || tabs.some(t => t.id === tab.id)) continue
-    if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), hideName: tab.hideName !== false, icon: sidebarTabIcons.includes(tab.icon) ? tab.icon : 'grid' })
+    if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), icon: sidebarTabIcons.includes(tab.icon) ? tab.icon : 'grid' })
   }
   const sections = Object.fromEntries(sidebarSectionKeys.map(key => [key, {
     tab: tabs.some(t => t.id === value?.sections?.[key]?.tab) ? value.sections[key].tab : 'home',
     count: sidebarDisplayCounts.includes(value?.sections?.[key]?.count) ? value.sections[key].count : key === 'projects' ? 5 : 10,
   }]))
-  return { tabs, sections, active: tabs.some(t => t.id === value?.active) ? value.active : 'home' }
+  const active = tabs.some(t => t.id === value?.active) ? value.active : 'home'
+  const savedActive = Array.isArray(value?.tabs) ? value.tabs.find(tab => tab?.id === active) : null
+  const showActiveTabName = typeof value?.showActiveTabName === 'boolean' ? value.showActiveTabName : savedActive?.hideName === false
+  return { tabs, sections, active, showActiveTabName }
 }
