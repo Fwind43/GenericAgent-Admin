@@ -104,6 +104,11 @@ jobs:
             cgo: '0'
 
     steps:
+      - name: Keep LF checkout on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.autocrlf false
+
       - name: Checkout tag
         uses: actions/checkout@v4
         with:

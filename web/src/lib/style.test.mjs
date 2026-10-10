@@ -15,7 +15,7 @@ test('session badges reserve the trailing menu slot including running rows', () 
 })
 
 test('sidebar navigation icons use theme-muted color without fading labels or status glyphs', () => {
-  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8')
+  const sidebarCss = readFileSync(resolve(here, '../chatSidebar.css'), 'utf8').replace(/\r\n?/g, '\n')
   const navigationSelectors = [
     '.oa-chat .oa-sidebar .oa-side-head > button > svg',
     '.oa-chat .oa-sidebar .oa-sidebar-tabs button svg',
