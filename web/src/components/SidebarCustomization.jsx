@@ -157,8 +157,14 @@ export function SidebarTabs({ preferences, update, ct, onCustomize }) {
         const name = tab.id === 'home' && tab.name === 'Home' ? ct('主页', 'Home') : tab.name
         const hideName = tab.hideName !== false
         return <div className="oa-sidebar-tab-item" key={tab.id}>
-        <button type="button" role="tab" data-tab-id={tab.id} aria-label={name} title={name} aria-selected={layout.active === tab.id} onClick={()=>update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))} onDoubleClick={()=>rename({...tab, name})}>{tab.id === 'home' && !tab.icon ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{!hideName && <span>{name}</span>}</button>
-        <ProjectActionsMenu className="oa-sidebar-tab-menu" label={ct(`管理选项卡 ${name}`, `Manage tab ${name}`)}>
+        <ProjectActionsMenu className="oa-sidebar-tab-menu" label={ct(`管理选项卡 ${name}`, `Manage tab ${name}`)} renderTrigger={({ triggerProps, closeMenu }) => <button type="button" role="tab" data-tab-id={tab.id} aria-label={name} title={name} aria-selected={layout.active === tab.id} {...triggerProps} aria-haspopup="menu" onClick={e=>{
+          if (layout.active === tab.id) triggerProps.onClick(e)
+          else {
+            e.stopPropagation()
+            closeMenu()
+            update('sectionLayout', current=>({ ...normalizeSidebarLayout(current), active: tab.id }))
+          }
+        }}>{tab.id === 'home' && !tab.icon ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{!hideName && <span>{name}</span>}</button>}>
           <button type="button" onClick={()=>rename({...tab, name})}><Pencil size={15} aria-hidden="true"/>{ct('重命名', 'Rename')}</button>
           <button type="button" onClick={()=>rename({...tab, name}, true)}><Palette size={15} aria-hidden="true"/>{ct('更改图标', 'Change icon')}</button>
           {tab.id !== 'home' && <button type="button" title={ct('删除选项卡，版块移回主页，不删除会话', 'Move sections home without deleting conversations')} onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}><Trash2 size={15} aria-hidden="true"/>{ct('删除选项卡', 'Delete tab')}</button>}
