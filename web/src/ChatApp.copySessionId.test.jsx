@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { execPath } from 'node:process'
 import { afterEach, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import * as icons from 'lucide-react'
 import { copyText } from './lib/format'
 
@@ -17,7 +17,68 @@ const compiled = execFileSync(execPath, ['--input-type=module', '-e', "import { 
 const draw = new Function('React', 'sessionManagerOpen', 'menuOpen', 'menuPos', 'sessions', 'menuRef', 'copySessionId', 'ct', 'startRename', 'setSessionPinned', 'setSessionHubEnabled', 'deleteSession', 'Copy', 'Edit3', 'Pin', 'Bot', 'Trash2', compiled)
 const ct = (_, en) => en
 const originalExec = Object.getOwnPropertyDescriptor(document, 'execCommand')
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); if (originalExec) Object.defineProperty(document, 'execCommand', originalExec); else delete document.execCommand })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); if (originalExec) Object.defineProperty(document, 'execCommand', originalExec); else delete document.execCommand })
+
+const noticeBody = source.slice(source.indexOf('  const [sessionCopyNotice,'), source.indexOf('  const [llms,', source.indexOf('  const [sessionCopyNotice,')))
+const useCopyNotice = new Function('useState', 'useRef', 'useCallback', 'useEffect', `${noticeBody}; return { notice: sessionCopyNotice, show: setSessionCopyNotice }`)
+function mountedNotice() {
+  let current
+  function Notice() {
+    current = useCopyNotice(React.useState, React.useRef, React.useCallback, React.useEffect)
+    return current.notice ? <div role="status">{current.notice}</div> : null
+  }
+  const ui = render(<Notice/>)
+  return { ...ui, show: text => current.show(text) }
+}
+
+test.each(['Session ID copied', 'Could not copy session ID'])('copy feedback auto-dismisses after three seconds: %s', text => {
+  vi.useFakeTimers()
+  const ui = mountedNotice()
+  act(() => ui.show(text))
+  act(() => vi.advanceTimersByTime(2999))
+  expect(ui.getByRole('status').textContent).toBe(text)
+  act(() => vi.advanceTimersByTime(1))
+  expect(ui.queryByRole('status')).toBeNull()
+})
+
+test('repeating identical copy feedback restarts its timeout', () => {
+  vi.useFakeTimers()
+  const ui = mountedNotice()
+  act(() => ui.show('Session ID copied'))
+  act(() => vi.advanceTimersByTime(2000))
+  act(() => ui.show('Session ID copied'))
+  expect(vi.getTimerCount()).toBe(1)
+  act(() => vi.advanceTimersByTime(1000))
+  expect(ui.getByRole('status')).toBeTruthy()
+  act(() => vi.advanceTimersByTime(1999))
+  expect(ui.getByRole('status')).toBeTruthy()
+  act(() => vi.advanceTimersByTime(1))
+  expect(ui.queryByRole('status')).toBeNull()
+})
+
+test('manual dismissal cancels the old timer before the next copy', () => {
+  vi.useFakeTimers()
+  const ui = mountedNotice()
+  act(() => ui.show('Session ID copied'))
+  act(() => vi.advanceTimersByTime(1000))
+  act(() => ui.show(''))
+  expect(ui.queryByRole('status')).toBeNull()
+  expect(vi.getTimerCount()).toBe(0)
+  act(() => ui.show('Session ID copied'))
+  act(() => vi.advanceTimersByTime(2000))
+  expect(ui.getByRole('status')).toBeTruthy()
+  act(() => vi.advanceTimersByTime(1000))
+  expect(ui.queryByRole('status')).toBeNull()
+})
+
+test('unmount cancels pending copy feedback cleanup', () => {
+  vi.useFakeTimers()
+  const ui = mountedNotice()
+  act(() => ui.show('Session ID copied'))
+  expect(vi.getTimerCount()).toBe(1)
+  ui.unmount()
+  expect(vi.getTimerCount()).toBe(0)
+})
 
 function callback(copy = vi.fn().mockResolvedValue()) {
   const close = vi.fn(), err = vi.fn(), notice = vi.fn()

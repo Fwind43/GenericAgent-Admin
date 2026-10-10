@@ -4905,7 +4905,20 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }, [])
   const [collapsed, setCollapsed] = useState(() => isNarrowChatViewport())
   const [notice, setNotice] = useState('')
-  const [sessionCopyNotice, setSessionCopyNotice] = useState('')
+  const [sessionCopyNotice, updateSessionCopyNotice] = useState('')
+  const sessionCopyNoticeTimerRef = useRef(null)
+  const setSessionCopyNotice = useCallback((message) => {
+    clearTimeout(sessionCopyNoticeTimerRef.current)
+    sessionCopyNoticeTimerRef.current = null
+    updateSessionCopyNotice(message)
+    if (message) {
+      sessionCopyNoticeTimerRef.current = setTimeout(() => {
+        sessionCopyNoticeTimerRef.current = null
+        updateSessionCopyNotice('')
+      }, 3000)
+    }
+  }, [])
+  useEffect(() => () => clearTimeout(sessionCopyNoticeTimerRef.current), [])
   const [llms, setLlms] = useState([])
   const [chatBackend, setChatBackend] = useState(null)
   const [depsRepairing, setDepsRepairing] = useState(false)
