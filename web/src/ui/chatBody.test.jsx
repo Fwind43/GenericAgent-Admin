@@ -61,3 +61,22 @@ it('still honors explicit hiding, assigned tabs and collapsed bodies', () => {
   expect(pinnedSection(container).hidden).toBe(false)
   expect(container.querySelector('#oa-sidebar-pinned-body').hidden).toBe(true)
 })
+
+it('renders a shared section in both tabs and shows the add-section empty state only after local removal', () => {
+  const sectionLayout = normalizeSidebarLayout({tabs:[{id:'work',name:'Work'}], sections:{
+    pinned:{tabs:['home','work']},projects:{tabs:[]},conductors:{tabs:[]},recent:{tabs:[]},
+  }})
+  const preferences = { ...sidebarProps.sidebarPreferences, sectionLayout }
+  const { container, rerender } = render(<ChatSidebar {...sidebarProps} sidebarPreferences={preferences}/> )
+  expect(pinnedSection(container)).not.toBeNull()
+  expect(screen.queryByText('No sections in this tab yet')).toBeNull()
+  rerender(<ChatSidebar {...sidebarProps} sidebarPreferences={{...preferences,sectionLayout:{...sectionLayout,active:'work'}}}/> )
+  expect(pinnedSection(container)).not.toBeNull()
+  expect(screen.queryByText('No sections in this tab yet')).toBeNull()
+  const removed = {...sectionLayout,active:'work',sections:{...sectionLayout.sections,pinned:{tabs:['home'],count:10}}}
+  rerender(<ChatSidebar {...sidebarProps} sidebarPreferences={{...preferences,sectionLayout:removed}}/> )
+  expect(pinnedSection(container)).toBeNull()
+  expect(screen.getByText('No sections in this tab yet')).toBeTruthy()
+  rerender(<ChatSidebar {...sidebarProps} sidebarPreferences={{...preferences,sectionLayout:{...removed,active:'home'}}}/> )
+  expect(pinnedSection(container)).not.toBeNull()
+})

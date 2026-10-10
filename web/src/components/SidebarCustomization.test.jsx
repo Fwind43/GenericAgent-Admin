@@ -49,14 +49,15 @@ it('uses accessible icon tabs by default and honors explicit visible names', () 
   }
   expect(screen.getByRole('tab', {name:'Named'}).textContent).toBe('Named')
 })
-it('edits visibility and restores layout without deleting content', () => {
+it('removes a local membership and restores layout without deleting content', () => {
   const update = vi.fn()
   render(<SidebarCustomization preferences={{showProjects:true}} update={update} ct={ct}/> )
   expect(screen.getByRole('button', {name:'Reorder Projects'})).toBeTruthy()
   expect(screen.queryByRole('checkbox')).toBeNull()
   fireEvent.click(screen.getByRole('button', {name:'Projects section settings'}))
-  fireEvent.click(screen.getByRole('button', {name:'Hide section'}))
-  expect(update).toHaveBeenCalledWith('showProjects', false)
+  fireEvent.click(screen.getByRole('button', {name:'Remove from this tab'}))
+  expect(update).toHaveBeenCalledWith('sectionLayout', expect.objectContaining({sections:expect.objectContaining({projects:{tabs:[],count:5}})}))
+  expect(update).not.toHaveBeenCalledWith('showProjects', false)
   fireEvent.click(screen.getByRole('button', {name:'Restore default sections'}))
   expect(update).toHaveBeenCalledWith('sectionLayout', normalizeSidebarLayout())
   for (const key of ['showPinned','showConductor','showProjects','showRecent']) expect(update).toHaveBeenCalledWith(key, true)
@@ -73,7 +74,7 @@ it('reorders sections, filters by active tab and keeps edit content visible', ()
   expect(view.container.firstChild.hidden).toBe(true)
   expect(view.container.textContent).toBe('SearchProjects')
 })
-it('adds hidden sections and moves existing sections without losing their settings', () => {
+it('adds hidden and shared sections without losing their original tabs or settings', () => {
   const update = vi.fn()
   const layout = normalizeSidebarLayout({tabs:[{id:'work',name:'Work'}],active:'work',sections:{projects:{tab:'work',count:20},recent:{tab:'home',count:50}}})
   render(<SidebarCustomization preferences={{sectionLayout:layout,showProjects:false}} update={update} ct={ct}/>)
@@ -81,13 +82,13 @@ it('adds hidden sections and moves existing sections without losing their settin
   fireEvent.click(screen.getByRole('button', {name:'Add section'}))
   fireEvent.click(screen.getByRole('menuitemradio', {name:'Projects'}))
   expect(update).toHaveBeenCalledWith('showProjects', true)
-  expect(update).toHaveBeenCalledWith('sectionLayout', expect.objectContaining({sections:expect.objectContaining({projects:{tab:'work',count:20}})}))
+  expect(update).toHaveBeenCalledWith('sectionLayout', expect.objectContaining({sections:expect.objectContaining({projects:{tabs:['work'],count:20}})}))
   fireEvent.click(screen.getByRole('button', {name:'Add section'}))
-  fireEvent.click(screen.getByRole('menuitemradio', {name:'Recent (move to this tab)'}))
+  fireEvent.click(screen.getByRole('menuitemradio', {name:'Recent'}))
   expect(update).toHaveBeenCalledWith('showRecent', true)
-  expect(update.mock.calls.at(-1)[1].sections.recent).toEqual({tab:'work',count:50})
+  expect(update.mock.calls.at(-1)[1].sections.recent).toEqual({tabs:['home','work'],count:50})
 })
-it('creates, renames and deletes tabs while moving sections home', () => {
+it('creates, renames and deletes tabs while rescuing otherwise orphaned sections', () => {
   const update = vi.fn()
   const layout = normalizeSidebarLayout({tabs:[{id:'work',name:'Work'}],active:'work',sections:{projects:{tab:'work',count:20}}})
   render(<SidebarTabs preferences={{sectionLayout:layout}} update={update} ct={ct}/> )
@@ -98,13 +99,13 @@ it('creates, renames and deletes tabs while moving sections home', () => {
   expect(update.mock.calls.at(-1)[1].tabs[1].name).toBe('Office')
   openTabMenu('Work')
   fireEvent.click(screen.getByRole('button',{name:'Delete tab'}))
-  expect(update.mock.calls.at(-1)[1].sections.projects).toEqual({tab:'home',count:20})
+  expect(update.mock.calls.at(-1)[1].sections.projects).toEqual({tabs:['home'],count:20})
   fireEvent.click(screen.getByRole('button',{name:'New tab'}))
   fireEvent.change(screen.getByLabelText('Tab name'),{target:{value:'Personal'}})
   fireEvent.submit(screen.getByLabelText('Tab name').closest('form'))
   expect(update.mock.calls.at(-1)[1].tabs.at(-1).name).toBe('Personal')
 })
-it('section menus change count, order and tab ownership', () => {
+it('section menus change count, order and add another tab without moving the section', () => {
   const update = vi.fn()
   render(<SidebarSectionOptions section="recent" preferences={{}} update={update} ct={ct}/> )
   fireEvent.mouseEnter(screen.getByRole('button',{name:'Show · 10'}).parentElement)
@@ -114,9 +115,9 @@ it('section menus change count, order and tab ownership', () => {
   fireEvent.click(screen.getByRole('button',{name:'Move up'}))
   expect(update).toHaveBeenCalledWith('sectionOrder',['pinned','conductors','recent','projects'])
   expect(screen.getByRole('button',{name:'Move down'}).disabled).toBe(true)
-  fireEvent.click(screen.getByRole('button',{name:'Move to new tab'}))
+  fireEvent.click(screen.getByRole('button',{name:'Add to new tab'}))
   const next = update.mock.calls.at(-1)[1]
-  expect(next.sections.recent.tab).toBe(next.active)
+  expect(next.sections.recent.tabs).toEqual(['home',next.active])
   expect(next.tabs.at(-1).id).toBe(next.active)
 })
 
@@ -345,4 +346,45 @@ it('shows only the selected tab name and carries the global toggle through switc
   openTabMenu('Personal')
   fireEvent.click(screen.getByRole('button',{name:'Delete tab'}))
   check('Home',true)
+})
+
+
+it('toggles shared tabs continuously and removes only the current membership', () => {
+  let latest
+  function Harness() {
+    const [layout, setLayout] = React.useState(() => normalizeSidebarLayout({tabs:[{id:'work',name:'Work'}],sections:{projects:{tabs:['home'],count:20}}}))
+    latest = layout
+    return <SidebarSectionOptions section="projects" preferences={{sectionLayout:layout}} update={(_,value)=>setLayout(value)} ct={ct}/>
+  }
+  render(<Harness/> )
+  const trigger = screen.getByRole('button',{name:'Show in tabs'})
+  fireEvent.mouseEnter(trigger.parentElement)
+  fireEvent.click(trigger)
+  fireEvent.click(screen.getByRole('menuitemcheckbox',{name:'Work'}))
+  expect(latest.sections.projects).toEqual({tabs:['home','work'],count:20})
+  expect(screen.getByRole('menuitemcheckbox',{name:'Work'}).getAttribute('aria-checked')).toBe('true')
+  expect(screen.getByRole('menuitemcheckbox',{name:'Home'}).getAttribute('aria-checked')).toBe('true')
+  fireEvent.click(screen.getByRole('menuitemcheckbox',{name:'Work'}))
+  expect(latest.sections.projects.tabs).toEqual(['home'])
+  fireEvent.click(screen.getByRole('menuitemcheckbox',{name:'Work'}))
+  fireEvent.click(screen.getByRole('button',{name:'Remove from this tab'}))
+  expect(latest.sections.projects).toEqual({tabs:['work'],count:20})
+  expect(normalizeSidebarLayout(latest)).toEqual(latest)
+})
+
+it('deleting a tab preserves other memberships and deliberately unassigned sections', () => {
+  const update = vi.fn()
+  const layout = normalizeSidebarLayout({tabs:[{id:'work',name:'Work'},{id:'other',name:'Other'}],active:'work',sections:{
+    projects:{tabs:['work','other'],count:20},recent:{tabs:['work']},pinned:{tabs:[]},conductors:{tabs:['home']},
+  }})
+  render(<SidebarTabs preferences={{sectionLayout:layout}} update={update} ct={ct}/> )
+  openTabMenu('Work')
+  fireEvent.click(screen.getByRole('button',{name:'Delete tab'}))
+  const next = update.mock.calls.at(-1)[1]
+  expect(next.sections.projects).toEqual({tabs:['other'],count:20})
+  expect(next.sections.recent.tabs).toEqual(['home'])
+  expect(next.sections.pinned.tabs).toEqual([])
+  expect(next.sections.conductors.tabs).toEqual(['home'])
+  expect(next.tabs.map(tab=>tab.id)).toEqual(['home','other'])
+  expect(next.active).toBe('home')
 })

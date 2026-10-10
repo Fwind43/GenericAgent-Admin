@@ -70,10 +70,15 @@ export function normalizeSidebarLayout(value) {
     if (typeof tab?.id !== 'string' || !tab.id || tabs.some(t => t.id === tab.id)) continue
     if (typeof tab.name === 'string' && tab.name.trim()) tabs.push({ id: tab.id, name: tab.name.trim().slice(0, 40), icon: sidebarTabIcons.includes(tab.icon) ? tab.icon : 'grid' })
   }
-  const sections = Object.fromEntries(sidebarSectionKeys.map(key => [key, {
-    tab: tabs.some(t => t.id === value?.sections?.[key]?.tab) ? value.sections[key].tab : 'home',
-    count: sidebarDisplayCounts.includes(value?.sections?.[key]?.count) ? value.sections[key].count : key === 'projects' ? 5 : 10,
-  }]))
+  const sections = Object.fromEntries(sidebarSectionKeys.map(key => {
+    const saved = value?.sections?.[key]
+    const assigned = Array.isArray(saved?.tabs) ? saved.tabs : [saved?.tab ?? 'home']
+    const valid = [...new Set(assigned.filter(id => tabs.some(tab => tab.id === id)))]
+    return [key, {
+      tabs: valid.length || !assigned.length ? valid : ['home'],
+      count: sidebarDisplayCounts.includes(saved?.count) ? saved.count : key === 'projects' ? 5 : 10,
+    }]
+  }))
   const active = tabs.some(t => t.id === value?.active) ? value.active : 'home'
   const savedActive = Array.isArray(value?.tabs) ? value.tabs.find(tab => tab?.id === active) : null
   const showActiveTabName = typeof value?.showActiveTabName === 'boolean' ? value.showActiveTabName : savedActive?.hideName === false

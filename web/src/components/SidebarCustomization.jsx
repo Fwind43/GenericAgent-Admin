@@ -20,7 +20,7 @@ export function SidebarSections({ order, layout, children, hidden = false }) {
     const rank = child => child.props?.['data-sidebar-section'] ? keys.indexOf(child.props['data-sidebar-section']) + 1 : 0
     return rank(a) - rank(b)
   })
-  return <div className="oa-sidebar-sections" hidden={hidden}>{sorted.filter(child => !child.props?.['data-sidebar-section'] || !layout || layout.sections[child.props['data-sidebar-section']].tab === layout.active)}</div>
+  return <div className="oa-sidebar-sections" hidden={hidden}>{sorted.filter(child => !child.props?.['data-sidebar-section'] || !layout || layout.sections[child.props['data-sidebar-section']].tabs.includes(layout.active))}</div>
 }
 
 const flags = { pinned: 'showPinned', conductors: 'showConductor', projects: 'showProjects', recent: 'showRecent' }
@@ -40,7 +40,7 @@ function SortableSection({ section, preferences, update, ct }) {
 export default function SidebarCustomization({ preferences, update, ct }) {
   const layout = normalizeSidebarLayout(preferences.sectionLayout)
   const order = normalizeSidebarOrder(preferences.sectionOrder)
-  const visible = order.filter(key => preferences[flags[key]] !== false && layout.sections[key].tab === layout.active)
+  const visible = order.filter(key => preferences[flags[key]] !== false && layout.sections[key].tabs.includes(layout.active))
   const available = order.filter(key => !visible.includes(key))
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
   const reorder = ({ active, over }) => {
@@ -48,7 +48,7 @@ export default function SidebarCustomization({ preferences, update, ct }) {
   }
   const add = key => {
     update(flags[key], true)
-    update('sectionLayout', { ...layout, sections: { ...layout.sections, [key]: { ...layout.sections[key], tab: layout.active } } })
+    update('sectionLayout', { ...layout, sections: { ...layout.sections, [key]: { ...layout.sections[key], tabs: [...new Set([...layout.sections[key].tabs, layout.active])] } } })
   }
   return <div className="oa-sidebar-customize" aria-label={ct('自定义侧边栏', 'Customize sidebar')}>
     <h2>{ct('侧边栏版块', 'Sidebar sections')}</h2>
@@ -60,7 +60,7 @@ export default function SidebarCustomization({ preferences, update, ct }) {
     </DndContext>
     {!visible.length && <div className="oa-sidebar-customize-empty">{ct('此选项卡还没有版块', 'No sections in this tab yet')}</div>}
     <div className="oa-sidebar-add-sections">
-      <SidebarPreferenceSubmenu label={<><Plus size={16} aria-hidden="true"/>{ct('添加版块', 'Add section')}</>} value={null} options={available.map(key => ({ value: key, label: `${sectionLabel(key, ct)}${layout.sections[key].tab !== layout.active ? ct('（移至此选项卡）', ' (move to this tab)') : ''}` }))} onChange={add}/>
+      <SidebarPreferenceSubmenu label={<><Plus size={16} aria-hidden="true"/>{ct('添加版块', 'Add section')}</>} value={null} options={available.map(key => ({ value: key, label: sectionLabel(key, ct) }))} onChange={add}/>
       {!available.length && <small>{ct('所有版块均已添加', 'All sections added')}</small>}
     </div>
     <button type="button" className="oa-sidebar-customize-reset" onClick={()=>{ update('sectionOrder', [...sidebarSectionKeys]); update('sectionLayout', normalizeSidebarLayout()); Object.values(flags).forEach(key=>update(key, true)) }}>{ct('恢复默认版块', 'Restore default sections')}</button>
@@ -167,7 +167,7 @@ export function SidebarTabs({ preferences, update, ct, onCustomize }) {
         }}>{tab.id === 'home' && !tab.icon ? <Home size={17} aria-hidden="true" /> : <SidebarTabIcon icon={tab.icon}/>}{showName && <span>{name}</span>}</button>}>
           <button type="button" onClick={()=>rename({...tab, name})}><Pencil size={15} aria-hidden="true"/>{ct('重命名', 'Rename')}</button>
           <button type="button" onClick={()=>rename({...tab, name}, true)}><Palette size={15} aria-hidden="true"/>{ct('更改图标', 'Change icon')}</button>
-          {tab.id !== 'home' && <button type="button" title={ct('删除选项卡，版块移回主页，不删除会话', 'Move sections home without deleting conversations')} onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tab === tab.id ? {...v, tab:'home'} : v])) })}><Trash2 size={15} aria-hidden="true"/>{ct('删除选项卡', 'Delete tab')}</button>}
+          {tab.id !== 'home' && <button type="button" title={ct('删除选项卡，保留其他选项卡中的版块，不删除会话', 'Keep sections in other tabs without deleting conversations')} onClick={()=>update('sectionLayout', { ...layout, active: layout.active === tab.id ? 'home' : layout.active, tabs: layout.tabs.filter(t=>t.id !== tab.id), sections: Object.fromEntries(Object.entries(layout.sections).map(([k,v])=>[k, v.tabs.includes(tab.id) ? {...v, tabs: v.tabs.filter(id=>id !== tab.id).length ? v.tabs.filter(id=>id !== tab.id) : ['home']} : v])) })}><Trash2 size={15} aria-hidden="true"/>{ct('删除选项卡', 'Delete tab')}</button>}
           <div className="oa-sidebar-tab-menu-divider" role="separator"/>
           <button type="button" onClick={()=>update('sectionLayout', {...layout, showActiveTabName:!layout.showActiveTabName})}>{layout.showActiveTabName ? <EyeOff size={15} aria-hidden="true"/> : <Eye size={15} aria-hidden="true"/>}{layout.showActiveTabName ? ct('隐藏选中选项卡名称', 'Hide selected tab name') : ct('显示选中选项卡名称', 'Show selected tab name')}</button>
           {onCustomize && <><div className="oa-sidebar-tab-menu-divider" role="separator"/><button type="button" onClick={onCustomize}><SlidersHorizontal size={15} aria-hidden="true"/>{ct('自定义侧边栏', 'Customize sidebar')}</button></>}
@@ -181,7 +181,7 @@ export function SidebarTabs({ preferences, update, ct, onCustomize }) {
 export function SidebarSectionOptions({ section, preferences, update, ct }) {
   const layout = normalizeSidebarLayout(preferences.sectionLayout)
   const order = normalizeSidebarOrder(preferences.sectionOrder)
-  const peers = order.filter(k=>layout.sections[k].tab === layout.sections[section].tab)
+  const peers = order.filter(k=>preferences[flags[k]] !== false && layout.sections[k].tabs.includes(layout.active))
   const index = peers.indexOf(section)
   const move = delta => {
     const next = [...order], a = next.indexOf(section), b = next.indexOf(peers[index + delta])
@@ -191,15 +191,15 @@ export function SidebarSectionOptions({ section, preferences, update, ct }) {
   }
   const newTab = () => {
     const id = `tab-${globalThis.crypto.randomUUID()}`
-    update('sectionLayout', { ...layout, active:id, tabs:[...layout.tabs, {id, name:ct('新选项卡', 'New tab')}], sections:{...layout.sections, [section]:{...layout.sections[section], tab:id}} })
+    update('sectionLayout', { ...layout, active:id, tabs:[...layout.tabs, {id, name:ct('新选项卡', 'New tab')}], sections:{...layout.sections, [section]:{...layout.sections[section], tabs:[...layout.sections[section].tabs, id]}} })
   }
   const set = patch => update('sectionLayout', { ...layout, sections: { ...layout.sections, [section]: { ...layout.sections[section], ...patch } } })
   return <>
     <SidebarPreferenceSubmenu label={ct(`显示 · ${layout.sections[section].count}`, `Show · ${layout.sections[section].count}`)} value={layout.sections[section].count} options={sidebarDisplayCounts.map(value=>({ value, label: ct(`${value} 项`, `${value} items`) }))} onChange={count=>set({count})}/>
     <button type="button" disabled={index === 0} onClick={()=>move(-1)}>{ct('向上移动', 'Move up')}</button>
     <button type="button" disabled={index === peers.length - 1} onClick={()=>move(1)}>{ct('向下移动', 'Move down')}</button>
-    <SidebarPreferenceSubmenu label={ct('移至选项卡', 'Move to tab')} value={layout.sections[section].tab} options={layout.tabs.map(t=>({value:t.id, label:t.id === 'home' ? ct('主页', 'Home') : t.name}))} onChange={tab=>set({tab})}/>
-    <button type="button" disabled={layout.tabs.length >= 12} onClick={newTab}>{ct('移至新选项卡', 'Move to new tab')}</button>
-    <button type="button" onClick={()=>update(flags[section], false)}>{ct('隐藏版块', 'Hide section')}</button>
+    <SidebarPreferenceSubmenu label={ct('显示于选项卡', 'Show in tabs')} multiple value={layout.sections[section].tabs} options={layout.tabs.map(t=>({value:t.id, label:t.id === 'home' ? ct('主页', 'Home') : t.name}))} onChange={tab=>set({tabs:layout.sections[section].tabs.includes(tab) ? layout.sections[section].tabs.filter(id=>id !== tab) : [...layout.sections[section].tabs, tab]})}/>
+    <button type="button" disabled={layout.tabs.length >= 12} onClick={newTab}>{ct('添加到新选项卡', 'Add to new tab')}</button>
+    <button type="button" onClick={()=>set({tabs:layout.sections[section].tabs.filter(id=>id !== layout.active)})}>{ct('从此选项卡移除', 'Remove from this tab')}</button>
   </>
 }
