@@ -3,6 +3,7 @@ import Modal from 'antd/es/modal'
 import { AlertCircle, CheckCircle2, Download, ExternalLink, RefreshCw, RotateCw } from 'lucide-react'
 import { updateText, versionUpdateView } from '../lib/versionUpdateView'
 import { MarkdownPreview } from './FilePreviewLink'
+import GitHubMirrorSetting from './GitHubMirrorSetting'
 import './system-update-modal.css'
 
 const dateLabel = (value, lang, fallback) => {
@@ -38,6 +39,7 @@ export default function SystemUpdateModal({ open, onClose, version, lang = 'zh' 
       </section>
       {info && !info.update_supported && <p className="system-update-warning" role="note">{text.unsupported}: {info.update_unsupported_reason || text.manual}</p>}
       {check?.update && (!check.asset || !check.checksum) && <p className="system-update-warning" role="note">{text.assetsMissing}</p>}
+      {open && <GitHubMirrorSetting lang={lang} disabled={version.busy || checking || view.locked}/>}
       <div className="system-update-content">
         <section className="system-update-notes"><header><h3>{text.notes}</h3>{release?.html_url && <a href={release.html_url} target="_blank" rel="noreferrer">{text.release}<ExternalLink size={13}/></a>}</header>
           {release?.published_at && <small>{text.published} {dateLabel(release.published_at, lang, text.unknown)}</small>}

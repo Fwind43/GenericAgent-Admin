@@ -82,6 +82,21 @@
 .system-update-modal .system-update-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .system-update-modal button.is-primary { background: var(--accent); border-color: var(--accent); color: var(--text-on-accent); }
 .system-update-modal button.is-primary:hover:not(:disabled) { background: var(--accent-hover); color: var(--text-on-accent); }
+.system-update-modal .system-update-mirror { margin: 20px 0 24px; padding-top: 18px; border-top: 1px solid var(--border); }
+.system-update-modal .system-update-mirror label { display: block; margin-bottom: 8px; color: var(--text); font-size: 13px; font-weight: 600; }
+.system-update-modal .system-update-mirror-controls { display: flex; align-items: stretch; gap: 8px; }
+.system-update-modal .system-update-mirror input { flex: 1 1 0; min-width: 0; width: 100%; min-height: 36px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; font-size: 13px; }
+.system-update-modal .system-update-mirror input::placeholder { color: var(--muted); opacity: 1; }
+.system-update-modal .system-update-mirror input:hover:not(:disabled) { border-color: var(--accent); }
+.system-update-modal .system-update-mirror input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.system-update-modal .system-update-mirror input:disabled { opacity: .55; cursor: not-allowed; }
+.system-update-modal .system-update-mirror-controls button { flex: 0 0 auto; white-space: nowrap; }
+.system-update-modal .system-update-mirror p { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.system-update-modal .system-update-mirror .is-success { color: var(--accent); }
+.system-update-modal .system-update-mirror .is-error,
+.system-update-modal .system-update-mirror-error { color: var(--error); font-size: 12px; overflow-wrap: anywhere; }
+.system-update-modal .system-update-mirror-error { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.system-update-modal .system-update-mirror-error button { flex: 0 0 auto; }
 .system-update-modal .is-spinning { animation: system-update-spin 1s linear infinite; }
 @keyframes system-update-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .system-update-modal .is-spinning { animation: none; } .system-update-modal .system-update-progress i { transition: none; } }
