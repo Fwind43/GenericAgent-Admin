@@ -636,8 +636,68 @@ def _install_outbound_model_hooks(agent):
     return restore
 
 
+# Keep inline vision comfortably below common upstream request limits. The upload
+# itself remains untouched; only the model-facing copy is resized/re-encoded.
+_CHAT_IMAGE_MAX_EDGE = 1568
+_CHAT_IMAGE_MAX_BYTES = 1024 * 1024
+_CHAT_IMAGES_MAX_BYTES = 3 * 1024 * 1024
+
+
+def _prepare_chat_image(path, max_bytes):
+    from io import BytesIO
+    from PIL import Image, ImageOps
+
+    with Image.open(path) as source:
+        # Animated uploads use the first frame for vision; the original stays on disk.
+        image = ImageOps.exif_transpose(source)
+        image.thumbnail((_CHAT_IMAGE_MAX_EDGE, _CHAT_IMAGE_MAX_EDGE))
+        if image.mode in ('RGBA', 'LA') or 'transparency' in image.info:
+            rgba = image.convert('RGBA')
+            background = Image.new('RGB', rgba.size, 'white')
+            background.paste(rgba, mask=rgba.getchannel('A'))
+            image = background
+        else:
+            image = image.convert('RGB')
+        for _ in range(8):
+            output = BytesIO()
+            image.save(output, format='JPEG', quality=85, optimize=True)
+            data = output.getvalue()
+            if len(data) <= max_bytes:
+                return {'type': 'image', 'source': {
+                    'type': 'base64', 'media_type': 'image/jpeg',
+                    'data': base64.b64encode(data).decode('ascii'),
+                }}
+            image.thumbnail((max(1, image.width * 3 // 4), max(1, image.height * 3 // 4)))
+    raise ValueError('image cannot fit the model vision budget')
+
+
+def _strip_chat_inline_images(history):
+    """Repair legacy Admin attachment history without touching text/tools/remote URLs."""
+    for msg in history:
+        if not isinstance(msg, dict) or msg.get('role') != 'user':
+            continue
+        blocks = msg.get('content')
+        if not isinstance(blocks, list) or not any(
+            isinstance(block, dict) and block.get('type') == 'text'
+            and '[image:' in str(block.get('text', '')) for block in blocks
+        ):
+            continue
+        def is_inline_image(block):
+            if not isinstance(block, dict):
+                return False
+            if block.get('type') == 'image':
+                source = block.get('source') or {}
+                return isinstance(source, dict) and source.get('type') == 'base64'
+            if block.get('type') == 'image_url':
+                source = block.get('image_url') or {}
+                url = source.get('url', '') if isinstance(source, dict) else source
+                return str(url).startswith('data:image/')
+            return False
+        msg['content'] = [block for block in blocks if not is_inline_image(block)]
+
+
 def _install_image_injection(agent, image_paths):
-    """Inject this turn's images into the first native backend call only."""
+    """Attach bounded vision only to outbound messages, never to backend history."""
     paths = [os.fspath(value).strip() for value in (image_paths or [])
              if isinstance(value, (str, os.PathLike)) and os.fspath(value).strip()]
     if not paths:
@@ -648,13 +708,15 @@ def _install_image_injection(agent, image_paths):
         if not isinstance(client, NativeToolClient):
             return lambda: None
         backend = client.backend
-        original_ask = backend.ask
-        had_instance_attr = 'ask' in vars(backend)
-        instance_value = vars(backend).get('ask')
+        original_ask = backend.raw_ask
+        had_instance_attr = 'raw_ask' in vars(backend)
+        instance_value = vars(backend).get('raw_ask')
     except (ImportError, AttributeError, TypeError):
         return lambda: None
 
     active = [True]
+    prepared = []
+    target_text = [None]
 
     def restore():
         if not active[0]:
@@ -662,35 +724,50 @@ def _install_image_injection(agent, image_paths):
         active[0] = False
         try:
             if had_instance_attr:
-                backend.ask = instance_value
+                object.__setattr__(backend, 'raw_ask', instance_value)
             else:
-                delattr(backend, 'ask')
+                object.__delattr__(backend, 'raw_ask')
         except (AttributeError, TypeError):
-            try:
-                backend.ask = original_ask
-            except Exception:
-                pass
+            pass
+        prepared.clear()
 
-    def patched_ask(msg):
-        restore()
-        if isinstance(msg, dict) and isinstance(msg.get('content'), list):
+    def patched_ask(messages):
+        if not prepared:
+            budget = _CHAT_IMAGES_MAX_BYTES // len(paths)
             for path in paths:
                 try:
-                    mime = mimetypes.guess_type(path)[0] or 'image/png'
-                    if mime not in {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}:
-                        continue
-                    with open(path, 'rb') as image_file:
-                        data = base64.b64encode(image_file.read()).decode('ascii')
-                    msg['content'].append({
-                        'type': 'image',
-                        'source': {'type': 'base64', 'media_type': mime, 'data': data},
-                    })
-                except (OSError, ValueError):
+                    prepared.append(_prepare_chat_image(path, min(_CHAT_IMAGE_MAX_BYTES, budget)))
+                except Exception as exc:
+                    # Missing Pillow, corrupt/unsupported files, or decode limits must
+                    # not poison the session. The agent still has the original path.
+                    prepared.append({'type': 'text', 'text':
+                        '[Image preview unavailable (%s); use the original file: %s]'
+                        % (type(exc).__name__, path)})
+        outbound = messages
+        if isinstance(messages, list):
+            for index in range(len(messages) - 1, -1, -1):
+                msg = messages[index]
+                if not isinstance(msg, dict) or msg.get('role') != 'user':
                     continue
-        return (yield from original_ask(msg))
+                content = msg.get('content')
+                if not isinstance(content, list):
+                    continue
+                text = '\n'.join(str(block.get('text', '')) for block in content
+                                 if isinstance(block, dict) and block.get('type') == 'text')
+                if target_text[0] is None:
+                    target_text[0] = text
+                if text != target_text[0]:
+                    continue
+                # Native ask copies content shallowly; never mutate shared blocks.
+                outbound = list(messages)
+                outbound[index] = dict(msg, content=[*content, *prepared])
+                break
+        return (yield from original_ask(outbound))
 
     try:
-        backend.ask = patched_ask
+        # MixinSession guards node-specific setters; this hook belongs only to
+        # the facade, so retries on every routed node see the same vision copy.
+        object.__setattr__(backend, 'raw_ask', patched_ask)
     except (AttributeError, TypeError):
         active[0] = False
     return restore
@@ -889,6 +966,7 @@ def _restore_admin_history(agent, history, raw_history=None):
     try:
         restored = raw_history if isinstance(raw_history, list) and raw_history else _admin_history_to_backend(history)
         restored = json.loads(json.dumps(restored, ensure_ascii=False, default=str)) if isinstance(restored, list) else []
+        _strip_chat_inline_images(restored)
         agent.llmclient.backend.history = restored
     except Exception:
         pass
@@ -3454,8 +3532,8 @@ def handle_request(agent, worker, req):
         _clear_tool_timer_emitter(emit)
         restore_conductor_tools()
         restore_completion()
-        restore_image_injection()
         restore_model_hooks()
+        restore_image_injection()
 
 
 def main():

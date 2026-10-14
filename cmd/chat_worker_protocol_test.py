@@ -1010,12 +1010,21 @@ class PlanPayloadAdapterTests(unittest.TestCase):
 
 
 class ImageInjectionTest(unittest.TestCase):
-    def test_native_backend_gets_images_on_first_call_only_and_is_restored(self):
-        requests = []
-
+    def setUp(self):
         class FakeBackend:
+            def __init__(self):
+                self.history = []
+                self.requests = []
+                self.fail = False
+
             def ask(self, request):
-                requests.append(request)
+                self.history.append(request)
+                yield from self.raw_ask(self.history)
+
+            def raw_ask(self, messages):
+                self.requests.append(messages)
+                if self.fail:
+                    raise RuntimeError("request too large")
                 yield "ok"
 
         class NativeToolClient:
@@ -1024,43 +1033,154 @@ class ImageInjectionTest(unittest.TestCase):
 
         llmcore = ModuleType("llmcore")
         llmcore.NativeToolClient = NativeToolClient
-        backend = FakeBackend()
-        agent = SimpleNamespace(llmclient=NativeToolClient(backend))
+        self.modules = mock.patch.dict(sys.modules, {"llmcore": llmcore})
+        self.modules.start()
+        self.addCleanup(self.modules.stop)
+        self.backend = FakeBackend()
+        self.agent = SimpleNamespace(llmclient=NativeToolClient(self.backend))
+
+    @staticmethod
+    def message(text):
+        return {"role": "user", "content": [{"type": "text", "text": text}]}
+
+    def test_images_only_in_outbound_copy_and_tool_continuations_keep_vision(self):
+        block = {"type": "image", "source": {"type": "base64", "data": "YWJj"}}
+        with mock.patch.object(chat_worker, "_prepare_chat_image", return_value=block) as prepare:
+            restore = chat_worker._install_image_injection(self.agent, ["sample.png"])
+            first = self.message("look [image:sample.png]")
+            self.assertEqual(list(self.backend.ask(first)), ["ok"])
+            self.assertEqual(len(first["content"]), 1)
+            self.assertEqual(self.backend.requests[-1][0]["content"][-1], block)
+            second = self.message("tool result")
+            list(self.backend.ask(second))
+            self.assertEqual(self.backend.requests[-1][0]["content"][-1], block)
+            self.assertEqual(len(second["content"]), 1)
+            self.assertNotIn('"type": "image"', json.dumps(self.backend.history))
+            self.assertEqual(prepare.call_count, 1)
+            restore()
+            restore()
+            self.assertNotIn("raw_ask", vars(self.backend))
+            list(self.backend.ask(self.message("next turn")))
+            self.assertNotIn('"type": "image"', json.dumps(self.backend.requests[-1]))
+
+    def test_eight_large_images_fit_total_budget_and_original_is_unchanged(self):
+        import base64
+        import hashlib
+        from io import BytesIO
+        from PIL import Image
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            image_path = Path(temp_dir) / "sample.png"
-            image_path.write_bytes(b"png-bytes")
-            with mock.patch.dict(sys.modules, {"llmcore": llmcore}):
-                restore = chat_worker._install_image_injection(agent, [str(image_path)])
-                first = {"content": [{"type": "text", "text": "look"}]}
-                self.assertEqual(list(backend.ask(first)), ["ok"])
-                self.assertNotIn("ask", vars(backend))
+            path = Path(temp_dir) / "noise.png"
+            Image.frombytes("RGB", (2000, 1800), os.urandom(2000 * 1800 * 3)).save(path)
+            before = hashlib.sha256(path.read_bytes()).digest()
+            restore = chat_worker._install_image_injection(self.agent, [str(path)] * 8)
+            self.addCleanup(restore)
+            list(self.backend.ask(self.message("look [image:%s]" % path)))
+            images = self.backend.requests[-1][0]["content"][1:]
+            self.assertEqual(len(images), 8)
+            total = 0
+            for block in images:
+                self.assertEqual(block["type"], "image")
+                self.assertEqual(block["source"]["media_type"], "image/jpeg")
+                raw = base64.b64decode(block["source"]["data"])
+                total += len(raw)
+                self.assertLessEqual(len(raw), chat_worker._CHAT_IMAGE_MAX_BYTES)
+                with Image.open(BytesIO(raw)) as image:
+                    self.assertLessEqual(max(image.size), chat_worker._CHAT_IMAGE_MAX_EDGE)
+            self.assertLessEqual(total, chat_worker._CHAT_IMAGES_MAX_BYTES)
+            self.assertLess(len(json.dumps(self.backend.requests[-1])), 4 * 1024 * 1024 + 16384)
+            self.assertEqual(hashlib.sha256(path.read_bytes()).digest(), before)
 
-                image = first["content"][1]
-                self.assertEqual(image["type"], "image")
-                self.assertEqual(image["source"]["type"], "base64")
-                self.assertEqual(image["source"]["media_type"], "image/png")
-                self.assertEqual(image["source"]["data"], "cG5nLWJ5dGVz")
-
-                second = {"content": [{"type": "text", "text": "again"}]}
-                self.assertEqual(list(backend.ask(second)), ["ok"])
-                self.assertEqual(len(second["content"]), 1)
+    def test_transport_failure_does_not_poison_next_turn(self):
+        block = {"type": "image", "source": {"type": "base64", "data": "YWJj"}}
+        with mock.patch.object(chat_worker, "_prepare_chat_image", return_value=block):
+            restore = chat_worker._install_image_injection(self.agent, ["sample.png"])
+            self.backend.fail = True
+            try:
+                with self.assertRaisesRegex(RuntimeError, "too large"):
+                    list(self.backend.ask(self.message("look [image:sample.png]")))
+            finally:
                 restore()
+            self.assertNotIn('"type": "image"', json.dumps(chat_worker._snapshot_backend_history(self.agent)))
+            self.backend.fail = False
+            self.assertEqual(list(self.backend.ask(self.message("continue"))), ["ok"])
+            self.assertNotIn('"type": "image"', json.dumps(self.backend.requests[-1]))
 
-        self.assertEqual(requests, [first, second])
+    def test_bad_image_and_missing_pillow_fall_back_to_original_path(self):
+        for error in (ImportError("Pillow unavailable"), ValueError("bad image")):
+            with self.subTest(error=error), mock.patch.object(chat_worker, "_prepare_chat_image", side_effect=error):
+                restore = chat_worker._install_image_injection(self.agent, ["missing.png"])
+                try:
+                    self.assertEqual(list(self.backend.ask(self.message("look"))), ["ok"])
+                    fallback = self.backend.requests[-1][-1]["content"][-1]
+                    self.assertIn("use the original file: missing.png", fallback["text"])
+                finally:
+                    restore()
+
+    def test_owned_method_and_model_hook_are_restored_in_reverse_order(self):
+        original = lambda messages: iter(["ok"])
+        self.backend.raw_ask = original
+        with mock.patch.object(chat_worker, "_prepare_chat_image", return_value={"type": "text", "text": "preview"}):
+            restore_images = chat_worker._install_image_injection(self.agent, ["sample.png"])
+            restore_models = chat_worker._install_outbound_model_hooks(self.agent)
+            try:
+                list(self.backend.ask(self.message("look")))
+            finally:
+                restore_models()
+                restore_images()
+        self.assertIs(self.backend.raw_ask, original)
+
+    def test_legacy_attachment_recovery_is_narrow_and_does_not_mutate_input(self):
+        inline = {"type": "image", "source": {"type": "base64", "data": "large"}}
+        data_url = {"type": "image_url", "image_url": {"url": "data:image/png;base64,big"}}
+        remote = {"type": "image_url", "image_url": {"url": "https://example.test/a.png"}}
+        tool = {"type": "tool_result", "content": [inline], "tool_use_id": "tool-1"}
+        attachment = self.message("look [image:original.png]")
+        attachment["content"] += [inline, data_url, remote, tool]
+        unrelated = self.message("not an Admin attachment")
+        unrelated["content"].append(inline)
+        history = [attachment, unrelated]
+        before = json.dumps(history)
+        chat_worker._restore_admin_history(self.agent, [], raw_history=history)
+        restored = self.backend.history
+        self.assertEqual(restored[0]["content"], [attachment["content"][0], remote, tool])
+        self.assertEqual(restored[1], unrelated)
+        chat_worker._restore_admin_history(self.agent, [], raw_history=restored)
+        self.assertEqual(self.backend.history, restored)
+        self.assertEqual(json.dumps(history), before)
+        self.assertEqual(list(self.backend.ask(self.message("continue"))), ["ok"])
+
+    def test_transparent_rotated_and_animated_images_are_valid_previews(self):
+        import base64
+        from io import BytesIO
+        from PIL import Image
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "alpha.png"
+            Image.new("RGBA", (70, 30), (255, 0, 0, 0)).save(path)
+            block = chat_worker._prepare_chat_image(path, 100000)
+            with Image.open(BytesIO(base64.b64decode(block["source"]["data"]))) as image:
+                self.assertEqual(image.mode, "RGB")
+                self.assertEqual(image.getpixel((0, 0)), (255, 255, 255))
+            path = Path(temp_dir) / "rotated.jpg"
+            exif = Image.Exif()
+            exif[274] = 6
+            Image.new("RGB", (70, 30), "red").save(path, exif=exif)
+            block = chat_worker._prepare_chat_image(path, 100000)
+            with Image.open(BytesIO(base64.b64decode(block["source"]["data"]))) as image:
+                self.assertEqual(image.size, (30, 70))
+            path = Path(temp_dir) / "animation.gif"
+            Image.new("RGB", (20, 10), "red").save(path, save_all=True,
+                append_images=[Image.new("RGB", (20, 10), "blue")], duration=100)
+            self.assertEqual(chat_worker._prepare_chat_image(path, 100000)["type"], "image")
 
     def test_non_native_client_is_not_patched(self):
-        llmcore = ModuleType("llmcore")
-        llmcore.NativeToolClient = type("NativeToolClient", (), {})
-        backend = SimpleNamespace(ask=lambda request: iter(("ok",)))
+        backend = SimpleNamespace(raw_ask=lambda request: iter(("ok",)))
         agent = SimpleNamespace(llmclient=SimpleNamespace(backend=backend))
-        original = backend.ask
-
-        with mock.patch.dict(sys.modules, {"llmcore": llmcore}):
-            restore = chat_worker._install_image_injection(agent, ["sample.png"])
-            restore()
-
-        self.assertIs(backend.ask, original)
+        original = backend.raw_ask
+        restore = chat_worker._install_image_injection(agent, ["sample.png"])
+        restore()
+        self.assertIs(backend.raw_ask, original)
 
 
 class FakeReloadAgent:
