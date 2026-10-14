@@ -139,6 +139,9 @@ func (s *Server) handleConductorSettingsEvent(parentID string, ev map[string]int
 		case "conductor_defaults":
 			args, _ := ev["args"].(map[string]interface{})
 			reply["defaults"], err = s.conductorDefaults(parentID, args)
+		case "conductor_limits":
+			args, _ := ev["args"].(map[string]interface{})
+			reply["scheduler"], err = s.conductorLimits(parentID, args)
 		case "conductor_model_strategy":
 			args, _ := ev["args"].(map[string]interface{})
 			reply["strategy"], err = s.conductorModelStrategy(parentID, args)

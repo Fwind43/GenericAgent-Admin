@@ -576,7 +576,7 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 			}
 			continue
 		}
-		if ev["type"] == "conductor_defaults" || ev["type"] == "conductor_models" || ev["type"] == "conductor_model_strategy" {
+		if ev["type"] == "conductor_defaults" || ev["type"] == "conductor_models" || ev["type"] == "conductor_model_strategy" || ev["type"] == "conductor_limits" {
 			s.handleConductorSettingsEvent(sid, ev)
 			continue
 		}

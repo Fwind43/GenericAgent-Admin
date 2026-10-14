@@ -2983,6 +2983,13 @@ def _install_conductor_tools(agent, config):
         reply = read_reply(broker / (request_id + '.response.json'), 30)
         if not isinstance(reply, dict):
             reply = {'ok': False, 'error': 'Request timed out; query again before retrying a mutation.'}
+        if kind == 'conductor_limits' and reply.get('ok'):
+            return StepOutcome(reply, next_prompt=(
+                'Current parent session scheduler snapshot (server-owned, tool_request): '
+                + json.dumps(reply.get('scheduler', {}), ensure_ascii=False)
+                + '. These limits replace earlier snapshots this turn; counts are not live. '
+                'Lowering does not cancel active workers; queued starts/admission obey the new limits. '
+                'No global/provider quota or permission changes. Continue the authorized parent task.'))
         if kind == 'conductor_model_strategy' and reply.get('ok'):
             strategy = reply.get('strategy', '')
             return StepOutcome(reply, next_prompt=(
@@ -2992,6 +2999,11 @@ def _install_conductor_tools(agent, config):
                 'Explicit user choices win. Use conductor_models indexes for llm_no/reasoning_effort; '
                 'empty=defaults/inheritance; queued/running workers are unchanged.'))
         return StepOutcome(reply, next_prompt='Inspect the Conductor configuration result and continue the parent task.')
+
+    def limits_tool(self, args, response):
+        if self.parent is not agent:
+            return StepOutcome({'ok': False, 'error': 'Conductor request mismatch'}, next_prompt='Correct the request and continue.')
+        return settings_tool('conductor_limits', args)
 
     def strategy_tool(self, args, response):
         if self.parent is not agent:
@@ -3200,6 +3212,7 @@ def _install_conductor_tools(agent, config):
 
     specs.append(('conductor_instruct', instruct, 'Send incremental continuation/correction/verification guidance to an owned running/queued dispatch without stopping it, changing its model, or creating a dispatch. Input arrives at the next model boundary. Receipt is not execution/verification. For finishing/terminal workers wait and reuse the session via dispatch.', 'dispatch_id'))
     specs.append(('conductor_tasks', tasks, 'Read the parent-request task and scheduler snapshot (limits and counts, not live), 48 tasks per page. Start at offset 0, follow next_offset. Use collect for live status. New dispatches this turn are in receipts.', 'offset'))
+    specs.append(('conductor_limits', limits_tool, 'Get, set or reset this parent session scheduler limits. Defaults 3 concurrent/12 outstanding. Set partial max_running (1..32) and/or max_non_terminal (max_running..256); choose conservatively for authorized work and respect user caps. Raising schedules eligible queued work immediately; lowering never cancels in-flight workers. Persists for this parent only, not global/provider quotas or permissions.', 'action'))
     specs.extend([('conductor_model_strategy', strategy_tool, 'Get/set/reset this parent session model-selection policy. On a user request, save task-to-model routing, escalation and fallback preferences as a strategy string (1-8192 characters). Do not invent or rewrite user policy without authorization. Saved policy is injected on every parent request; successful updates apply this turn via receipt. It guides explicit dispatch fields, never grants permissions or changes parent/queued/running models. get reads; set replaces; reset clears.', 'action'),
                   ('conductor_defaults', defaults_tool, 'Get/set/reset persistent parent subtask defaults (llm_no, reasoning_effort, additional_prompt). set preserves omitted fields; null clears; reset clears all. Explicit dispatch overrides defaults; model defaults override inherited/reused settings. Prompt defaults apply only to future dispatches, never grant permissions. Queued/running tasks unchanged.', 'action'),
                   ('conductor_models', models_tool, 'List available runtime model indexes and public identifiers.', None)])
@@ -3238,6 +3251,10 @@ def _install_conductor_tools(agent, config):
             originals[attr] = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
         setattr(handler_type, attr, displayed(method))
         properties = {parameter: {'type': 'string'}} if parameter else {}
+        if name == 'conductor_limits':
+            properties = {'action': {'type': 'string', 'enum': ['get', 'set', 'reset']},
+                          'max_running': {'type': 'integer', 'minimum': 1, 'maximum': 32},
+                          'max_non_terminal': {'type': 'integer', 'minimum': 1, 'maximum': 256}}
         if name == 'conductor_model_strategy':
             properties = {'action': {'type': 'string', 'enum': ['get', 'set', 'reset']},
                           'strategy': {'type': 'string', 'minLength': 1, 'maxLength': 8192,

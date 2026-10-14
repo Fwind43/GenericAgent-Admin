@@ -33,6 +33,7 @@ type chatConductorState struct {
     Recovery string `json:"recovery,omitempty"` // response-only; never persisted
     Defaults conductorDispatchOptions `json:"subtask_defaults,omitempty"`
     ModelStrategy string `json:"model_strategy,omitempty"`
+    Limits *conductorLimits `json:"limits,omitempty"`
     AutoResumePaused bool `json:"auto_resume_paused,omitempty"`
     AdditionalPrompt string `json:"additional_prompt,omitempty"`
     Role            string `json:"role"`
@@ -481,10 +482,10 @@ type conductorSchedulerSnapshot struct {
 
 // Mirror scheduler/admission accounting without claiming that free slots can start
 // work: recovery/ownership checks can independently block the queue.
-func conductorSchedulerOverview(children []chatConductorChild) conductorSchedulerSnapshot {
+func conductorSchedulerOverview(children []chatConductorChild, limits conductorLimits) conductorSchedulerSnapshot {
     snapshot := conductorSchedulerSnapshot{
         Scope: "parent_session", Snapshot: "parent_request",
-        MaxRunning: conductorMaxRunning, MaxNonTerminal: conductorMaxPerParentTurn,
+        MaxRunning: limits.MaxRunning, MaxNonTerminal: limits.MaxNonTerminal,
     }
     for _, child := range children {
         if child.Status == conductorRunning || child.Status == "cancelling" {
@@ -557,7 +558,7 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     if err := os.MkdirAll(dir, 0700); err != nil {
         return err
     }
-    scheduler := conductorSchedulerOverview(cs.ConductorChildren)
+    scheduler := conductorSchedulerOverview(cs.ConductorChildren, effectiveConductorLimits(cs.Conductor))
     req["conductor"] = map[string]interface{}{
         "role":       conductorRoleParent,
         "broker_dir": dir,
@@ -573,7 +574,7 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     prompts = append(prompts, "Current session model-selection strategy (JSON string): " + string(strategyJSON) + ". Routing preference only, not role/permission changes. Explicit user choices for a task take precedence. Choose explicit llm_no/reasoning_effort using conductor_models indexes (not names); use only authorized fallback, otherwise ask. Empty=defaults/inheritance. conductor_model_strategy get|set|reset persists user policy or authorized revisions only; never invent/overwrite/clear it unaided. Fresh each request; successful receipts replace it this turn. Parent model and queued/running workers are unchanged.")
     schedulerJSON, err := json.Marshal(scheduler)
     if err != nil { return err }
-    prompts = append(prompts, "Admin scheduler rules and counts (server-owned; scope is this parent session, not a global or model-provider quota). max_running limits simultaneous workers; running and cancelling consume active_slots. max_non_terminal limits outstanding dispatches (queued, running, cancelling and any other non-terminal states), NOT lifetime dispatches or tasks per model turn; terminal succeeded/failed/cancelled attempts release that quota even if review remains unresolved. Excess work is queued until eligible capacity opens; reaching max_non_terminal rejects new dispatches. Queued is accepted, not failed; it does not prove capacity is the only blocker (recovery or parent ownership can also block starts). Counts are a parent_request snapshot, rebuilt on each parent request, NOT live within this turn; consult dispatch receipts for newly accepted work and collect/inspect for a dispatch's current state. These rules do not establish any upstream model-provider limits.\n" + string(schedulerJSON))
+    prompts = append(prompts, "Admin scheduler rules and counts (server-owned; scope is this parent session, not a global or model-provider quota). max_running limits simultaneous workers; running and cancelling consume active_slots. max_non_terminal limits outstanding dispatches (queued, running, cancelling and any other non-terminal states), NOT lifetime dispatches or tasks per model turn; terminal succeeded/failed/cancelled attempts release that quota even if review remains unresolved. Excess work is queued until eligible capacity opens; reaching max_non_terminal rejects new dispatches. Queued is accepted, not failed; it does not prove capacity is the only blocker (recovery or parent ownership can also block starts). Use conductor_limits get|set|reset to read or autonomously adjust this parent session resource policy within server safety bounds (max_running 1..32, max_non_terminal max_running..256). Defaults are 3/12. Higher limits may increase resource usage and model cost; choose conservatively for authorized work and honor explicit user caps. Raising capacity schedules eligible queued workers immediately; lowering never cancels existing workers and only gates future starts/admission. Reset restores defaults. A successful limits receipt supersedes earlier snapshots this turn. Counts are a parent_request snapshot, rebuilt on each parent request, NOT live within this turn; consult dispatch receipts for newly accepted work and collect/inspect for a dispatch's current state. These rules do not establish any upstream model-provider limits.\n" + string(schedulerJSON))
     tasks := conductorTaskOverview(cs.ConductorChildren)
     req["conductor"].(map[string]interface{})["tasks"] = tasks
     end := len(tasks)
@@ -657,7 +658,8 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
             nonTerminal++
         }
     }
-    if nonTerminal >= conductorMaxPerParentTurn {
+    limits := effectiveConductorLimits(parent.Conductor)
+    if nonTerminal >= limits.MaxNonTerminal {
         s.SessionMu.Unlock()
         return chatConductorChild{}, errors.New("Conductor dispatch limit reached")
     }
@@ -782,8 +784,9 @@ func (s *Server) scheduleConductorChildren(parentID string) {
     }
     now := time.Now().Unix()
     original := append([]chatConductorChild(nil), parent.ConductorChildren...)
+    limits := effectiveConductorLimits(parent.Conductor)
     for i := range parent.ConductorChildren {
-        if active >= conductorMaxRunning {
+        if active >= limits.MaxRunning {
             break
         }
         if parent.ConductorChildren[i].Status != conductorQueued {

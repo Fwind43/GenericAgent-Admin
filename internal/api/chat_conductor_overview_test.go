@@ -59,7 +59,7 @@ func TestConductorSchedulerAccounting(t *testing.T) {
    children[i] = chatConductorChild{Status: status, Review: &conductorReview{Status: "needs_work"}}
   }
   before, _ := json.Marshal(children)
-  got := conductorSchedulerOverview(children)
+  got := conductorSchedulerOverview(children, effectiveConductorLimits(nil))
   want := conductorSchedulerSnapshot{Scope: "parent_session", Snapshot: "parent_request", MaxRunning: conductorMaxRunning, MaxNonTerminal: conductorMaxPerParentTurn, ActiveSlots: tc.active, Queued: tc.queued, NonTerminal: tc.nonTerminal}
   if got != want { t.Fatalf("scheduler = %+v, want %+v", got, want) }
   after, _ := json.Marshal(children)
