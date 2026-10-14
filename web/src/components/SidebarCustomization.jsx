@@ -195,7 +195,7 @@ export function SidebarSectionOptions({ section, preferences, update, ct }) {
   }
   const set = patch => update('sectionLayout', { ...layout, sections: { ...layout.sections, [section]: { ...layout.sections[section], ...patch } } })
   return <>
-    <SidebarPreferenceSubmenu label={ct(`显示 · ${layout.sections[section].count}`, `Show · ${layout.sections[section].count}`)} value={layout.sections[section].count} options={sidebarDisplayCounts.map(value=>({ value, label: ct(`${value} 项`, `${value} items`) }))} onChange={count=>set({count})}/>
+    <SidebarPreferenceSubmenu label={ct(`显示 · ${layout.sections[section].count}`, `Show · ${layout.sections[section].count}`)} value={layout.sections[section].count} options={sidebarDisplayCounts.map(value=>({ value, label: ct(`${value} 项`, `${value} items`) }))} onChange={count=>{ if (section === 'projects') update('showAllProjects', false); set({count}) }}/>
     <button type="button" disabled={index === 0} onClick={()=>move(-1)}>{ct('向上移动', 'Move up')}</button>
     <button type="button" disabled={index === peers.length - 1} onClick={()=>move(1)}>{ct('向下移动', 'Move down')}</button>
     <SidebarPreferenceSubmenu label={ct('显示于选项卡', 'Show in tabs')} multiple value={layout.sections[section].tabs} options={layout.tabs.map(t=>({value:t.id, label:t.id === 'home' ? ct('主页', 'Home') : t.name}))} onChange={tab=>set({tabs:layout.sections[section].tabs.includes(tab) ? layout.sections[section].tabs.filter(id=>id !== tab) : [...layout.sections[section].tabs, tab]})}/>

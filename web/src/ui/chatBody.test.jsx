@@ -1,6 +1,6 @@
 import React from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { ChatSidebar } from './chatBody'
 import ProjectActionsMenu from '../components/ProjectActionsMenu'
 import { normalizeSidebarLayout } from '../lib/chatSidebarPreferences.js'
@@ -19,6 +19,27 @@ const sidebarProps = {
   renderSidebarProject: item => <div key={item.id}>{item.title}</div>,
 }
 const pinnedSection = container => container.querySelector('[data-sidebar-section="pinned"]')
+
+it('applies one shared display limit to pinned projects and sessions', () => {
+  const preferences = {sectionLayout:{sections:{pinned:{count:5}}}}
+  const { container } = render(<ChatSidebar {...sidebarProps} sidebarPreferences={preferences}
+    pinnedProjectGroups={Array.from({length:8}, (_,i)=>({id:`p${i+1}`}))}
+    pinnedSessions={Array.from({length:3}, (_,i)=>({id:`s${i}`}))}
+    renderSidebarProject={(group, index, options)=><div key={group.id} data-index={index} data-testid="pinned-item">Project {group.id} limit {options.initialLimit}</div>}
+    renderSidebarTree={node=><div key={node.id} data-testid="pinned-item">Session {node.id}</div>}/> )
+  expect(within(pinnedSection(container)).getAllByTestId('pinned-item')).toHaveLength(5)
+  expect(screen.getByText('Project p1 limit 5')).toBeTruthy()
+  fireEvent.click(within(pinnedSection(container)).getByRole('button',{name:'Load more (6 remaining)...'}))
+  expect(within(pinnedSection(container)).getAllByTestId('pinned-item')).toHaveLength(11)
+})
+
+it.each(['projects', 'pinned'])('passes the %s display count to project session pages', section => {
+  const groups = [{id:'p1'}]
+  render(<ChatSidebar {...sidebarProps} sidebarPreferences={{sectionLayout:{sections:{[section]:{count:5}}}}}
+    regularProjectGroups={section === 'projects' ? groups : []} pinnedProjectGroups={section === 'pinned' ? groups : []}
+    renderSidebarProject={(group, index, options)=><div key={group.id} data-index={index}>Nested limit {options.initialLimit}</div>}/> )
+  expect(screen.getByText('Nested limit 5')).toBeTruthy()
+})
 
 it('keeps an enabled empty pinned section visible with guidance and its settings menu', () => {
   const { container } = render(<ChatSidebar {...sidebarProps}/> )

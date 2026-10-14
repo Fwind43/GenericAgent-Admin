@@ -105,6 +105,15 @@ it('creates, renames and deletes tabs while rescuing otherwise orphaned sections
   fireEvent.submit(screen.getByLabelText('Tab name').closest('form'))
   expect(update.mock.calls.at(-1)[1].tabs.at(-1).name).toBe('Personal')
 })
+it('selecting a project count clears a previous expand-all preference', () => {
+  const update = vi.fn()
+  render(<SidebarSectionOptions section="projects" preferences={{showAllProjects:true,sectionLayout:{sections:{projects:{count:10}}}}} update={update} ct={ct}/> )
+  fireEvent.click(screen.getByRole('button',{name:'Show · 10'}))
+  fireEvent.click(screen.getByRole('menuitemradio',{name:'5 items'}))
+  expect(update).toHaveBeenCalledWith('showAllProjects', false)
+  expect(update.mock.calls.find(([key])=>key === 'sectionLayout')[1].sections.projects.count).toBe(5)
+})
+
 it('section menus change count, order and add another tab without moving the section', () => {
   const update = vi.fn()
   render(<SidebarSectionOptions section="recent" preferences={{}} update={update} ct={ct}/> )

@@ -7696,7 +7696,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const renderSidebarTree = (node, options = {}) => node.workers.length
     ? <ConductorSessionTree key={node.session.id} session={node.session} workers={node.workers} renderSession={(session, treeOptions) => renderSidebarSession(session, { ...options, ...treeOptions })} activeSessionId={sid}/>
     : renderSidebarSession(node.session, options)
-  const renderSidebarProject = (group, index) => {
+  const renderSidebarProject = (group, index, { initialLimit = 10 } = {}) => {
           const projectKey = group.key || group.name
           const expanded = expandedProjectNames.has(projectKey)
           const bodyId = `oa-project-sessions-${group.pinned ? 'pinned' : 'normal'}-${index}`
@@ -7725,7 +7725,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
               </ProjectActionsMenu>
             </div>
             <div className="oa-project-body" id={bodyId} hidden={!expanded}>
-              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessionTrees} renderItem={node => renderSidebarTree(node, { hideProjectLabel: true })} ct={ct}/>
+              <ProjectSessionPage key={`${projectKey}:${sidebarSearch}`} items={group.sessionTrees} renderItem={node => renderSidebarTree(node, { hideProjectLabel: true })} ct={ct} initialLimit={initialLimit}/>
               {!group.sessionTrees.length && <div className="oa-project-empty">{ct('暂无对话，点击项目旁的 + 新建', 'No chats yet. Click + beside the project to start one.')}</div>}
             </div>
           </section>

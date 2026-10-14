@@ -60,8 +60,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
             </div>
           </div>
           <div id="oa-sidebar-pinned-body" hidden={!pinnedExpanded}>
-            <div className="oa-session-list"><ProjectSessionPage key={`pinned:${sectionLayout.sections.pinned.count}`} initialLimit={sectionLayout.sections.pinned.count} items={pinnedSessions} renderItem={renderSidebarTree} ct={ct}/></div>
-            <div className="oa-session-list oa-project-list"><ProjectSessionPage key={`pinned-projects:${sectionLayout.sections.pinned.count}`} initialLimit={sectionLayout.sections.pinned.count} items={pinnedProjectGroups} renderItem={renderSidebarProject} ct={ct}/></div>
+            <div className="oa-session-list oa-project-list"><ProjectSessionPage key={`pinned:${sectionLayout.sections.pinned.count}`} initialLimit={sectionLayout.sections.pinned.count} items={[...pinnedSessions.map(node=>({node})), ...pinnedProjectGroups.map(group=>({group}))]} renderItem={({node, group}, index)=>node ? renderSidebarTree(node) : renderSidebarProject(group, index, {initialLimit:sectionLayout.sections.pinned.count})} ct={ct}/></div>
             {!pinnedSessions.length && !pinnedProjectGroups.length && <div className="oa-empty-list">
               {sidebarSearch ? ct('\u65e0\u5339\u914d\u7684\u7f6e\u9876\u5185\u5bb9', 'No matching pinned items') : ct('\u6682\u65e0\u7f6e\u9876\u5185\u5bb9\uff0c\u53ef\u5728\u4f1a\u8bdd\u6216\u9879\u76ee\u7684\u66f4\u591a\u83dc\u5355\u4e2d\u7f6e\u9876\u3002', 'No pinned items yet. Pin a session or project from its menu.')}
             </div>}
@@ -111,7 +110,7 @@ export function ChatSidebar({ layout = 'default', version, ProjectActionsMenu, b
           <button type="button" onClick={closeProjectDraft} disabled={projectCreating}>{ct('取消', 'Cancel')}</button>
         </form>}
         <div className="oa-session-list oa-project-list">
-        {(showAllProjects || sidebarSearch ? regularProjectGroups : regularProjectGroups.slice(0, sectionLayout.sections.projects.count)).map(renderSidebarProject)}
+        {(showAllProjects || sidebarSearch ? regularProjectGroups : regularProjectGroups.slice(0, sectionLayout.sections.projects.count)).map((group, index)=>renderSidebarProject(group, index, {initialLimit:sectionLayout.sections.projects.count}))}
         {!sidebarSearch && regularProjectGroups.length > sectionLayout.sections.projects.count && <button type="button" className="oa-project-show-more" aria-expanded={showAllProjects} onClick={()=>setShowAllProjects(value => !value)}><span aria-hidden="true" style={{ display: 'inline-flex', transform: showAllProjects ? 'rotate(180deg)' : undefined }}><ChevronDown size={12}/></span>{showAllProjects ? ct('收起更多项目', 'Show fewer projects') : ct('展开更多项目', 'Show more projects')}</button>}
         {!regularProjectGroups.length && <div className="oa-empty-list oa-projects-empty">
           <FolderOpen size={20}/>
