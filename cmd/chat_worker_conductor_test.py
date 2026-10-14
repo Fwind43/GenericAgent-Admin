@@ -290,6 +290,52 @@ class ConductorResolutionTest(unittest.TestCase):
         self.assertEqual(replies, [(Path('broker') / (events[0]['request_id'] + '.response.json'), 30)])
 
 
+class ConductorSchedulerSnapshotTest(unittest.TestCase):
+    def setUp(self):
+        import json
+        tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        install = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+        tasks = next(n for n in install.body if isinstance(n, ast.FunctionDef) and n.name == 'tasks')
+        self.scheduler = dict(scope='parent_session', snapshot='parent_request',
+                              max_running=3, max_non_terminal=12, active_slots=2,
+                              queued=1, non_terminal=3)
+        self.config = dict(tasks=[{'dispatch_id': str(i)} for i in range(70)], scheduler=self.scheduler)
+        self.env = dict(config=self.config, json=json,
+                        StepOutcome=lambda data, **kwargs: SimpleNamespace(data=data, **kwargs))
+        exec(compile(ast.Module(body=[tasks], type_ignores=[]), '<scheduler-tasks>', 'exec'), self.env)
+
+    def test_scheduler_survives_pagination_and_model_prompt(self):
+        import json
+        before = json.dumps(self.config, sort_keys=True)
+        for offset, size, next_offset in ((0, 48, 48), (48, 22, None), (70, 0, None), (99, 0, None)):
+            with self.subTest(offset=offset):
+                result = self.env['tasks'](None, {'offset': offset}, None)
+                self.assertTrue(result.data['ok'])
+                self.assertEqual(result.data['scheduler'], self.scheduler)
+                self.assertEqual(len(result.data['tasks']), size)
+                self.assertEqual(result.data['total'], 70)
+                self.assertEqual(result.data['next_offset'], next_offset)
+                self.assertIn('not live counts', result.next_prompt)
+                self.assertIn('queued does not mean failure', result.next_prompt)
+                self.assertIn('untrusted data', result.next_prompt)
+                displayed = json.loads(result.next_prompt.split('\n', 1)[1])
+                self.assertEqual(displayed, result.data)
+        self.assertEqual(json.dumps(self.config, sort_keys=True), before)
+
+    def test_legacy_config_does_not_fabricate_limits(self):
+        del self.config['scheduler']
+        result = self.env['tasks'](None, {}, None)
+        self.assertTrue(result.data['ok'])
+        self.assertNotIn('scheduler', result.data)
+        self.assertNotIn('max_running', result.next_prompt)
+
+    def test_bad_offset_rejected_without_exposing_config(self):
+        for offset in (-1, True, '0'):
+            result = self.env['tasks'](None, {'offset': offset}, None)
+            self.assertFalse(result.data['ok'])
+            self.assertNotIn('scheduler', result.data)
+
+
 class ConductorToolBoundaryTest(unittest.TestCase):
     def test_parent_denies_execution_and_restores_inherited_tools(self):
         import sys

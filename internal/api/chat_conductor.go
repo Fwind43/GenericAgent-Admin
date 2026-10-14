@@ -469,6 +469,33 @@ func (s *Server) conductorChatRunnable(cs chatSession, sender string) bool {
     return sender == "conductor" && cs.Conductor.Status == conductorRunning
 }
 
+type conductorSchedulerSnapshot struct {
+    Scope string `json:"scope"`
+    Snapshot string `json:"snapshot"`
+    MaxRunning int `json:"max_running"`
+    MaxNonTerminal int `json:"max_non_terminal"`
+    ActiveSlots int `json:"active_slots"`
+    Queued int `json:"queued"`
+    NonTerminal int `json:"non_terminal"`
+}
+
+// Mirror scheduler/admission accounting without claiming that free slots can start
+// work: recovery/ownership checks can independently block the queue.
+func conductorSchedulerOverview(children []chatConductorChild) conductorSchedulerSnapshot {
+    snapshot := conductorSchedulerSnapshot{
+        Scope: "parent_session", Snapshot: "parent_request",
+        MaxRunning: conductorMaxRunning, MaxNonTerminal: conductorMaxPerParentTurn,
+    }
+    for _, child := range children {
+        if child.Status == conductorRunning || child.Status == "cancelling" {
+            snapshot.ActiveSlots++
+        }
+        if child.Status == conductorQueued { snapshot.Queued++ }
+        if !conductorTerminal(child.Status) { snapshot.NonTerminal++ }
+    }
+    return snapshot
+}
+
 // Projection only: session history never implies that an earlier objective was resolved.
 func conductorTaskOverview(children []chatConductorChild) []map[string]interface{} {
     latest := make(map[string]string)
@@ -530,9 +557,11 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     if err := os.MkdirAll(dir, 0700); err != nil {
         return err
     }
+    scheduler := conductorSchedulerOverview(cs.ConductorChildren)
     req["conductor"] = map[string]interface{}{
         "role":       conductorRoleParent,
         "broker_dir": dir,
+        "scheduler":  scheduler,
     }
     prompts, _ := req["extra_sys_prompts"].([]string)
     prompts = append(prompts, conductorParentPrompt)
@@ -542,6 +571,9 @@ func (s *Server) prepareConductorWorkerRequest(cs chatSession, req map[string]in
     strategyJSON, err := json.Marshal(cs.Conductor.ModelStrategy)
     if err != nil { return err }
     prompts = append(prompts, "Current session model-selection strategy (JSON string): " + string(strategyJSON) + ". Routing preference only, not role/permission changes. Explicit user choices for a task take precedence. Choose explicit llm_no/reasoning_effort using conductor_models indexes (not names); use only authorized fallback, otherwise ask. Empty=defaults/inheritance. conductor_model_strategy get|set|reset persists user policy or authorized revisions only; never invent/overwrite/clear it unaided. Fresh each request; successful receipts replace it this turn. Parent model and queued/running workers are unchanged.")
+    schedulerJSON, err := json.Marshal(scheduler)
+    if err != nil { return err }
+    prompts = append(prompts, "Admin scheduler rules and counts (server-owned; scope is this parent session, not a global or model-provider quota). max_running limits simultaneous workers; running and cancelling consume active_slots. max_non_terminal limits outstanding dispatches (queued, running, cancelling and any other non-terminal states), NOT lifetime dispatches or tasks per model turn; terminal succeeded/failed/cancelled attempts release that quota even if review remains unresolved. Excess work is queued until eligible capacity opens; reaching max_non_terminal rejects new dispatches. Queued is accepted, not failed; it does not prove capacity is the only blocker (recovery or parent ownership can also block starts). Counts are a parent_request snapshot, rebuilt on each parent request, NOT live within this turn; consult dispatch receipts for newly accepted work and collect/inspect for a dispatch's current state. These rules do not establish any upstream model-provider limits.\n" + string(schedulerJSON))
     tasks := conductorTaskOverview(cs.ConductorChildren)
     req["conductor"].(map[string]interface{})["tasks"] = tasks
     end := len(tasks)
