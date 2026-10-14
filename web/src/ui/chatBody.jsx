@@ -2,7 +2,7 @@ import { normalizeSidebarLayout, normalizeRecentFilter } from '../lib/chatSideba
 import ProjectSessionPage from '../components/ProjectSessionPage'
 import ChatVersionBadge from '../components/ChatVersionBadge'
 import { SidebarPreferenceSubmenu } from '../components/ProjectActionsMenu'
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import SidebarCustomization, { SidebarSections, SidebarTabs, SidebarSectionOptions } from '../components/SidebarCustomization'
 import { Bot, CheckCheck, ChevronDown, ChevronUp, CircleHelp, Copy, Download, Edit3, FolderOpen, FolderPlus, Loader2, MessageSquarePlus, PanelLeftClose, Inbox, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Trash2, X } from 'lucide-react'
 import './chatBody.css'
@@ -237,8 +237,10 @@ export function ChatMessages({ layout = 'default', MessageList, activeSessionDet
 }
 
 export function ChatComposer({ layout = 'default', ComposerActions, CopyButton, PendingAttachments, ProviderModelCascade, REASONING_EFFORT_OPTIONS, activePromptPreset, activeSessionDetail, activeSidRef, addAttachmentFiles, applyComposerHeight, attachments, autorunEnabled, beginComposerResize, cancelRun, cmdManagerOpen, composerActionsTriggerRef, composerDragHeight, composerManualHeightRef, conductorEnabling, ct, defaultReasoningLabel, depsRepairing, dragging, extraPromptOpen, extraSysPromptPresetID, fileRef, finishComposerResize, handlePromptChange, handlePromptKeyDown, installChatPythonDeps, isConductorParent, isConductorWorker, isCurrentRunning, isUltraPlanPrompt, keychainOpen, loadChatState, loopRailOpen, modelDiagnosis, modelDiagnosisAdvice, modelDiagnosisTitle, moveComposerResize, onDropFiles, onPaste, openExtraPromptEditor, prompt, promptRef, providerGroups, queuedMessages, reasoningEffort, removeAttachment, saveModel, saveReasoningEffort, selectedModelNo, selectedProvider, send, sessionLoadFailed, sessionLoading, setCmdManagerOpen, setDragging, setErr, setKeychainOpen, setLoopRailOpen, sid, toggleAutorun, upgradeToConductor }) {
+  const photoRef = useRef(null)
   return (<div data-ui-surface="chat.composer" data-ui-layout={layout} className={`oa-composer ${dragging ? 'is-dragging' : ''}`} onDragOver={e=>{e.preventDefault(); setDragging(true)}} onDragLeave={()=>setDragging(false)} onDrop={onDropFiles}>
-          <input ref={fileRef} type="file" multiple hidden onChange={e=>{ addAttachmentFiles(e.target.files); e.target.value='' }} />
+          <input ref={fileRef} type="file" multiple hidden aria-label={ct('选择附件', 'Choose attachments')} onChange={e=>{ addAttachmentFiles(e.target.files); e.target.value='' }} />
+          <input ref={photoRef} type="file" accept="image/*" multiple hidden aria-label={ct('从相册选择图片', 'Choose photos')} onChange={e=>{ addAttachmentFiles(e.target.files); e.target.value='' }} />
           {attachments.length > 0 && <PendingAttachments attachments={attachments} onRemove={removeAttachment}/>}
           {modelDiagnosis && <div className={`oa-model-alert ${modelDiagnosis.fixable ? 'is-fixable' : ''}`} role="status" aria-live="polite">
             <div className="oa-model-alert-copy">
@@ -272,6 +274,7 @@ export function ChatComposer({ layout = 'default', ComposerActions, CopyButton, 
           <div className="oa-composer-bar">
             <ComposerActions
               onAttach={() => fileRef.current?.click()}
+              onPhotos={() => photoRef.current?.click()}
               onCommands={() => setCmdManagerOpen(true)}
               onSystemPrompt={openExtraPromptEditor}
               onKeychain={() => setKeychainOpen(true)}

@@ -4574,7 +4574,7 @@ export function ProviderModelCascade({
   )
 }
 
-export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeychain, onAutorun, onLoop, onConductor, conductorActive, conductorDisabled, commandsOpen, keychainOpen, systemPromptActive, systemPromptLabel, autorunEnabled, loopOpen, triggerRef }) {
+export function ComposerActions({ onAttach, onPhotos, onCommands, onSystemPrompt, onKeychain, onAutorun, onLoop, onConductor, conductorActive, conductorDisabled, commandsOpen, keychainOpen, systemPromptActive, systemPromptLabel, autorunEnabled, loopOpen, triggerRef }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const fallbackTriggerRef = useRef(null)
@@ -4591,6 +4591,7 @@ export function ComposerActions({ onAttach, onCommands, onSystemPrompt, onKeycha
   }, [open])
 
   const actions = [
+    ...(onPhotos ? [{ icon: FileImage, label: ct('相册', 'Photos'), onClick: onPhotos, active: false }] : []),
     { icon: Paperclip, label: ct('附件', 'Attachments'), onClick: onAttach, active: false },
     { icon: Sparkles, label: ct('命令', 'Commands'), onClick: onCommands, active: commandsOpen },
     { icon: FileText, label: systemPromptActive ? `${ct('系统提示', 'System prompt')} · ${systemPromptLabel}` : ct('系统提示', 'System prompt'), onClick: onSystemPrompt, active: systemPromptActive },
