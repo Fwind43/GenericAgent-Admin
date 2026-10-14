@@ -232,6 +232,7 @@ const (
 	chatTitleSourceTemporary = "temporary"
 	chatTitleSourceGenerated = "generated"
 	chatTitleSourceManual    = "manual"
+	chatTitleSourceObjective = "objective"
 )
 
 type chatUpload struct {
@@ -2135,6 +2136,7 @@ func loadChatSession(cfg config.AppConfig, sid string) (chatSession, error) {
 	}
 	cs.Plan = normalizeChatPlan(cs.Plan)
 	cs.Settings = normalizeChatSettings(cs.Settings)
+	syncConductorChatTitle(&cs)
 	return cs, nil
 }
 func mergeChatMessageLists(first, second []chatMessage) []chatMessage {
@@ -2249,6 +2251,7 @@ func saveChatSessionPreserveUpdatedAtLocked(cfg config.AppConfig, cs chatSession
 }
 
 func saveChatSessionWithUpdatedAtLocked(cfg config.AppConfig, cs chatSession, touchUpdatedAt bool) error {
+	syncConductorChatTitle(&cs)
 	if err := ensureChatDataMigrated(cfg); err != nil {
 		return err
 	}
@@ -2352,6 +2355,10 @@ func temporaryChatTitle(messages []chatMessage) string {
 }
 
 func updateChatTitle(cs *chatSession) {
+	syncConductorChatTitle(cs)
+	if conductorObjectiveChatTitle(*cs) != "" {
+		return
+	}
 	// Never overwrite manually set or AI-generated titles
 	if cs.TitleSource == chatTitleSourceManual || cs.TitleSource == chatTitleSourceGenerated {
 		return
@@ -2400,6 +2407,9 @@ func sanitizeGeneratedChatTitle(title string) string {
 }
 
 func chatTitleExchangeForGeneration(cs chatSession) (chatTitleExchange, bool) {
+	if conductorObjectiveChatTitle(cs) != "" {
+		return chatTitleExchange{}, false
+	}
 	messages := make([]chatMessage, 0, 2)
 	for _, msg := range cs.Messages {
 		if msg.Kind == "btw" || (msg.Role != "user" && msg.Role != "assistant") {
@@ -2504,6 +2514,9 @@ func chatTitleContextStillExists(cs chatSession, context chatTitleContext) bool 
 }
 
 func chatTitleNeedsAutomaticBackfill(cs chatSession) bool {
+	if conductorObjectiveChatTitle(cs) != "" {
+		return false
+	}
 	if cs.TitleSource == chatTitleSourceGenerated || cs.TitleSource == chatTitleSourceManual {
 		return false
 	}
@@ -2588,7 +2601,7 @@ func (s *Server) scheduleChatTitleGeneration(sid string, cs chatSession) {
 		s.SessionMu.Lock()
 		defer s.SessionMu.Unlock()
 		latest, err := loadChatSession(s.CfgStore.Snapshot(), sid)
-		if err != nil || latest.TitleSource == chatTitleSourceManual || latest.TitleSource == chatTitleSourceGenerated {
+		if err != nil || conductorObjectiveChatTitle(latest) != "" || latest.TitleSource == chatTitleSourceManual || latest.TitleSource == chatTitleSourceGenerated {
 			return
 		}
 		if !chatTitleExchangeStillExists(latest, exchange) {

@@ -52,8 +52,11 @@ func TestConductorDispatchOverrides(t *testing.T) {
 				if worker.Settings != want {
 					t.Fatalf("settings %+v want %+v", worker.Settings, want)
 				}
-				if reuse && (worker.ID != "worker" || worker.Title != "preserve") {
+				if reuse && worker.ID != "worker" {
 					t.Fatal("reuse lost session")
+				}
+				if worker.Title != "test" || worker.TitleSource != chatTitleSourceObjective {
+					t.Fatalf("dispatch title did not follow objective: %q (%s)", worker.Title, worker.TitleSource)
 				}
 				after, _ := loadChatSession(s.CfgStore.Snapshot(), "parent")
 				if after.Settings != parent.Settings {

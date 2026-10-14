@@ -8133,7 +8133,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
             const renderSessionRow = (s) => {
               const selected = selectedSessionIdSet.has(s.id)
               const hubUpdating = hubUpdatingSessionId === s.id
-              const sourceLabel = s.title_source === 'generated' ? 'AI' : s.title_source === 'manual' ? '手动' : '旧标题'
+              const sourceLabel = s.title_source === 'objective' ? ct('任务目标', 'Task goal') : s.title_source === 'generated' ? 'AI' : s.title_source === 'manual' ? '手动' : '旧标题'
               return <div key={s.id} className={`oa-session-manager-dialog-row ${selected ? 'is-selected' : ''}`}>
                 <button className="oa-session-manager-dialog-select" type="button" role="checkbox" aria-checked={selected} onClick={()=>toggleSessionSelection(s.id)} disabled={batchDeleting || Boolean(hubUpdatingSessionId)}>
                   <span className={`oa-session-check ${selected ? 'is-checked' : ''}`}>{selected && <Check size={12}/>}</span>

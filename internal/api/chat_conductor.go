@@ -243,6 +243,19 @@ func conductorTerminal(status string) bool {
     return status == conductorSucceeded || status == conductorFailed || status == conductorCancelled
 }
 
+// Worker titles follow the current dispatch, not the first conversation exchange.
+// A manual rename within that dispatch remains explicit user metadata.
+func conductorObjectiveChatTitle(cs chatSession) string {
+    if cs.Conductor == nil || cs.Conductor.Role != conductorRoleWorker { return "" }
+    return truncateChatRunes(strings.Join(strings.Fields(cs.Conductor.Objective), " "), maxChatTitleRunes)
+}
+
+func syncConductorChatTitle(cs *chatSession) {
+    if title := conductorObjectiveChatTitle(*cs); title != "" && cs.TitleSource != chatTitleSourceManual {
+        cs.Title, cs.TitleSource = title, chatTitleSourceObjective
+    }
+}
+
 func boundedConductorText(value string, limit int) string {
     value = strings.TrimSpace(value)
     runes := []rune(value)
@@ -717,6 +730,9 @@ func (s *Server) dispatchConductorWithOptions(parentID, objective string, option
         worker.UpdatedAt = now
         childID, child.SessionID = target, target
     }
+    // Every accepted dispatch (including reuse) starts with its current objective.
+    worker.TitleSource = chatTitleSourceObjective
+    syncConductorChatTitle(&worker)
     worker.Settings, err = parent.Conductor.Defaults.apply(worker.Settings)
     if err != nil { s.SessionMu.Unlock(); return chatConductorChild{}, err }
     worker.Settings, _ = options.apply(worker.Settings)

@@ -61,8 +61,11 @@ func TestConductorAdditionalPromptDispatch(t *testing.T) {
 					if worker.Conductor.AdditionalPrompt != want || worker.Settings != parent.Settings || len(worker.ExtraSysPrompts) != 1 || worker.ExtraSysPrompts[0] != "existing-system" {
 						t.Fatalf("wrong dispatch snapshot: %+v", worker)
 					}
-					if reuse && (worker.ID != "worker" || worker.Title != "preserve") {
+					if reuse && worker.ID != "worker" {
 						t.Fatal("reuse lost history")
+					}
+					if worker.Title != "task" || worker.TitleSource != chatTitleSourceObjective {
+						t.Fatalf("dispatch title did not follow objective: %q (%s)", worker.Title, worker.TitleSource)
 					}
 					req := map[string]interface{}{"extra_sys_prompts": worker.ExtraSysPrompts}
 					if err := s.prepareConductorWorkerRequest(worker, req); err != nil {

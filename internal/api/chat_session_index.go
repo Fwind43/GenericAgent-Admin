@@ -11,7 +11,7 @@ import (
 	"genericagent-admin-go/internal/config"
 )
 
-const chatSessionListIndexVersion = 6
+const chatSessionListIndexVersion = 7
 
 type chatSessionResult struct {
 	ID              string `json:"id"`
@@ -109,6 +109,7 @@ func chatSessionListIndexPath(cfg config.AppConfig) string {
 }
 
 func summaryFromChatSession(cs chatSession) chatSessionSummary {
+	syncConductorChatTitle(&cs)
 	return chatSessionSummary{
 		Conductor:       cs.Conductor,
 		TaskbarState:    chatSessionTaskbarState(cs),
