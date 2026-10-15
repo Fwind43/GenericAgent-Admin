@@ -301,6 +301,12 @@ func rawHistoryUserTurns(raw []map[string]interface{}) []rawUserTurn {
 		if !ok {
 			continue
 		}
+		// Completion notifications use the model's user transport role, but
+		// have no corresponding user message in the Admin conversation. Keep
+		// them in the preserved prefix, not in text matching or turn ordinals.
+		if strings.HasPrefix(strings.TrimSpace(text), "[Internal Conductor completion event; not a new user request]") {
+			continue
+		}
 		turns = append(turns, rawUserTurn{index: i, text: text})
 	}
 	return turns

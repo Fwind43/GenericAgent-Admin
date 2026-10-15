@@ -113,6 +113,39 @@ func TestRawHistoryBeforeMessageForResendToleratesMismatch(t *testing.T) {
 	}
 }
 
+func TestRawHistoryBeforeMessageForResendSkipsConductorCompletions(t *testing.T) {
+	completion := "[Internal Conductor completion event; not a new user request] Completed dispatches: d-1. Use conductor_collect for full receipts if needed."
+	for _, tc := range []struct {
+		name        string
+		selected    string
+		rawSelected string
+	}{
+		{name: "position fallback after content compaction", selected: "selected user request", rawSelected: "compacted user text"},
+		{name: "receipt text must not match the selected request", selected: "Completed dispatches: d-1.", rawSelected: "compacted user text"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cs := chatSession{
+				Messages: []chatMessage{
+					{ID: "u1", Role: "user", Content: "first"},
+					{ID: "a1", Role: "assistant", Content: "dispatched"},
+					{ID: "receipt", Role: "assistant", Content: "collected"},
+					{ID: "u2", Role: "user", Content: tc.selected},
+					{ID: "a2", Role: "assistant", Content: "old response"},
+				},
+				RawHistory: []map[string]interface{}{
+					rawUserItem("first"), rawAssistantItem("dispatched"),
+					rawUserItem(completion), rawAssistantItem("collected"),
+					rawUserItem(tc.rawSelected), rawAssistantItem("old response"),
+				},
+			}
+			got := rawHistoryBeforeMessageForResend(cs, 3)
+			if len(got) != 4 {
+				t.Fatalf("resend cut at raw index %d, want 4 (preserve the earlier receipt, remove the selected user turn)", len(got))
+			}
+		})
+	}
+}
+
 // The fork path keeps strict semantics: forking off an unrelated raw history
 // should still be refused rather than silently guessing a boundary.
 func TestRawHistoryBeforeMessageStaysStrictForFork(t *testing.T) {

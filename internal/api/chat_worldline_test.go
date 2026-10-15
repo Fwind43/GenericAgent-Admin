@@ -719,6 +719,49 @@ func TestWorldlineDeleteIsNarrowAndRejectsBusySession(t *testing.T) {
 	}
 }
 
+func TestWorldlineEditResendKeepsEarlierConductorReceipts(t *testing.T) {
+	s := newChatCommandTestServer(t)
+	const sid = "conductor-receipt-edit-resend"
+	completion := "[Internal Conductor completion event; not a new user request] Completed dispatches: d-1. Use conductor_collect for full receipts if needed."
+	cs := chatSession{
+		ID: sid,
+		Messages: []chatMessage{
+			{ID: "first-user", Role: "user", Content: "first question"},
+			{ID: "first-assistant", Role: "assistant", Content: "first answer"},
+			{ID: "legacy-user", Role: "user", Content: "selected question before compaction"},
+			{ID: "legacy-assistant", Role: "assistant", Content: "old answer"},
+		},
+		RawHistory: []map[string]interface{}{
+			rawUserItem("first question"), rawAssistantItem("first answer"),
+			rawUserItem(completion), rawAssistantItem("collected d-1"),
+			rawUserItem(completion), rawAssistantItem("collected d-2"),
+			rawUserItem("compacted selected question"), rawAssistantItem("old answer"),
+		},
+		HistoryInfo: []interface{}{map[string]interface{}{"stale": true}},
+		Working:     map[string]interface{}{"stale": true},
+	}
+	installWorldlineTestWorker(t, s, sid)
+	token := s.beginChatRun(sid)
+	if token == nil {
+		t.Fatal("failed to acquire chat run")
+	}
+	defer s.endChatRunOwned(sid, token)
+	if err := s.prepareChatWorldlineResend(sid, token, &cs, "legacy-user"); err != nil {
+		t.Fatal(err)
+	}
+	if len(cs.Messages) != 2 || len(cs.RawHistory) != 6 {
+		t.Fatalf("incorrect resend boundary: messages=%+v raw=%+v", cs.Messages, cs.RawHistory)
+	}
+	for _, i := range []int{2, 4} {
+		if text, _ := visibleRawUserText(cs.RawHistory[i]); text != completion {
+			t.Fatalf("earlier receipt at %d was changed: %+v", i, cs.RawHistory[i])
+		}
+	}
+	if len(cs.HistoryInfo) != 0 || cs.Working != nil {
+		t.Fatalf("unsafe future GA state survived: info=%+v working=%+v", cs.HistoryInfo, cs.Working)
+	}
+}
+
 func TestWorldlineEditResendFallsBackForLegacyUnmappedMessage(t *testing.T) {
 	s := newChatCommandTestServer(t)
 	const sid = "legacy-edit-resend"
