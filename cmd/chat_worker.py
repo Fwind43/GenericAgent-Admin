@@ -3166,7 +3166,7 @@ def _install_conductor_tools(agent, config):
         request_id = uuid.uuid4().hex
         emit({'type': 'conductor_inspect', 'request_id': request_id, 'broker_dir': str(broker), 'dispatch_id': dispatch_id})
         reply = read_reply(broker / (request_id + '.response.json'), 30)
-        return StepOutcome({'untrusted_worker_progress': reply}, next_prompt='On-demand public progress only, not delivery or verification. No updates do not prove a hang. Do not poll; use conductor_collect for terminal results.')
+        return StepOutcome({'untrusted_worker_progress': reply}, next_prompt='On-demand public progress only, not delivery or verification. For a progress request, describe recent_steps and update_age_ms as worker-reported activity, not verified corrections; step counts public model turns, not completed fixes. If absent, explain reason/message and any active tool instead of reporting only running. No updates do not prove a hang. Do not poll; use conductor_collect for terminal results.')
 
     def collect(handler, args, response):
         if handler.parent is not agent:
@@ -3193,7 +3193,7 @@ def _install_conductor_tools(agent, config):
              ('conductor_cancel', cancel, 'Cancel an owned queued or running dispatch. Does not undo actions. On timeout outcome is unknown: retry cancellation before reuse. On terminal receipt reuse session_id for corrected work; already completed work is unchanged.', 'dispatch_id'),
              ('conductor_dispatch', dispatch, 'Dispatch asynchronously: for follow-up, corrections, or verification, prefer the original completed worker by passing session_id to preserve context. Omit session_id only for a new independent worker. Returns session_id and a new dispatch_id.', 'objective'),
              ('conductor_collect', collect, 'Collect a worker outcome snapshot without waiting. evidence[] contains optional review IDs; evidence_status=none means no ledger records, not failed delivery. result_receipt is only a read acknowledgment. If pending, end the turn; completion automatically wakes the parent.', 'dispatch_id')]
-    specs.append(('conductor_inspect', inspect, 'Read on-demand live public progress for an owned dispatch: phase, completed steps, latest summary/output and active tool. Not a result receipt or evidence; no updates do not prove a hang. Do not poll. Use conductor_collect for terminal delivery.', 'dispatch_id'))
+    specs.append(('conductor_inspect', inspect, 'Read on-demand public progress for an owned dispatch: phase, recent_steps (up to 5 public model turns), latest summary/output, active tool, update_age_ms and reason/message when steps are absent. Worker reports, not verified fixes or evidence; no updates do not prove a hang. Do not poll. Use conductor_collect for terminal delivery.', 'dispatch_id'))
     specs.append(('conductor_resolve', resolve, 'Explicitly close a terminal dispatch with a basis, or supersede it with a newer dispatch owned by this parent. Use only for an authorized disposition or a real replacement of the same objective. Never infer it from session reuse. Does not change execution/review or make replacement work resolved; cannot close active work.', 'dispatch_id'))
     # A remembered SOP/tool call must not bypass the manager-only role.
     def tasks(handler, args, response):

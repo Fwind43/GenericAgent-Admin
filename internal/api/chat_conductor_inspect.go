@@ -9,17 +9,30 @@ import (
 	"unicode/utf8"
 )
 
+const conductorRecentStepLimit = 5
+
+type conductorProgressStep struct {
+	Step        int    `json:"step"`
+	Summary     string `json:"summary,omitempty"`
+	Output      string `json:"output,omitempty"`
+	UpdatedAtMS int64  `json:"updated_at_ms"`
+}
+
 // Transient public telemetry, not history, evidence, tool arguments, or model reasoning.
 type conductorRunProgress struct {
-	Available     bool   `json:"available"`
-	Phase         string `json:"phase"`
-	Step          int    `json:"step,omitempty"`
-	LatestSummary string `json:"latest_summary,omitempty"`
-	LatestOutput  string `json:"latest_output,omitempty"`
-	ToolName      string `json:"tool_name,omitempty"`
-	ActiveTools   int    `json:"active_tools,omitempty"`
-	UpdatedAtMS   int64  `json:"updated_at_ms,omitempty"`
-	ElapsedMS     int64  `json:"elapsed_ms,omitempty"`
+	Available     bool                    `json:"available"`
+	Phase         string                  `json:"phase"`
+	Step          int                     `json:"step,omitempty"`
+	LatestSummary string                  `json:"latest_summary,omitempty"`
+	LatestOutput  string                  `json:"latest_output,omitempty"`
+	ToolName      string                  `json:"tool_name,omitempty"`
+	ActiveTools   int                     `json:"active_tools,omitempty"`
+	UpdatedAtMS   int64                   `json:"updated_at_ms,omitempty"`
+	ElapsedMS     int64                   `json:"elapsed_ms,omitempty"`
+	RecentSteps   []conductorProgressStep `json:"recent_steps,omitempty"`
+	Reason        string                  `json:"reason,omitempty"`
+	Message       string                  `json:"message"`
+	UpdateAgeMS   *int64                  `json:"update_age_ms,omitempty"`
 }
 
 // Byte caps also bound Python's ASCII-escaped tool receipt, including control characters.
@@ -55,13 +68,23 @@ func (r *chatRun) updateConductorProgress(line []byte) {
 		return
 	}
 	progress := &r.ConductorProgress
+	now := time.Now().UnixMilli()
 	switch ev.Type {
 	case "turn":
 		progress.Step++
-		progress.LatestSummary = conductorProgressText(ev.Summary, 256, false)
 		// Raw deltas also contain tool arguments/results; only structured public
 		// model content is safe for this on-demand coordination snapshot.
-		progress.LatestOutput = conductorProgressText(ev.Content, 512, true)
+		summary := conductorProgressText(strings.TrimSpace(ev.Summary), 256, false)
+		output := conductorProgressText(strings.TrimSpace(ev.Content), 512, true)
+		if summary != "" || output != "" {
+			progress.LatestSummary = summary
+			progress.LatestOutput = output
+			// Replace rather than mutate the backing array: returned snapshots stay immutable.
+			start := max(0, len(progress.RecentSteps)-(conductorRecentStepLimit-1))
+			recent := make([]conductorProgressStep, 0, conductorRecentStepLimit)
+			recent = append(recent, progress.RecentSteps[start:]...)
+			progress.RecentSteps = append(recent, conductorProgressStep{Step: progress.Step, Summary: summary, Output: output, UpdatedAtMS: now})
+		}
 	case "tool_timing":
 		progress.ActiveTools = max(0, ev.ActiveTools)
 		progress.ToolName = ""
@@ -76,7 +99,7 @@ func (r *chatRun) updateConductorProgress(line []byte) {
 	if progress.ActiveTools > 0 {
 		progress.Phase = "tool"
 	}
-	progress.UpdatedAtMS = time.Now().UnixMilli()
+	progress.UpdatedAtMS = now
 }
 
 func (s *Server) inspectConductorChild(parentID, dispatchID string) (map[string]interface{}, error) {
@@ -100,24 +123,56 @@ func (s *Server) inspectConductorChild(parentID, dispatchID string) (map[string]
 	if child == nil {
 		return nil, errors.New("dispatch does not belong to this parent")
 	}
-	progress := conductorRunProgress{Phase: child.Status}
+	progress := conductorRunProgress{Phase: child.Status, Reason: "not_running", Message: "Dispatch is not running; use its lifecycle status and conductor_collect for terminal delivery/review."}
 	reply := map[string]interface{}{"ok": true, "dispatch_id": child.DispatchID, "session_id": child.SessionID, "status": child.Status, "objective": conductorProgressText(child.Objective, 256, false)}
+	if child.Status == conductorQueued {
+		progress.Reason = "waiting_to_start"
+		progress.Message = "Dispatch is queued and has not started; no live steps are available."
+	}
 	if child.Status == conductorRunning {
 		progress.Phase = "unavailable"
 		worker, loadErr := loadChatSession(s.CfgStore.Snapshot(), child.SessionID)
-		if loadErr == nil && worker.Conductor != nil && worker.Conductor.Role == conductorRoleWorker && worker.Conductor.ParentSessionID == parentID && worker.Conductor.DispatchID == dispatchID && child.MessageStart != nil && *child.MessageStart >= 0 && *child.MessageStart <= len(worker.Messages) {
+		switch {
+		case loadErr != nil || worker.Conductor == nil:
+			progress.Reason = "worker_unavailable"
+			progress.Message = "Worker session or its Conductor context is unavailable; live progress cannot be read."
+		case worker.Conductor.Role != conductorRoleWorker || worker.Conductor.ParentSessionID != parentID || worker.Conductor.DispatchID != dispatchID:
+			progress.Reason = "worker_mismatch"
+			progress.Message = "Worker session no longer matches this dispatch; unrelated progress is withheld."
+		case child.MessageStart == nil || *child.MessageStart < 0 || *child.MessageStart > len(worker.Messages):
+			progress.Reason = "dispatch_boundary_unavailable"
+			progress.Message = "Current dispatch message boundary is unavailable; historical progress is withheld."
+		default:
+			progress.Reason = "no_active_run"
+			progress.Message = "Lifecycle says running, but no matching active run snapshot is available; this does not prove a hang or completion."
 			s.ChatMu.Lock()
 			run := s.ChatRuns[child.SessionID]
 			if run != nil && !run.Done && !run.Canceled && run.PendingAssistantID != "" {
+				progress.Reason = "pending_message_unavailable"
+				progress.Message = "Active run cannot be matched to this dispatch's pending message; unrelated progress is withheld."
 				for _, message := range worker.Messages[*child.MessageStart:] {
 					if message.ID == run.PendingAssistantID && message.Role == "assistant" && message.Kind == "pending" {
 						progress = run.ConductorProgress
+						progress.RecentSteps = append([]conductorProgressStep(nil), progress.RecentSteps...)
 						progress.Available = true
 						if progress.Phase == "" {
 							progress.Phase = "starting"
 						}
+						now := time.Now().UnixMilli()
 						if run.RunStartedAtMS > 0 {
-							progress.ElapsedMS = max(int64(0), time.Now().UnixMilli()-run.RunStartedAtMS)
+							progress.ElapsedMS = max(int64(0), now-run.RunStartedAtMS)
+						}
+						if progress.UpdatedAtMS > 0 {
+							age := max(int64(0), now-progress.UpdatedAtMS)
+							progress.UpdateAgeMS = &age
+						}
+						progress.Message = "Recent steps are worker-reported public activity, not verified completion."
+						if len(progress.RecentSteps) == 0 && progress.LatestSummary == "" && progress.LatestOutput == "" {
+							progress.Reason = "no_public_steps"
+							progress.Message = "Worker run is active but has not published a readable public step yet."
+							if progress.ActiveTools > 0 {
+								progress.Message = "A tool is running, but no readable public step has been published yet."
+							}
 						}
 						break
 					}
@@ -127,7 +182,7 @@ func (s *Server) inspectConductorChild(parentID, dispatchID string) (map[string]
 		}
 	}
 	reply["progress"] = progress
-	reply["note"] = "Public telemetry only; no update is not proof of a hang. Use conductor_collect for terminal delivery/review."
+	reply["note"] = "Worker-reported public telemetry, not verified corrections or evidence. Step counts public model turns, not completed fixes. Use recent_steps and update_age_ms to describe progress; explain reason/message if absent. No update is not proof of a hang. Use conductor_collect for terminal delivery/review."
 	return reply, nil
 }
 

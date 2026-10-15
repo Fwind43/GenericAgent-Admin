@@ -81,7 +81,7 @@ func TestConductorInspectIsolationAndLifecycle(t *testing.T) {
 			token := s.beginChatRun(w)
 			defer s.endChatRunOwned(w, token)
 			token.PendingAssistantID = "pending"
-			token.ConductorProgress = conductorRunProgress{Available: true, Phase: "tool", LatestOutput: "live-public", ToolName: "code_run"}
+			token.ConductorProgress = conductorRunProgress{Available: true, Phase: "tool", LatestOutput: "live-public", ToolName: "code_run", UpdatedAtMS: 1, RecentSteps: []conductorProgressStep{{Step: 1, Summary: "live-public", UpdatedAtMS: 1}}}
 			switch name {
 			case "starting":
 				token.ConductorProgress = conductorRunProgress{}
@@ -123,6 +123,20 @@ func TestConductorInspectIsolationAndLifecycle(t *testing.T) {
 				wantLive := name == "live" || name == "starting"
 				if progress.Available != wantLive {
 					t.Fatalf("available=%v for %s", progress.Available, name)
+				}
+				wantReason := map[string]string{
+					"live": "", "starting": "no_public_steps", "queued": "waiting_to_start",
+					"succeeded": "not_running", "failed": "not_running", "cancelled": "not_running",
+					"missing-run": "no_active_run", "done": "no_active_run", "canceled": "no_active_run",
+					"different-parent": "worker_mismatch", "reused-dispatch": "worker_mismatch",
+					"missing-start": "dispatch_boundary_unavailable", "negative-start": "dispatch_boundary_unavailable", "past-start": "dispatch_boundary_unavailable",
+					"old-pending": "pending_message_unavailable", "missing-pending": "pending_message_unavailable", "non-pending": "pending_message_unavailable",
+				}[name]
+				if progress.Reason != wantReason || progress.Message == "" {
+					t.Fatalf("missing progress explanation for %s: %+v", name, progress)
+				}
+				if !wantLive && (len(progress.RecentSteps) > 0 || progress.UpdateAgeMS != nil) {
+					t.Fatalf("leaked unrelated history/freshness: %+v", progress)
 				}
 				if !wantLive && (progress.LatestOutput != "" || progress.ToolName != "") {
 					t.Fatalf("leaked unrelated run: %+v", progress)
@@ -186,5 +200,100 @@ func TestConductorInspectRejectsForeignBroker(t *testing.T) {
 	s.handleConductorInspectEvent(p, map[string]interface{}{"request_id": "../bad", "dispatch_id": d, "broker_dir": dir})
 	if !reflect.DeepEqual(before, instructionDiskSnapshot(t, s)) {
 		t.Fatal("invalid transport changed disk")
+	}
+}
+
+func TestConductorInspectRecentStepsBoundedAndImmutable(t *testing.T) {
+	run := &chatRun{}
+	var old []conductorProgressStep
+	for i := 1; i <= 8; i++ {
+		event, _ := json.Marshal(map[string]interface{}{"type": "turn", "summary": strings.Repeat("s", 400), "content": strings.Repeat("o", 900), "raw_delta": "RAW_SECRET", "reasoning": "PRIVATE_SECRET", "tool_result": "RESULT_SECRET"})
+		run.updateConductorProgress(event)
+		if i == 5 {
+			old = run.ConductorProgress.RecentSteps
+		}
+	}
+	progress := run.ConductorProgress
+	if progress.Step != 8 || len(progress.RecentSteps) != conductorRecentStepLimit || progress.RecentSteps[0].Step != 4 || progress.RecentSteps[4].Step != 8 {
+		t.Fatalf("unbounded or out-of-order history: %+v", progress)
+	}
+	if old[0].Step != 1 || old[4].Step != 5 {
+		t.Fatalf("mutated old snapshot: %+v", old)
+	}
+	for _, step := range progress.RecentSteps {
+		if len(step.Summary) > 256 || len(step.Output) > 512 || step.UpdatedAtMS <= 0 {
+			t.Fatal(step)
+		}
+	}
+	// Blank or tool-only turns still count, but must not erase the last readable step.
+	run.updateConductorProgress([]byte(`{"type":"turn","summary":"  ","content":"\n "}`))
+	run.updateConductorProgress([]byte(`{"type":"tool_timing","tool_phase":"start","tool_name":"code_run","tool_active_count":1,"args":"ARGS_SECRET"}`))
+	if run.ConductorProgress.Step != 9 || !reflect.DeepEqual(progress.RecentSteps, run.ConductorProgress.RecentSteps) || run.ConductorProgress.LatestSummary != progress.LatestSummary || run.ConductorProgress.Phase != "tool" {
+		t.Fatalf("lost readable progress: %+v", run.ConductorProgress)
+	}
+	encoded, _ := json.Marshal(run.ConductorProgress)
+	if strings.Contains(string(encoded), "SECRET") || len(encoded) > 6500 {
+		t.Fatalf("unsafe or oversized snapshot: %s", encoded)
+	}
+}
+
+func TestConductorInspectReadableStepsAndFreshness(t *testing.T) {
+	s, p, w, d := instructionTestPair(t, conductorRunning)
+	parent, _ := loadChatSession(s.CfgStore.Snapshot(), p)
+	start := 0
+	parent.ConductorChildren[0].MessageStart = &start
+	if err := saveChatSession(s.CfgStore.Snapshot(), parent); err != nil {
+		t.Fatal(err)
+	}
+	worker, _ := loadChatSession(s.CfgStore.Snapshot(), w)
+	worker.Messages = []chatMessage{{ID: "pending-current", Role: "assistant", Kind: "pending"}}
+	if err := saveChatSession(s.CfgStore.Snapshot(), worker); err != nil {
+		t.Fatal(err)
+	}
+	run := s.beginChatRun(w)
+	defer s.endChatRunOwned(w, run)
+	run.PendingAssistantID = "pending-current"
+	query := func() conductorRunProgress {
+		t.Helper()
+		reply, err := s.inspectConductorChild(p, d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return reply["progress"].(conductorRunProgress)
+	}
+	before := instructionDiskSnapshot(t, s)
+	first := query()
+	if !first.Available || first.Reason != "no_public_steps" || first.Phase != "starting" || first.UpdateAgeMS != nil {
+		t.Fatal(first)
+	}
+	s.ChatMu.Lock()
+	run.updateConductorProgress([]byte(`{"type":"tool_timing","tool_phase":"start","tool_name":"code_run","tool_active_count":1}`))
+	s.ChatMu.Unlock()
+	tool := query()
+	if tool.Reason != "no_public_steps" || tool.ToolName != "code_run" || !strings.Contains(tool.Message, "tool is running") {
+		t.Fatal(tool)
+	}
+	s.ChatMu.Lock()
+	run.updateConductorProgress([]byte(`{"type":"turn","summary":"Updated parser; checking tests","content":"Worker reports patch applied; validation pending"}`))
+	run.ConductorProgress.UpdatedAtMS = time.Now().Add(-2 * time.Second).UnixMilli()
+	s.ChatMu.Unlock()
+	readable := query()
+	if !readable.Available || readable.Reason != "" || len(readable.RecentSteps) != 1 || readable.RecentSteps[0].Summary != "Updated parser; checking tests" || readable.UpdateAgeMS == nil || *readable.UpdateAgeMS < 1900 || !strings.Contains(readable.Message, "not verified") {
+		t.Fatalf("missing readable progress/freshness: %+v", readable)
+	}
+	// A caller cannot mutate a later query's history via a previously returned slice.
+	readable.RecentSteps[0].Summary = "CALLER MUTATION"
+	again := query()
+	if again.RecentSteps[0].Summary != "Updated parser; checking tests" || !reflect.DeepEqual(before, instructionDiskSnapshot(t, s)) {
+		t.Fatal("query mutated runtime or persistent state")
+	}
+	// The lifecycle can say running even if the corresponding worker file is unavailable.
+	parent.ConductorChildren[0].SessionID = "missing-worker-progress"
+	if err := saveChatSession(s.CfgStore.Snapshot(), parent); err != nil {
+		t.Fatal(err)
+	}
+	missing := query()
+	if missing.Available || missing.Reason != "worker_unavailable" || len(missing.RecentSteps) != 0 || missing.UpdateAgeMS != nil {
+		t.Fatal(missing)
 	}
 }

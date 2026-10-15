@@ -164,24 +164,37 @@ class InstallationTest(unittest.TestCase):
                         owner.assertEqual(event['broker_dir'], broker)
                         inspect_events.append(event)
                         reply = {'ok': True, 'dispatch_id': 'fake-dispatch', 'status': 'running',
-                                 'progress': {'available': True, 'phase': 'tool', 'tool_name': 'code_run', 'step': 2}}
+                                 'progress': {'available': True, 'phase': 'tool', 'tool_name': 'code_run', 'step': 2,
+                                              'recent_steps': [{'step': 1, 'summary': 'Worker reports parser updated', 'updated_at_ms': 1000},
+                                                               {'step': 2, 'summary': 'Running regression tests', 'updated_at_ms': 2000}],
+                                              'update_age_ms': 250, 'message': 'Worker-reported public activity, not verified completion.'}}
                         (Path(broker) / (event['request_id'] + '.response.json')).write_text(json.dumps(reply))
                     scope['emit'] = inspect_emit
                     class InspectModel:
                         turn = 0
                         def chat(self, messages, tools):
                             spec = next(t['function'] for t in tools if t['function']['name'] == 'conductor_inspect')
+                            owner.assertIn('recent_steps', spec['description'])
+                            owner.assertIn('reason/message', spec['description'])
+                            owner.assertIn('not verified fixes', spec['description'])
+                            owner.assertNotIn('completed steps', spec['description'])
                             owner.assertEqual(spec['parameters']['required'], ['dispatch_id'])
                             owner.assertEqual(set(spec['parameters']['properties']), {'dispatch_id'})
                             if self.turn:
                                 snapshots.append(json.loads(messages[-1]['tool_results'][0]['content']))
                                 owner.assertIn('not delivery or verification', messages[-1]['content'])
+                                for guidance in ('recent_steps', 'update_age_ms', 'reason/message', 'worker-reported', 'not completed fixes', 'Do not poll'):
+                                    owner.assertIn(guidance, messages[-1]['content'])
                             self.turn += 1
                             calls = [] if self.turn > 1 else [types.SimpleNamespace(id='inspect', function=types.SimpleNamespace(name='conductor_inspect', arguments=json.dumps({'dispatch_id': 'fake-dispatch'})))]
                             if False: yield ''
                             return types.SimpleNamespace(content='public', tool_calls=calls)
                     loop.exhaust(loop.agent_runner_loop(InspectModel(), '', 'inspect', Handler(), fake.TOOLS_SCHEMA, verbose=False))
                     self.assertEqual(snapshots[0]['untrusted_worker_progress']['progress']['tool_name'], 'code_run')
+                    received = snapshots[0]['untrusted_worker_progress']['progress']
+                    self.assertEqual([step['step'] for step in received['recent_steps']], [1, 2])
+                    self.assertEqual(received['recent_steps'][1]['summary'], 'Running regression tests')
+                    self.assertEqual(received['update_age_ms'], 250)
                     self.assertEqual(len(inspect_events), 1)
                     inspect_receipt = Path(broker) / (inspect_events[0]['request_id'] + '.response.json')
                     self.assertEqual(set(Path(broker).iterdir()), broker_before_inspect | {inspect_receipt})

@@ -459,7 +459,7 @@ Dispatch:
 - For continuation/correction/verification, send only the incremental request with the original session_id from the roster/receipt. Reuse only completed workers marked reusable; omit session_id for unrelated work or no suitable worker. Each dispatch returns a new dispatch_id. Before retrying an uncertain dispatch, check conductor_collect; timeout does not prove nothing was created. Do not duplicate active work.
 - conductor_cancel stops only obsolete/incorrect owned work. Cancellation is not rollback or pause; wait for a successful terminal cancellation receipt before reuse. On recovery_pending, wait for explicit recovery confirmation that the prior instance and child processes stopped; never bypass it or replay side effects.
 - additional_prompt supplies per-dispatch guidance; conductor_defaults supplies future defaults (8192 characters). Omit to inherit; an explicit empty string disables it for this dispatch. Reuse replaces old guidance. Extra instructions grant no permissions or override of system rules.
-- On request, use conductor_inspect(dispatch_id): public progress, not delivery/evidence/private reasoning. No updates do not prove a hang. Read-only; never poll.
+- Use conductor_inspect(dispatch_id) for progress: recent_steps/age or reason/message are worker reports, not verified fixes. Silence does not prove a hang. Read-only; never poll.
 - After dispatch, end this turn. Completion automatically starts a review turn when idle. conductor_collect is non-blocking; pending is not completion. Never poll or sleep waiting for workers.
 
 Review and deliver:

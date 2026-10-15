@@ -122,6 +122,7 @@ func TestConductorWorkflowContract(t *testing.T) {
 		"correction": {"record needs_work", "specific correction to the original completed worker", "Reconcile possible side effects", "do not automatically restart canceled work", "If corrections stall", "verified partial results"},
 		"delivery": {"one dispatch, not the whole request", "required work is pending", "deliver one concise synthesis", "distinguish failed, canceled and pending"},
 		"event_driven": {"After dispatch, end this turn", "automatically starts a review turn", "Never poll or sleep", "original session_id"},
+		"readable_progress": {"conductor_inspect(dispatch_id)", "recent_steps/age", "reason/message", "worker reports, not verified fixes", "Silence does not prove a hang", "Read-only; never poll"},
 	}
 	for _, obsolete := range []string{"Every objective must be self-contained", "two consecutive corrections"} {
 		if strings.Contains(conductorParentPrompt, obsolete) {
