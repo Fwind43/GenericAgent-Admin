@@ -38,9 +38,45 @@ test('detail failure does not automatically retry and explicit retry recovers', 
   await waitFor(() => expect(load).toHaveBeenCalledTimes(2))
 })
 
-test('disabled auto-collapse fetches the process once on mount', async () => {
+test('disabled auto-collapse does not fetch lazy history until explicitly expanded', async () => {
   setAutoCollapseProcess(false)
   const load = vi.fn().mockResolvedValue(full)
+  const view = render(<ChatMessage message={partial} onLoadMessage={load} />)
+  await act(async () => {})
+  expect(load).not.toHaveBeenCalled()
+  expect(view.container.querySelector('.oa-turn-stack-head').getAttribute('aria-expanded')).toBe('false')
+  fireEvent.click(view.container.querySelector('.oa-turn-stack-head'))
+  await waitFor(() => expect(load).toHaveBeenCalledOnce())
+  view.rerender(<ChatMessage message={full} onLoadMessage={load} />)
+  expect(view.container.querySelector('.oa-turn-stack-head').getAttribute('aria-expanded')).toBe('true')
+  fireEvent.click(view.container.querySelector('.oa-turn-stack-head'))
+  fireEvent.click(view.container.querySelector('.oa-turn-stack-head'))
+  expect(load).toHaveBeenCalledOnce()
+  view.unmount()
   render(<ChatMessage message={partial} onLoadMessage={load} />)
+  await act(async () => {})
+  expect(load).toHaveBeenCalledOnce()
+})
+
+test('changing display preference does not download lazy history', async () => {
+  const load = vi.fn()
+  const view = render(<ChatMessage message={partial} onLoadMessage={load} />)
+  act(() => setAutoCollapseProcess(false))
+  await act(async () => {})
+  expect(load).not.toHaveBeenCalled()
+  expect(view.container.querySelector('.oa-turn-stack-head').getAttribute('aria-expanded')).toBe('false')
+})
+
+test('already loaded history still honors the expanded preference', () => {
+  setAutoCollapseProcess(false)
+  const load = vi.fn()
+  const view = render(<ChatMessage message={full} onLoadMessage={load} />)
+  expect(view.container.querySelector('.oa-turn-stack-head').getAttribute('aria-expanded')).toBe('true')
+  expect(load).not.toHaveBeenCalled()
+})
+
+test('live lazy response still fetches execution once', async () => {
+  const load = vi.fn().mockResolvedValue(full)
+  render(<ChatMessage message={partial} pending onLoadMessage={load} />)
   await waitFor(() => expect(load).toHaveBeenCalledOnce())
 })

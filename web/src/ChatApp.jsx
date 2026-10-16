@@ -3362,7 +3362,9 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
   }, [contentPartial, onLoadExecution])
   const parseContent = useMemo(() => createAssistantContentParser(), [])
   const [autoCollapseProcess] = useAutoCollapseProcess()
-  const stackOpen = stackOpenOverride ?? (Boolean(pending) || !autoCollapseProcess)
+  // A display preference must not eagerly download lazy historical bodies.
+  // Live runs still expand automatically; explicit clicks override both defaults.
+  const stackOpen = stackOpenOverride ?? (Boolean(pending) || (!contentPartial && !autoCollapseProcess))
   const autoExecutionRequested = useRef(false)
   useEffect(() => {
     if (contentPartial && stackOpen && !autoExecutionRequested.current) {
