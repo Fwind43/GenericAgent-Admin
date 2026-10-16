@@ -18,10 +18,12 @@ function normalizeDraftEntry(value) {
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const text = typeof value.text === 'string' ? value.text : ''
-  if (!text) return null
+  const attachments = Array.isArray(value.attachments) ? value.attachments.filter(file => file && typeof file.dataURL === 'string' && file.dataURL.startsWith('data:')) : []
+  if (!text && !attachments.length) return null
   const updatedAt = Number(value.updated_at)
   return {
     text,
+    attachments,
     updated_at: Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : 0,
     instance_id: instanceKey(value.instance_id),
   }
@@ -44,12 +46,13 @@ function readDraftMap(storage) {
 
 function writeDraftMap(drafts, storage) {
   const target = availableStorage(storage)
-  if (!target) return
+  if (!target) return false
   try {
     if (Object.keys(drafts).length) target.setItem(STORAGE_KEY, JSON.stringify(drafts))
     else target.removeItem(STORAGE_KEY)
+    return true
   } catch {
-    // Draft persistence is best-effort when storage is unavailable or full.
+    return false
   }
 }
 
@@ -70,20 +73,27 @@ export function loadChatSessionDraft(sessionId, storage, instanceId) {
   return draft.text
 }
 
-export function saveChatSessionDraft(sessionId, value, storage, instanceId = '') {
+export function loadChatSessionDraftAttachments(sessionId, storage, instanceId) {
+  const draft = readDraftMap(storage)[String(sessionId || '').trim()]
+  if (!draft || (instanceId !== undefined && draft.instance_id && draft.instance_id !== instanceKey(instanceId))) return []
+  return draft.attachments || []
+}
+
+export function saveChatSessionDraft(sessionId, value, storage, instanceId = '', attachments = []) {
   const id = String(sessionId || '').trim()
   if (!id) return
   const drafts = readDraftMap(storage)
   const text = typeof value === 'string' ? value : String(value || '')
-  if (text) {
+  if (text || attachments.length) {
     const previous = drafts[id]
     drafts[id] = {
       text,
-      updated_at: previous?.text === text && previous.updated_at > 0 ? previous.updated_at : Date.now(),
+      attachments,
+      updated_at: previous?.text === text && JSON.stringify(previous.attachments || []) === JSON.stringify(attachments) && previous.updated_at > 0 ? previous.updated_at : Date.now(),
       instance_id: instanceKey(instanceId),
     }
   } else delete drafts[id]
-  writeDraftMap(drafts, storage)
+  return writeDraftMap(drafts, storage)
 }
 
 export function mergeChatSessionDraftSessions(sessions, instanceId, storage) {

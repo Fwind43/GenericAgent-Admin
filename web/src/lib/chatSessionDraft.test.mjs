@@ -6,6 +6,7 @@ import {
   clearChatSessionDrafts,
   listChatSessionDraftIds,
   loadChatSessionDraft,
+  loadChatSessionDraftAttachments,
   mergeChatSessionDraftSessions,
   saveChatSessionDraft,
 } from './chatSessionDrafts.js'
@@ -196,4 +197,46 @@ test('project activity stays in the header independently of filtered sessions', 
   assert.match(header, /role="img"/)
   const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
   assert.match(css, /\.oa-sidebar \.oa-project-running \.oa-session-running-wave,/)
+})
+
+
+test('image-only drafts survive reload and remain isolated by instance', () => {
+  const storage = memoryStorage()
+  const files = [{ id: 'image-1', name: 'a.png', type: 'image/png', size: 3, dataURL: 'data:image/png;base64,YWJj' }]
+  assert.equal(saveChatSessionDraft('images', '', storage, 'one', files), true)
+  assert.deepEqual(listChatSessionDraftIds(storage, 'one'), ['images'])
+  assert.deepEqual(loadChatSessionDraftAttachments('images', storage, 'one'), files)
+  assert.deepEqual(loadChatSessionDraftAttachments('images', storage, 'two'), [])
+  assert.equal(mergeChatSessionDraftSessions([], 'one', storage)[0].id, 'images')
+  saveChatSessionDraft('images', 'caption', storage, 'one', files)
+  assert.equal(loadChatSessionDraft('images', storage, 'one'), 'caption')
+  assert.deepEqual(loadChatSessionDraftAttachments('images', storage, 'one'), files)
+  saveChatSessionDraft('images', '', storage, 'one', [])
+  assert.deepEqual(listChatSessionDraftIds(storage), [])
+})
+
+test('failed image persistence reports failure and leaves previous draft intact', () => {
+  const storage = memoryStorage()
+  saveChatSessionDraft('a', 'previous', storage)
+  const blocked = { ...storage, setItem() { throw new Error('quota') } }
+  assert.equal(saveChatSessionDraft('a', '', blocked, '', [{ dataURL: 'data:image/png;base64,YQ==' }]), false)
+  assert.equal(loadChatSessionDraft('a', storage), 'previous')
+})
+
+
+test('composer persistence passes actual attachments to storage and reports failures', () => {
+  const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
+  const body = main.split('const persistSessionDraft = useCallback((sessionId, value) => {')[1].split('\n  }, [])')[0]
+  const storage = memoryStorage()
+  const files = [{ id: 'img', dataURL: 'data:image/png;base64,YQ==' }]
+  let error = ''
+  const run = new Function('sessionId', 'value', 'saveChatSessionDraft', 'chatInstanceRef', 'attachmentsRef', 'setErr', 'ct', 'setSessions', 'setDraftSessionIds', body)
+  const invoke = save => run('a', '', save, { current: 'one' }, { current: files }, value => { error = value }, (_, en) => en, () => {}, update => { assert.equal(update(new Set()).has('a'), true) })
+  invoke((id, text, _, instance, attachments) => saveChatSessionDraft(id, text, storage, instance, attachments))
+  assert.deepEqual(loadChatSessionDraftAttachments('a', storage, 'one'), files)
+  assert.equal(error, '')
+  invoke(() => false)
+  assert.match(error, /Draft could not be saved/)
+  assert.match(main, /updateAttachments\(loadChatSessionDraftAttachments\(id/)
+  assert.match(main, /updateAttachments\(\[\]\); setSessionPrompt\(''\)/)
 })

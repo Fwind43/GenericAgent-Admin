@@ -57,7 +57,7 @@ import { getAskUserPayload } from './lib/askUserPayload'
 import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ultraPlanTasks'
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
-import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
+import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, loadChatSessionDraftAttachments, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
 import { projectSessionLabel, projectSidebarGroups, groupProjectSessions, runningProjectKeys } from './lib/chatProjectSessions.js'
 import { useRuntimeModelRefresh } from './lib/useRuntimeModelRefresh.js'
 import { hubSessions } from './lib/chatHubSessions.js'
@@ -4986,6 +4986,11 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const [batchDeleting, setBatchDeleting] = useState(false)
   const [hubUpdatingSessionId, setHubUpdatingSessionId] = useState('')
   const [attachments, setAttachments] = useState([])
+  const attachmentsRef = useRef([])
+  const updateAttachments = (value) => {
+    attachmentsRef.current = value
+    setAttachments(value)
+  }
   const [queuedMessages, setQueuedMessages] = useState([])
   const [queueCollapsed, setQueueCollapsed] = useState(false)
   const [queueEditingId, setQueueEditingId] = useState('')
@@ -5167,11 +5172,12 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const persistSessionDraft = useCallback((sessionId, value) => {
     const id = String(sessionId || '').trim()
     const draft = typeof value === 'string' ? value : String(value || '')
-    saveChatSessionDraft(id, draft, undefined, chatInstanceRef.current)
     if (!id) return
+    const saved = saveChatSessionDraft(id, draft, undefined, chatInstanceRef.current, attachmentsRef.current)
+    if (!saved) setErr(ct('草稿保存失败，可能已超过浏览器存储容量；请勿刷新或切换会话。', 'Draft could not be saved; browser storage may be full. Do not refresh or switch chats.'))
     setSessions(current => mergeChatSessionDraftSessions(current, chatInstanceRef.current))
     setDraftSessionIds(current => {
-      const hasDraft = Boolean(draft)
+      const hasDraft = Boolean(draft) || attachmentsRef.current.length > 0
       if (current.has(id) === hasDraft) return current
       const next = new Set(current)
       if (hasDraft) next.add(id)
@@ -5931,6 +5937,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     streamAbortRef.current = null
     scrollModeRef.current = 'auto'
     setSid(id)
+    updateAttachments(loadChatSessionDraftAttachments(id, undefined, chatInstanceRef.current))
     setSessionPrompt(loadChatSessionDraft(id, undefined, chatInstanceRef.current), id)
     setBusy(false)
     setStreamingSid('')
@@ -6125,6 +6132,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     pendingRenderedSessionRef.current = d.id
     activeSidRef.current = d.id
     scrollModeRef.current = 'auto'
+    updateAttachments([])
     clearSessionDrafts(d.id)
     setActiveSessionDetail(d)
     setSid(d.id); setMessages([]); applyQueueSnapshot([]); setQueueEditingId(''); setQueueDraft(''); guidingQueueRef.current = ''; setGuidingQueueId(''); setRawHistory([]); setHistoryInfo([]); setWorkingState(null); setPlanState(null); setLoopState(null); setLoopObjective(''); setLoopConfigOpen(false); setContextOpen(false); setSessionPrompt('', d.id); setErr(''); setNotice(sessionOptions.mode === 'conductor' ? ct('已创建 Conductor', 'Conductor created') : ct('已创建新对话', 'New chat created')); setBusy(false); setStreamingSid(''); setAutoFollow(false); setShowFollow(false); setLlmNo(d.settings?.llm_no ?? llmNo)
@@ -6663,6 +6671,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
       setErr(ct('附件总大小限制 300MiB', 'Total attachment size is limited to 300 MiB'))
       return
     }
+    const attachmentSession = activeSidRef.current
+    const attachmentInstance = chatInstanceRef.current
     const readOne = (file) => new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve({
@@ -6677,12 +6687,17 @@ export default function ChatApp({ onOpenSettings } = {}) {
     })
     try {
       const next = await Promise.all(files.map(readOne))
-      setAttachments((current) => [...current, ...next].slice(0, MAX_CHAT_UPLOAD_FILES))
+      if (attachmentSession !== activeSidRef.current || attachmentInstance !== chatInstanceRef.current) return
       setErr('')
+      updateAttachments([...attachmentsRef.current, ...next].slice(0, MAX_CHAT_UPLOAD_FILES))
+      persistSessionDraft(attachmentSession, promptRef.current?.value ?? prompt)
     } catch (e) { setErr(e.message || String(e)) }
   }
 
-  const removeAttachment = (id) => setAttachments(xs => xs.filter(x => x.id !== id))
+  const removeAttachment = (id) => {
+    updateAttachments(attachmentsRef.current.filter(x => x.id !== id))
+    persistSessionDraft(activeSidRef.current, promptRef.current?.value ?? prompt)
+  }
   const applyQueueSnapshot = (messages, sessionId = activeSidRef.current) => {
     if (sessionId !== activeSidRef.current) return []
     const next = Array.isArray(messages) ? messages : []
@@ -7021,7 +7036,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
       return
     }
     const item = { text, files, llmNo, reasoningEffort }
-    setSessionPrompt(''); setAttachments([])
+    updateAttachments([]); setSessionPrompt('')
     setCmdDrawer({ open:false, filter:'', selectedIdx:0 })
     setCmdEditIdx(-1)
     if (isBTWCommand(text) && !files.length) {
@@ -7419,7 +7434,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     setQueueDraft('')
     guidingQueueRef.current = ''
     setGuidingQueueId('')
-    setAttachments([])
+    updateAttachments([])
     setErr('')
     setNotice(ct('已切换 GA 实例', 'GA instance switched'))
   }
