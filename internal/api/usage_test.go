@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -378,5 +379,130 @@ func TestRecordSessionUsageRefreshesStaleZeroTotals(t *testing.T) {
 	}
 	if entry.ModelID != "model-c" {
 		t.Fatalf("model_id=%q want model-c", entry.ModelID)
+	}
+}
+
+func TestRecordSessionUsageDoesNotRewriteUnchangedLedger(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	cfg := s.CfgStore.Snapshot()
+	cs := chatSession{ID: "unchanged", Title: "Unchanged title", Messages: []chatMessage{
+		{ID: "one", Role: "assistant", ModelID: "model", CreatedAt: 123,
+			Usage: map[string]int{"input_tokens": 10, "output_tokens": 5}},
+		{ID: "two", Role: "assistant", ModelID: "model", CreatedAt: 124,
+			Usage: map[string]int{"input_tokens": 4, "reasoning_tokens": 3}},
+	}}
+	if err := s.recordSessionUsage(cs); err != nil {
+		t.Fatal(err)
+	}
+	path := usageLedgerPath(cfg)
+	stamp := time.Unix(1600000000, 0)
+	if err := os.Chtimes(path, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for pass := range 2 {
+		if err := s.recordSessionUsage(cs); err != nil {
+			t.Fatal(err)
+		}
+		after, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		next, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(before, after) || !info.ModTime().Equal(next.ModTime()) {
+			t.Fatalf("unchanged usage rewrote ledger on pass %d: mtime %v -> %v", pass, info.ModTime(), next.ModTime())
+		}
+	}
+}
+
+func TestRecordSessionUsageUpdatesChangedFieldsAndPreservesHistory(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	cfg := s.CfgStore.Snapshot()
+	cs := chatSession{ID: "changing", Title: "Original title", Messages: []chatMessage{{
+		ID: "one", Role: "assistant", ModelID: "old-model", CreatedAt: 123,
+		Usage: map[string]int{"input_tokens": 10, "output_tokens": 5, "reasoning_tokens": 2},
+	}}}
+	if err := s.recordSessionUsage(cs); err != nil {
+		t.Fatal(err)
+	}
+	changes := []struct {
+		name  string
+		apply func()
+	}{
+		{"title", func() { cs.Title = "Renamed" }},
+		{"model", func() { cs.Messages[0].ModelID = "new-model" }},
+		{"input", func() { cs.Messages[0].Usage["input_tokens"] = 11 }},
+		{"output", func() { cs.Messages[0].Usage["output_tokens"] = 6 }},
+		{"total", func() { cs.Messages[0].Usage["total_tokens"] = 20 }},
+		{"other-value", func() { cs.Messages[0].Usage["reasoning_tokens"] = 3 }},
+		{"other-key", func() {
+			delete(cs.Messages[0].Usage, "reasoning_tokens")
+			cs.Messages[0].Usage["custom_tokens"] = 3
+		}},
+		{"other-empty", func() { delete(cs.Messages[0].Usage, "custom_tokens") }},
+		{"append-message", func() {
+			cs.Messages = append(cs.Messages, chatMessage{ID: "two", Role: "assistant", ModelID: "new-model",
+				Usage: map[string]int{"output_tokens": 1}})
+		}},
+	}
+	path := usageLedgerPath(cfg)
+	for _, change := range changes {
+		t.Run(change.name, func(t *testing.T) {
+			before, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			change.apply()
+			if err := s.recordSessionUsage(cs); err != nil {
+				t.Fatal(err)
+			}
+			after, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Equal(before, after) {
+				t.Fatal("changed usage was not persisted")
+			}
+			ledger, err := readUsageLedger(cfg)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := json.Marshal(usageLedger{Version: usageLedgerVersion, Entries: usageEntriesFromSession(cs)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := json.Marshal(ledger)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got, want) {
+				t.Fatalf("ledger = %s, want %s", got, want)
+			}
+		})
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs.Messages = cs.Messages[:1]
+	if err := s.recordSessionUsage(cs); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("worldline truncation erased recorded usage")
 	}
 }

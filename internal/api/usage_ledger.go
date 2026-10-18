@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -154,13 +155,18 @@ func (s *Server) recordSessionUsage(cs chatSession) error {
 	changed := false
 	for _, entry := range usageEntriesFromSession(cs) {
 		if index, ok := byKey[entry.Key]; ok {
-			if ledger.Entries[index].Title != entry.Title {
-				ledger.Entries[index].Title = entry.Title
-				changed = true
+			current := &ledger.Entries[index]
+			if current.Title == entry.Title && current.ModelID == entry.ModelID &&
+				current.Totals.InputTokens == entry.Totals.InputTokens &&
+				current.Totals.OutputTokens == entry.Totals.OutputTokens &&
+				current.Totals.TotalTokens == entry.Totals.TotalTokens &&
+				maps.Equal(current.Totals.Other, entry.Totals.Other) {
+				continue
 			}
-			// Always refresh Totals and ModelID so stale zero-values get corrected.
-			ledger.Entries[index].Totals = entry.Totals
-			ledger.Entries[index].ModelID = entry.ModelID
+			// Persist corrections (including stale zero-values), not identical snapshots.
+			current.Title = entry.Title
+			current.Totals = entry.Totals
+			current.ModelID = entry.ModelID
 			changed = true
 			continue
 		}
