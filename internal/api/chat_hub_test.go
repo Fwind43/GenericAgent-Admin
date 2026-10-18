@@ -414,3 +414,48 @@ func TestChatSetPinnedPersistsWithoutChangingUpdatedAt(t *testing.T) {
 		t.Fatal("unpinned state was not persisted")
 	}
 }
+
+func TestChatHubSessionListReusesSessionSummaryIndex(t *testing.T) {
+	store := config.NewStore(t.TempDir())
+	s := New(store, nil, nil, nil)
+	for _, cs := range []chatSession{
+		{ID: "hub-on", Title: "Shared", HubEnabled: true, Messages: []chatMessage{{Role: "user", Content: "task"}}},
+		{ID: "hub-off", Title: "Hidden", Messages: []chatMessage{{Role: "user", Content: "task"}}},
+	} {
+		if err := saveChatSession(store.Snapshot(), cs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	loads := 0
+	s.ChatRuntime.sessionListLoadHook = func(string) { loads++ }
+
+	first := s.listChatHubSessions(false)
+	if len(first) != 1 || first[0].SessionID != "hub-on" || first[0].Title != "Shared" {
+		t.Fatalf("first Hub listing = %#v", first)
+	}
+	coldLoads := loads
+	if coldLoads != 2 {
+		t.Fatalf("Hub listing bypassed the session summary index: cold loads = %d, want 2", coldLoads)
+	}
+	if got := s.listChatHubSessions(false); len(got) != 1 || loads != coldLoads {
+		t.Fatalf("unchanged Hub listing decoded sessions again: loads %d -> %d, listing=%#v", coldLoads, loads, got)
+	}
+	if got := s.listChatHubSessions(true); len(got) != 2 || loads != coldLoads {
+		t.Fatalf("bridge listing decoded sessions again: loads %d -> %d, listing=%#v", coldLoads, loads, got)
+	}
+
+	hidden, err := loadChatSession(store.Snapshot(), "hub-off")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hidden.HubEnabled = true
+	hidden.Title = "Now shared"
+	hidden.UpdatedAt += 10
+	if err := saveChatSession(store.Snapshot(), hidden); err != nil {
+		t.Fatal(err)
+	}
+	got := s.listChatHubSessions(false)
+	if len(got) != 2 || got[0].SessionID != "hub-off" || got[0].Title != "Now shared" {
+		t.Fatalf("changed session not refreshed in Hub listing: %#v", got)
+	}
+}

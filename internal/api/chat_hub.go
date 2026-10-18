@@ -76,17 +76,12 @@ func (s *Server) listChatHubSessions(allowAll bool) []chatHubSession {
 		if err != nil {
 			continue
 		}
-		entries, err := os.ReadDir(chatSessionDir(server.CfgStore.Snapshot()))
+		summaries, err := server.loadChatSessionSummaries(server.CfgStore.Snapshot())
 		if err != nil {
 			continue
 		}
-		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
-				continue
-			}
-			sid := strings.TrimSuffix(entry.Name(), ".json")
-			cs, err := loadChatSession(server.CfgStore.Snapshot(), sid)
-			if err != nil || cs.ID == "" || (!allowAll && !cs.HubEnabled) {
+		for _, cs := range summaries {
+			if cs.ID == "" || (!allowAll && !cs.HubEnabled) {
 				continue
 			}
 			advertisedInstanceID := instanceID
