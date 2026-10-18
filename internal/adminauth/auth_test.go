@@ -2,6 +2,7 @@ package adminauth
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -323,4 +324,52 @@ func (a *Manager) authenticatePassword(user, password string) bool {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.SetBasicAuth(user, password)
 	return a.authenticateRequest(req)
+}
+
+func TestDerivePasswordHashMatchesPBKDF2Vectors(t *testing.T) {
+	for _, tc := range []struct {
+		iterations int
+		want       string
+	}{
+		{1, "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b"},
+		{2, "ae4d0c95af6b46d32d0adff928f06dd02a303f8ef3c251dfd6e2d85a95474c43"},
+		{4096, "c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a"},
+	} {
+		got := hex.EncodeToString(derivePasswordHash([]byte("password"), []byte("salt"), tc.iterations))
+		if got != tc.want {
+			t.Fatalf("iterations %d = %s, want %s", tc.iterations, got, tc.want)
+		}
+	}
+}
+
+func TestVerifiedPasswordCacheRejectsWrongAndStalePasswords(t *testing.T) {
+	root := t.TempDir()
+	manager, err := newManager(root, "", "", testConfigStore(t, root, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := manager.Middleware(okHandler())
+	set := func(current, next string) {
+		t.Helper()
+		res := authRequest(handler, http.MethodPost, authPasswordPath, "127.0.0.1:5000", "", "", map[string]string{"currentPassword": current, "newPassword": next, "confirmPassword": next})
+		if res.Code != http.StatusOK {
+			t.Fatalf("set password = %d %s", res.Code, res.Body.String())
+		}
+	}
+	set("", "first-password")
+	for i := 0; i < 2; i++ {
+		if !manager.authenticatePassword("admin", "first-password") {
+			t.Fatalf("attempt %d rejected the correct password", i)
+		}
+	}
+	if manager.authenticatePassword("admin", "wrong-password") || manager.authenticatePassword("other", "first-password") {
+		t.Fatal("cache accepted a wrong credential")
+	}
+	set("first-password", "second-password")
+	if manager.authenticatePassword("admin", "first-password") {
+		t.Fatal("old password still accepted after change")
+	}
+	if !manager.authenticatePassword("admin", "second-password") {
+		t.Fatal("new password rejected")
+	}
 }

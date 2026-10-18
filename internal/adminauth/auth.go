@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"genericagent-admin-go/internal/config"
 )
@@ -61,6 +62,12 @@ type Manager struct {
 	iterations int
 	configured bool
 	external   bool
+
+	// The derived hash costs tens of milliseconds and browsers resend Basic
+	// credentials on every request, so the last verified password is kept as
+	// a keyed digest; cleared whenever the credential changes.
+	cacheKey []byte
+	verified atomic.Pointer[[]byte]
 }
 
 // New builds a manager for appRoot, taking the credential from the environment
@@ -70,7 +77,11 @@ func New(appRoot string, cfg *config.Store) (*Manager, error) {
 }
 
 func newManager(appRoot, envUser, envPassword string, cfg *config.Store) (*Manager, error) {
-	manager := &Manager{path: filepath.Join(appRoot, authStateFilename), cfg: cfg, username: defaultAuthUser}
+	cacheKey := make([]byte, sha256.Size)
+	if _, err := rand.Read(cacheKey); err != nil {
+		return nil, fmt.Errorf("init auth cache: %w", err)
+	}
+	manager := &Manager{path: filepath.Join(appRoot, authStateFilename), cfg: cfg, username: defaultAuthUser, cacheKey: cacheKey}
 	if (envUser == "") != (envPassword == "") {
 		return nil, fmt.Errorf("%s and %s must be set together", UserEnv, PasswordEnv)
 	}
@@ -270,6 +281,7 @@ func (a *Manager) handleSetPassword(w http.ResponseWriter, r *http.Request) {
 	a.hash = hash
 	a.iterations = authHashIterations
 	a.configured = true
+	a.verified.Store(nil)
 	writeAuthJSON(w, http.StatusOK, map[string]any{"ok": true, "passwordSet": true})
 }
 
@@ -297,6 +309,7 @@ func (a *Manager) handleRemovePassword(w http.ResponseWriter) {
 	a.hash = nil
 	a.iterations = 0
 	a.configured = false
+	a.verified.Store(nil)
 	writeAuthJSON(w, http.StatusOK, map[string]any{"ok": true, "passwordSet": false})
 }
 
@@ -307,8 +320,23 @@ func (a *Manager) passwordMatchesLocked(password string) bool {
 	if len(a.hash) == 0 {
 		return false
 	}
+	digest := a.cacheDigest(password)
+	if cached := a.verified.Load(); cached != nil && hmac.Equal(*cached, digest) {
+		return true
+	}
 	candidate := derivePasswordHash([]byte(password), a.salt, a.iterations)
-	return subtle.ConstantTimeCompare(candidate, a.hash) == 1
+	if subtle.ConstantTimeCompare(candidate, a.hash) != 1 {
+		return false
+	}
+	a.verified.Store(&digest)
+	return true
+}
+
+func (a *Manager) cacheDigest(password string) []byte {
+	mac := hmac.New(sha256.New, a.cacheKey)
+	mac.Write(a.hash)
+	mac.Write([]byte(password))
+	return mac.Sum(nil)
 }
 
 func derivePasswordHash(password, salt []byte, iterations int) []byte {
@@ -318,9 +346,9 @@ func derivePasswordHash(password, salt []byte, iterations int) []byte {
 	u := mac.Sum(nil)
 	result := append([]byte(nil), u...)
 	for i := 1; i < iterations; i++ {
-		mac = hmac.New(sha256.New, password)
+		mac.Reset()
 		mac.Write(u)
-		u = mac.Sum(nil)
+		u = mac.Sum(u[:0])
 		for j := range result {
 			result[j] ^= u[j]
 		}
