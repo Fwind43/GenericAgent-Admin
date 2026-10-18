@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,9 +95,10 @@ type chatSessionSummary struct {
 }
 
 type chatSessionListIndexEntry struct {
-	Size      int64              `json:"size"`
-	ModTimeNS int64              `json:"mod_time_ns"`
-	Summary   chatSessionSummary `json:"summary"`
+	InvalidJSON bool               `json:"invalid_json,omitempty"`
+	Size        int64              `json:"size"`
+	ModTimeNS   int64              `json:"mod_time_ns"`
+	Summary     chatSessionSummary `json:"summary"`
 }
 
 type chatSessionListIndex struct {
@@ -150,6 +152,14 @@ func writeChatSessionListIndex(path string, entries map[string]chatSessionListIn
 	return writeChatFileAtomic(path, b, 0644)
 }
 
+// Cache only deterministic decode failures. Read/permission errors must be
+// retried even when the file fingerprint has not changed.
+func isChatSessionJSONError(err error) bool {
+	var syntax *json.SyntaxError
+	var valueType *json.UnmarshalTypeError
+	return errors.As(err, &syntax) || errors.As(err, &valueType)
+}
+
 // loadChatSessionSummary reuses the list index for a single related session.
 // Callers hold SessionMu, as with loadChatSessionSummaries. Only the compact
 // summary is retained; unchanged worker histories are never decoded again.
@@ -174,14 +184,22 @@ func (s *Server) loadChatSessionSummary(cfg config.AppConfig, sid string) (chatS
 	}
 	key := filepath.Base(path)
 	cached, ok := runtime.sessionListEntries[key]
-	if ok && cached.Size == info.Size() && cached.ModTimeNS == info.ModTime().UnixNano() && cached.Summary.ID != "" {
-		return cached.Summary, nil
+	if ok && cached.Size == info.Size() && cached.ModTimeNS == info.ModTime().UnixNano() {
+		if cached.InvalidJSON {
+			return chatSessionSummary{}, errors.New("invalid chat session JSON")
+		}
+		if cached.Summary.ID != "" {
+			return cached.Summary, nil
+		}
 	}
 	if runtime.sessionListLoadHook != nil {
 		runtime.sessionListLoadHook(sid)
 	}
 	cs, err := loadChatSession(cfg, sid)
 	if err != nil {
+		if isChatSessionJSONError(err) {
+			runtime.sessionListEntries[key] = chatSessionListIndexEntry{Size: info.Size(), ModTimeNS: info.ModTime().UnixNano(), InvalidJSON: true}
+		}
 		return chatSessionSummary{}, err
 	}
 	summary := summaryFromChatSession(cs)
@@ -229,9 +247,11 @@ func (s *Server) loadChatSessionSummaries(cfg config.AppConfig) ([]chatSessionSu
 			continue
 		}
 		cached, ok := previous[entry.Name()]
-		if ok && cached.Size == info.Size() && cached.ModTimeNS == info.ModTime().UnixNano() && cached.Summary.ID != "" {
+		if ok && cached.Size == info.Size() && cached.ModTimeNS == info.ModTime().UnixNano() && (cached.InvalidJSON || cached.Summary.ID != "") {
 			next[entry.Name()] = cached
-			summaries = append(summaries, cached.Summary)
+			if !cached.InvalidJSON {
+				summaries = append(summaries, cached.Summary)
+			}
 			continue
 		}
 
@@ -241,7 +261,10 @@ func (s *Server) loadChatSessionSummaries(cfg config.AppConfig) ([]chatSessionSu
 		}
 		cs, err := loadChatSession(cfg, sid)
 		if err != nil {
-			dirty = true
+			if isChatSessionJSONError(err) {
+				next[entry.Name()] = chatSessionListIndexEntry{Size: info.Size(), ModTimeNS: info.ModTime().UnixNano(), InvalidJSON: true}
+				dirty = true
+			}
 			continue
 		}
 		summary := summaryFromChatSession(cs)

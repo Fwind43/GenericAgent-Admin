@@ -1,12 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"genericagent-admin-go/internal/config"
 )
@@ -90,5 +92,149 @@ func TestChatSessionSummaryIndexCachesAndInvalidates(t *testing.T) {
 	got = requestChatSessionSummaries(t, cold)
 	if len(got) != 1 || got[0].Conductor == nil || got[0].Conductor.Role != "parent" || got[0].Title != first.Title || coldLoads != 0 {
 		t.Fatalf("cold runtime summaries = %#v, session loads = %d", got, coldLoads)
+	}
+}
+
+func TestChatSessionSummaryIndexCachesInvalidFiles(t *testing.T) {
+	root := t.TempDir()
+	s := newGoalTestServer(t, root)
+	updateTestConfig(t, s.CfgStore, func(cfg *config.AppConfig) {
+		cfg.ChatDataDir = filepath.Join(root, "chat-data")
+	})
+	cfg := s.CfgStore.Snapshot()
+	valid := chatSession{ID: "valid", Title: "Valid"}
+	if err := saveChatSessionLocked(cfg, valid); err != nil {
+		t.Fatal(err)
+	}
+	for sid, data := range map[string]string{"empty": "", "broken": "{", "wrong-type": `{"messages":42}`} {
+		if err := os.WriteFile(chatSessionPath(cfg, sid), []byte(data), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	loads := 0
+	s.ChatRuntime.sessionListLoadHook = func(string) { loads++ }
+	if got := requestChatSessionSummaries(t, s); len(got) != 1 || got[0].ID != valid.ID || loads != 4 {
+		t.Fatalf("initial summaries = %#v, loads = %d", got, loads)
+	}
+	indexPath := chatSessionListIndexPath(cfg)
+	before, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Pin the timestamp so even identical-byte rewrites are observable.
+	stamp := time.Unix(100, 0)
+	if err := os.Chtimes(indexPath, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	assertUnchanged := func(server *Server) {
+		t.Helper()
+		for range 2 {
+			if got := requestChatSessionSummaries(t, server); len(got) != 1 || got[0].ID != valid.ID {
+				t.Fatalf("cached summaries = %#v", got)
+			}
+		}
+		after, err := os.ReadFile(indexPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Stat(indexPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(before, after) || !info.ModTime().Equal(stamp) {
+			t.Fatal("unchanged invalid sessions rewrote the index")
+		}
+	}
+	loads = 0
+	assertUnchanged(s)
+	if loads != 0 {
+		t.Fatalf("unchanged invalid sessions reparsed: %d", loads)
+	}
+	cold := New(s.CfgStore, nil, s.Models, nil)
+	cold.ChatRuntime.sessionListLoadHook = func(string) { loads++ }
+	assertUnchanged(cold)
+	if loads != 0 {
+		t.Fatalf("cold index reparsed invalid sessions: %d", loads)
+	}
+
+	// Repair, corruption of a formerly valid file, and deletion all invalidate.
+	if err := saveChatSessionLocked(cfg, chatSession{ID: "empty", Title: "Repaired"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(chatSessionPath(cfg, valid.ID), []byte("{"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(chatSessionPath(cfg, "broken")); err != nil {
+		t.Fatal(err)
+	}
+	got := requestChatSessionSummaries(t, cold)
+	if len(got) != 1 || got[0].ID != "empty" || loads != 2 {
+		t.Fatalf("changed summaries = %#v, loads = %d", got, loads)
+	}
+	loads = 0
+	requestChatSessionSummaries(t, cold)
+	if loads != 0 {
+		t.Fatalf("new invalid state was not cached: %d", loads)
+	}
+	if _, ok := cold.ChatRuntime.sessionListEntries["broken.json"]; ok {
+		t.Fatal("deleted invalid session remained in the index")
+	}
+}
+
+func TestChatSessionSummaryInvalidCacheRetriesChangedFile(t *testing.T) {
+	s := newGoalTestServer(t, t.TempDir())
+	cfg := s.CfgStore.Snapshot()
+	valid := []byte(`{"id":"repair"}`)
+	invalid := bytes.Repeat([]byte("!"), len(valid))
+	if err := os.MkdirAll(chatSessionDir(cfg), 0755); err != nil {
+		t.Fatal(err)
+	}
+	path := chatSessionPath(cfg, "repair")
+	if err := os.WriteFile(path, invalid, 0644); err != nil {
+		t.Fatal(err)
+	}
+	stamp := time.Unix(100, 0)
+	if err := os.Chtimes(path, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	loads := 0
+	s.ChatRuntime.sessionListLoadHook = func(string) { loads++ }
+	for range 2 {
+		if _, err := s.loadChatSessionSummary(cfg, "repair"); err == nil {
+			t.Fatal("invalid session unexpectedly returned a summary")
+		}
+	}
+	if loads != 1 {
+		t.Fatalf("unchanged invalid session decoded %d times", loads)
+	}
+	// A repair with the same byte length is detected through mtime alone.
+	if err := os.WriteFile(path, valid, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(path, stamp.Add(time.Second), stamp.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		got, err := s.loadChatSessionSummary(cfg, "repair")
+		if err != nil || got.ID != "repair" {
+			t.Fatalf("repaired summary = %#v, err = %v", got, err)
+		}
+	}
+	if loads != 2 {
+		t.Fatalf("repaired session decoded %d times, want 2 total", loads)
+	}
+}
+
+func TestChatSessionJSONErrorClassification(t *testing.T) {
+	for _, raw := range []string{"", "{", `{"messages":42}`} {
+		var cs chatSession
+		if err := json.Unmarshal([]byte(raw), &cs); !isChatSessionJSONError(err) {
+			t.Fatalf("decode error for %q was not cacheable: %v", raw, err)
+		}
+	}
+	for _, err := range []error{nil, os.ErrPermission, os.ErrNotExist, &os.PathError{Op: "read", Path: "session.json", Err: os.ErrPermission}} {
+		if isChatSessionJSONError(err) {
+			t.Fatalf("transient filesystem error was cacheable: %v", err)
+		}
 	}
 }
