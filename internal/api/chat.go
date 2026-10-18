@@ -2684,13 +2684,9 @@ func (s *Server) generateLegacyChatTitle(sid string) (chatSession, error) {
 }
 
 func (s *Server) automaticChatTitleBackfillCandidates() ([]string, error) {
-	if err := ensureChatDataMigrated(s.CfgStore.Snapshot()); err != nil {
-		return nil, err
-	}
-	if err := os.MkdirAll(chatSessionDir(s.CfgStore.Snapshot()), 0755); err != nil {
-		return nil, err
-	}
-	entries, err := os.ReadDir(chatSessionDir(s.CfgStore.Snapshot()))
+	s.SessionMu.Lock()
+	summaries, err := s.loadChatSessionSummaries(s.CfgStore.Snapshot())
+	s.SessionMu.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -2698,18 +2694,12 @@ func (s *Server) automaticChatTitleBackfillCandidates() ([]string, error) {
 		id        string
 		updatedAt int64
 	}
-	candidates := make([]candidate, 0, len(entries))
-	s.SessionMu.Lock()
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		cs, loadErr := loadChatSession(s.CfgStore.Snapshot(), strings.TrimSuffix(entry.Name(), ".json"))
-		if loadErr == nil && chatTitleNeedsAutomaticBackfill(cs) {
-			candidates = append(candidates, candidate{id: cs.ID, updatedAt: cs.UpdatedAt})
+	candidates := make([]candidate, 0, len(summaries))
+	for _, summary := range summaries {
+		if summary.titleNeedsBackfill {
+			candidates = append(candidates, candidate{id: summary.ID, updatedAt: summary.UpdatedAt})
 		}
 	}
-	s.SessionMu.Unlock()
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].updatedAt > candidates[j].updatedAt })
 	if len(candidates) > 80 {
 		candidates = candidates[:80]

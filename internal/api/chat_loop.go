@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -782,37 +781,34 @@ func (s *Server) recoverChatLoopsAfterRestart() error {
 	}
 	s.ChatRuntime.loopRecoveryOnce.Do(func() {
 		cfg := s.CfgStore.Snapshot()
-		if err := ensureChatDataMigrated(cfg); err != nil {
-			s.ChatRuntime.loopRecoveryErr = err
-			return
-		}
-		if err := os.MkdirAll(chatSessionDir(cfg), 0755); err != nil {
-			s.ChatRuntime.loopRecoveryErr = err
-			return
-		}
-		entries, err := os.ReadDir(chatSessionDir(cfg))
+		s.SessionMu.Lock()
+		summaries, err := s.loadChatSessionSummaries(cfg)
+		s.SessionMu.Unlock()
 		if err != nil {
 			s.ChatRuntime.loopRecoveryErr = err
 			return
 		}
-
-		s.SessionMu.Lock()
-		defer s.SessionMu.Unlock()
-		for _, entry := range entries {
-			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+		for _, summary := range summaries {
+			if !summary.Loop.Enabled {
 				continue
 			}
-			sid := strings.TrimSuffix(entry.Name(), ".json")
-			cs, err := loadChatSession(cfg, sid)
+			// Revalidate only the sessions that need recovery, under the write
+			// lock. Ordinary histories are served by the shared summary index.
+			err := func() error {
+				s.SessionMu.Lock()
+				defer s.SessionMu.Unlock()
+				cs, err := loadChatSession(cfg, summary.ID)
+				if err != nil {
+					return nil
+				}
+				next, changed := normalizePersistedChatLoop(cs.Loop)
+				if !changed {
+					return nil
+				}
+				cs.Loop = next
+				return saveChatSessionPreserveUpdatedAtLocked(cfg, cs)
+			}()
 			if err != nil {
-				continue
-			}
-			next, changed := normalizePersistedChatLoop(cs.Loop)
-			if !changed {
-				continue
-			}
-			cs.Loop = next
-			if err := saveChatSessionPreserveUpdatedAtLocked(cfg, cs); err != nil {
 				s.ChatRuntime.loopRecoveryErr = err
 				return
 			}

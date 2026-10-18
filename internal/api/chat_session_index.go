@@ -12,7 +12,7 @@ import (
 	"genericagent-admin-go/internal/config"
 )
 
-const chatSessionListIndexVersion = 7
+const chatSessionListIndexVersion = 8
 
 type chatSessionResult struct {
 	ID              string `json:"id"`
@@ -76,29 +76,32 @@ func latestChatSessionResult(cs chatSession) *chatSessionResult {
 }
 
 type chatSessionSummary struct {
-	Conductor       *chatConductorState `json:"conductor,omitempty"`
-	TaskbarState    string              `json:"taskbar_state"`
-	Result          *chatSessionResult  `json:"result,omitempty"`
-	ID              string              `json:"id"`
-	Title           string              `json:"title"`
-	TitleSource     string              `json:"title_source,omitempty"`
-	UpdatedAt       int64               `json:"updated_at"`
-	Count           int                 `json:"count"`
-	Workspace       string              `json:"workspace,omitempty"`
-	ProjectMode     string              `json:"project_mode,omitempty"`
-	ProjectProvider string              `json:"project_provider,omitempty"`
-	ProjectID       string              `json:"project_id,omitempty"`
-	HubEnabled      bool                `json:"hub_enabled,omitempty"`
-	Pinned          bool                `json:"pinned,omitempty"`
-	Autorun         chatAutorunState    `json:"autorun"`
-	Loop            chatLoopState       `json:"loop"`
+	// Derived startup metadata is persisted in the index, not exposed in the API.
+	titleNeedsBackfill bool
+	Conductor          *chatConductorState `json:"conductor,omitempty"`
+	TaskbarState       string              `json:"taskbar_state"`
+	Result             *chatSessionResult  `json:"result,omitempty"`
+	ID                 string              `json:"id"`
+	Title              string              `json:"title"`
+	TitleSource        string              `json:"title_source,omitempty"`
+	UpdatedAt          int64               `json:"updated_at"`
+	Count              int                 `json:"count"`
+	Workspace          string              `json:"workspace,omitempty"`
+	ProjectMode        string              `json:"project_mode,omitempty"`
+	ProjectProvider    string              `json:"project_provider,omitempty"`
+	ProjectID          string              `json:"project_id,omitempty"`
+	HubEnabled         bool                `json:"hub_enabled,omitempty"`
+	Pinned             bool                `json:"pinned,omitempty"`
+	Autorun            chatAutorunState    `json:"autorun"`
+	Loop               chatLoopState       `json:"loop"`
 }
 
 type chatSessionListIndexEntry struct {
-	InvalidJSON bool               `json:"invalid_json,omitempty"`
-	Size        int64              `json:"size"`
-	ModTimeNS   int64              `json:"mod_time_ns"`
-	Summary     chatSessionSummary `json:"summary"`
+	TitleNeedsBackfill bool               `json:"title_needs_backfill,omitempty"`
+	InvalidJSON        bool               `json:"invalid_json,omitempty"`
+	Size               int64              `json:"size"`
+	ModTimeNS          int64              `json:"mod_time_ns"`
+	Summary            chatSessionSummary `json:"summary"`
 }
 
 type chatSessionListIndex struct {
@@ -113,22 +116,23 @@ func chatSessionListIndexPath(cfg config.AppConfig) string {
 func summaryFromChatSession(cs chatSession) chatSessionSummary {
 	syncConductorChatTitle(&cs)
 	return chatSessionSummary{
-		Conductor:       cs.Conductor,
-		TaskbarState:    chatSessionTaskbarState(cs),
-		Result:          latestChatSessionResult(cs),
-		ID:              cs.ID,
-		Title:           cs.Title,
-		TitleSource:     cs.TitleSource,
-		UpdatedAt:       cs.UpdatedAt,
-		Count:           len(cs.Messages),
-		Workspace:       cs.Workspace,
-		ProjectMode:     cs.ProjectMode,
-		ProjectProvider: cs.ProjectProvider,
-		ProjectID:       cs.ProjectID,
-		HubEnabled:      cs.HubEnabled,
-		Pinned:          cs.Pinned,
-		Loop:            cs.Loop,
-		Autorun:         cs.Autorun,
+		titleNeedsBackfill: chatTitleNeedsAutomaticBackfill(cs),
+		Conductor:          cs.Conductor,
+		TaskbarState:       chatSessionTaskbarState(cs),
+		Result:             latestChatSessionResult(cs),
+		ID:                 cs.ID,
+		Title:              cs.Title,
+		TitleSource:        cs.TitleSource,
+		UpdatedAt:          cs.UpdatedAt,
+		Count:              len(cs.Messages),
+		Workspace:          cs.Workspace,
+		ProjectMode:        cs.ProjectMode,
+		ProjectProvider:    cs.ProjectProvider,
+		ProjectID:          cs.ProjectID,
+		HubEnabled:         cs.HubEnabled,
+		Pinned:             cs.Pinned,
+		Loop:               cs.Loop,
+		Autorun:            cs.Autorun,
 	}
 }
 
@@ -140,6 +144,10 @@ func readChatSessionListIndex(path string) map[string]chatSessionListIndexEntry 
 	var index chatSessionListIndex
 	if json.Unmarshal(b, &index) != nil || index.Version != chatSessionListIndexVersion || index.Entries == nil {
 		return make(map[string]chatSessionListIndexEntry)
+	}
+	for name, entry := range index.Entries {
+		entry.Summary.titleNeedsBackfill = entry.TitleNeedsBackfill
+		index.Entries[name] = entry
 	}
 	return index.Entries
 }
@@ -203,7 +211,7 @@ func (s *Server) loadChatSessionSummary(cfg config.AppConfig, sid string) (chatS
 		return chatSessionSummary{}, err
 	}
 	summary := summaryFromChatSession(cs)
-	runtime.sessionListEntries[key] = chatSessionListIndexEntry{Size: info.Size(), ModTimeNS: info.ModTime().UnixNano(), Summary: summary}
+	runtime.sessionListEntries[key] = chatSessionListIndexEntry{Size: info.Size(), ModTimeNS: info.ModTime().UnixNano(), Summary: summary, TitleNeedsBackfill: summary.titleNeedsBackfill}
 	return summary, nil
 }
 
@@ -268,7 +276,7 @@ func (s *Server) loadChatSessionSummaries(cfg config.AppConfig) ([]chatSessionSu
 			continue
 		}
 		summary := summaryFromChatSession(cs)
-		indexed := chatSessionListIndexEntry{Size: info.Size(), ModTimeNS: info.ModTime().UnixNano(), Summary: summary}
+		indexed := chatSessionListIndexEntry{Size: info.Size(), ModTimeNS: info.ModTime().UnixNano(), Summary: summary, TitleNeedsBackfill: summary.titleNeedsBackfill}
 		next[entry.Name()] = indexed
 		summaries = append(summaries, summary)
 		dirty = true

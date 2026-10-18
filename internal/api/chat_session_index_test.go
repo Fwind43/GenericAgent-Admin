@@ -3,10 +3,13 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -236,5 +239,110 @@ func TestChatSessionJSONErrorClassification(t *testing.T) {
 		if isChatSessionJSONError(err) {
 			t.Fatalf("transient filesystem error was cacheable: %v", err)
 		}
+	}
+}
+
+func TestStartupScansReuseSummaryIndex(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	cfg := s.CfgStore.Snapshot()
+	sessions := []chatSession{
+		{ID: "legacy", Title: "Legacy question", UpdatedAt: 20, Messages: []chatMessage{
+			{Role: "user", Content: "Legacy question"}, {Role: "assistant", Content: "Answer"},
+		}},
+		{ID: "newer", Title: "New question", UpdatedAt: 30, Messages: []chatMessage{
+			{Role: "user", Content: "New question"}, {Role: "assistant", Content: "Answer"},
+		}},
+		{ID: "manual", Title: "Legacy question", TitleSource: chatTitleSourceManual, Messages: []chatMessage{
+			{Role: "user", Content: "Legacy question"}, {Role: "assistant", Content: "Answer"},
+		}},
+		{ID: "custom", Title: "Custom title", Messages: []chatMessage{
+			{Role: "user", Content: "Different question"}, {Role: "assistant", Content: "Answer"},
+		}},
+		{ID: "no-exchange", Title: "Question", Messages: []chatMessage{{Role: "user", Content: "Question"}}},
+		{ID: "enabled-loop", Title: "Loop", UpdatedAt: 50,
+			Loop: chatLoopState{Enabled: true, Status: chatLoopStatusRunning, Epoch: 7, Round: 3}},
+	}
+	for i := range 20 {
+		sessions = append(sessions, chatSession{ID: fmt.Sprintf("history-%02d", i), Title: "Generated",
+			TitleSource: chatTitleSourceGenerated, Messages: []chatMessage{
+				{Role: "user", Content: "Question"}, {Role: "assistant", Content: strings.Repeat("answer ", 40<<10)},
+			}})
+	}
+	for _, cs := range sessions {
+		if err := saveChatSessionPreserveUpdatedAtLocked(cfg, cs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	checkCandidates := func(server *Server) {
+		t.Helper()
+		got, err := server.automaticChatTitleBackfillCandidates()
+		if err != nil || !reflect.DeepEqual(got, []string{"newer", "legacy", "no-exchange"}) {
+			t.Fatalf("candidates = %v, err = %v", got, err)
+		}
+	}
+	loads := 0
+	s.ChatRuntime.sessionListLoadHook = func(string) { loads++ }
+	checkCandidates(s)
+	if loads != len(sessions) {
+		t.Fatalf("first startup decoded %d sessions, want %d", loads, len(sessions))
+	}
+	loads = 0
+	cold := New(s.CfgStore, nil, s.Models, nil)
+	cold.ChatRuntime.sessionListLoadHook = func(string) { loads++ }
+	checkCandidates(cold)
+	if err := cold.recoverChatLoopsAfterRestart(); err != nil {
+		t.Fatal(err)
+	}
+	if loads != 0 {
+		t.Fatalf("persisted startup summaries decoded %d unchanged histories", loads)
+	}
+	recovered, err := loadChatSession(cfg, "enabled-loop")
+	if err != nil || recovered.Loop.Enabled || recovered.Loop.Status != chatLoopStatusPaused ||
+		recovered.Loop.Epoch != 8 || recovered.Loop.Round != 3 || recovered.UpdatedAt != 50 {
+		t.Fatalf("recovered loop = %+v, err = %v", recovered, err)
+	}
+	path := chatSessionPath(cfg, recovered.ID)
+	before, _ := os.Stat(path)
+	if err := cold.recoverChatLoopsAfterRestart(); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.Stat(path)
+	if !before.ModTime().Equal(after.ModTime()) {
+		t.Fatal("repeated loop recovery rewrote the session")
+	}
+	// A title edit invalidates just that session's cached startup metadata.
+	cs, err := loadChatSession(cfg, "legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs.TitleSource = chatTitleSourceManual
+	if err := saveChatSessionLocked(cfg, cs); err != nil {
+		t.Fatal(err)
+	}
+	got, err := cold.automaticChatTitleBackfillCandidates()
+	if err != nil || !reflect.DeepEqual(got, []string{"newer", "no-exchange"}) || loads != 2 {
+		t.Fatalf("updated candidates = %v, loads = %d (want changed loop+title only), err = %v", got, loads, err)
+	}
+}
+
+func TestLoopRecoveryBuildsSharedSummaryIndex(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	for _, id := range []string{"one", "two", "three"} {
+		saveChatLoopTestSession(t, s, chatSession{ID: id})
+	}
+	loads := 0
+	s.ChatRuntime.sessionListLoadHook = func(string) { loads++ }
+	if err := s.recoverChatLoopsAfterRestart(); err != nil {
+		t.Fatal(err)
+	}
+	if loads != 3 {
+		t.Fatalf("recovery did not populate shared summaries: loads=%d", loads)
+	}
+	loads = 0
+	if _, err := s.automaticChatTitleBackfillCandidates(); err != nil {
+		t.Fatal(err)
+	}
+	if loads != 0 {
+		t.Fatalf("title backfill reparsed %d unchanged histories after loop recovery", loads)
 	}
 }
