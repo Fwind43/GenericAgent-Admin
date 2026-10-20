@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -840,30 +841,42 @@ func (s *Server) serveStaticData(w http.ResponseWriter, r *http.Request, name st
 		// leave an old index referring to chunks that no longer exist.
 		w.Header().Set("Cache-Control", "no-cache")
 	}
+	useGzip := false
+	variant := ""
+	if staticGzipEligible(name) {
+		w.Header().Set("Vary", "Accept-Encoding")
+		if acceptsGzip(r.Header.Get("Accept-Encoding")) {
+			useGzip = true
+			variant = "-gzip"
+		}
+	}
+	etag := fmt.Sprintf(`"%x%s"`, sha256.Sum256(data), variant)
+	w.Header().Set("ETag", etag)
+	if ifNoneMatch(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
 	if contentType := staticContentType(name); contentType != "" {
 		w.Header().Set("Content-Type", contentType)
 	}
 
 	body := data
-	if staticGzipEligible(name) {
-		w.Header().Set("Vary", "Accept-Encoding")
-		if acceptsGzip(r.Header.Get("Accept-Encoding")) {
-			// index.html carries a per-response theme bootstrap snippet, so it
-			// must not reuse a gzip cache keyed only by filename.
-			if cached, ok := s.staticGzip.Load(name); ok && name != "index.html" {
-				body = cached.([]byte)
-			} else {
-				var compressed bytes.Buffer
-				zw := gzip.NewWriter(&compressed)
-				_, _ = zw.Write(data)
-				_ = zw.Close()
-				body = compressed.Bytes()
-				if name != "index.html" {
-					s.staticGzip.Store(name, body)
-				}
+	if useGzip {
+		// index.html carries a per-response theme bootstrap snippet, so it
+		// must not reuse a gzip cache keyed only by filename.
+		if cached, ok := s.staticGzip.Load(name); ok && name != "index.html" {
+			body = cached.([]byte)
+		} else {
+			var compressed bytes.Buffer
+			zw := gzip.NewWriter(&compressed)
+			_, _ = zw.Write(data)
+			_ = zw.Close()
+			body = compressed.Bytes()
+			if name != "index.html" {
+				s.staticGzip.Store(name, body)
 			}
-			w.Header().Set("Content-Encoding", "gzip")
 		}
+		w.Header().Set("Content-Encoding", "gzip")
 	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	if r.Method == http.MethodHead {

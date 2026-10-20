@@ -34,12 +34,9 @@ func writeCachedJSON(w http.ResponseWriter, r *http.Request, v interface{}) {
 	w.Header().Add("Vary", "Accept-Encoding")
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Cache-Control", "private, no-cache")
-	for _, candidate := range strings.Split(r.Header.Get("If-None-Match"), ",") {
-		candidate = strings.TrimSpace(candidate)
-		if candidate == "*" || strings.TrimPrefix(candidate, "W/") == etag {
-			w.WriteHeader(http.StatusNotModified)
-			return
-		}
+	if ifNoneMatch(r.Header.Get("If-None-Match"), etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
 	}
 	if compressed {
 		var buf bytes.Buffer
@@ -51,6 +48,17 @@ func writeCachedJSON(w http.ResponseWriter, r *http.Request, v interface{}) {
 	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = w.Write(body)
+}
+
+// ifNoneMatch uses the weak comparison RFC 9110 requires for If-None-Match.
+func ifNoneMatch(header, etag string) bool {
+	for _, candidate := range strings.Split(header, ",") {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "*" || strings.TrimPrefix(candidate, "W/") == etag {
+			return true
+		}
+	}
+	return false
 }
 
 func bad(w http.ResponseWriter, code int, msg string) {

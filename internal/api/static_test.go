@@ -215,4 +215,126 @@ func TestStaticDoesNotInjectUIThemeWhenUnset(t *testing.T) {
 	}
 }
 
+func TestStaticRevalidatesRootAssetsWithETag(t *testing.T) {
+	font := "wOF2 font bytes"
+	s := &Server{Static: fstest.MapFS{
+		"fonts/misans/a.woff2": &fstest.MapFile{Data: []byte(font)},
+	}}
+	first := httptest.NewRecorder()
+	s.static(first, httptest.NewRequest(http.MethodGet, "/fonts/misans/a.woff2", nil))
+	etag := first.Header().Get("ETag")
+	if first.Code != http.StatusOK || etag == "" {
+		t.Fatalf("status=%d ETag=%q", first.Code, etag)
+	}
+	if got := first.Header().Get("Cache-Control"); got != "no-cache" {
+		t.Fatalf("Cache-Control=%q", got)
+	}
+	for name, validator := range map[string]string{
+		"exact": etag,
+		"weak":  "W/" + etag,
+		"list":  `"stale", ` + etag,
+		"any":   "*",
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodHead} {
+			t.Run(name+"/"+method, func(t *testing.T) {
+				rr := httptest.NewRecorder()
+				req := httptest.NewRequest(method, "/fonts/misans/a.woff2", nil)
+				req.Header.Set("If-None-Match", validator)
+				s.static(rr, req)
+				if rr.Code != http.StatusNotModified || rr.Body.Len() != 0 {
+					t.Fatalf("status=%d body=%d bytes", rr.Code, rr.Body.Len())
+				}
+				if got := rr.Header().Get("ETag"); got != etag {
+					t.Fatalf("ETag=%q want %q", got, etag)
+				}
+				if got := rr.Header().Get("Cache-Control"); got != "no-cache" {
+					t.Fatalf("Cache-Control=%q", got)
+				}
+			})
+		}
+	}
+	stale := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/fonts/misans/a.woff2", nil)
+	req.Header.Set("If-None-Match", `"stale"`)
+	s.static(stale, req)
+	if stale.Code != http.StatusOK || stale.Body.String() != font {
+		t.Fatalf("stale validator status=%d body=%q", stale.Code, stale.Body.String())
+	}
+}
+
+func TestStaticETagDistinguishesGzipRepresentation(t *testing.T) {
+	body := strings.Repeat("body{color:red}", 40)
+	s := &Server{Static: fstest.MapFS{
+		"theme.css": &fstest.MapFile{Data: []byte(body)},
+	}}
+	fetch := func(acceptEncoding, validator string) *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/theme.css", nil)
+		if acceptEncoding != "" {
+			req.Header.Set("Accept-Encoding", acceptEncoding)
+		}
+		if validator != "" {
+			req.Header.Set("If-None-Match", validator)
+		}
+		s.static(rr, req)
+		return rr
+	}
+	gz := fetch("gzip", "")
+	plain := fetch("", "")
+	gzTag, plainTag := gz.Header().Get("ETag"), plain.Header().Get("ETag")
+	if gzTag == "" || plainTag == "" || gzTag == plainTag {
+		t.Fatalf("gzip ETag=%q identity ETag=%q", gzTag, plainTag)
+	}
+	cross := fetch("gzip", plainTag)
+	if cross.Code != http.StatusOK || cross.Header().Get("Content-Encoding") != "gzip" {
+		t.Fatalf("identity validator on gzip request: status=%d encoding=%q", cross.Code, cross.Header().Get("Content-Encoding"))
+	}
+	notModified := fetch("gzip", gzTag)
+	if notModified.Code != http.StatusNotModified || notModified.Body.Len() != 0 {
+		t.Fatalf("status=%d body=%d bytes", notModified.Code, notModified.Body.Len())
+	}
+	if got := notModified.Header().Get("Vary"); got != "Accept-Encoding" {
+		t.Fatalf("Vary=%q", got)
+	}
+}
+
+func TestStaticIndexETagTracksInjectedTheme(t *testing.T) {
+	store := config.NewStore(t.TempDir())
+	setTheme := func(theme string) {
+		cfg := store.Snapshot()
+		cfg.UITheme = theme
+		if err := store.Save(cfg); err != nil {
+			t.Fatal(err)
+		}
+	}
+	setTheme("dark")
+	s := &Server{
+		CfgStore: store,
+		Static: fstest.MapFS{
+			"index.html": &fstest.MapFile{Data: []byte("<html><head></head><body>app</body></html>")},
+		},
+	}
+	dark := httptest.NewRecorder()
+	s.static(dark, httptest.NewRequest(http.MethodGet, "/", nil))
+	darkTag := dark.Header().Get("ETag")
+	if dark.Code != http.StatusOK || darkTag == "" {
+		t.Fatalf("status=%d ETag=%q", dark.Code, darkTag)
+	}
+
+	setTheme("light")
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Set("If-None-Match", darkTag)
+	s.static(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("theme change must invalidate cached index: status=%d", rr.Code)
+	}
+	if got := rr.Header().Get("ETag"); got == "" || got == darkTag {
+		t.Fatalf("ETag=%q dark ETag=%q", got, darkTag)
+	}
+	if rr.Body.String() == dark.Body.String() {
+		t.Fatalf("index body did not change with theme: %q", rr.Body.String())
+	}
+}
+
 var _ fs.FS = fstest.MapFS{}
