@@ -7,7 +7,8 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const fontCssPath = resolve(here, '../fonts/misans.css')
-const fontDir = resolve(here, '../../public/fonts/misans')
+const fontDir = resolve(here, '../fonts/misans')
+const licenseDir = resolve(here, '../../public/fonts/misans')
 const fontCss = readFileSync(fontCssPath, 'utf8')
 const mainSource = readFileSync(resolve(here, '../main.jsx'), 'utf8')
 const generalSource = readFileSync(resolve(here, '../ui/appearanceSettings.jsx'), 'utf8')
@@ -24,7 +25,7 @@ test('MiSans is bundled as a complete local variable-font asset set', () => {
   assert.equal(urls.length, 56)
   assert.equal(new Set(urls).size, 56)
   assert.equal(files.length, 56)
-  assert.ok(urls.every(url => url.startsWith('/fonts/misans/')))
+  assert.ok(urls.every(url => url.startsWith('./misans/')))
   assert.deepEqual(urls.map(url => url.split('/').at(-1)).sort(), files)
   assert.equal((fontCss.match(/font-family:\s*MiSans VF;/g) || []).length, 56)
   assert.doesNotMatch(fontCss, /font-style:\s*(?:italic|oblique)/i)
@@ -36,6 +37,10 @@ test('MiSans is bundled as a complete local variable-font asset set', () => {
   for (const file of files) {
     assert.equal(readFileSync(resolve(fontDir, file)).subarray(0, 4).toString('ascii'), 'wOF2')
   }
+})
+
+test('MiSans fonts use the content-hashed asset pipeline instead of public/', () => {
+  assert.deepEqual(readdirSync(licenseDir).filter(name => name.endsWith('.woff2')), [])
 })
 
 test('bundled MiSans files match the committed SHA-256 manifest', () => {
@@ -59,8 +64,8 @@ test('MiSans loading and required attribution stay wired into the product', () =
   assert.ok(fontImport >= 0)
   assert.ok(productCssImport > fontImport)
 
-  const licensePath = resolve(fontDir, 'MiSans-License.pdf')
-  const noticePath = resolve(fontDir, 'NOTICE.txt')
+  const licensePath = resolve(licenseDir, 'MiSans-License.pdf')
+  const noticePath = resolve(licenseDir, 'NOTICE.txt')
   assert.ok(existsSync(licensePath))
   assert.ok(existsSync(noticePath))
   assert.equal(readFileSync(licensePath).subarray(0, 4).toString('ascii'), '%PDF')

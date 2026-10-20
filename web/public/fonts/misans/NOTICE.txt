@@ -4,9 +4,11 @@ MiSans is provided by Xiaomi Inc. and is used by GA Admin under the
 MiSans Font Intellectual Property License Agreement included in this directory
 as MiSans-License.pdf.
 
-The WOFF2 files in this directory are unmodified files from Xiaomi's official
-MiSans web-font service:
+The bundled WOFF2 files are unmodified files from Xiaomi's official MiSans
+web-font service:
 https://cdn-font.hyperos.mi.com/font/css?family=MiSans_VF:VF:Chinese_Simplify,Latin&display=swap
+They are kept with SHA256SUMS.txt in web/src/fonts/misans/ in the source tree
+and are served from /assets/ under content-hashed file names.
 
 Official font site: https://hyperos.mi.com/font
 Retrieved: 2026-08-17
