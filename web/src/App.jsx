@@ -345,7 +345,7 @@ function AdminApp({ embedded = false, active = true, onClose }) {
       <button type="button" className="admin-sidebar-scrim" aria-label={lang === 'zh' ? '关闭管理导航' : 'Close admin navigation'} onClick={()=>setAdminSidebarOpen(false)} />
       <UiSurface name="admin.shell" viewProps={{ navigation: packageNavigation, presentation: { lang, theme } }} fallback={<aside id="admin-sidebar" ref={adminSidebarRef} className="sidebar">
         <div className="admin-sidebar-heading">
-          <div className="brand"><img className="brand-logo" src="/icon.png" alt=""/><div><h1>{t.appName}</h1><p>{t.tagline}</p></div></div>
+          <div className="brand"><img className="brand-logo" src="/icon-small.png" alt=""/><div><h1>{t.appName}</h1><p>{t.tagline}</p></div></div>
           <button type="button" className="admin-sidebar-close" aria-label={lang === 'zh' ? '收起管理导航' : 'Collapse admin navigation'} onClick={()=>setAdminSidebarOpen(false)}><PanelLeftClose size={20} aria-hidden="true"/></button>
         </div>
         <button type="button" className="admin-back-to-chat" onClick={async ()=>{ if (!await canLeavePage()) return; pageDraft.current = { dirty: false, busy: false }; if (onClose) onClose(); else window.location.href = '/chat' }}><MessageSquare size={15} aria-hidden="true"/>{lang === 'zh' ? '返回对话' : 'Back to chat'}</button>
