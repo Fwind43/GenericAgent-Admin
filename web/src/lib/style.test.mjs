@@ -120,7 +120,10 @@ test('custom message spacing preserves the user action toolbar clearance', () =>
   assert.match(css, /\.oa-message\.user\s*\{[^}]*padding:\s*11px 0 32px/s)
   assert.match(css, /@media\s*\(max-width:620px\)\s*\{\s*\.oa-message\.user\s*\{\s*padding-bottom:35px/)
 })
-const chatSource = readFileSync(resolve(here, '../ChatApp.jsx'), 'utf8').replace(/\r\n?/g, '\n')
+const chatSource = ['../ChatApp.jsx', '../chat/AssistantContent.jsx']
+  .map((file) => readFileSync(resolve(here, file), 'utf8'))
+  .join('\n')
+  .replace(/\r\n?/g, '\n')
 
 const ruleBodies = (selector) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
