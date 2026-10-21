@@ -83,7 +83,7 @@ import {
   workerStatus,
 } from './lib/chatConductor.js'
 import { dateFromTimestamp, chatLocale, chatLanguage, ct, fmtTime, loopPhaseLabel, loopStopReasonText } from './chat/chatFormat.js'
-import { parseFileToolArgs, toolReceiptSummary, parseToolReceiptArgs, toolResultState, parseToolResultDetails, normalizeToolArgumentValue } from './chat/toolArgs.js'
+import { parseFileToolArgs, toolReceiptSummary, parseToolReceiptArgs, normalizeToolArgumentValue } from './chat/toolArgs.js'
 import { clampUltraPlanDrawerWidth, ULTRAPLAN_DRAWER_DEFAULT_WIDTH, ULTRAPLAN_DRAWER_MIN_WIDTH, getUltraPlanDrawerMaxWidth, taskFileName, hasUltraPlanDashboardState, stripUltraPlanProgressText, mergeUltraPlanStates, normalizeUltraPlanState, parseUltraPlanText, parseUltraPlanResult } from './chat/ultraPlan.js'
 import { buildChatStats, getElapsedMs, sumUsages, formatTokens, freezeActiveAssistantElapsed, formatElapsedMs, usageHasTokens } from './chat/usageStats.js'
 import { slashCommandNextDrawer, slashCommandInsertText, isArgumentStyleSlashCmd, SLASH_ARG_SUFFIX_RE, builtinSlashCommandKey, builtinSlashKey, BUILTIN_SLASH_COMMANDS } from './chat/slashCommands.js'
@@ -99,6 +99,7 @@ import { parseSubagentOutput } from './chat/subagentOutput.js'
 import { InlineMarkdown, MathFormula } from './chat/InlineMarkdown.jsx'
 import { CopyButton } from './chat/CopyButton.jsx'
 import { ToolCallCollapse, ToolCallBlock, FileToolArgsPanel, DiffRows, AskUserPanel, ToolReceiptSummary } from './chat/ToolCallBlock.jsx'
+import { ToolResultDetails } from './chat/ToolDetails.jsx'
 export { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
 export { groupRuntimeModels } from './chat/sessionLabels.js'
 export { buildChatStats, getElapsedMs, freezeActiveAssistantElapsed } from './chat/usageStats.js'
@@ -707,25 +708,6 @@ const ToolArguments = ({ body = '' }) => {
         </div>
       ))}
     </dl>
-  )
-}
-
-const ToolResultDetails = ({ body = '', live = false }) => {
-  const sections = parseToolResultDetails(body)
-  if (!sections) return <pre className="ga-fold-pre">{body}</pre>
-  const state = live ? 'live' : toolResultState(sections)
-
-  return (
-    <div className={`ga-tool-result is-${state}`}>
-      {sections.map((section, index) => (
-        <div className={`ga-tool-result-row is-${section.kind}`} key={`${section.kind}-${index}`}>
-          <div className="ga-tool-result-key">{section.kind}</div>
-          {section.kind === 'status'
-            ? <div className="ga-tool-result-status">{section.content || (live ? ct('\u6267\u884c\u4e2d', 'Running') : '\u2014')}</div>
-            : <pre className="ga-tool-result-value">{section.content || ct('\u65e0\u8f93\u51fa', 'No output')}</pre>}
-        </div>
-      ))}
-    </div>
   )
 }
 
