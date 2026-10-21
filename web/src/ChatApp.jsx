@@ -97,6 +97,7 @@ import { getFileVisual, isImageFile, uploadFileSource, uploadFileName, MAX_CHAT_
 import { goalCardStatusInfo, formatGoalCardTime, normalizeGoalCardState, goalCardPathKey, GOAL_CARD_TERMINAL } from './chat/goalCard.js'
 import { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
 import { extractSavedFilePaths, stripUserAttachmentBlock } from './chat/userMessageText.js'
+import { renderMermaidSvg } from './chat/mermaidRender.js'
 export { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
 export { groupRuntimeModels } from './chat/sessionLabels.js'
 export { buildChatStats, getElapsedMs, freezeActiveAssistantElapsed } from './chat/usageStats.js'
@@ -566,27 +567,6 @@ function InlineRichText({ text = '', runs }) {
   }
   if (last < src.length) nodes.push(<InlineMarkdown key={`t${n++}`} text={src.slice(last)} />)
   return <>{nodes}</>
-}
-
-let mermaidRenderSequence = 0
-let mermaidRenderQueue = Promise.resolve()
-
-const renderMermaidSvg = (source, colorScheme) => {
-  const render = async () => {
-    const module = await import('mermaid')
-    const mermaid = module.default || module
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      suppressErrorRendering: true,
-      theme: colorScheme === 'dark' ? 'dark' : 'neutral',
-    })
-    mermaidRenderSequence += 1
-    return mermaid.render(`oa-mermaid-${Date.now().toString(36)}-${mermaidRenderSequence}`, source)
-  }
-  const pending = mermaidRenderQueue.then(render, render)
-  mermaidRenderQueue = pending.then(() => undefined, () => undefined)
-  return pending
 }
 
 function MermaidDiagram({ source = '' }) {
