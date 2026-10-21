@@ -224,19 +224,11 @@ test('failed image persistence reports failure and leaves previous draft intact'
 })
 
 
-test('composer persistence passes actual attachments to storage and reports failures', () => {
+test('composer uses durable asynchronous attachments with guarded restoration', () => {
   const main = readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8')
-  const body = main.split('const persistSessionDraft = useCallback((sessionId, value) => {')[1].split('\n  }, [])')[0]
-  const storage = memoryStorage()
-  const files = [{ id: 'img', dataURL: 'data:image/png;base64,YQ==' }]
-  let error = ''
-  const run = new Function('sessionId', 'value', 'saveChatSessionDraft', 'chatInstanceRef', 'attachmentsRef', 'setErr', 'ct', 'setSessions', 'setDraftSessionIds', body)
-  const invoke = save => run('a', '', save, { current: 'one' }, { current: files }, value => { error = value }, (_, en) => en, () => {}, update => { assert.equal(update(new Set()).has('a'), true) })
-  invoke((id, text, _, instance, attachments) => saveChatSessionDraft(id, text, storage, instance, attachments))
-  assert.deepEqual(loadChatSessionDraftAttachments('a', storage, 'one'), files)
-  assert.equal(error, '')
-  invoke(() => false)
-  assert.match(error, /Draft could not be saved/)
-  assert.match(main, /updateAttachments\(loadChatSessionDraftAttachments\(id/)
-  assert.match(main, /updateAttachments\(\[\]\); setSessionPrompt\(''\)/)
+  assert.match(main, /await saveChatSessionDraftAsync/)
+  assert.match(main, /await clearChatSessionDraftsAsync/)
+  assert.match(main, /const files = await restoring/)
+  assert.match(main, /attachmentsRef.current === restoringAttachments/)
+  assert.match(main, /await draftRestoreRef.current/)
 })

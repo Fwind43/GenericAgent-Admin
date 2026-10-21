@@ -57,7 +57,7 @@ import { getAskUserPayload } from './lib/askUserPayload'
 import { preferredUltraPlanOutputFile, reconcileUltraPlanTasks } from './lib/ultraPlanTasks'
 import { REASONING_EFFORT_LEVELS, REASONING_EFFORT_OPTIONS, normalizeReasoningEffort } from './lib/reasoningEffort'
 import { deleteChatSessions, normalizeSessionIds } from './lib/chatSessionManagement'
-import { clearChatSessionDrafts, listChatSessionDraftIds, loadChatSessionDraft, loadChatSessionDraftAttachments, mergeChatSessionDraftSessions, saveChatSessionDraft } from './lib/chatSessionDrafts'
+import { clearChatSessionDraftsAsync, listChatSessionDraftIds, loadChatSessionDraft, loadChatSessionDraftAttachmentsAsync, mergeChatSessionDraftSessions, saveChatSessionDraftAsync } from './lib/chatSessionDrafts'
 import { projectSessionLabel, projectSidebarGroups, groupProjectSessions, runningProjectKeys } from './lib/chatProjectSessions.js'
 import { useRuntimeModelRefresh } from './lib/useRuntimeModelRefresh.js'
 import { hubSessions } from './lib/chatHubSessions.js'
@@ -4987,6 +4987,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const [hubUpdatingSessionId, setHubUpdatingSessionId] = useState('')
   const [attachments, setAttachments] = useState([])
   const attachmentsRef = useRef([])
+  const draftRestoreRef = useRef(null)
+  const draftRestoreFailedRef = useRef(false)
   const updateAttachments = (value) => {
     attachmentsRef.current = value
     setAttachments(value)
@@ -5169,15 +5171,23 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }, [contextOpen, sid, sessionLoading, contextRefresh, chatApi])
   const queuedRef = useRef([])
   const chatScope = useRef(null)
-  const persistSessionDraft = useCallback((sessionId, value) => {
+  const persistSessionDraft = useCallback(async (sessionId, value) => {
     const id = String(sessionId || '').trim()
     const draft = typeof value === 'string' ? value : String(value || '')
     if (!id) return
-    const saved = saveChatSessionDraft(id, draft, undefined, chatInstanceRef.current, attachmentsRef.current)
+    const instance = chatInstanceRef.current
+    if (draftRestoreRef.current) {
+      try { await draftRestoreRef.current } catch { return }
+      if (chatInstanceRef.current !== instance || activeSidRef.current !== id) return
+    }
+    if (draftRestoreFailedRef.current) return
+    const files = attachmentsRef.current
+    const saved = await saveChatSessionDraftAsync(id, draft, undefined, instance, files)
+    if (chatInstanceRef.current !== instance || activeSidRef.current !== id) return
     if (!saved) setErr(ct('草稿保存失败，可能已超过浏览器存储容量；请勿刷新或切换会话。', 'Draft could not be saved; browser storage may be full. Do not refresh or switch chats.'))
     setSessions(current => mergeChatSessionDraftSessions(current, chatInstanceRef.current))
     setDraftSessionIds(current => {
-      const hasDraft = Boolean(draft) || attachmentsRef.current.length > 0
+      const hasDraft = Boolean(draft) || files.length > 0
       if (current.has(id) === hasDraft) return current
       const next = new Set(current)
       if (hasDraft) next.add(id)
@@ -5185,10 +5195,14 @@ export default function ChatApp({ onOpenSettings } = {}) {
       return next
     })
   }, [])
-  const clearSessionDrafts = useCallback((sessionIds) => {
+  const clearSessionDrafts = useCallback(async (sessionIds) => {
     const values = Array.isArray(sessionIds) ? sessionIds : [sessionIds]
     const ids = values.map(value => String(value || '').trim()).filter(Boolean)
-    clearChatSessionDrafts(ids)
+    const cleared = await clearChatSessionDraftsAsync(ids)
+    if (!cleared) {
+      setErr(ct('草稿清理失败，刷新后旧草稿可能再次出现。', 'Draft cleanup failed; the old draft may reappear after refresh.'))
+      return
+    }
     if (!ids.length) return
     setSessions(current => mergeChatSessionDraftSessions(current, chatInstanceRef.current))
     setDraftSessionIds(current => {
@@ -5937,8 +5951,23 @@ export default function ChatApp({ onOpenSettings } = {}) {
     streamAbortRef.current = null
     scrollModeRef.current = 'auto'
     setSid(id)
-    updateAttachments(loadChatSessionDraftAttachments(id, undefined, chatInstanceRef.current))
-    setSessionPrompt(loadChatSessionDraft(id, undefined, chatInstanceRef.current), id)
+    updateAttachments([])
+    setPrompt(loadChatSessionDraft(id, undefined, chatInstanceRef.current))
+    draftRestoreFailedRef.current = false
+    const restoringAttachments = attachmentsRef.current
+    const restoring = loadChatSessionDraftAttachmentsAsync(id, undefined, chatInstanceRef.current)
+    draftRestoreRef.current = restoring
+    try {
+      const files = await restoring
+      if (openToken !== openSeqRef.current || activeSidRef.current !== id) return
+      if (attachmentsRef.current === restoringAttachments) updateAttachments(files)
+    } catch {
+      if (openToken === openSeqRef.current && activeSidRef.current === id) setErr(ct('附件草稿读取失败，请保留原文件并重试。', 'Draft attachments could not be loaded. Keep the original files and retry.'))
+      if (openToken === openSeqRef.current && activeSidRef.current === id) draftRestoreFailedRef.current = true
+    } finally {
+      if (draftRestoreRef.current === restoring) draftRestoreRef.current = null
+    }
+    if (openToken !== openSeqRef.current || activeSidRef.current !== id) return
     setBusy(false)
     setStreamingSid('')
     try {
