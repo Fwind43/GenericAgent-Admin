@@ -94,6 +94,7 @@ import { JUMP_TOP_MARGIN, threadCanScroll, isNearBottom, SMOOTH_SETTLE_MS, FOLLO
 import { groupRuntimeModels, runtimeModelLabel, runtimeModelGroup, sessionAgeText, formatAge, fmtDate, shortTitle, stripBTWEcho, parseBTWDisplay } from './chat/sessionLabels.js'
 import { isMermaidFence, normalizeToolParts, prepareMarkdownParts, segmentMarkdownText } from './chat/markdownParts.js'
 import { getFileVisual, isImageFile, uploadFileSource, uploadFileName, MAX_CHAT_UPLOAD_BYTES_TOTAL, MAX_CHAT_UPLOAD_BYTES_PER_FILE, MAX_CHAT_UPLOAD_FILES } from './chat/uploadFiles.js'
+import { goalCardStatusInfo, formatGoalCardTime, normalizeGoalCardState, goalCardPathKey, GOAL_CARD_TERMINAL } from './chat/goalCard.js'
 export { groupRuntimeModels } from './chat/sessionLabels.js'
 export { buildChatStats, getElapsedMs, freezeActiveAssistantElapsed } from './chat/usageStats.js'
 export { stripUltraPlanProgressText } from './chat/ultraPlan.js'
@@ -1921,42 +1922,6 @@ function TextMarkdown({ text = '', prepared, onAskReply }) {
       : <MarkdownNodes key={i} blocks={seg.blocks} />)}
     {hidden > 0 && <div className="oa-md-truncated">{ct(`… 已隐藏 ${hidden.toLocaleString(chatLocale())} 个内容块，可复制消息查看完整内容。`, `… ${hidden.toLocaleString(chatLocale())} content blocks hidden; copy the message to view all.`)}</div>}
   </>
-}
-
-const GOAL_CARD_TERMINAL = new Set(['achieved', 'stopped', 'failed', 'timeout', 'expired', 'error', 'given_up', 'gave_up', 'done', 'removed'])
-const goalCardPathKey = (p) => String(p || '').replace(/\\/g, '/').toLowerCase()
-
-const normalizeGoalCardState = (raw) => {
-  if (!raw || typeof raw !== 'object') return null
-  const g = { ...raw }
-  const nowSec = Date.now() / 1000
-  const start = Number(g.start_time || 0)
-  if (!(Number(g.elapsed_seconds) > 0) && start > 0) {
-    const end = Number(g.end_time || 0) > 0 ? Number(g.end_time) : nowSec
-    g.elapsed_seconds = Math.max(0, end - start)
-  }
-  const budget = Number(g.budget_seconds || 0)
-  if (!(Number(g.remaining_seconds) >= 0) && budget > 0) {
-    g.remaining_seconds = Math.max(0, budget - Number(g.elapsed_seconds || 0))
-  }
-  return g
-}
-
-const formatGoalCardTime = (value) => {
-  const d = dateFromTimestamp(value)
-  if (!d || d.getFullYear() < 2000 || d.getTime() > Date.now() + 86400000) return ''
-  return d.toLocaleString()
-}
-
-const goalCardStatusInfo = (status, removed) => {
-  const s = String(status || '').toLowerCase()
-  if (removed) return { text: '已结束', cls: 'is-done' }
-  if (s === 'achieved' || s === 'success' || s === 'done') return { text: '已达成', cls: 'is-done' }
-  if (s === 'failed' || s === 'error') return { text: '失败', cls: 'is-error' }
-  if (s === 'stopped' || s === 'given_up' || s === 'gave_up') return { text: '已停止', cls: 'is-error' }
-  if (s === 'timeout' || s === 'expired') return { text: '超时', cls: 'is-error' }
-  if (!s || s === 'running' || s === 'active' || s === 'pending') return { text: '进行中', cls: 'is-running' }
-  return { text: s, cls: 'is-running' }
 }
 
 export function GoalStatusCard({ state, pending = false }) {
