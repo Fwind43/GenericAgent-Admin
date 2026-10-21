@@ -96,6 +96,7 @@ import { isMermaidFence, normalizeToolParts, prepareMarkdownParts, segmentMarkdo
 import { getFileVisual, isImageFile, uploadFileSource, uploadFileName, MAX_CHAT_UPLOAD_BYTES_TOTAL, MAX_CHAT_UPLOAD_BYTES_PER_FILE, MAX_CHAT_UPLOAD_FILES } from './chat/uploadFiles.js'
 import { goalCardStatusInfo, formatGoalCardTime, normalizeGoalCardState, goalCardPathKey, GOAL_CARD_TERMINAL } from './chat/goalCard.js'
 import { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
+import { extractSavedFilePaths, stripUserAttachmentBlock } from './chat/userMessageText.js'
 export { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
 export { groupRuntimeModels } from './chat/sessionLabels.js'
 export { buildChatStats, getElapsedMs, freezeActiveAssistantElapsed } from './chat/usageStats.js'
@@ -2348,23 +2349,6 @@ const AssistantContent = memo(function AssistantContent({ content, structuredCon
     <FileSummaryCard content={content} />
   </div>
 })
-
-// User messages append a generated attachment block. Cards render it separately, so hide the raw suffix.
-const stripUserAttachmentBlock = (content = '') => {
-  const src = String(content || '')
-  const markers = ['\n[附件]', '\n[图片附件]', '\n[附件已保存]', '[附件]', '[图片附件]', '[附件已保存]']
-  let cut = -1
-  for (const marker of markers) {
-    const i = src.lastIndexOf(marker)
-    if (i >= 0 && (cut < 0 || i < cut)) cut = i
-  }
-  return cut >= 0 ? src.slice(0, cut).trimEnd() : src
-}
-
-const extractSavedFilePaths = (content = '') => Array.from(
-  String(content || '').matchAll(/\[FILE:([^\]]+)\]/g),
-  (match) => match[1].trim(),
-).filter(Boolean)
 
 const UsageRow = ({ u, usages = [], label, className, elapsedMs = 0, live = false, ctxChars = 0, ctxMsgs = 0, showTTFT = false, firstTokenMs = 0 }) => {
   const modelTTFT = usages.map(item => Number(item?.ttft_ms)).find(value => Number.isFinite(value) && value > 0) || 0
