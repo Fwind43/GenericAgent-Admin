@@ -95,6 +95,8 @@ import { groupRuntimeModels, runtimeModelLabel, runtimeModelGroup, sessionAgeTex
 import { isMermaidFence, normalizeToolParts, prepareMarkdownParts, segmentMarkdownText } from './chat/markdownParts.js'
 import { getFileVisual, isImageFile, uploadFileSource, uploadFileName, MAX_CHAT_UPLOAD_BYTES_TOTAL, MAX_CHAT_UPLOAD_BYTES_PER_FILE, MAX_CHAT_UPLOAD_FILES } from './chat/uploadFiles.js'
 import { goalCardStatusInfo, formatGoalCardTime, normalizeGoalCardState, goalCardPathKey, GOAL_CARD_TERMINAL } from './chat/goalCard.js'
+import { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
+export { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
 export { groupRuntimeModels } from './chat/sessionLabels.js'
 export { buildChatStats, getElapsedMs, freezeActiveAssistantElapsed } from './chat/usageStats.js'
 export { stripUltraPlanProgressText } from './chat/ultraPlan.js'
@@ -2456,22 +2458,6 @@ export const CommandResultCard = memo(function CommandResultCard({ result = {} }
     </section>
   )
 })
-
-export const worldlineReadURL = (sessionID, activate = false) =>
-  `/api/chat/worldline/${sessionID}${activate ? '?activate=true' : ''}`
-
-export const worldlineRestoreCommand = (nodeID, mode = 'both', target = 'at') => {
-  const id = String(nodeID || '').trim()
-  const restoreMode = ['both', 'conversation', 'code'].includes(mode) ? mode : 'both'
-  const restoreTarget = ['at', 'before'].includes(target) ? target : 'at'
-  return id ? `/worldline restore ${id} ${restoreMode} ${restoreTarget}` : ''
-}
-
-export const isWorldlinePickerResult = (result) => {
-  const commandName = String(result?.command || '').replace(/^\//, '').toLowerCase()
-  const nodes = result?.tree?.nodes
-  return commandName === 'worldline' && result?.action !== 'restore' && Array.isArray(nodes) && nodes.length > 0
-}
 
 export const WorldlineRestoreDialog = memo(function WorldlineRestoreDialog({ nodes = [], onClose, onSelect }) {
   const [selectedNodeID, setSelectedNodeID] = useState('')
