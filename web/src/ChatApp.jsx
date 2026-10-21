@@ -30,7 +30,7 @@ import Collapse from 'antd/es/collapse'
 import Tag from 'antd/es/tag'
 import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
-import { Bot, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileArchive, FileCode2, FileImage, FileOutput, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Loader2, Lock, Maximize, Maximize2, MessageSquarePlus, MoreHorizontal, Orbit, PanelLeftOpen, PanelLeftClose, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Bot, Check, CheckCheck, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleAlert, CircleHelp, Clock3, Copy, CornerDownLeft, Download, Edit3, ExternalLink, FileCode2, FileImage, FileOutput, FileText, Folder, FolderOpen, FolderPlus, GitBranch, Hand, KeyRound, Loader2, Lock, Maximize, Maximize2, MessageSquarePlus, MoreHorizontal, Orbit, PanelLeftOpen, PanelLeftClose, PanelRightOpen, Paperclip, Pin, Plus, RotateCw, Search, Send, Settings, Sparkles, Square, Target, Trash2, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { api, apiStream } from './lib/api'
 import { createChatSessionCache } from './lib/chatSessionCache.js'
 import { createChatSessionListReader } from './lib/chatSessionListReader.js'
@@ -93,6 +93,7 @@ import { slashCommandNextDrawer, slashCommandInsertText, isArgumentStyleSlashCmd
 import { JUMP_TOP_MARGIN, threadCanScroll, isNearBottom, SMOOTH_SETTLE_MS, FOLLOW_SETTLE_MS, isMobileModelPickerViewport, isMobileViewport, isNarrowChatViewport, prefersReducedMotion } from './chat/viewport.js'
 import { groupRuntimeModels, runtimeModelLabel, runtimeModelGroup, sessionAgeText, formatAge, fmtDate, shortTitle, stripBTWEcho, parseBTWDisplay } from './chat/sessionLabels.js'
 import { isMermaidFence, normalizeToolParts, prepareMarkdownParts, segmentMarkdownText } from './chat/markdownParts.js'
+import { getFileVisual, isImageFile, uploadFileSource, uploadFileName, MAX_CHAT_UPLOAD_BYTES_TOTAL, MAX_CHAT_UPLOAD_BYTES_PER_FILE, MAX_CHAT_UPLOAD_FILES } from './chat/uploadFiles.js'
 export { groupRuntimeModels } from './chat/sessionLabels.js'
 export { buildChatStats, getElapsedMs, freezeActiveAssistantElapsed } from './chat/usageStats.js'
 export { stripUltraPlanProgressText } from './chat/ultraPlan.js'
@@ -459,31 +460,6 @@ function JsonTree({ data, name = 'root', depth = 0 }) {
     </div>}
   </div>
 }
-
-const MAX_CHAT_UPLOAD_FILES = 8
-const MAX_CHAT_UPLOAD_BYTES_PER_FILE = 300 * 1024 * 1024
-const MAX_CHAT_UPLOAD_BYTES_TOTAL = 300 * 1024 * 1024
-
-const uploadFileName = (f) => String(f?.name || f?.Name || 'attachment')
-const uploadFileSource = chatAttachmentSource
-
-function isImageFile(f) {
-  if (!f) return false
-  const mime = String(f.type || f.Type || f.mime || f.Mime || '')
-  if (mime.startsWith('image/')) return true
-  const ref = String(f.name || f.Name || f.url || f.URL || f.path || f.Path || f.dataURL || f.DataURL || '').split(/[?#]/)[0]
-  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(ref)
-}
-
-const FILE_KIND_RULES = [
-  { kind:'image', re:/\.(png|jpe?g|gif|webp|bmp|svg)$/i, Icon:FileImage },
-  { kind:'archive', re:/\.(zip|rar|7z|tar|gz|bz2|xz)$/i, Icon:FileArchive },
-  { kind:'sheet', re:/\.(csv|xls|xlsx|ods)$/i, Icon:FileSpreadsheet },
-  { kind:'code', re:/\.(c|cc|cpp|cs|css|go|h|hpp|html?|java|js|jsx|json|kt|kts|md|php|py|rb|rs|sh|sql|swift|toml|ts|tsx|vue|xml|ya?ml)$/i, Icon:FileCode2 },
-  { kind:'pdf', re:/\.pdf$/i, Icon:FileOutput },
-]
-
-const getFileVisual = (value) => FILE_KIND_RULES.find((rule) => rule.re.test(String(value || '').split(/[?#]/)[0])) || { kind:'file', Icon:FileText }
 
 export const PendingAttachments = memo(function PendingAttachments({ attachments = [], onRemove }) {
   const [preview, setPreview] = useState(null)
