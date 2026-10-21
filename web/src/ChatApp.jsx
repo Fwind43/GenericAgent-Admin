@@ -98,6 +98,7 @@ import { extractSavedFilePaths, stripUserAttachmentBlock } from './chat/userMess
 import { renderMermaidSvg } from './chat/mermaidRender.js'
 import { parseSubagentOutput } from './chat/subagentOutput.js'
 import { InlineMarkdown, MathFormula } from './chat/InlineMarkdown.jsx'
+import { CopyButton } from './chat/CopyButton.jsx'
 export { isWorldlinePickerResult, worldlineRestoreCommand, worldlineReadURL } from './chat/worldline.js'
 export { groupRuntimeModels } from './chat/sessionLabels.js'
 export { buildChatStats, getElapsedMs, freezeActiveAssistantElapsed } from './chat/usageStats.js'
@@ -209,22 +210,6 @@ const ConductorWorkspace = memo(function ConductorWorkspace({ detail, sessions, 
     </div>
   </aside>
 })
-
-function CopyButton({ text, compact = false, label = ct('复制', 'Copy'), copiedLabel = ct('已复制', 'Copied') }) {
-  const [ok, setOk] = useState(false)
-  const copy = async (e) => {
-    e?.stopPropagation?.()
-    try {
-      await navigator.clipboard.writeText(text || '')
-      setOk(true)
-      setTimeout(() => setOk(false), 1200)
-    } catch {}
-  }
-  const statusLabel = ok ? copiedLabel : label
-  return <button type="button" className={compact ? 'oa-mini-copy' : 'oa-copy'} onClick={copy} title={statusLabel} aria-label={statusLabel}>
-    {ok ? <Check size={14}/> : <Copy size={14}/>}<span>{statusLabel}</span>
-  </button>
-}
 
 function LongTextPreview({ text = '', stats }) {
   const s = stats || textRenderStats(text)
