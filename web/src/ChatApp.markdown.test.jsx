@@ -321,17 +321,34 @@ describe('assistant markdown rendering', () => {
     expect(card.querySelector('pre code').textContent).toContain('fmt.Println')
   })
 
-  test('renders bracketed display math through KaTeX', () => {
+  test('shows the TeX source until KaTeX finishes loading', async () => {
+    vi.resetModules()
+    const { MathFormula } = await import('./chat/InlineMarkdown.jsx')
+    const { container } = render(<><MathFormula value="E=mc^2" /><MathFormula value="a^2+b^2" display block /></>)
+    const pending = container.querySelectorAll('.oa-math-pending')
+    expect(pending.length).toBe(2)
+    expect(pending[0].textContent).toBe('E=mc^2')
+    expect(pending[0].classList.contains('oa-math-inline')).toBe(true)
+    expect(pending[1].tagName).toBe('DIV')
+    expect(pending[1].classList.contains('oa-math-display')).toBe(true)
+    expect(container.querySelector('.katex')).toBeNull()
+    await waitFor(() => expect(container.querySelectorAll('.katex').length).toBe(2), { timeout: 5000 })
+    expect(container.querySelector('.oa-math-pending')).toBeNull()
+  })
+
+  test('renders bracketed display math through KaTeX', async () => {
     const formula = '\\text{tok/s}=\\frac{\\sum \\text{\\u5df2\\u6d4b\\u91cf\\u6b65\\u9aa4\\u7684 output\\_tokens}}{\\sum \\text{generation\\_ms}/1000}'
     const container = renderAssistant(`\\[ ${formula} \\]`)
+    await waitFor(() => expect(container.querySelector('.katex')).toBeTruthy(), { timeout: 5000 })
     const math = container.querySelector('.oa-math-display .katex-display')
     expect(math).toBeTruthy()
     expect(math.querySelector('annotation[encoding="application/x-tex"]').textContent).toBe(formula)
     expect(container.querySelector('.oa-md').textContent).not.toContain('\\[')
   })
 
-  test('renders inline dollar math without parsing prices or code spans', () => {
+  test('renders inline dollar math without parsing prices or code spans', async () => {
     const container = renderAssistant('Energy $E=mc^2$, price $5 and $10, code `$x$`.')
+    await waitFor(() => expect(container.querySelector('.katex')).toBeTruthy(), { timeout: 5000 })
     const math = container.querySelectorAll('.oa-math-inline .katex')
     expect(math.length).toBe(1)
     expect(math[0].querySelector('annotation[encoding="application/x-tex"]').textContent).toBe('E=mc^2')

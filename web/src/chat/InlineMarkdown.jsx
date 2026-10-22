@@ -1,30 +1,52 @@
 import { parseInline, resolveMarkdownLink, resolveMarkdownImageUrl } from '../lib/markdown.js'
 import { ct } from './chatFormat.js'
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { fileDownloadTarget } from '../lib/fileDownload.js'
 import FilePreviewLink from '../components/FilePreviewLink'
 import { confirmDanger, showAppAlert } from '../lib/danger'
 import { api } from '../lib/api'
 import { ExternalLink, FolderOpen, Download } from 'lucide-react'
-import katex from 'katex'
 
 // Raw HTML stays escaped by React; parseInline only recognises <br> and
 // <autolink> shapes. Hrefs arrive pre-sanitised by safeUrl().
 const INLINE_EMPHASIS_TAGS = { strong: 'strong', em: 'em', del: 'del' }
 
+// KaTeX loads on the first formula so it stays out of the initial Chat bundle.
+let katexLib = null
+let katexLoading = null
+
+const loadKatex = () => {
+  if (!katexLoading) {
+    katexLoading = import('./katexRuntime.js').then((module) => {
+      katexLib = module.default
+      return katexLib
+    }, (error) => {
+      katexLoading = null
+      throw error
+    })
+  }
+  return katexLoading
+}
+
 export function MathFormula({ value = '', display = false, block = false }) {
-  const html = useMemo(() => katex.renderToString(value, {
+  const [katex, setKatex] = useState(katexLib)
+  useEffect(() => {
+    if (katex) return undefined
+    let active = true
+    loadKatex().then((loaded) => { if (active) setKatex(loaded) }, () => {})
+    return () => { active = false }
+  }, [katex])
+  const html = useMemo(() => katex ? katex.renderToString(value, {
     displayMode: display,
     output: 'htmlAndMathml',
     throwOnError: false,
     strict: 'warn',
     trust: false,
-  }), [display, value])
+  }) : '', [katex, display, value])
   const Tag = block ? 'div' : 'span'
-  return <Tag
-    className={`oa-math ${display ? 'oa-math-display' : 'oa-math-inline'}`}
-    dangerouslySetInnerHTML={{ __html: html }}
-  />
+  const className = `oa-math ${display ? 'oa-math-display' : 'oa-math-inline'}`
+  if (!katex) return <Tag className={`${className} oa-math-pending`}>{value}</Tag>
+  return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 function InlineNodes({ nodes = [] }) {

@@ -1669,6 +1669,7 @@ html[data-color-scheme="dark"] .oa-cselect > ul li:hover{background:rgba(255,255
 .oa-math-display{display:block;max-width:100%;margin:12px 0;overflow-x:auto;overflow-y:hidden;text-align:center;padding:2px 0}
 .oa-math-display .katex-display{margin:0;min-width:max-content}
 .oa-math .katex-error{color:var(--danger,#b42318);font-family:"SFMono-Regular",Consolas,monospace;font-size:.9em}
+.oa-math-pending{color:var(--muted);font-family:"SFMono-Regular",Consolas,monospace;font-size:.9em;white-space:pre-wrap;overflow-wrap:anywhere}
 .oa-code-card{overflow:hidden;background:var(--code-bg);border:1px solid var(--border);box-shadow:none}
 .oa-mermaid-card{margin:14px 0;border-radius:12px;overflow:hidden;background:var(--surface);border:1px solid var(--border);box-shadow:none}
 .oa-mermaid-head{height:auto;min-height:38px;gap:8px;flex-wrap:wrap;padding-block:5px}
