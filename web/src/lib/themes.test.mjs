@@ -1,3 +1,4 @@
+import { readStyleSource } from './readStyleSource.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
@@ -351,7 +352,7 @@ test('component scrollbars consume custom tokens and release standard rendering 
     ['../chatSidebar.css', '.oa-chat .oa-sidebar .oa-sidebar-sections'],
     ['../components/MessageNavigator.css', '.oa-message-nav-track'],
   ]) {
-    const css = readFileSync(new URL(file, import.meta.url), 'utf8')
+    const css = readStyleSource(new URL(file, import.meta.url))
     const block = (suffix) => {
       const key = selector + suffix
       const start = css.indexOf(key)

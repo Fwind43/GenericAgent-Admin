@@ -1,3 +1,4 @@
+import { readStyleSource } from './lib/readStyleSource.mjs'
 import { readFileSync } from 'node:fs'
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
@@ -51,7 +52,7 @@ vi.mock('mermaid', () => ({
   },
 }))
 
-const appStyles = readFileSync('src/style.css', 'utf8')
+const appStyles = readStyleSource('src/style.css')
 const adminMobileStyles = readFileSync('src/admin-mobile.css', 'utf8')
 
 globalThis.React = React

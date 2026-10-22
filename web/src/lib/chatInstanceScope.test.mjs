@@ -1,3 +1,4 @@
+import { readStyleSource } from './readStyleSource.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -9,7 +10,7 @@ import {
 } from './chatInstanceScope.js'
 
 const chatSource = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
-const chatStyles = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
+const chatStyles = readStyleSource(new URL('../style.css', import.meta.url))
 
 test('renders the instance selector once directly above settings in the session sidebar', () => {
   assert.equal((chatSource.match(/className="oa-sidebar-instance"/g) || []).length, 1)

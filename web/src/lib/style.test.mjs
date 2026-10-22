@@ -1,3 +1,4 @@
+import { readStyleSource } from './readStyleSource.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -5,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
-const css = readFileSync(resolve(here, '../style.css'), 'utf8').replace(/\r\n?/g, '\n')
+const css = readStyleSource(resolve(here, '../style.css')).replace(/\r\n?/g, '\n')
 const sizeCss = readFileSync(resolve(here, '../theme-sizes.css'), 'utf8').replace(/\r\n?/g, '\n')
 const mainSource = readFileSync(resolve(here, '../themes.js'), 'utf8').replace(/\r\n?/g, '\n')
 

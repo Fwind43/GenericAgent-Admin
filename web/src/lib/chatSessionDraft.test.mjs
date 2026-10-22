@@ -1,3 +1,4 @@
+import { readStyleSource } from './readStyleSource.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -47,7 +48,7 @@ test('pinned projects expose a persistent group style outside the collapsed body
   assert.ok(group.includes("${group.pinned ? 'is-pinned' : ''}"))
   assert.match(group, /aria-pressed=\{group\.pinned\}/)
   assert.match(group, /toggleProjectPinned\(projectKey, !group\.pinned\)/)
-  const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
+  const css = readStyleSource(new URL('../style.css', import.meta.url))
   assert.match(css, /\.oa-project-group\.is-pinned\s*\{/)
 })
 
@@ -127,7 +128,7 @@ test('chat session draft storage failures do not break the composer', () => {
 
 test('main chat wires reactive draft badges into persistence, sending, and deletion', () => {
   const main = (readFileSync(new URL('../ChatApp.jsx', import.meta.url), 'utf8') + '\n' + readFileSync(new URL('../ui/chatBody.jsx', import.meta.url), 'utf8'))
-  const style = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
+  const style = readStyleSource(new URL('../style.css', import.meta.url))
   assert.match(main, /listChatSessionDraftIds/)
   assert.match(main, /loadChatSessionDraft/)
   assert.match(main, /saveChatSessionDraft/)
@@ -195,7 +196,7 @@ test('project activity stays in the header independently of filtered sessions', 
   assert.match(header, /runningProjects\.has\(projectKey\)/)
   assert.match(header, /oa-project-running/)
   assert.match(header, /role="img"/)
-  const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8')
+  const css = readStyleSource(new URL('../style.css', import.meta.url))
   assert.match(css, /\.oa-sidebar \.oa-project-running \.oa-session-running-wave,/)
 })
 

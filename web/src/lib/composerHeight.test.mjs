@@ -1,3 +1,4 @@
+import { readStyleSource } from './readStyleSource.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -31,7 +32,7 @@ test('top handle grows upwards, shrinks downwards and clamps', () => {
 
 test('chat composer wires desktop resize and narrow fallback', () => {
   const chatApp = (readFileSync(resolve(here, '../ChatApp.jsx'), 'utf8') + '\n' + readFileSync(resolve(here, '../ui/chatBody.jsx'), 'utf8'))
-  const style = readFileSync(resolve(here, '../style.css'), 'utf8')
+  const style = readStyleSource(resolve(here, '../style.css'))
   assert.match(chatApp, /onPointerDown=\{beginComposerResize\}/)
   assert.match(chatApp, /window\.addEventListener\('resize', applyComposerHeight\)/)
   assert.match(chatApp, /root\.style\.setProperty\('--oa-composer-h', `\$\{Math\.ceil\(wrap\.getBoundingClientRect\(\)\.height\)\}px`\)/)
