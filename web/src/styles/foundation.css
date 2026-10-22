@@ -497,7 +497,7 @@ header p { margin: 0; line-height: 1.55; max-width: 760px; }
 .task-row.status-never_run { border-left-color: var(--orange); }
 .task-row.status-disabled { opacity: .72; }
 
-.goal-row { display: grid; gap: 12px; align-items: center; margin: 10px 0; border-left: 4px solid rgba(23,23,23,.18); }
+.goal-row { display: grid; gap: 12px; margin: 10px 0; border-left: 4px solid rgba(23,23,23,.18); }
 .goal-row.running { border-left-color: var(--green); }
 .goal-row > button { display: block; width: 100%; text-align: left; background: transparent; border-color: transparent; box-shadow: none; padding: 0; }
 .goal-row > button:hover, .goal-row > button.active { background: transparent; border-color: transparent; box-shadow: none; color: inherit; }
