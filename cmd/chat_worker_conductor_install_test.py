@@ -197,7 +197,8 @@ class InstallationTest(unittest.TestCase):
                     self.assertEqual(received['update_age_ms'], 250)
                     self.assertEqual(len(inspect_events), 1)
                     inspect_receipt = Path(broker) / (inspect_events[0]['request_id'] + '.response.json')
-                    self.assertEqual(set(Path(broker).iterdir()), broker_before_inspect | {inspect_receipt})
+                    self.assertFalse(inspect_receipt.exists())
+                    self.assertEqual(set(Path(broker).iterdir()), broker_before_inspect)
                     print('inspect real-loop schema/broker/receipt: PASS')
                 finally:
                     restore()
@@ -214,7 +215,8 @@ class InstallationTest(unittest.TestCase):
                     self.assertIs(fake.TOOLS_SCHEMA, original)
                     self.assertFalse(hasattr(Handler, 'do_conductor_inspect'))
                     self.assertEqual(len(inspect_events), 1)
-                    self.assertEqual(set(Path(broker).iterdir()), broker_before_inspect | {inspect_receipt})
+                    self.assertFalse(inspect_receipt.exists())
+                    self.assertEqual(set(Path(broker).iterdir()), broker_before_inspect)
                 finally:
                     worker_restore()
                 self.assertIs(Handler.dispatch, original_dispatch)

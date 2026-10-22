@@ -2883,6 +2883,10 @@ def _install_conductor_worker_instructions(agent, config):
         while not getattr(agent, 'stop_sig', False):
             try:
                 raw = path.read_bytes()
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
                 if len(raw) > 1024 * 1024:
                     raise RuntimeError('Conductor instruction reply exceeds size limit')
                 reply = json.loads(raw)
@@ -3026,6 +3030,10 @@ def _install_conductor_tools(agent, config):
         while not getattr(agent, 'stop_sig', False):
             try:
                 data = path.read_bytes()
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
                 if len(data) > 1024 * 1024:
                     return {'ok': False, 'error': 'Conductor reply exceeds size limit'}
                 value = json.loads(data)

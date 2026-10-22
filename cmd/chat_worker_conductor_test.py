@@ -701,6 +701,7 @@ class ConductorReplyTransientDenialTest(unittest.TestCase):
             next(stream)
         self.assertEqual(stopped.exception.value, 'done')
         self.assertEqual(self.state['denied'], 3)
+        self.assertEqual(list(Path(self.directory.name).glob('*.response.json')), [])
 
     def test_parent_tool_retries_denied_reply(self):
         install, module = self.install({'ok': True, 'dispatch_id': 'd'})
@@ -715,6 +716,7 @@ class ConductorReplyTransientDenialTest(unittest.TestCase):
             next(stream)
         self.assertTrue(stopped.exception.value.data['ok'], stopped.exception.value.data)
         self.assertEqual(self.state['denied'], 3)
+        self.assertEqual(list(Path(self.directory.name).glob('*.response.json')), [])
 
 if __name__ == '__main__':
     unittest.main()
