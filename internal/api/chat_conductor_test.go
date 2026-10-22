@@ -442,3 +442,21 @@ func TestConductorTerminalWorkerRejectsLateStart(t *testing.T) {
   })
  }
 }
+
+func TestConductorErrorReasonKeepsCause(t *testing.T) {
+    long := strings.Repeat("partial answer ", 600)
+    cases := map[string]struct{ content, want string }{
+        "trailing marker": {long + "\n\n[生成中断：upstream 502]", "[生成中断：upstream 502]"},
+        "traceback": {"执行失败：PermissionError: [Errno 13]\nTraceback (most recent call last):\n  File \"x.py\", line 1\nPermissionError: [Errno 13] denied\n", "执行失败：PermissionError: [Errno 13]\nPermissionError: [Errno 13] denied"},
+        "short": {"提交失败：boom", "提交失败：boom"},
+    }
+    for name, tc := range cases {
+        if got := conductorErrorReason(tc.content); got != tc.want {
+            t.Fatalf("%s: got %q want %q", name, got, tc.want)
+        }
+    }
+    got := conductorErrorReason("HEAD" + long + long + "TAIL")
+    if !strings.HasPrefix(got, "HEAD") || !strings.HasSuffix(got, "TAIL") || len([]rune(got)) > 4096+5 {
+        t.Fatalf("long fallback lost head/tail: %d", len([]rune(got)))
+    }
+}

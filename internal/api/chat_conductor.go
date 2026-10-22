@@ -256,6 +256,34 @@ func syncConductorChatTitle(cs *chatSession) {
     }
 }
 
+// conductorErrorReason keeps the failure cause, which run paths append as a
+// trailing "[...]" marker or print first above a Python traceback.
+func conductorErrorReason(content string) string {
+    content = strings.TrimSpace(content)
+    if i := strings.LastIndex(content, "\n\n["); i >= 0 && strings.HasSuffix(content, "]") {
+        return boundedConductorText(content[i+2:], 1024)
+    }
+    if strings.Contains(content, "Traceback (most recent call last)") {
+        lines := strings.Split(content, "\n")
+        head, tail := strings.TrimSpace(lines[0]), ""
+        for j := len(lines) - 1; j > 0; j-- {
+            if line := strings.TrimSpace(lines[j]); line != "" {
+                tail = line
+                break
+            }
+        }
+        if tail != "" && tail != head && !strings.Contains(head, tail) {
+            head += "\n" + tail
+        }
+        return boundedConductorText(head, 1024)
+    }
+    runes := []rune(content)
+    if len(runes) <= 4096 {
+        return content
+    }
+    return string(runes[:2048]) + "\n...\n" + string(runes[len(runes)-2048:])
+}
+
 func boundedConductorText(value string, limit int) string {
     value = strings.TrimSpace(value)
     runes := []rune(value)
@@ -926,7 +954,7 @@ func (s *Server) syncConductorTerminal(cs chatSession) {
             } else if !last.Error && result != "" {
                 status, reason = conductorSucceeded, ""
             } else if last.Error {
-                reason = boundedConductorText(last.Content, 4096)
+                reason = conductorErrorReason(last.Content)
             }
         }
     }
