@@ -20,13 +20,13 @@
 }
 .models-page .model-empty-state .ant-btn-primary {
   border-color: var(--model-ink);
-  color: #fff;
+  color: var(--on-accent);
   background: var(--model-ink);
   box-shadow: 0 3px 8px color-mix(in srgb, var(--model-ink) 18%, transparent);
 }
 .models-page .model-empty-state .ant-btn-primary:hover:not(:disabled) {
   border-color: var(--model-ink-strong);
-  color: #fff;
+  color: var(--on-accent);
   background: var(--model-ink-strong);
   transform: translateY(-1px);
 }
@@ -142,16 +142,16 @@
 
 /* Warm paper stays neutral; only deliberate actions carry the accent. */
 html[data-theme="warm"] .models-page {
-  --model-ink: #776A63;
-  --model-ink-strong: #362F2B;
-  --model-wash: #EEE6E1;
-  --model-wash-strong: #F0E1DA;
-  --model-paper: #FCFAF8;
-  --model-panel: #F4F0ED;
+  --model-ink: var(--muted);
+  --model-ink-strong: var(--text);
+  --model-wash: var(--surface-muted);
+  --model-wash-strong: var(--selected);
+  --model-paper: var(--surface);
+  --model-panel: var(--bg);
   --model-focus: var(--accent);
-  --model-ok: #357838;
-  --model-warn: #9A5C00;
-  --model-error: #C62828;
+  --model-ok: var(--success);
+  --model-warn: var(--warning);
+  --model-error: var(--error);
 }
 
 [data-color-scheme="dark"] .models-page {
