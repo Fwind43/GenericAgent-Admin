@@ -146,8 +146,7 @@ body::before {
   background-size: 44px 44px;
   mask-image: linear-gradient(to bottom, rgba(0,0,0,.58), transparent 72%);
 }
-button, input, select, textarea { font: inherit; }
-button, input, select, textarea { transition: border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease, color .16s ease, opacity .16s ease; }
+button, input, select, textarea { font: inherit; transition: border-color .16s ease, background .16s ease, transform .16s ease, box-shadow .16s ease, color .16s ease, opacity .16s ease; }
 button { user-select: none; }
 
 .app { position: relative; }
@@ -821,8 +820,7 @@ header p { margin: 0; line-height: 1.55; max-width: 760px; }
 }
 @media (max-width: 680px) {
   .main { padding: 18px; }
-header { display: block; }
-  header { padding: 16px; }
+  header { display: block; padding: 16px; }
   .badges { justify-content: flex-start; margin-top: 14px; }
   .stats { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }

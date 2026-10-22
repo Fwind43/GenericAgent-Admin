@@ -3408,9 +3408,8 @@ html[data-color-scheme="dark"] .logs-page {
   box-shadow: none;
   backdrop-filter: none;
   scrollbar-gutter: stable;
+  scrollbar-color: var(--scrollbar-colors);
 }
-
-#admin-sidebar { scrollbar-color: var(--scrollbar-colors); }
 @supports selector(::-webkit-scrollbar) {
   #admin-sidebar { scrollbar-color: auto; scrollbar-width: auto; }
 }
