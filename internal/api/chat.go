@@ -54,113 +54,6 @@ type chatMessage struct {
 	StructuredContent []map[string]interface{} `json:"structured_content,omitempty"`
 }
 
-const (
-	chatReasoningEffortOff     = "off"
-	chatReasoningEffortNone    = "none"
-	chatReasoningEffortMinimal = "minimal"
-	chatReasoningEffortLow     = "low"
-	chatReasoningEffortMedium  = "medium"
-	chatReasoningEffortHigh    = "high"
-	chatReasoningEffortXHigh   = "xhigh"
-	chatReasoningEffortMax     = "max"
-)
-
-type chatSettings struct {
-	LLMNo           int    `json:"llm_no"`
-	ReasoningEffort string `json:"reasoning_effort,omitempty"`
-}
-
-type chatSettingsPatch struct {
-	LLMNo                  int       `json:"llm_no"`
-	ReasoningEffort        string    `json:"reasoning_effort,omitempty"`
-	ExtraSysPrompts        *[]string `json:"extra_sys_prompts"`
-	ExtraSysPromptPresetID *string   `json:"extra_sys_prompt_preset_id,omitempty"`
-}
-
-func normalizeChatExtraSysPrompts(prompts []string) []string {
-	cleaned := make([]string, 0, len(prompts))
-	for _, prompt := range prompts {
-		prompt = strings.TrimSpace(prompt)
-		if prompt != "" {
-			cleaned = append(cleaned, prompt)
-		}
-	}
-	if len(cleaned) == 0 {
-		return nil
-	}
-	return cleaned
-}
-
-func normalizeChatSettings(st chatSettings) chatSettings {
-	switch strings.ToLower(strings.TrimSpace(st.ReasoningEffort)) {
-	case "", "default", "model":
-		st.ReasoningEffort = ""
-	case chatReasoningEffortOff, "clear", "unset":
-		st.ReasoningEffort = chatReasoningEffortOff
-	case chatReasoningEffortNone:
-		st.ReasoningEffort = chatReasoningEffortNone
-	case chatReasoningEffortMinimal:
-		st.ReasoningEffort = chatReasoningEffortMinimal
-	case chatReasoningEffortLow:
-		st.ReasoningEffort = chatReasoningEffortLow
-	case chatReasoningEffortMedium:
-		st.ReasoningEffort = chatReasoningEffortMedium
-	case chatReasoningEffortHigh:
-		st.ReasoningEffort = chatReasoningEffortHigh
-	case chatReasoningEffortXHigh:
-		st.ReasoningEffort = chatReasoningEffortXHigh
-	case chatReasoningEffortMax:
-		st.ReasoningEffort = chatReasoningEffortMax
-	default:
-		st.ReasoningEffort = chatReasoningEffortOff
-	}
-	return st
-}
-
-// defaultChatSettingsFor builds the settings a brand new chat session starts
-// with. The model index comes from config (the one last picked in Admin Chat)
-// so a new conversation keeps the current model instead of snapping back to the
-// first configured one.
-func defaultChatSettingsFor(cfg config.AppConfig) chatSettings {
-	st := chatSettings{}
-	if cfg.ChatDefaultLLMNo > 0 {
-		st.LLMNo = cfg.ChatDefaultLLMNo
-	}
-	return normalizeChatSettings(st)
-}
-
-func (s *Server) defaultChatSettings() chatSettings {
-	if s == nil || s.CfgStore == nil {
-		return normalizeChatSettings(chatSettings{})
-	}
-	return defaultChatSettingsFor(s.CfgStore.Snapshot())
-}
-
-// rememberDefaultChatLLMNo persists llmNo as the seed for future sessions.
-// Request-scoped chat servers use an in-memory instance Store, so persist the
-// preference through the base Store instead. This remains best effort: a
-// config write failure must not undo the session settings already saved.
-func (s *Server) rememberDefaultChatLLMNo(llmNo int) {
-	if s == nil || llmNo < 0 {
-		return
-	}
-	store := s.BaseCfgStore
-	if store == nil {
-		store = s.CfgStore
-	}
-	if store == nil {
-		return
-	}
-	s.ConfigMu.Lock()
-	defer s.ConfigMu.Unlock()
-	cfg := store.Snapshot()
-	if cfg.ChatDefaultLLMNo == llmNo {
-		return
-	}
-	cfg.ChatDefaultLLMNo = llmNo
-	_ = store.Save(cfg)
-}
-
 type chatLoopRecord struct {
 	AtMS    int64  `json:"created_at_ms"`
 	Round   int    `json:"round"`
@@ -1999,6 +1892,7 @@ func resolveChatWorkerScript() (string, error) {
 }
 
 func mustGetwd() string { wd, _ := os.Getwd(); return wd }
+
 func safeChatID(v string) string {
 	v = strings.TrimSpace(v)
 	if v == "" {
@@ -2013,6 +1907,7 @@ func safeChatID(v string) string {
 }
 
 var chatDataMigrationMu sync.Mutex
+
 var chatDataMigrated = map[string]bool{}
 
 func chatDataDir(cfg config.AppConfig) string {
@@ -2025,21 +1920,27 @@ func chatDataDir(cfg config.AppConfig) string {
 	}
 	return dir
 }
+
 func chatSessionDir(cfg config.AppConfig) string {
 	return filepath.Join(chatDataDir(cfg), "chat_sessions")
 }
+
 func chatUploadDir(cfg config.AppConfig) string {
 	return filepath.Join(chatDataDir(cfg), "chat_uploads")
 }
+
 func legacyChatSessionDir(root string) string {
 	return filepath.Join(root, "temp", "react_frontend_sessions")
 }
+
 func legacyChatUploadDir(root string) string {
 	return filepath.Join(root, "temp", "react_frontend_uploads")
 }
+
 func chatSessionPath(cfg config.AppConfig, sid string) string {
 	return filepath.Join(chatSessionDir(cfg), safeChatID(sid)+".json")
 }
+
 func ensureChatDataMigrated(cfg config.AppConfig) error {
 	key := cfg.GARoot + "|" + chatDataDir(cfg)
 	chatDataMigrationMu.Lock()
@@ -2059,6 +1960,7 @@ func ensureChatDataMigrated(cfg config.AppConfig) error {
 	chatDataMigrationMu.Unlock()
 	return nil
 }
+
 func copyDirIfTargetEmpty(src, dst string) error {
 	entries, err := os.ReadDir(src)
 	if err != nil || len(entries) == 0 {
@@ -2089,6 +1991,7 @@ func copyDirIfTargetEmpty(src, dst string) error {
 	}
 	return nil
 }
+
 func (s *Server) mutateChatSession(sid string, token *chatRun, mutate func(*chatSession) error) (chatSession, error) {
 	if !s.ownsChatRun(sid, token) {
 		return chatSession{}, fmt.Errorf("chat run is no longer owned")
@@ -2139,6 +2042,7 @@ func loadChatSession(cfg config.AppConfig, sid string) (chatSession, error) {
 	syncConductorChatTitle(&cs)
 	return cs, nil
 }
+
 func mergeChatMessageLists(first, second []chatMessage) []chatMessage {
 	out := append([]chatMessage(nil), first...)
 	positions := make(map[string]int, len(out))
@@ -2299,6 +2203,7 @@ func writeChatFileAtomic(path string, data []byte, perm os.FileMode) (err error)
 	}
 	return os.Rename(tmpName, path)
 }
+
 func readChatWorkerLine(r *bufio.Reader) ([]byte, error) {
 	var line []byte
 	for {
