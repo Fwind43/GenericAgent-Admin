@@ -2889,7 +2889,8 @@ def _install_conductor_worker_instructions(agent, config):
                 if not isinstance(reply, dict) or not reply.get('ok'):
                     raise RuntimeError('Conductor instruction handshake failed')
                 return reply
-            except FileNotFoundError:
+            # Windows can briefly deny reads while Go atomically replaces the reply.
+            except (FileNotFoundError, PermissionError):
                 if time.monotonic() >= deadline:
                     raise RuntimeError('Conductor instruction handshake timed out')
                 time.sleep(0.02)
@@ -3029,7 +3030,7 @@ def _install_conductor_tools(agent, config):
                     return {'ok': False, 'error': 'Conductor reply exceeds size limit'}
                 value = json.loads(data)
                 return value if isinstance(value, dict) else {'ok': False, 'error': 'Invalid Conductor reply'}
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 pass
             except (OSError, ValueError) as exc:
                 return {'ok': False, 'error': str(exc)}

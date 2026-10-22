@@ -644,5 +644,77 @@ class ConductorCoreContractTest(ConductorDispatchOptionsTest):
         self.exercise_loop({'ok': True, 'dispatch_id': 'd'}, legacy=True)
 
 
+class ConductorReplyTransientDenialTest(unittest.TestCase):
+    """Windows may deny reads while Go atomically renames a reply into place."""
+
+    def setUp(self):
+        import json
+        import tempfile
+        self.json = json
+        self.tree = ast.parse(Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8'))
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        state = self.state = {'left': 3, 'denied': 0}
+
+        class FlakyPath(type(Path())):
+            def read_bytes(self):
+                if self.name.endswith('.response.json') and self.exists() and state['left'] > 0:
+                    state['left'] -= 1
+                    state['denied'] += 1
+                    raise PermissionError(13, 'Access is denied', str(self))
+                return super().read_bytes()
+        self.Path = FlakyPath
+
+    def install(self, reply):
+        import sys
+        import time
+        from types import ModuleType
+        from unittest.mock import patch
+        node = next(n for n in self.tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
+        worker = next(n for n in self.tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_worker_instructions')
+        module, loop = ModuleType('agentmain'), ModuleType('agent_loop')
+        module.GenericAgentHandler = type('Handler', (), {'dispatch': lambda *args, **kwargs: None})
+        module.TOOLS_SCHEMA = []
+        loop.StepOutcome = lambda data, **kwargs: SimpleNamespace(data=data, **kwargs)
+        directory = self.directory.name
+        def emit(event):
+            (Path(directory) / (event['request_id'] + '.response.json')).write_text(self.json.dumps(reply), encoding='utf-8')
+        env = dict(Path=self.Path, re=__import__('re'), json=self.json, time=time, emit=emit)
+        exec(compile(ast.Module(body=[worker, node], type_ignores=[]), '<conductor-tools>', 'exec'), env)
+        modules = patch.dict(sys.modules, {'agentmain': module, 'agent_loop': loop})
+        modules.start()
+        self.addCleanup(modules.stop)
+        return env['_install_conductor_tools'], module
+
+    def test_worker_handshake_retries_denied_reply(self):
+        install, _ = self.install({'ok': True, 'instructions': []})
+        class Client:
+            def chat(self, messages):
+                yield 'partial'
+                return 'done'
+        agent = SimpleNamespace(llmclient=Client(), stop_sig=False)
+        restore = install(agent, {'role': 'worker', 'broker_dir': self.directory.name, 'dispatch_id': 'd'})
+        self.addCleanup(restore)
+        stream = agent.llmclient.chat(messages=[{'role': 'user', 'content': 'task'}])
+        self.assertEqual(next(stream), 'partial')
+        with self.assertRaises(StopIteration) as stopped:
+            next(stream)
+        self.assertEqual(stopped.exception.value, 'done')
+        self.assertEqual(self.state['denied'], 3)
+
+    def test_parent_tool_retries_denied_reply(self):
+        install, module = self.install({'ok': True, 'dispatch_id': 'd'})
+        agent = object()
+        restore = install(agent, {'role': 'parent', 'broker_dir': self.directory.name})
+        self.addCleanup(restore)
+        handler = module.GenericAgentHandler()
+        handler.parent = agent
+        stream = handler.do_conductor_dispatch({'objective': 'task'}, None)
+        next(stream)
+        with self.assertRaises(StopIteration) as stopped:
+            next(stream)
+        self.assertTrue(stopped.exception.value.data['ok'], stopped.exception.value.data)
+        self.assertEqual(self.state['denied'], 3)
+
 if __name__ == '__main__':
     unittest.main()
