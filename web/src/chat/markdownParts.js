@@ -1,6 +1,7 @@
 import { parseToolCallBlock, parseToolArgsBlock } from './toolArgs.js'
 import { isToolResultText, MARKDOWN_BLOCK_LIMIT } from '../lib/chatTextSafety'
-import { parseBlocks, parseInline } from '../lib/markdown.js'
+import { parseInline } from '../lib/markdown.js'
+import { parseMarkdownBlocksCached as parseBlocks } from '../lib/markdownRenderCache.js'
 
 export const normalizeToolParts = (parts = []) => {
   const out = []
