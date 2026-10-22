@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { precompressAssets } from './scripts/precompress-assets.mjs'
 import fs from 'fs'
 import path from 'path'
 
@@ -35,7 +36,7 @@ console.log(`[Vite] Frontend listening on: ${config.viteHost}:${config.vitePort}
 console.log(`[Vite] Backend proxy target: ${proxyTarget}`)
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), precompressAssets()],
   esbuild: { jsx: 'automatic' },
   server: {
     host: config.viteHost,

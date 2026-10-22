@@ -842,12 +842,22 @@ func (s *Server) serveStaticData(w http.ResponseWriter, r *http.Request, name st
 		w.Header().Set("Cache-Control", "no-cache")
 	}
 	useGzip := false
+	var brotliBody []byte
 	variant := ""
 	if staticGzipEligible(name) {
 		w.Header().Set("Vary", "Accept-Encoding")
 		if acceptsGzip(r.Header.Get("Accept-Encoding")) {
 			useGzip = true
 			variant = "-gzip"
+		}
+	}
+	// Only immutable build assets have sidecars; index.html is personalized.
+	accept := r.Header.Get("Accept-Encoding")
+	if strings.HasPrefix(name, "assets/") && staticGzipEligible(name) && encodingQuality(accept, "br") > 0 && encodingQuality(accept, "br") >= encodingQuality(accept, "gzip") {
+		if compressed, err := fs.ReadFile(s.Static, name+".br"); err == nil {
+			brotliBody = compressed
+			useGzip = false
+			variant = "-br"
 		}
 	}
 	etag := fmt.Sprintf(`"%x%s"`, sha256.Sum256(data), variant)
@@ -877,6 +887,10 @@ func (s *Server) serveStaticData(w http.ResponseWriter, r *http.Request, name st
 			}
 		}
 		w.Header().Set("Content-Encoding", "gzip")
+	}
+	if brotliBody != nil {
+		body = brotliBody
+		w.Header().Set("Content-Encoding", "br")
 	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
 	if r.Method == http.MethodHead {
@@ -909,6 +923,10 @@ func staticGzipEligible(name string) bool {
 }
 
 func acceptsGzip(header string) bool {
+	return encodingQuality(header, "gzip") > 0
+}
+
+func encodingQuality(header, target string) float64 {
 	gzipQuality := -1.0
 	wildcardQuality := -1.0
 	for _, item := range strings.Split(header, ",") {
@@ -928,16 +946,19 @@ func acceptsGzip(header string) bool {
 			}
 		}
 		switch encoding {
-		case "gzip":
+		case target:
 			gzipQuality = quality
 		case "*":
 			wildcardQuality = quality
 		}
 	}
 	if gzipQuality >= 0 {
-		return gzipQuality > 0
+		return gzipQuality
 	}
-	return wildcardQuality > 0
+	if wildcardQuality > 0 {
+		return wildcardQuality
+	}
+	return 0
 }
 
 type reactAppBridge struct {
