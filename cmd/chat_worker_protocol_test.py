@@ -1139,16 +1139,54 @@ class ImageInjectionTest(unittest.TestCase):
         attachment["content"] += [inline, data_url, remote, tool]
         unrelated = self.message("not an Admin attachment")
         unrelated["content"].append(inline)
-        history = [attachment, unrelated]
+        call = {"role": "assistant", "content": [{"type": "tool_use", "id": "tool-1", "name": "t", "input": {}}]}
+        history = [call, attachment, unrelated]
         before = json.dumps(history)
         chat_worker._restore_admin_history(self.agent, [], raw_history=history)
         restored = self.backend.history
-        self.assertEqual(restored[0]["content"], [attachment["content"][0], remote, tool])
-        self.assertEqual(restored[1], unrelated)
+        self.assertEqual(restored[0], call)
+        self.assertEqual(restored[1]["content"], [attachment["content"][0], remote, tool])
+        self.assertEqual(restored[2], unrelated)
         chat_worker._restore_admin_history(self.agent, [], raw_history=restored)
         self.assertEqual(self.backend.history, restored)
         self.assertEqual(json.dumps(history), before)
         self.assertEqual(list(self.backend.ask(self.message("continue"))), ["ok"])
+
+    def test_restore_repairs_orphan_and_empty_id_tool_blocks(self):
+        def use(tid):
+            return {"type": "tool_use", "id": tid, "name": "code_run", "input": {}}
+
+        def result(tid, text):
+            return {"type": "tool_result", "tool_use_id": tid, "content": text}
+
+        paired = [{"role": "assistant", "content": [{"type": "text", "text": "run"}, use("a")]},
+                  {"role": "user", "content": [result("a", "ok-a")]}]
+        history = paired + [
+            {"role": "assistant", "content": [{"type": "text", "text": "lost tool_use"}]},
+            {"role": "user", "content": [result("b", "orphan-b"), result("", "empty-id")]},
+            {"role": "assistant", "content": [use(""), use("c")]},
+            {"role": "user", "content": [{"type": "text", "text": "no results"}]},
+            {"role": "assistant", "content": [use("d")]},
+            {"role": "user", "content": [result("d", [{"type": "text", "text": "ok-d"}])]},
+        ]
+        before = json.dumps(history)
+        chat_worker._restore_admin_history(self.agent, [], raw_history=history)
+        restored = self.backend.history
+        self.assertEqual(json.dumps(history), before)
+        self.assertEqual(restored[:2], paired)
+        self.assertEqual(restored[3]["content"], [{"type": "text", "text": "orphan-b"},
+                                                  {"type": "text", "text": "empty-id"}])
+        self.assertEqual(restored[4]["content"], [{"type": "text", "text": "..."}])
+        self.assertEqual(restored[6:], history[6:])
+        for i, msg in enumerate(restored):
+            for block in msg["content"]:
+                if block["type"] == "tool_use":
+                    self.assertTrue(block["id"])
+                    self.assertIn(block["id"], {b.get("tool_use_id") for b in restored[i + 1]["content"]})
+                if block["type"] == "tool_result":
+                    self.assertIn(block["tool_use_id"], {b.get("id") for b in restored[i - 1]["content"]})
+        chat_worker._restore_admin_history(self.agent, [], raw_history=restored)
+        self.assertEqual(self.backend.history, restored)
 
     def test_transparent_rotated_and_animated_images_are_valid_previews(self):
         import base64

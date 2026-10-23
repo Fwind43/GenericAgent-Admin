@@ -696,6 +696,60 @@ def _strip_chat_inline_images(history):
         msg['content'] = [block for block in blocks if not is_inline_image(block)]
 
 
+def _tool_result_text(block):
+    content = block.get('content', '')
+    if isinstance(content, list):
+        return '\n'.join(str(item.get('text', '')) for item in content
+                         if isinstance(item, dict) and item.get('text'))
+    return '' if content is None else str(content)
+
+
+def _repair_tool_pairs(history):
+    """Keep tool_use/tool_result strictly paired across adjacent assistant/user turns.
+
+    Upstreams reject orphan results and empty ids with a 400 on every later request,
+    which would brick the session permanently once such history is persisted.
+    """
+    def blocks_of(msg, role):
+        if isinstance(msg, dict) and msg.get('role') == role and isinstance(msg.get('content'), list):
+            return msg['content']
+        return None
+
+    def ids_of(blocks, kind, key):
+        return {str(b.get(key) or '') for b in blocks or []
+                if isinstance(b, dict) and b.get('type') == kind} - {''}
+
+    for i, msg in enumerate(history):
+        blocks = blocks_of(msg, 'assistant')
+        if blocks is None:
+            continue
+        nxt = blocks_of(history[i + 1], 'user') if i + 1 < len(history) else None
+        answered = ids_of(nxt, 'tool_result', 'tool_use_id')
+        kept = [b for b in blocks if not (isinstance(b, dict) and b.get('type') == 'tool_use'
+                                          and str(b.get('id') or '') not in answered)]
+        if len(kept) != len(blocks):
+            msg['content'] = kept or [{'type': 'text', 'text': '...'}]
+
+    for i, msg in enumerate(history):
+        blocks = blocks_of(msg, 'user')
+        if blocks is None:
+            continue
+        prev = blocks_of(history[i - 1], 'assistant') if i > 0 else None
+        requested = ids_of(prev, 'tool_use', 'id')
+        repaired, changed = [], False
+        for b in blocks:
+            if (isinstance(b, dict) and b.get('type') == 'tool_result'
+                    and str(b.get('tool_use_id') or '') not in requested):
+                changed = True
+                text = _tool_result_text(b)
+                if text:
+                    repaired.append({'type': 'text', 'text': text})
+                continue
+            repaired.append(b)
+        if changed:
+            msg['content'] = repaired or [{'type': 'text', 'text': '...'}]
+
+
 def _install_image_injection(agent, image_paths):
     """Attach bounded vision only to outbound messages, never to backend history."""
     paths = [os.fspath(value).strip() for value in (image_paths or [])
@@ -1153,6 +1207,7 @@ def _restore_admin_history(agent, history, raw_history=None):
         restored = raw_history if isinstance(raw_history, list) and raw_history else _admin_history_to_backend(history)
         restored = json.loads(json.dumps(restored, ensure_ascii=False, default=str)) if isinstance(restored, list) else []
         _strip_chat_inline_images(restored)
+        _repair_tool_pairs(restored)
         agent.llmclient.backend.history = restored
     except Exception:
         pass
