@@ -759,6 +759,7 @@ func (s *Server) continueChatLoop(sid string, epoch int64, prompt string) {
 		cmdReq[key] = value
 	}
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
+	applyViewImageRequestField(cmdReq, s.CfgStore.Snapshot())
 	go s.runChatWorkerOwned(sid, token, cs, cmdReq)
 }
 
@@ -1001,6 +1002,7 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		cmdReq[key] = value
 	}
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
+	applyViewImageRequestField(cmdReq, s.CfgStore.Snapshot())
 
 	// Publish the pending assistant identity together with the persisted session.
 	// Reattaching clients use these fields to bind live deltas to the placeholder;

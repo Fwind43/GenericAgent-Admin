@@ -133,6 +133,14 @@ type ChatTitleModelRef struct {
 	LLMNo           int    `json:"llm_no"`
 }
 
+type ChatViewImageRef struct {
+	Enable          bool   `json:"enable"`
+	Mode            string `json:"mode"` // "main" injects into the conversation model, "vision" asks the selected model
+	ProviderVarName string `json:"provider_var_name"`
+	Model           string `json:"model"`
+	LLMNo           int    `json:"llm_no"`
+}
+
 type InstanceConfig struct {
 	ID              string `json:"id"`
 	Name            string `json:"name"`
@@ -184,6 +192,7 @@ type AppConfig struct {
 	ServiceAutostart         []string                  `json:"service_autostart"`
 	ServiceModels            map[string]int            `json:"service_models,omitempty"`
 	ChatTitleModel           *ChatTitleModelRef        `json:"chat_title_model,omitempty"`
+	ChatViewImage            *ChatViewImageRef         `json:"chat_view_image,omitempty"`
 	UpdateRepoURL            string                    `json:"update_repo_url"`
 	GitHubMirror             string                    `json:"github_mirror"`
 	SlashCommands            []SlashCommandItem        `json:"slash_commands,omitempty"`
@@ -321,6 +330,17 @@ func Validate(cfg AppConfig) error {
 			if provEmpty != modelEmpty {
 				return fmt.Errorf("chat_title_model: provider_var_name and model must both be set or both be empty")
 			}
+		}
+	}
+	if v := cfg.ChatViewImage; v != nil {
+		if v.LLMNo < 0 {
+			return fmt.Errorf("chat_view_image.llm_no must be non-negative")
+		}
+		if v.Mode != "main" && v.Mode != "vision" {
+			return fmt.Errorf("chat_view_image.mode must be main or vision")
+		}
+		if v.Mode == "vision" && (strings.TrimSpace(v.ProviderVarName) == "" || strings.TrimSpace(v.Model) == "") {
+			return fmt.Errorf("chat_view_image: vision mode requires provider_var_name and model")
 		}
 	}
 	if len(cfg.Instances) == 0 {
@@ -588,6 +608,10 @@ func cloneAppConfig(cfg AppConfig) AppConfig {
 	if cfg.ChatTitleModel != nil {
 		cloned := *cfg.ChatTitleModel
 		cfg.ChatTitleModel = &cloned
+	}
+	if cfg.ChatViewImage != nil {
+		cloned := *cfg.ChatViewImage
+		cfg.ChatViewImage = &cloned
 	}
 	if cfg.SlashCommands != nil {
 		cloned := make([]SlashCommandItem, len(cfg.SlashCommands))

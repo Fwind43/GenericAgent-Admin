@@ -24,6 +24,7 @@ import { useModelsConfig } from './hooks/useModelsConfig'
 import { useSchedule } from './hooks/useSchedule'
 import { useServices } from './hooks/useServices'
 import { useTitleModel } from './hooks/useTitleModel'
+import { useViewImageModel } from './hooks/useViewImageModel'
 import { useVersionUpdates } from './hooks/useVersionUpdates'
 // Page-level code splitting keeps the app shell small and loads each route on demand.
 const OverviewPage = lazy(() => import('./pages/OverviewPage'))
@@ -176,6 +177,7 @@ function AdminApp({ embedded = false, active = true, onClose }) {
   const goals = useGoals({ t, lang, setMsg, setBusy, active: active && tab === 'goals' })
   const models = useModelsConfig({ t, lang, setMsg, setBusy, active: active && tab === 'models' })
   const titleModel = useTitleModel({ t, lang, setMsg, active: active && tab === 'chat', fallbackProfiles: models.persistedProfiles })
+  const viewImage = useViewImageModel({ lang, setMsg, active: active && tab === 'chat' })
 
   const inventory = health?.inventory || {}
   const scheduleSummary = schedule.data || inventory.schedule || {}
@@ -413,7 +415,7 @@ function AdminApp({ embedded = false, active = true, onClose }) {
               autostart={version.autostart}
               onToggleAutostart={version.toggleAutostart}
             />}
-            {tab==='chat' && <ChatSettingsPage t={t} text={text} titleModel={titleModel} lang={lang} projectProvider={savedCfg?.default_project_provider || 'official'} onSaveProjectProvider={saveProjectProvider} projectSettingsDisabled={!savedCfg}/>}
+            {tab==='chat' && <ChatSettingsPage t={t} text={text} titleModel={titleModel} viewImage={viewImage} lang={lang} projectProvider={savedCfg?.default_project_provider || 'official'} onSaveProjectProvider={saveProjectProvider} projectSettingsDisabled={!savedCfg}/>}
             {tab==='keychain' && <KeychainPage text={text} adminWorkspace onDraftState={onPageDraft}/>}
             {tab==='models' && <Models officialSlots={models.officialSlots} t={t} profiles={models.profiles} setProfiles={models.setProfiles} patchProfile={models.patchProfile} addModelProfiles={models.addProfiles} removeModelProfile={models.removeProfile} importModels={models.importModels} previewModels={models.previewModels} failoverGroups={models.failoverGroups} setFailoverGroups={models.setFailoverGroups} discoverModels={models.discoverModels} modelPreview={models.preview} changes={models.changes} saveState={models.saveState} saveAll={models.saveAll} discardDraft={models.discardDraft} importLoading={models.importLoading} riskCatalog={observability?.riskItems || []} riskCatalogError={observabilityError} revealedKeys={models.revealedKeys} revealBusy={models.keyBusy} getProfileKey={models.getProfileKey} onRevealKey={models.revealKey} onClearRevealedKey={models.clearRevealedKey} modelInstance={models.instance} modelInstanceLabel={lang === 'zh' ? '当前实例' : 'Current instance'}/>}
             {tab==='instances' && <InstancesPage lang={lang} onConfigureModels={openModels}/>}

@@ -1363,6 +1363,7 @@ func (s *Server) chatPostWithSender(w http.ResponseWriter, r *http.Request, sid 
 		cmdReq[key] = value
 	}
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
+	applyViewImageRequestField(cmdReq, s.CfgStore.Snapshot())
 	go s.runChatWorkerOwned(sid, token, cs, cmdReq)
 	if startOnly {
 		writeJSON(w, map[string]interface{}{"ok": true, "running": true})

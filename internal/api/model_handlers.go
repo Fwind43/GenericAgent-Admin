@@ -200,7 +200,7 @@ func (s *Server) models(w http.ResponseWriter, r *http.Request) {
 			bad(w, 500, err.Error())
 			return
 		}
-		if err := s.reconcileChatTitleModel(d.Profiles); err != nil {
+		if err := s.reconcileChatModelRefs(d.Profiles); err != nil {
 			bad(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -593,7 +593,7 @@ func (s *Server) modelsExport(w http.ResponseWriter, r *http.Request) {
 	// Export has already rewritten the same runtime model files as save, so the cached runtime
 	// list is stale from here on: drop it before any later step can return early.
 	s.invalidateGARuntimeLLMs(s.CfgStore.Snapshot())
-	if err := s.reconcileChatTitleModel(profiles); err != nil {
+	if err := s.reconcileChatModelRefs(profiles); err != nil {
 		bad(w, http.StatusInternalServerError, err.Error())
 		return
 	}

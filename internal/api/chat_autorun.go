@@ -208,6 +208,7 @@ func (s *Server) dispatchChatAutorun(sid string, now int64) bool {
 	}
 
 	applyProjectRequestFields(cmdReq, cs, s.CfgStore.Snapshot())
+	applyViewImageRequestField(cmdReq, s.CfgStore.Snapshot())
 
 	// Publish the pending assistant identity together with the persisted session.
 	// Reattaching clients use these fields to bind live deltas to the placeholder;

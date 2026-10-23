@@ -2,12 +2,13 @@ import './chat-settings-workbench.css'
 import React, { useState } from 'react'
 import { UiSurface } from '../ui/UiHost'
 import { DefaultChatTitleSettings } from '../ui/chatTitleSettings'
+import { DefaultChatViewImageSettings } from '../ui/chatViewImageSettings'
 import ProjectModeSetting from '../components/ProjectModeSetting'
 import { DefaultProcessDisplaySettings } from '../ui/chatRuntimeSettings'
 import { useAutoCollapseProcess } from '../hooks/useAutoCollapseProcess.js'
 import { SettingsPage } from '../components/settings'
 
-export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, onSaveProjectProvider, projectSettingsDisabled }) {
+export function ChatSettingsPage({ t, text, titleModel, viewImage, lang, projectProvider, onSaveProjectProvider, projectSettingsDisabled }) {
   const [autoCollapseProcess, setAutoCollapseProcess] = useAutoCollapseProcess()
   const [processFeedback, setProcessFeedback] = useState('')
   const en = lang === 'en'
@@ -29,6 +30,31 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
     },
     actions: { setEnabled: titleModel.setEnabled, selectModel: titleModel.setDraft, save: titleModel.submit },
   }
+  const viewImageView = viewImage && {
+    model: {
+      enabled: viewImage.enabled, mode: viewImage.mode, draft: viewImage.draft, busy: viewImage.saving,
+      dirty: viewImage.dirty, feedback: viewImage.feedback, missingModel: viewImage.missingModel,
+      options: viewImage.options,
+      labels: {
+        title: en ? 'Image viewing' : '看图工具',
+        description: en ? 'Lets the agent call view_image to inspect screenshots or image files during a run.' : '允许 Agent 在执行中调用 view_image，查看截图或图片文件做视觉校验。',
+        toggle: en ? 'Enable view_image tool' : '启用 view_image 工具',
+        toggleHelp: en ? 'When off, the tool is not offered to the model.' : '关闭时不向模型提供该工具。',
+        on: text.chat.on, off: text.chat.off,
+        mode: en ? 'Who reads the image' : '由谁读图',
+        modeMain: en ? 'Current conversation model' : '当前对话模型',
+        modeVision: en ? 'Dedicated vision model' : '专用视觉模型',
+        modeMainHelp: en ? 'The image is injected into the conversation. Use only when the conversation model accepts images.' : '图片直接注入对话，仅适用于对话模型支持图片输入的情况。',
+        modeVisionHelp: en ? 'The selected model reads the image and returns a text description to the conversation model.' : '由所选模型读图，并把文字描述返回给对话模型。',
+        model: en ? 'Vision model' : '视觉模型',
+        modelHelp: en ? 'Pick a configured model that accepts image input.' : '选择一个已配置且支持图片输入的模型。',
+        save: en ? 'Save' : '保存',
+        saving: en ? 'Saving…' : '保存中…',
+        scope: en ? 'Save applies only to image viewing; changes take effect on new runs.' : '保存仅应用于看图工具设置，从新的运行开始生效。',
+      },
+    },
+    actions: { setEnabled: viewImage.setEnabled, setMode: viewImage.setMode, selectModel: viewImage.setDraft, save: viewImage.submit },
+  }
   const processView = {
     model: {
       enabled: autoCollapseProcess, feedback: processFeedback,
@@ -49,6 +75,7 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
       <a href="#chat-project-mode">{en ? 'Project mode' : '项目模式'}</a>
       <a href="#chat-process-display">{text.chat.processDisplay}</a>
       <a href="#chat-auto-title">{text.chat.autoTitle}</a>
+      {viewImageView && <a href="#chat-view-image">{en ? 'Image viewing' : '看图工具'}</a>}
     </nav>
     <div className="chat-settings-content">
     <div id="chat-project-mode" tabIndex={-1}>
@@ -60,6 +87,9 @@ export function ChatSettingsPage({ t, text, titleModel, lang, projectProvider, o
     <div id="chat-auto-title" tabIndex={-1}>
     <UiSurface name="admin.settings.chat.title" viewProps={titleView} fallback={<DefaultChatTitleSettings {...titleView}/>}/>
     </div>
+    {viewImageView && <div id="chat-view-image" tabIndex={-1}>
+    <DefaultChatViewImageSettings {...viewImageView}/>
+    </div>}
     </div>
   </SettingsPage>
 }

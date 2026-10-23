@@ -37,6 +37,12 @@ const catalog = [
     "level": "reversible",
     "action": "set_chat_title_model",
     "reason": "changes the model used for chat title generation"
+  },
+  {
+    "path": "/api/models/view-image-model",
+    "level": "reversible",
+    "action": "set_chat_view_image",
+    "reason": "changes whether chat agents can view images and which model reads them"
   }
 ]
 const gates = ['/api/models/export', '/api/models/import-mykey']

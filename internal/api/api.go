@@ -206,6 +206,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/api/models/export", s.requireDangerousConfirm(s.withModelInstance((*Server).modelsExport)))
 	// The title model is an Admin-wide chat preference, not an instance model file.
 	mux.HandleFunc("/api/models/title-model", s.requireDangerousConfirm(s.modelsTitleModel))
+	mux.HandleFunc("/api/models/view-image-model", s.requireDangerousConfirm(s.modelsViewImageModel))
 	mux.HandleFunc("/api/channels/test", s.channelTest)
 	mux.HandleFunc("/api/channels", s.requireDangerousConfirm(s.channels))
 	mux.HandleFunc("/api/usage/overview", s.usageOverview)
@@ -296,6 +297,7 @@ var riskCatalogItems = []riskCatalogItem{
 	{Path: "/api/models/discover", Level: "reversible", Action: "discover_provider_models", Reason: "queries the selected provider models endpoint without saving configuration"},
 	{Path: "/api/models/export", Level: "dangerous", Action: "export_models", Reason: "writes active GA model configuration"},
 	{Path: "/api/models/title-model", Level: "reversible", Action: "set_chat_title_model", Reason: "changes the model used for chat title generation"},
+	{Path: "/api/models/view-image-model", Level: "reversible", Action: "set_chat_view_image", Reason: "changes whether chat agents can view images and which model reads them"},
 	{Path: "/api/ga/processes/kill", Level: "dangerous", Action: "kill_ga_process", Reason: "terminates a GA-related process by PID after explicit dangerous authorization"},
 	{Path: "/api/ga/processes/adopt", Level: "dangerous", Action: "adopt_ga_process", Reason: "marks an external GA process as managed by Admin-Go for subsequent supervision"},
 	{Path: "/api/channels", Level: "dangerous", Action: "edit_channel_secrets", Reason: "writes GA Admin channel credentials to GA root mykey.py"},

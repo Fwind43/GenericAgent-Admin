@@ -773,6 +773,192 @@ def _install_image_injection(agent, image_paths):
     return restore
 
 
+_VIEW_IMAGE_TIMEOUT_SECONDS = 180
+_VIEW_IMAGE_MAX_PENDING = 4
+_VIEW_IMAGE_SYSTEM_PROMPT = (
+    'You are a visual inspection assistant for another agent. Describe only what is visible '
+    'in the image, answer the question precisely, quote visible text verbatim, and say '
+    'explicitly when something cannot be determined from the image.'
+)
+_VIEW_IMAGE_DESCRIPTION = (
+    'Look at a local image file (screenshot, chart, rendered page, photo). Use it for visual '
+    'verification during a task, e.g. after taking a screenshot. path: absolute or relative to '
+    'the working directory. question: what to check.'
+)
+
+
+def _view_image_config(value):
+    if not isinstance(value, dict) or value.get('enabled') is not True:
+        return None
+    mode = value.get('mode')
+    if mode not in ('main', 'vision'):
+        return None
+    llm_no = value.get('llm_no')
+    if mode == 'vision' and (type(llm_no) is not int or llm_no < 0):
+        return None
+    return {'mode': mode, 'llm_no': llm_no}
+
+
+def _collect_raw_ask(backend, messages):
+    chunks = []
+    # Class method on purpose: instance-level request hooks (upload images,
+    # pending view_image blocks) belong to the main conversation only.
+    stream = type(backend).raw_ask(backend, messages)
+    while True:
+        try:
+            chunk = next(stream)
+        except StopIteration as stop:
+            response = stop.value
+            break
+        if chunk is not None:
+            chunks.append(str(chunk))
+    if isinstance(response, list):
+        text = '\n'.join(b.get('text', '') for b in response
+                         if isinstance(b, dict) and b.get('type') == 'text').strip()
+        if text:
+            return text
+    return ''.join(chunks).strip()
+
+
+def _ask_vision_model(backend, block, question):
+    """One stateless request; never touches the vision model's chat history."""
+    text = question or 'Describe this image in detail, including all visible text.'
+    messages = [{'role': 'user', 'content': [block, {'type': 'text', 'text': text}]}]
+    saved = {name: getattr(backend, name) for name in ('system', 'tools') if hasattr(backend, name)}
+    result = {}
+
+    def run():
+        try:
+            result['text'] = _collect_raw_ask(backend, messages)
+        except Exception as exc:
+            result['error'] = '%s: %s' % (type(exc).__name__, exc)
+
+    try:
+        if 'system' in saved:
+            backend.system = _VIEW_IMAGE_SYSTEM_PROMPT
+        if 'tools' in saved:
+            backend.tools = []
+        thread = threading.Thread(target=run, daemon=True, name='view-image')
+        thread.start()
+        thread.join(_VIEW_IMAGE_TIMEOUT_SECONDS)
+    finally:
+        for name, value in saved.items():
+            setattr(backend, name, value)
+    if thread.is_alive():
+        raise TimeoutError('vision model did not answer within %d seconds' % _VIEW_IMAGE_TIMEOUT_SECONDS)
+    if 'error' in result:
+        raise RuntimeError(result['error'])
+    if not result.get('text'):
+        raise RuntimeError('vision model returned an empty answer')
+    return result['text']
+
+
+def _install_view_image_tool(agent, value):
+    """Request-scoped view_image tool; main mode injects into the next outbound request only."""
+    config = _view_image_config(value)
+    if config is None:
+        return lambda: None
+    import agentmain
+    from agent_loop import StepOutcome
+    handler_type = agentmain.GenericAgentHandler
+    original_schema = agentmain.TOOLS_SCHEMA
+    attr = 'do_view_image'
+    original_attr = (attr in handler_type.__dict__, handler_type.__dict__.get(attr))
+    pending = []
+    restore_ask = lambda: None
+    main_error = None
+
+    if config['mode'] == 'main':
+        try:
+            from llmcore import NativeToolClient
+            client = agent.llmclient
+            if not isinstance(client, NativeToolClient):
+                raise TypeError('current model uses the text tool protocol')
+            backend = client.backend
+            original_ask = backend.raw_ask
+            had_instance_attr = 'raw_ask' in vars(backend)
+            instance_value = vars(backend).get('raw_ask')
+        except (ImportError, AttributeError, TypeError) as exc:
+            main_error = 'Inline images are unsupported for the current model (%s). Switch view_image to a vision model in Chat settings.' % exc
+        else:
+            def patched_ask(messages):
+                outbound = messages
+                if pending and isinstance(messages, list):
+                    blocks = list(pending)
+                    pending.clear()
+                    for index in range(len(messages) - 1, -1, -1):
+                        msg = messages[index]
+                        if isinstance(msg, dict) and msg.get('role') == 'user' and isinstance(msg.get('content'), list):
+                            # Outbound copy only: images never enter persisted history.
+                            outbound = list(messages)
+                            outbound[index] = dict(msg, content=[*msg['content'], *blocks])
+                            break
+                return (yield from original_ask(outbound))
+
+            object.__setattr__(backend, 'raw_ask', patched_ask)
+
+            def restore_ask():
+                pending.clear()
+                try:
+                    if had_instance_attr:
+                        object.__setattr__(backend, 'raw_ask', instance_value)
+                    else:
+                        object.__delattr__(backend, 'raw_ask')
+                except (AttributeError, TypeError):
+                    pass
+
+    def do_view_image(self, args, response):
+        raw_path = str((args or {}).get('path') or '').strip()
+        question = str((args or {}).get('question') or '').strip()
+        if not raw_path:
+            return StepOutcome({'status': 'error', 'msg': 'path is required'}, next_prompt='\n')
+        path = self._get_abs_path(raw_path)
+        if not os.path.isfile(path):
+            return StepOutcome({'status': 'error', 'msg': 'file not found: %s' % path}, next_prompt='\n')
+        if main_error:
+            return StepOutcome({'status': 'error', 'msg': main_error}, next_prompt='\n')
+        try:
+            block = _prepare_chat_image(path, _CHAT_IMAGE_MAX_BYTES)
+        except Exception as exc:
+            return StepOutcome({'status': 'error', 'msg': 'cannot read image (%s: %s)' % (type(exc).__name__, exc)}, next_prompt='\n')
+        if config['mode'] == 'main':
+            if len(pending) >= _VIEW_IMAGE_MAX_PENDING:
+                return StepOutcome({'status': 'error', 'msg': 'at most %d images per step' % _VIEW_IMAGE_MAX_PENDING}, next_prompt='\n')
+            pending.append({'type': 'text', 'text': '[view_image: %s]' % path})
+            pending.append(block)
+            return StepOutcome({'status': 'success', 'path': path,
+                                'msg': 'The image is attached to your next model request only and is not kept in history. Record what you observe.'},
+                               next_prompt='\n')
+        try:
+            clients = getattr(agent, 'llmclients', None) or []
+            vision = clients[config['llm_no']].backend
+        except (IndexError, AttributeError, TypeError):
+            return StepOutcome({'status': 'error', 'msg': 'configured vision model #%s is unavailable; check Chat settings' % config['llm_no']}, next_prompt='\n')
+        try:
+            answer = _ask_vision_model(vision, block, question)
+        except Exception as exc:
+            return StepOutcome({'status': 'error', 'msg': 'vision model failed (%s)' % exc}, next_prompt='\n')
+        return StepOutcome({'status': 'success', 'path': path, 'vision_model_answer': answer}, next_prompt='\n')
+
+    setattr(handler_type, attr, do_view_image)
+    agentmain.TOOLS_SCHEMA = [item for item in original_schema
+                              if item.get('function', {}).get('name') != 'view_image'] + [{
+        'type': 'function', 'function': {'name': 'view_image', 'description': _VIEW_IMAGE_DESCRIPTION,
+            'parameters': {'type': 'object', 'properties': {
+                'path': {'type': 'string'},
+                'question': {'type': 'string', 'maxLength': 2000}}, 'required': ['path']}}}]
+
+    def restore():
+        agentmain.TOOLS_SCHEMA = original_schema
+        existed, value = original_attr
+        if existed:
+            setattr(handler_type, attr, value)
+        elif attr in handler_type.__dict__:
+            delattr(handler_type, attr)
+        restore_ask()
+    return restore
+
+
 def _json_clone(value, fallback):
     try:
         return json.loads(json.dumps(value, ensure_ascii=False, default=str))
@@ -3451,9 +3637,11 @@ def handle_request(agent, worker, req):
 
     restore_image_injection = _install_image_injection(agent, req.get('images'))
     restore_model_hooks = _install_outbound_model_hooks(agent)
+    restore_view_image = lambda: None
     restore_conductor_tools = lambda: None
     prompt, restore_completion = _prepare_conductor_completion(agent, req, prompt)
     try:
+        restore_view_image = _install_view_image_tool(agent, req.get('view_image'))
         restore_conductor_tools = _install_conductor_tools(agent, req.get('conductor'))
         if _up_context:
             _up_thread = threading.Thread(
@@ -3559,6 +3747,7 @@ def handle_request(agent, worker, req):
             turn_hooks.pop(turn_hook_key, None)
         _clear_tool_timer_emitter(emit)
         restore_conductor_tools()
+        restore_view_image()
         restore_completion()
         restore_model_hooks()
         restore_image_injection()
