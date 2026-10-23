@@ -120,7 +120,7 @@ func TestConductorWorkflowContract(t *testing.T) {
 		"recovery":      {"Before retrying an uncertain dispatch", "never duplicate active work", "cancellation is not rollback", "recovery_pending", "explicit recovery confirmation", "never bypass it or replay side effects"},
 		"event_driven":  {"After dispatch, end the turn", "completion wakes you automatically", "Never poll or sleep"},
 		"review":        {"succeeded only means the run ended", "Read the actual result", "conductor_review", "Review lightly by default", "high-risk or multi-worker"},
-		"correction":    {"specific correction to the original worker", "If corrections stall", "never resend unchanged", "narrow, split or reassign", "verified partial results", "Reconcile side effects", "do not auto-restart canceled work"},
+		"correction":    {"specific correction to the original worker", "If corrections stall", "never resend unchanged", "narrow it to the missing deliverable on the original worker", "split or reassign only if that also stalls", "verified partial results", "Reconcile side effects", "do not auto-restart canceled work"},
 		"delivery":      {"A completion covers one dispatch", "required work is pending", "one concise synthesis", "distinguishing failed, canceled and pending"},
 	}
 	for _, obsolete := range []string{"Every objective must be self-contained", "two consecutive corrections", "Prefer one worker"} {

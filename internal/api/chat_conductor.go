@@ -489,7 +489,7 @@ Dispatch:
 
 Review and deliver:
 - succeeded only means the run ended. Read the actual result, then record conductor_review (verified or needs_work) with basis and unverified scope. Review lightly by default; check harder for high-risk or multi-worker work or when asked.
-- For needs_work, send a specific correction to the original worker. If corrections stall (plans/progress only, key deliverable missing), never resend unchanged: narrow, split or reassign, or report verified partial results and the smallest missing input. Reconcile side effects before retrying failed work; do not auto-restart canceled work.
+- For needs_work, send a specific correction to the original worker. If corrections stall (plans/progress only, key deliverable missing), never resend unchanged: first narrow it to the missing deliverable on the original worker (its context is valuable); split or reassign only if that also stalls, or report verified partial results and the smallest missing input. Reconcile side effects before retrying failed work; do not auto-restart canceled work.
 - A completion covers one dispatch. Never claim completion while required work is pending. Deliver one concise synthesis with evidence and unverified boundaries, distinguishing failed, canceled and pending from success.
 `
 
