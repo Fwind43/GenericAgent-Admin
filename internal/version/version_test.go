@@ -55,6 +55,14 @@ func TestNewer(t *testing.T) {
 		{"0.0.8", "v0.0.7", false},
 		{"0.0.10", "v0.0.9", false},
 		{"0.1.0", "v0.0.9", false},
+		{"0.4.7-preview.1", "v0.4.7", true},
+		{"0.4.7", "v0.4.7-preview.1", false},
+		{"0.4.7-preview.1", "v0.4.7-preview.2", true},
+		{"0.4.7-preview.2", "v0.4.7-preview.10", true},
+		{"0.4.7-preview.10", "v0.4.7-preview.2", false},
+		{"0.4.7-preview.1", "v0.4.7-preview.1", false},
+		{"0.4.6", "v0.4.7-preview.1", true},
+		{"0.4.7-preview.1+build.5", "v0.4.7", true},
 	}
 	for _, c := range cases {
 		if got := newer(c.current, c.latest); got != c.want {

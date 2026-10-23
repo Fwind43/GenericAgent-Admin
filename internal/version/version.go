@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -1273,7 +1274,55 @@ func compareSemver(a, b string) int {
 			return -1
 		}
 	}
-	return strings.Compare(a, b)
+	return comparePrerelease(prereleaseOf(a), prereleaseOf(b))
+}
+
+func prereleaseOf(s string) string {
+	s, _, _ = strings.Cut(s, "+")
+	_, pre, _ := strings.Cut(s, "-")
+	return pre
+}
+
+// SemVer 2.0: a release ranks above any prerelease of the same core version.
+func comparePrerelease(a, b string) int {
+	if a == b {
+		return 0
+	}
+	if a == "" {
+		return 1
+	}
+	if b == "" {
+		return -1
+	}
+	ap, bp := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(ap) && i < len(bp); i++ {
+		an, aErr := strconv.Atoi(ap[i])
+		bn, bErr := strconv.Atoi(bp[i])
+		switch {
+		case aErr == nil && bErr == nil:
+			if an != bn {
+				if an > bn {
+					return 1
+				}
+				return -1
+			}
+		case aErr == nil:
+			return -1
+		case bErr == nil:
+			return 1
+		default:
+			if c := strings.Compare(ap[i], bp[i]); c != 0 {
+				return c
+			}
+		}
+	}
+	switch {
+	case len(ap) > len(bp):
+		return 1
+	case len(ap) < len(bp):
+		return -1
+	}
+	return 0
 }
 func splitVer(s string) [3]int {
 	var out [3]int
