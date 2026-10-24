@@ -291,10 +291,36 @@ type rawUserTurn struct {
 	text  string
 }
 
+// rawToolLoopMarker is appended by GA to every tool-continuation prompt. Those
+// prompts use the user transport role but are not user turns; once GA trims old
+// tool results into plain text the marker is the only reliable signal left.
+const rawToolLoopMarker = "### [WORKING MEMORY]"
+
+// isRawToolLoopItem reports whether a raw user-role item is an agent tool-loop
+// continuation (tool_result blocks and/or injected working memory) rather than
+// a message the user typed. Its <earlier_context> summary quotes earlier user
+// requests as "[USER]: ...", so treating it as a user turn makes content
+// matching cut the history at the wrong place.
+func isRawToolLoopItem(item map[string]interface{}) bool {
+	if parts, ok := item["content"].([]interface{}); ok {
+		for _, part := range parts {
+			if m, ok := part.(map[string]interface{}); ok {
+				if typ, _ := m["type"].(string); typ == "tool_result" {
+					return true
+				}
+			}
+		}
+	}
+	return strings.Contains(rawChatText(item["content"]), rawToolLoopMarker)
+}
+
 func rawHistoryUserTurns(raw []map[string]interface{}) []rawUserTurn {
 	turns := make([]rawUserTurn, 0, len(raw))
 	for i, item := range raw {
 		if role, _ := item["role"].(string); role != "user" {
+			continue
+		}
+		if isRawToolLoopItem(item) {
 			continue
 		}
 		text, ok := visibleRawUserText(item)
@@ -312,6 +338,44 @@ func rawHistoryUserTurns(raw []map[string]interface{}) []rawUserTurn {
 	return turns
 }
 
+// sessionUserPosition describes the selected user message relative to the
+// newest end of the session. Raw history and history_info are trimmed from the
+// head, so only tail-relative positions stay aligned with them.
+type sessionUserPosition struct {
+	target     string // normalized content of the selected message
+	occFromEnd int    // occurrences of target at or after the selected message
+	fromEnd    int    // user messages after the selected message
+}
+
+func selectedUserPosition(cs chatSession, messageIndex int) sessionUserPosition {
+	pos := sessionUserPosition{target: normalizeChatMatchText(cs.Messages[messageIndex].Content)}
+	for i := messageIndex; i < len(cs.Messages); i++ {
+		if cs.Messages[i].Role != "user" {
+			continue
+		}
+		if i > messageIndex {
+			pos.fromEnd++
+		}
+		if normalizeChatMatchText(cs.Messages[i].Content) == pos.target {
+			pos.occFromEnd++
+		}
+	}
+	return pos
+}
+
+// containsUserText is the loose tier: raw text may carry an injected prefix,
+// or the session copy may carry dropped parts. A very short raw text (for
+// example "continue") inside a longer request is not evidence of a match.
+func containsUserText(rawNorm, target string) bool {
+	if rawNorm == "" || target == "" {
+		return false
+	}
+	if strings.Contains(rawNorm, target) {
+		return true
+	}
+	return len([]rune(rawNorm)) >= 16 && strings.Contains(target, rawNorm)
+}
+
 // rawHistoryBeforeMessage finds the raw-history cut point that precedes the
 // selected user message. Matching degrades through four tiers so that an
 // edit/resend never hard-fails on cosmetic content drift; the positional tier
@@ -327,51 +391,32 @@ func rawHistoryBeforeMessage(cs chatSession, messageIndex int) ([]map[string]int
 	cut := func(i int) []map[string]interface{} {
 		return append([]map[string]interface{}(nil), cs.RawHistory[:i]...)
 	}
-
-	targetNorm := normalizeChatMatchText(cs.Messages[messageIndex].Content)
-	occurrence := 0
-	userOrdinal := 0
-	totalUsers := 0
-	for i := range cs.Messages {
-		if cs.Messages[i].Role != "user" {
-			continue
-		}
-		totalUsers++
-		if i > messageIndex {
-			continue
-		}
-		userOrdinal++
-		if normalizeChatMatchText(cs.Messages[i].Content) == targetNorm {
-			occurrence++
-		}
-	}
-
-	// Tier 1+2: exact match on normalized text, honouring duplicate-content order.
-	if targetNorm != "" {
+	pos := selectedUserPosition(cs, messageIndex)
+	if pos.target != "" {
+		// Tier 1+2: exact match on normalized text, counted from the newest
+		// turn so a head-trimmed raw window still honours duplicate order.
 		seen := 0
-		for _, ru := range rawUsers {
-			if normalizeChatMatchText(ru.text) != targetNorm {
+		for k := len(rawUsers) - 1; k >= 0; k-- {
+			if normalizeChatMatchText(rawUsers[k].text) != pos.target {
 				continue
 			}
 			seen++
-			if seen == occurrence {
-				return cut(ru.index), nil
+			if seen == pos.occFromEnd {
+				return cut(rawUsers[k].index), nil
 			}
 		}
 		// Tier 3: containment, for injected prefixes or dropped attachment parts.
 		seen = 0
-		for _, ru := range rawUsers {
-			rn := normalizeChatMatchText(ru.text)
-			if rn == "" || (!strings.Contains(rn, targetNorm) && !strings.Contains(targetNorm, rn)) {
+		for k := len(rawUsers) - 1; k >= 0; k-- {
+			if !containsUserText(normalizeChatMatchText(rawUsers[k].text), pos.target) {
 				continue
 			}
 			seen++
-			if seen == occurrence {
-				return cut(ru.index), nil
+			if seen == pos.occFromEnd {
+				return cut(rawUsers[k].index), nil
 			}
 		}
 	}
-
 	return nil, fmt.Errorf("raw history does not contain the selected user message")
 }
 
@@ -379,7 +424,10 @@ func rawHistoryBeforeMessage(cs chatSession, messageIndex int) ([]map[string]int
 // already located the turn by message ID inside this very session, so raw
 // history is only needed to pick a context boundary. When content matching
 // fails (compacted raw history, non-text parts, injected prefixes) it aligns by
-// user-turn position instead of aborting the resend.
+// user-turn position from the newest end instead of aborting the resend. If the
+// selected turn is older than the retained raw window, everything retained
+// belongs to the discarded branch and the boundary is empty; the trimmed
+// earlier context lives on in history_info.
 func rawHistoryBeforeMessageForResend(cs chatSession, messageIndex int) []map[string]interface{} {
 	if raw, err := rawHistoryBeforeMessage(cs, messageIndex); err == nil {
 		if raw == nil {
@@ -390,35 +438,67 @@ func rawHistoryBeforeMessageForResend(cs chatSession, messageIndex int) []map[st
 		return raw
 	}
 	rawUsers := rawHistoryUserTurns(cs.RawHistory)
-	if len(rawUsers) == 0 {
+	pos := selectedUserPosition(cs, messageIndex)
+	if pos.fromEnd >= len(rawUsers) {
 		return []map[string]interface{}{}
 	}
-	userOrdinal := 0
-	totalUsers := 0
-	for i := range cs.Messages {
-		if cs.Messages[i].Role != "user" {
-			continue
+	i := rawUsers[len(rawUsers)-1-pos.fromEnd].index
+	out := make([]map[string]interface{}, i)
+	copy(out, cs.RawHistory[:i])
+	return out
+}
+
+const historyInfoUserPrefix = "[USER]:"
+
+func historyInfoUserText(entry interface{}) (string, bool) {
+	text, ok := entry.(string)
+	if !ok || !strings.HasPrefix(text, historyInfoUserPrefix) {
+		return "", false
+	}
+	norm := normalizeChatMatchText(strings.TrimPrefix(text, historyInfoUserPrefix))
+	// history_info flattens newlines, so the attachment suffix that
+	// normalizeChatMatchText strips from session content survives here.
+	if idx := strings.Index(norm, "[附件已保存]"); idx >= 0 {
+		norm = strings.TrimSpace(norm[:idx])
+	}
+	return norm, true
+}
+
+// historyInfoBeforeMessage keeps the GA turn summaries that precede the
+// selected user message. history_info is the agent's long-term recall once raw
+// history has been trimmed, so dropping it on resend leaves the agent with no
+// idea what the conversation was about.
+func historyInfoBeforeMessage(cs chatSession, messageIndex int) []interface{} {
+	type userEntry struct {
+		index int
+		text  string
+	}
+	users := make([]userEntry, 0)
+	for i, entry := range cs.HistoryInfo {
+		if text, ok := historyInfoUserText(entry); ok {
+			users = append(users, userEntry{index: i, text: text})
 		}
-		totalUsers++
-		if i <= messageIndex {
-			userOrdinal++
+	}
+	cut := func(i int) []interface{} {
+		return append([]interface{}{}, cs.HistoryInfo[:i]...)
+	}
+	pos := selectedUserPosition(cs, messageIndex)
+	if pos.target != "" {
+		seen := 0
+		for k := len(users) - 1; k >= 0; k-- {
+			if users[k].text != pos.target {
+				continue
+			}
+			seen++
+			if seen == pos.occFromEnd {
+				return cut(users[k].index)
+			}
 		}
 	}
-	cut := func(i int) []map[string]interface{} {
-		out := make([]map[string]interface{}, i)
-		copy(out, cs.RawHistory[:i])
-		return out
+	if pos.fromEnd < len(users) {
+		return cut(users[len(users)-1-pos.fromEnd].index)
 	}
-	// Prefer counting from the head. If raw history holds fewer user turns than
-	// the session (compaction dropped older ones), align from the tail so the
-	// offset relative to the newest turn still lines up.
-	if userOrdinal >= 1 && userOrdinal <= len(rawUsers) {
-		return cut(rawUsers[userOrdinal-1].index)
-	}
-	if fromEnd := totalUsers - userOrdinal; fromEnd >= 0 && fromEnd < len(rawUsers) {
-		return cut(rawUsers[len(rawUsers)-1-fromEnd].index)
-	}
-	return cut(rawUsers[len(rawUsers)-1].index)
+	return []interface{}{}
 }
 
 func (s *Server) chatForkSession(w http.ResponseWriter, r *http.Request, sid string) {

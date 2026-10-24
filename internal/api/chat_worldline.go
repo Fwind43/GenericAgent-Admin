@@ -335,13 +335,17 @@ func (s *Server) prepareChatWorldlineResend(sid string, token *chatRun, cs *chat
 		// Sessions created before worldline bindings have no node to restore.
 		// Keep resend safe by falling back to the persisted chat boundary rather
 		// than pretending that an unrelated worldline node represents this turn.
+		// Keep the turn summaries that precede the selected message: clearing
+		// them left the agent with no recollection of the task. Working memory
+		// describes the discarded branch, so it is still reset.
 		rawHistory := rawHistoryBeforeMessageForResend(*cs, messageIndex)
+		historyInfo := historyInfoBeforeMessage(*cs, messageIndex)
 		if !s.ownsChatRun(sid, token) {
 			return fmt.Errorf("worldline edit/resend lost ownership")
 		}
 		cs.Messages = append([]chatMessage(nil), cs.Messages[:messageIndex]...)
 		cs.RawHistory = rawHistory
-		cs.HistoryInfo = []interface{}{}
+		cs.HistoryInfo = historyInfo
 		cs.Working = nil
 		return nil
 	}
