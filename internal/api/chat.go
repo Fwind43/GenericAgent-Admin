@@ -71,6 +71,7 @@ type chatSession struct {
 	TitleSource            string                   `json:"title_source,omitempty"`
 	UpdatedAt              int64                    `json:"updated_at"`
 	Messages               []chatMessage            `json:"messages"`
+	Guides                 []chatGuide              `json:"guides,omitempty"`
 	Settings               chatSettings             `json:"settings"`
 	RawHistory             []map[string]interface{} `json:"raw_history,omitempty"`
 	HistoryInfo            []interface{}            `json:"history_info,omitempty"`
@@ -169,6 +170,7 @@ type chatRun struct {
 	TaskbarWaiting     bool
 	Done               bool
 	Canceled           bool
+	GuideClosed        bool // guarded by ChatMu; terminal safe point closes guide admission
 	CancelReady        bool
 	PendingAssistantID string
 	RunStartedAtMS     int64

@@ -235,6 +235,7 @@ func (s *Server) saveChatSessionExactLocked(cs chatSession) error {
 }
 
 func preserveLatestChatUserMetadata(candidate *chatSession, latest chatSession) {
+	preserveChatGuideMessages(candidate, latest)
 	candidate.Pinned = latest.Pinned
 	candidate.Loop = latest.Loop
 	candidate.Autorun = latest.Autorun

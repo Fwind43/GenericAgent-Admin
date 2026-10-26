@@ -672,6 +672,7 @@ class ConductorReplyTransientDenialTest(unittest.TestCase):
         from unittest.mock import patch
         node = next(n for n in self.tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_tools')
         worker = next(n for n in self.tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_conductor_worker_instructions')
+        safe_point = next(n for n in self.tree.body if isinstance(n, ast.FunctionDef) and n.name == '_install_safe_point_instructions')
         module, loop = ModuleType('agentmain'), ModuleType('agent_loop')
         module.GenericAgentHandler = type('Handler', (), {'dispatch': lambda *args, **kwargs: None})
         module.TOOLS_SCHEMA = []
@@ -680,7 +681,7 @@ class ConductorReplyTransientDenialTest(unittest.TestCase):
         def emit(event):
             (Path(directory) / (event['request_id'] + '.response.json')).write_text(self.json.dumps(reply), encoding='utf-8')
         env = dict(Path=self.Path, re=__import__('re'), json=self.json, time=time, emit=emit)
-        exec(compile(ast.Module(body=[worker, node], type_ignores=[]), '<conductor-tools>', 'exec'), env)
+        exec(compile(ast.Module(body=[safe_point, worker, node], type_ignores=[]), '<conductor-tools>', 'exec'), env)
         modules = patch.dict(sys.modules, {'agentmain': module, 'agent_loop': loop})
         modules.start()
         self.addCleanup(modules.stop)

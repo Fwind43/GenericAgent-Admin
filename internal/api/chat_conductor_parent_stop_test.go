@@ -309,11 +309,8 @@ func TestConductorExplicitAdmissionResumesPausedParent(t *testing.T) {
 				queue = append(queue, chatQueuedMessage{ID: "manual-guide", Text: "continue"})
 			}
 			saveChatLoopTestSession(t, s, chatSession{ID: sid, Conductor: &chatConductorState{Role: conductorRoleParent, AutoResumePaused: true}, QueuedMessages: queue})
-			if method == "guide" {
-				// Guide cancels this run, then must reserve its requested item
-				// rather than losing the reservation to the completion inbox.
-				s.beginChatRun(sid)
-			}
+			// Idle guidance resumes the paused parent and reserves the selected
+			// item ahead of the completion inbox; active guidance never restarts it.
 			rr := httptest.NewRecorder()
 			if method == "post" {
 				s.chatPostMode(rr, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"prompt":"continue"}`)), sid, true)

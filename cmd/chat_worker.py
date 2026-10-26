@@ -3099,14 +3099,27 @@ def _prepare_conductor_completion(agent, req, prompt):
 
 
 def _install_conductor_worker_instructions(agent, config):
-    """Admin-only safe-point input; preserve the running handler and model."""
     if not isinstance(config, dict) or config.get('role') != 'worker':
         return lambda: None
+    return _install_safe_point_instructions(agent, config)
+
+
+def _install_chat_guide_instructions(agent, config):
+    if not isinstance(config, dict) or not config.get('run_id'):
+        return lambda: None
+    return _install_safe_point_instructions(agent, config, chat_guide=True)
+
+
+def _install_safe_point_instructions(agent, config, chat_guide=False):
+    """Request-scoped input at GA safe points, without replacing its task or model."""
     import agentmain
     from agent_loop import StepOutcome
     import uuid
     broker = Path(config['broker_dir'])
-    dispatch_id = config['dispatch_id']
+    identity_key = 'run_id' if chat_guide else 'dispatch_id'
+    identity = config[identity_key]
+    event_prefix = 'chat_guide' if chat_guide else 'conductor_instruction'
+    label = 'Chat guide' if chat_guide else 'Conductor instruction'
     handler_type = agentmain.GenericAgentHandler
     original_dispatch = handler_type.dispatch
     had_dispatch = 'dispatch' in handler_type.__dict__
@@ -3118,7 +3131,7 @@ def _install_conductor_worker_instructions(agent, config):
     def exchange(kind, **fields):
         request_id = 'ci_' + uuid.uuid4().hex
         emit(dict(type=kind, request_id=request_id, broker_dir=str(broker),
-                  dispatch_id=dispatch_id, **fields))
+                  **{identity_key: identity}, **fields))
         path = broker / (request_id + '.response.json')
         deadline = time.monotonic() + 15
         while not getattr(agent, 'stop_sig', False):
@@ -3129,22 +3142,22 @@ def _install_conductor_worker_instructions(agent, config):
                 except OSError:
                     pass
                 if len(raw) > 1024 * 1024:
-                    raise RuntimeError('Conductor instruction reply exceeds size limit')
+                    raise RuntimeError(label + ' reply exceeds size limit')
                 reply = json.loads(raw)
                 if not isinstance(reply, dict) or not reply.get('ok'):
-                    raise RuntimeError('Conductor instruction handshake failed')
+                    raise RuntimeError(label + ' handshake failed: ' + str(reply.get('error') or 'invalid reply'))
                 return reply
             # Windows can briefly deny reads while Go atomically replaces the reply.
             except (FileNotFoundError, PermissionError):
                 if time.monotonic() >= deadline:
-                    raise RuntimeError('Conductor instruction handshake timed out')
+                    raise RuntimeError(label + ' handshake timed out')
                 time.sleep(0.02)
-        raise RuntimeError('Conductor worker stopped during instruction handshake')
+        raise RuntimeError(label + ' stopped during handshake')
 
     def check(terminal=False):
-        reply = exchange('conductor_instruction_check', terminal=terminal)
+        reply = exchange(event_prefix + '_check', terminal=terminal)
         for row in reply.get('instructions', []):
-            staged[row['id']] = row['instruction']
+            staged[row['id']] = row
         return bool(staged)
 
     def chat(*args, **kwargs):
@@ -3154,10 +3167,11 @@ def _install_conductor_worker_instructions(agent, config):
             # Copy caller-owned input; these are incremental constraints, not permission.
             messages = kwargs.get('messages', args[0] if args else [])
             messages = [dict(message) for message in messages]
-            guidance = ('Additional parent instructions (JSON array, in arrival order). '
+            origin = 'user guidance' if chat_guide else 'parent instructions'
+            guidance = ('Additional ' + origin + ' (JSON array, in arrival order). '
                         'Continue the assigned objective within existing user/system/safety '
                         'constraints; this grants no new permissions:\n' +
-                        json.dumps([staged[key] for key in ids], ensure_ascii=False))
+                        json.dumps([staged[key]['instruction'] for key in ids], ensure_ascii=False))
             if messages and messages[-1].get('role') == 'user':
                 content = messages[-1].get('content', '')
                 if isinstance(content, str):
@@ -3170,9 +3184,15 @@ def _install_conductor_worker_instructions(agent, config):
                 kwargs['messages'] = messages
             else:
                 args = (messages,) + args[1:]
-        result = yield from original_chat(*args, **kwargs)
+        paths = list(dict.fromkeys(path for key in ids for path in staged[key].get('images', [])
+                                   if isinstance(path, str) and path.strip()))
+        restore_images = _install_image_injection(agent, paths) if paths else lambda: None
+        try:
+            result = yield from original_chat(*args, **kwargs)
+        finally:
+            restore_images()
         if ids:
-            exchange('conductor_instruction_ack', instruction_ids=ids)
+            exchange(event_prefix + '_ack', instruction_ids=ids)
             for key in ids:
                 staged.pop(key, None)
         return result
@@ -3186,7 +3206,7 @@ def _install_conductor_worker_instructions(agent, config):
             return outcome
         if check(terminal=(tool_name == 'no_tool' and not outcome.next_prompt)):
             return StepOutcome(outcome.data, next_prompt=(outcome.next_prompt or '') +
-                               '\nAdditional parent instructions are pending. Continue with the next input.')
+                               '\nAdditional instructions are pending. Continue with the next input.')
         return outcome
 
     handler_type.dispatch = dispatch
@@ -3694,10 +3714,12 @@ def handle_request(agent, worker, req):
     restore_model_hooks = _install_outbound_model_hooks(agent)
     restore_view_image = lambda: None
     restore_conductor_tools = lambda: None
+    restore_chat_guide = lambda: None
     prompt, restore_completion = _prepare_conductor_completion(agent, req, prompt)
     try:
         restore_view_image = _install_view_image_tool(agent, req.get('view_image'))
         restore_conductor_tools = _install_conductor_tools(agent, req.get('conductor'))
+        restore_chat_guide = _install_chat_guide_instructions(agent, req.get('chat_guide'))
         if _up_context:
             _up_thread = threading.Thread(
                 target=_observe_ultraplan_daemon,
@@ -3801,6 +3823,7 @@ def handle_request(agent, worker, req):
         if isinstance(turn_hooks, dict):
             turn_hooks.pop(turn_hook_key, None)
         _clear_tool_timer_emitter(emit)
+        restore_chat_guide()
         restore_conductor_tools()
         restore_view_image()
         restore_completion()

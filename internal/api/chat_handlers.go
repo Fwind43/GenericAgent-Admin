@@ -840,6 +840,10 @@ func (s *Server) chatPatchQueue(w http.ResponseWriter, r *http.Request, sid stri
 			bad(w, http.StatusBadRequest, err.Error())
 			return
 		}
+		if s.chatGuideQueueItemPending(cs, req.Message.ID) {
+			bad(w, http.StatusConflict, "guidance is awaiting acknowledgment")
+			return
+		}
 		found := false
 		for i := range cs.QueuedMessages {
 			if cs.QueuedMessages[i].ID == req.Message.ID {
@@ -855,6 +859,10 @@ func (s *Server) chatPatchQueue(w http.ResponseWriter, r *http.Request, sid stri
 	case "remove":
 		if req.ID == "" {
 			bad(w, http.StatusBadRequest, "queue id required")
+			return
+		}
+		if s.chatGuideQueueItemPending(cs, req.ID) {
+			bad(w, http.StatusConflict, "guidance is awaiting acknowledgment")
 			return
 		}
 		found := false
@@ -921,6 +929,10 @@ func (s *Server) chatReplaceQueue(w http.ResponseWriter, r *http.Request, sid st
 		bad(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if s.chatGuideQueueItemPending(cs, "") {
+		bad(w, http.StatusConflict, "guidance is awaiting acknowledgment")
+		return
+	}
 	cs.QueuedMessages = req.Messages
 	if err := saveChatSessionPreserveUpdatedAtLocked(s.CfgStore.Snapshot(), cs); err != nil {
 		bad(w, http.StatusInternalServerError, err.Error())
@@ -941,63 +953,28 @@ func (s *Server) chatGuidePost(w http.ResponseWriter, r *http.Request, sid, queu
 		bad(w, http.StatusBadRequest, "queue id required")
 		return
 	}
-
-	// A guide can race with automatic queue consumption after cancellation. The
-	// run token retains the source queue ID, so retries for that exact item are
-	// idempotent even when the item has already left the persisted queue.
-	s.ChatMu.Lock()
-	current := s.ChatRuns[sid]
-	matchingRun := chatRunContainsQueueID(current, queueID)
-	anotherQueueRunning := current != nil && !current.Done && current.QueueID != "" && !matchingRun
-	matchingDone := matchingRun && current.Done
-	s.ChatMu.Unlock()
-
-	if matchingRun {
-		status := "already_started"
-		if matchingDone {
-			status = "already_completed"
-		}
-		writeJSON(w, map[string]interface{}{"ok": true, "status": status})
-		return
-	}
-	if anotherQueueRunning {
-		// If another queued item is active, this one remains queued until it completes.
-		writeJSON(w, map[string]interface{}{"ok": true, "status": "queued", "message": "will execute after current run"})
-		return
-	}
-
-	// Verify the queue item exists
-	s.SessionMu.Lock()
-	cs, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+	status, err := s.admitChatGuide(sid, queueID)
 	if err != nil {
-		s.SessionMu.Unlock()
-		bad(w, http.StatusInternalServerError, err.Error())
+		if os.IsNotExist(err) {
+			bad(w, http.StatusNotFound, "queue item not found")
+		} else {
+			bad(w, http.StatusInternalServerError, err.Error())
+		}
 		return
 	}
-
-	found := false
-	for _, item := range cs.QueuedMessages {
-		if item.ID == queueID {
-			found = true
-			break
+	if status == "idle" {
+		if s.processQueuedMessage(sid, queueID) {
+			status = "started"
+		} else {
+			// A run may have been admitted since the idle check. Do not cancel it.
+			status, err = s.admitChatGuide(sid, queueID)
+			if err != nil || status == "idle" {
+				bad(w, http.StatusConflict, "queued message could not be started")
+				return
+			}
 		}
 	}
-	s.SessionMu.Unlock()
-
-	if !found {
-		bad(w, http.StatusNotFound, "queue item not found")
-		return
-	}
-
-	if _, err := s.cancelChatRun(sid); err != nil {
-		bad(w, http.StatusInternalServerError, fmt.Sprintf("chat canceled but failed to persist partial output: %v", err))
-		return
-	}
-	if !s.processQueuedMessage(sid, queueID) {
-		bad(w, http.StatusConflict, "queued message could not be started")
-		return
-	}
-	writeJSON(w, map[string]interface{}{"ok": true, "status": "started"})
+	writeJSON(w, map[string]interface{}{"ok": true, "status": status})
 }
 
 func (s *Server) chatDeleteSession(w http.ResponseWriter, r *http.Request, sid string) {

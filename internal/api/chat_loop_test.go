@@ -129,30 +129,9 @@ func TestProcessNextQueuedMessageStartsAfterCompletedRun(t *testing.T) {
 	}
 }
 
-func TestChatGuideCancelsActiveRunAndStartsSelectedQueueItem(t *testing.T) {
-	capturedReq := make(chan map[string]interface{}, 1)
-	releaseWorker := make(chan struct{})
-	oldStart := startChatWorkerFunc
-	startChatWorkerFunc = func(config.AppConfig, string) (*chatWorker, error) {
-		stdinR, stdinW := io.Pipe()
-		stdoutR, stdoutW := io.Pipe()
-		go func() {
-			defer stdinR.Close()
-			defer stdoutW.Close()
-			var req map[string]interface{}
-			_ = json.NewDecoder(stdinR).Decode(&req)
-			capturedReq <- req
-			<-releaseWorker
-		}()
-		return &chatWorker{SID: "guide-interrupts-active-run", Stdin: stdinW, Stdout: stdoutR}, nil
-	}
-	defer func() {
-		close(releaseWorker)
-		startChatWorkerFunc = oldStart
-	}()
-
+func TestChatGuideKeepsActiveRunUntilSafePointAcknowledgment(t *testing.T) {
 	s := newChatLoopTestServer(t)
-	sid := "guide-interrupts-active-run"
+	sid := "guide-keeps-active-run"
 	const pendingID = "assistant-active"
 	saveChatLoopTestSession(t, s, chatSession{
 		ID: sid,
@@ -162,14 +141,14 @@ func TestChatGuideCancelsActiveRunAndStartsSelectedQueueItem(t *testing.T) {
 		},
 		QueuedMessages: []chatQueuedMessage{
 			{ID: "queued-first", Text: "leave me queued"},
-			{ID: "queued-guide", Text: "run this guidance now"},
+			{ID: "queued-guide", Text: "use this guidance now"},
 		},
 	})
-
 	active := s.beginChatRun(sid)
 	if active == nil {
 		t.Fatal("failed to create active run")
 	}
+	defer s.endChatRunOwned(sid, active)
 	s.ChatMu.Lock()
 	active.PendingAssistantID = pendingID
 	active.RunStartedAtMS = 1234
@@ -178,68 +157,58 @@ func TestChatGuideCancelsActiveRunAndStartsSelectedQueueItem(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	s.chatGuidePost(rr, httptest.NewRequest(http.MethodPost, "/api/chat/guide/"+sid+"/queued-guide", nil), sid, "queued-guide")
-	if rr.Code != http.StatusOK {
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"status":"guiding"`) {
 		t.Fatalf("guide status=%d body=%s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), `"status":"started"`) {
-		t.Fatalf("guide body=%s, want started", rr.Body.String())
-	}
-	if !active.Canceled {
-		t.Fatal("guide did not cancel the active run")
-	}
-
 	s.ChatMu.Lock()
-	started := s.ChatRuns[sid]
+	owner := s.ChatRuns[sid]
+	canceled := active.Canceled
 	s.ChatMu.Unlock()
-	if started == nil || started == active {
-		t.Fatalf("guide run token = %p, want replacement for %p", started, active)
+	if owner != active || canceled {
+		t.Fatal("guide canceled or replaced the active run")
 	}
-	defer s.endChatRunOwned(sid, started)
-
 	stored, err := loadChatSession(s.CfgStore.Snapshot(), sid)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stored.QueuedMessages) != 1 || stored.QueuedMessages[0].ID != "queued-first" {
-		t.Fatalf("queued messages = %#v, want untouched first item", stored.QueuedMessages)
+	if len(stored.QueuedMessages) != 2 || len(stored.Messages) != 2 || len(stored.Guides) != 1 {
+		t.Fatalf("guide must remain queued until acknowledgment: %#v", stored)
 	}
-	if len(stored.Messages) < 4 {
-		t.Fatalf("messages = %#v, want canceled output and guided turn", stored.Messages)
+	if stored.Guides[0].RunID != active.ID || stored.Guides[0].AssistantID != pendingID {
+		t.Fatalf("guide lost run ownership: %#v", stored.Guides[0])
 	}
-	if got := stored.Messages[len(stored.Messages)-2]; got.Role != "user" || got.Content != "run this guidance now" {
-		t.Fatalf("guided user message = %#v", got)
+	check, delivered, err := s.chatGuideExchange(sid, active, map[string]interface{}{
+		"type": "chat_guide_check", "run_id": active.ID,
+	})
+	if err != nil || len(delivered) != 0 {
+		t.Fatalf("check = %#v, delivered=%#v err=%v", check, delivered, err)
 	}
-	var canceled chatMessage
-	for _, msg := range stored.Messages {
-		if msg.ID == pendingID {
-			canceled = msg
-			break
-		}
+	instructions, ok := check["instructions"].([]map[string]interface{})
+	if !ok || len(instructions) != 1 || instructions[0]["instruction"] != "use this guidance now" {
+		t.Fatalf("safe-point instructions = %#v", check)
 	}
-	if canceled.Content != "partial answer\n\n[\u7528\u6237\u624b\u52a8\u4e2d\u6b62\u751f\u6210]" || !canceled.Error {
-		t.Fatalf("canceled partial message = %#v", canceled)
+	ack := map[string]interface{}{
+		"type": "chat_guide_ack", "run_id": active.ID,
+		"instruction_ids": []interface{}{"queued-guide"},
 	}
-
-	select {
-	case req := <-capturedReq:
-		if req["prompt"] != "run this guidance now" {
-			t.Fatalf("worker prompt = %#v", req["prompt"])
+	for attempt := 0; attempt < 2; attempt++ {
+		_, delivered, err = s.chatGuideExchange(sid, active, ack)
+		if err != nil || len(delivered) != 1-attempt {
+			t.Fatalf("ack attempt %d: delivered=%#v err=%v", attempt, delivered, err)
 		}
-		history, ok := req["history"].([]interface{})
-		if !ok || len(history) != 2 {
-			t.Fatalf("worker history = %#v, want interrupted user/assistant pair only", req["history"])
+		stored, err = loadChatSession(s.CfgStore.Snapshot(), sid)
+		if err != nil {
+			t.Fatal(err)
 		}
-		first, _ := history[0].(map[string]interface{})
-		second, _ := history[1].(map[string]interface{})
-		if first["content"] != "current request" || second["content"] != "partial answer\n\n[\u7528\u6237\u624b\u52a8\u4e2d\u6b62\u751f\u6210]" {
-			t.Fatalf("worker history lost interrupted turn: %#v", history)
+		if len(stored.QueuedMessages) != 1 || stored.QueuedMessages[0].ID != "queued-first" {
+			t.Fatalf("ack removed the wrong queue item: %#v", stored.QueuedMessages)
 		}
-		rawHistory, ok := req["raw_history"].([]interface{})
-		if !ok || len(rawHistory) != 2 {
-			t.Fatalf("worker raw_history = %#v, want interrupted raw turn", req["raw_history"])
+		if len(stored.Messages) != 3 || stored.Messages[1].ID != "guided-queued-guide" || stored.Messages[2].ID != pendingID {
+			t.Fatalf("ack duplicated or misplaced the guided message: %#v", stored.Messages)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for guided worker request")
+		if stored.Guides[0].Status != "delivered" {
+			t.Fatalf("guide was not durably acknowledged: %#v", stored.Guides)
+		}
 	}
 }
 

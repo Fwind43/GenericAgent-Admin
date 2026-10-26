@@ -2648,8 +2648,8 @@ export default function ChatApp({ onOpenSettings } = {}) {
     updateAttachments(attachmentsRef.current.filter(x => x.id !== id))
     persistSessionDraft(activeSidRef.current, promptRef.current?.value ?? prompt)
   }
-  const applyQueueSnapshot = (messages, sessionId = activeSidRef.current) => {
-    if (sessionId !== activeSidRef.current) return []
+  const applyQueueSnapshot = (messages, sessionId = activeSidRef.current, instanceId = chatInstanceRef.current) => {
+    if (sessionId !== activeSidRef.current || instanceId !== chatInstanceRef.current) return []
     const next = Array.isArray(messages) ? messages : []
     queuedRef.current = next
     setQueuedMessages(next)
@@ -2657,24 +2657,29 @@ export default function ChatApp({ onOpenSettings } = {}) {
   }
   const requestQueue = (operation, payload = {}, sessionId = activeSidRef.current) => {
     if (!sessionId) return Promise.resolve([])
-    const queueURL = addChatInstanceToURL(`/api/chat/queue/${sessionId}`, chatInstanceRef.current)
+    const instanceId = chatInstanceRef.current
+    const epoch = chatRequestEpochRef.current
+    const queueURL = addChatInstanceToURL(`/api/chat/queue/${sessionId}`, instanceId)
     const request = queueWriteRef.current
       .catch(() => {})
       .then(async () => {
         const d = await api(queueURL, { method:'PATCH', body:JSON.stringify({ op:operation, ...payload }) })
-        return applyQueueSnapshot(d.queued_messages, sessionId)
+        if (epoch !== chatRequestEpochRef.current || !isActiveSession(sessionId)) throw new DOMException('Chat instance changed', 'AbortError')
+        return applyQueueSnapshot(d.queued_messages, sessionId, instanceId)
       })
     queueWriteRef.current = request
     return request
   }
-  const refreshQueue = (sessionId = activeSidRef.current) => {
+  const refreshQueue = (sessionId = activeSidRef.current, instanceId = chatInstanceRef.current) => {
     if (!sessionId) return Promise.resolve([])
-    const queueURL = addChatInstanceToURL(`/api/chat/queue/${sessionId}`, chatInstanceRef.current)
+    const epoch = chatRequestEpochRef.current
+    const queueURL = addChatInstanceToURL(`/api/chat/queue/${sessionId}`, instanceId)
     const request = queueWriteRef.current
       .catch(() => {})
       .then(async () => {
         const d = await api(queueURL)
-        return applyQueueSnapshot(d.queued_messages, sessionId)
+        if (epoch !== chatRequestEpochRef.current) return []
+        return applyQueueSnapshot(d.queued_messages, sessionId, instanceId)
       })
     queueWriteRef.current = request
     return request
@@ -2683,7 +2688,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
     const queued = { ...item, id:`q-${Date.now()}-${Math.random().toString(16).slice(2)}`, queuedAt:Date.now() }
     try {
       const next = await requestQueue('enqueue', { message:queued })
-      setNotice(ct(`已加入队列（${next.length} 条）。点击“引导”可中止当前回复并立即发送。`, `Added to queue (${next.length}). Use Guide to stop the current response and send immediately.`))
+      setNotice(ct(`已加入队列（${next.length} 条）。点击“引导”可在下次模型调用时补充指令，不中断当前任务。`, `Added to queue (${next.length}). Use Guide to add instructions at the next model call without interrupting the current task.`))
     } catch (e) { if (e.name !== 'AbortError') setErr(e.message || String(e)) }
   }
   const removeQueued = async (id) => {
@@ -3083,85 +3088,44 @@ export default function ChatApp({ onOpenSettings } = {}) {
 
   const guideQueued = async (item = null) => {
     const next = item || queuedRef.current[0]
-    if (!next) {
+    const id = sid
+    const instanceId = chatInstanceRef.current
+    const epoch = chatRequestEpochRef.current
+    const isCurrent = () => isActiveSession(id) && instanceId === chatInstanceRef.current && epoch === chatRequestEpochRef.current
+    if (!next || !id || !next.id) {
       guidingQueueRef.current = ''
       setGuidingQueueId('')
       return
     }
-    const id = sid
-    const wasRunning = busy && streamingSid === sid
-    const guidedUser = id && next.id ? {
-      id:`guided-${next.id}`,
-      role:'user',
-      content:String(next.text || ''),
-      files:normalizeChatAttachments(next.files),
-      created_at:Math.floor(Date.now()/1000),
-    } : null
-    let guideStarted = false
-    // Project the selected queue item before cancellation or guide network I/O so
-    // the user's action is visible immediately. The stable queue-derived id also
-    // lets the stream/session snapshot replace or deduplicate this local turn.
-    if (guidedUser) {
-      // Guiding is an explicit jump to the newest turn. Restore follow before the
-      // optimistic append so the layout effect reveals it in the same paint.
-      scrollModeRef.current = 'smooth'
-      setFollowState(true)
-      setMessages(xs => isActiveSession(id) && !xs.some(message => message.id === guidedUser.id)
-        ? [...xs, guidedUser]
-        : xs)
-    }
-    // Only increment runSeqRef when there's actually a running task to abort
-    // Otherwise it will cause the next runSend's token check to fail
-    if (wasRunning) {
-      ++runSeqRef.current
-    }
     try {
-      if (wasRunning) {
-        streamAbortRef.current?.abort?.()
-        if (id) await chatApi(`/api/chat/cancel/${id}`, { method:'POST', body:'{}' })
-        setMessages(xs => {
-          const pendingAssistantIndex = xs.findLastIndex(message => message.role === 'assistant' && !message.content)
-          return xs.map((message, index) => index === pendingAssistantIndex
-            ? { ...message, content:ct('已中止，改为执行引导消息。', 'Stopped and switched to the guided message.'), error:true }
-            : message)
-        })
+      await queueWriteRef.current.catch(() => {})
+      if (!isCurrent()) return
+      const result = await chatApi(`/api/chat/guide/${id}/${next.id}`, { method:'POST', body:'{}' })
+      if (!isCurrent()) return
+      await refreshQueue(id, instanceId)
+      if (!isCurrent()) return
+      if (result?.status === 'guiding') {
+        setNotice(ct('已提交引导：当前任务不中断，在下次模型调用时接收', 'Guidance submitted: the current task continues and receives it at the next model call'))
+      } else if (result?.status === 'queued') {
+        setNotice(ct('当前任务正在结束，引导已保留在队列中', 'The current task is finishing; guidance remains in the queue'))
+      } else if (['started', 'already_started', 'already_completed', 'delivered'].includes(result?.status)) {
+        setNotice(ct('引导消息已接收', 'Guidance received'))
+      } else {
+        throw new Error(ct('引导消息未能提交', 'The guidance could not be submitted'))
       }
-      // Call backend guide API to trigger queue execution, then attach to the
-      // newly-created run so its user turn and output appear without a reload.
-      if (id && next.id) {
-        const guideURL = `/api/chat/guide/${id}/${next.id}`
-        let guideResult = await chatApi(guideURL, { method:'POST', body:'{}' })
-        // The local stream state can lag behind the backend. If guide reports
-        // an active run, cancel that server-owned run and retry exactly once;
-        // otherwise waitForRun would poll forever while the item stays queued.
-        if (guideResult?.status === 'queued') {
-          await chatApi(`/api/chat/cancel/${id}`, { method:'POST', body:'{}' })
-          guideResult = await chatApi(guideURL, { method:'POST', body:'{}' })
-        }
-        if (guideResult?.status !== 'started') {
-          throw new Error(ct('引导消息未能开始执行', 'The guided message did not start'))
-        }
-        guideStarted = true
-        if (!isActiveSession(id)) return
-        await refreshQueue(id)
-        guidingQueueRef.current = ''
-        setGuidingQueueId('')
-        setNotice(ct('已引导：中止当前回复并触发队列执行', 'Guided: stopped the current response and triggered queue execution'))
-        await attachRunningStream(id, { waitForRun:true, clientUserID:guidedUser.id })
+      // Preserve the active stream; only an idle-started run needs attachment.
+      if (result?.status === 'started' || result?.status === 'already_started') {
+        scrollModeRef.current = 'smooth'
+        setFollowState(true)
+        await attachRunningStream(id, { waitForRun:true })
       }
     } catch (e) {
-      if (!guideStarted && guidedUser) {
-        setMessages(xs => xs.filter(message => message.id !== guidedUser.id))
-        if (guidingQueueRef.current === next.id) {
-          guidingQueueRef.current = ''
-          setGuidingQueueId('')
-        }
-      }
-      setErr(e.message || String(e))
+      if (isCurrent() && e.name !== 'AbortError') setErr(e.message || String(e))
     } finally {
-      // attachRunningStream owns busy/streamingSid. A concurrent re-attach may have
-      // replaced this guide's controller, so clearing those here would hide the live run.
-      activeRunRef.current = false
+      if (isCurrent() && guidingQueueRef.current === next.id) {
+        guidingQueueRef.current = ''
+        setGuidingQueueId('')
+      }
     }
   }
 

@@ -46,6 +46,14 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 		}
 		return ms
 	}
+	if err := s.prepareChatGuideRequest(sid, token, cmdReq); err != nil {
+		msg := chatMessage{ID: pendingID, Role: "assistant", Content: fmt.Sprintf("Guide setup failed: %v", err), CreatedAt: time.Now().Unix(), Error: true, ElapsedMS: elapsedMillis()}
+		cs.Messages = replacePendingChatMessage(cs.Messages, pendingID, msg)
+		_ = saveTerminal(cs)
+		s.publishChatRun(sid, map[string]interface{}{"type": "error", "message": msg})
+		s.endChatRunOwned(sid, token)
+		return
+	}
 	worker, err := s.getChatWorker(sid)
 	if err != nil {
 		msg := chatMessage{ID: pendingID, Role: "assistant", Content: fmt.Sprintf("提交失败：%v", err), CreatedAt: time.Now().Unix(), Error: true, ElapsedMS: elapsedMillis()}
@@ -118,6 +126,10 @@ func (s *Server) runChatWorkerOwned(sid string, token *chatRun, cs chatSession, 
 		}
 		if ev["type"] == "conductor_defaults" || ev["type"] == "conductor_models" || ev["type"] == "conductor_model_strategy" || ev["type"] == "conductor_limits" {
 			s.handleConductorSettingsEvent(sid, ev)
+			continue
+		}
+		if ev["type"] == "chat_guide_check" || ev["type"] == "chat_guide_ack" {
+			s.handleChatGuideEvent(sid, token, ev)
 			continue
 		}
 		if ev["type"] == "conductor_instruct" || ev["type"] == "conductor_instruction_check" || ev["type"] == "conductor_instruction_ack" {

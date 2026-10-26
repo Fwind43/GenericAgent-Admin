@@ -32,7 +32,8 @@ class WorkerInstructionTest(unittest.TestCase):
         source = Path(__file__).with_name('chat_worker.py').read_text(encoding='utf-8')
         tree = ast.parse(source)
         funcs = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in
-                 ('_install_conductor_worker_instructions', '_install_conductor_tools')]
+                 ('_install_safe_point_instructions', '_install_conductor_worker_instructions',
+                  '_install_conductor_tools')]
         self.scope = dict(Path=Path, re=re, json=json, time=time, emit=self.emit, emit_tool=lambda *a, **k: None)
         exec(compile(ast.Module(body=funcs, type_ignores=[]), '<Admin installers>', 'exec'), self.scope)
         owner = self
