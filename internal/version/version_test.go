@@ -759,13 +759,18 @@ func TestStartApplyLatestWaitsForRestartAuthorizationBeforeLaunchingHelper(t *te
 			}
 			launched <- launchRecord{helperPath: helperPath, manifestPath: manifestPath, manifest: manifest}
 			return transitionUpdate(manifest.OperationID, func(st *UpdateStatus) error {
+				now := time.Now()
 				st.Stage = "waiting_for_exit"
 				st.Progress = 88
 				st.Message = "helper owns update status"
+				st.HelperPID = os.Getpid()
+				st.HelperStartedAt = now
+				st.WaitingAt = now
 				return nil
 			})
 		},
-		scheduleExit: func() { exitScheduled <- struct{}{} },
+		waitHelperAck: waitForHelperAck,
+		scheduleExit:  func() { exitScheduled <- struct{}{} },
 	}
 
 	initial, err := StartApplyLatest()
@@ -1291,7 +1296,7 @@ func TestUpdateTransactionWaitTimeoutLeavesInstallationUntouched(t *testing.T) {
 	oldStatus := statusPathOverride
 	statusPathOverride = filepath.Join(root, "ga-admin-update-status.json")
 	defer func() { statusPathOverride = oldStatus }()
-	if err := writeStatus(UpdateStatus{ID: "timeout-op", Running: true, Stage: "prepared"}); err != nil {
+	if err := writeStatus(UpdateStatus{ID: "timeout-op", Running: true, Stage: "starting_helper"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1301,7 +1306,9 @@ func TestUpdateTransactionWaitTimeoutLeavesInstallationUntouched(t *testing.T) {
 		Worker: oldWorker, StagedWorker: stagedWorker, WorkerBackup: oldWorker + ".timeout-op.bak",
 		StatusPath: statusPathOverride, WorkingDir: root, ExitTimeout: 25 * time.Millisecond,
 	}
-	if err := runReplacementTransaction(manifest, defaultTransactionDeps()); err == nil || !strings.Contains(err.Error(), "old process") {
+	deps := defaultTransactionDeps()
+	deps.waitHandoff = func(UpdateManifest) error { return nil }
+	if err := runReplacementTransaction(manifest, deps); err == nil || !strings.Contains(err.Error(), "old process") {
 		t.Fatalf("transaction error = %v, want old process timeout", err)
 	}
 	for path, want := range map[string]string{oldExe: "old-exe", oldWorker: "old-worker"} {
@@ -1361,7 +1368,7 @@ func TestUpdateTransactionRestartsOriginalAfterPreLaunchFailure(t *testing.T) {
 	statusPathOverride = filepath.Join(root, "ga-admin-update-status.json")
 	defer func() { statusPathOverride = oldStatus }()
 	operationID := "pre-launch-failure-op"
-	if err := writeStatus(UpdateStatus{ID: operationID, Running: true, Stage: "prepared"}); err != nil {
+	if err := writeStatus(UpdateStatus{ID: operationID, Running: true, Stage: "starting_helper"}); err != nil {
 		t.Fatal(err)
 	}
 	manifest := UpdateManifest{
@@ -1371,6 +1378,7 @@ func TestUpdateTransactionRestartsOriginalAfterPreLaunchFailure(t *testing.T) {
 	}
 	launches := []bool{}
 	deps := defaultTransactionDeps()
+	deps.waitHandoff = func(UpdateManifest) error { return nil }
 	deps.waitPIDExit = func(int, time.Duration) error { return nil }
 	deps.installFile = func(string, string, os.FileMode) error { return errors.New("injected install failure") }
 	deps.launch = func(_ UpdateManifest, confirmation bool) (*exec.Cmd, <-chan error, error) {
@@ -1408,7 +1416,7 @@ func TestUpdateTransactionPartialWorkerFailureRestoresWholeSet(t *testing.T) {
 	oldStatus := statusPathOverride
 	statusPathOverride = filepath.Join(root, "ga-admin-update-status.json")
 	defer func() { statusPathOverride = oldStatus }()
-	if err := writeStatus(UpdateStatus{ID: "rollback-op", Running: true, Stage: "prepared"}); err != nil {
+	if err := writeStatus(UpdateStatus{ID: "rollback-op", Running: true, Stage: "starting_helper"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1419,6 +1427,7 @@ func TestUpdateTransactionPartialWorkerFailureRestoresWholeSet(t *testing.T) {
 		StatusPath: statusPathOverride, WorkingDir: root,
 	}
 	deps := defaultTransactionDeps()
+	deps.waitHandoff = func(UpdateManifest) error { return nil }
 	install := deps.installFile
 	deps.installFile = func(src, dest string, perm os.FileMode) error {
 		if sameFilePath(dest, oldWorker) {
@@ -1463,7 +1472,7 @@ func TestUpdateTransactionPublishesStartingStageBeforeLaunch(t *testing.T) {
 	statusPathOverride = filepath.Join(root, "ga-admin-update-status.json")
 	defer func() { statusPathOverride = oldStatus }()
 	operationID := "synchronous-confirm-op"
-	if err := writeStatus(UpdateStatus{ID: operationID, Running: true, Stage: "prepared", TargetVersion: effectiveVersion()}); err != nil {
+	if err := writeStatus(UpdateStatus{ID: operationID, Running: true, Stage: "starting_helper", TargetVersion: effectiveVersion()}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1475,6 +1484,7 @@ func TestUpdateTransactionPublishesStartingStageBeforeLaunch(t *testing.T) {
 	child := exec.Command(os.Args[0], "-test.run=^$")
 	child.Process, _ = os.FindProcess(os.Getpid())
 	deps := defaultTransactionDeps()
+	deps.waitHandoff = func(UpdateManifest) error { return nil }
 	deps.waitPIDExit = func(int, time.Duration) error { return nil }
 	deps.stopChild = func(*exec.Cmd, <-chan error) {}
 	deps.launch = func(_ UpdateManifest, confirmation bool) (*exec.Cmd, <-chan error, error) {

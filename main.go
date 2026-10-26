@@ -99,6 +99,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if internalLaunch.ConfirmOperation == "" {
+		if err := version.ConfirmPendingServiceUpdateReady(); err != nil {
+			_ = listener.Close()
+			log.Fatalf("confirm service replacement startup: %v", err)
+		}
+	}
 	url := adminhttp.LocalURL(listener)
 	srv.SetListenAddress(listener.Addr().String(), url)
 	if err := adminhttp.WriteRuntimeInfo(cwd, listener); err != nil {

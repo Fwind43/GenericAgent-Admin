@@ -198,55 +198,50 @@ type DownloadProgress struct {
 }
 
 type UpdateStatus struct {
-	ID               string            `json:"id,omitempty"`
-	PID              int               `json:"pid,omitempty"`
-	OldPID           int               `json:"old_pid,omitempty"`
-	HelperPID        int               `json:"helper_pid,omitempty"`
-	NewPID           int               `json:"new_pid,omitempty"`
-	Running          bool              `json:"running"`
-	Stage            string            `json:"stage"`
-	Progress         int               `json:"progress"`
-	Download         *DownloadProgress `json:"download,omitempty"`
-	Log              string            `json:"log,omitempty"`
-	Message          string            `json:"message"`
-	Error            string            `json:"error,omitempty"`
-	Script           string            `json:"script,omitempty"`
-	SourceVersion    string            `json:"source_version,omitempty"`
-	TargetVersion    string            `json:"target_version,omitempty"`
-	InstalledVersion string            `json:"installed_version,omitempty"`
-	ConfirmedVersion string            `json:"confirmed_version,omitempty"`
-	RollbackResult   string            `json:"rollback_result,omitempty"`
-	Check            *CheckResult      `json:"check,omitempty"`
-	StartedAt        time.Time         `json:"started_at,omitempty"`
-	StagedAt         time.Time         `json:"staged_at,omitempty"`
-	HelperStartedAt  time.Time         `json:"helper_started_at,omitempty"`
-	WaitingAt        time.Time         `json:"waiting_at,omitempty"`
-	ApplyingAt       time.Time         `json:"applying_at,omitempty"`
-	RestartedAt      time.Time         `json:"restarted_at,omitempty"`
-	ConfirmedAt      time.Time         `json:"confirmed_at,omitempty"`
-	UpdatedAt        time.Time         `json:"updated_at,omitempty"`
-	EndedAt          time.Time         `json:"ended_at,omitempty"`
+	ID                string            `json:"id,omitempty"`
+	PID               int               `json:"pid,omitempty"`
+	OldPID            int               `json:"old_pid,omitempty"`
+	HelperPID         int               `json:"helper_pid,omitempty"`
+	NewPID            int               `json:"new_pid,omitempty"`
+	Running           bool              `json:"running"`
+	Stage             string            `json:"stage"`
+	Progress          int               `json:"progress"`
+	Download          *DownloadProgress `json:"download,omitempty"`
+	Log               string            `json:"log,omitempty"`
+	Message           string            `json:"message"`
+	Error             string            `json:"error,omitempty"`
+	Script            string            `json:"script,omitempty"`
+	SourceVersion     string            `json:"source_version,omitempty"`
+	TargetVersion     string            `json:"target_version,omitempty"`
+	InstalledVersion  string            `json:"installed_version,omitempty"`
+	ConfirmedVersion  string            `json:"confirmed_version,omitempty"`
+	RollbackResult    string            `json:"rollback_result,omitempty"`
+	Check             *CheckResult      `json:"check,omitempty"`
+	StartedAt         time.Time         `json:"started_at,omitempty"`
+	StagedAt          time.Time         `json:"staged_at,omitempty"`
+	HelperStartedAt   time.Time         `json:"helper_started_at,omitempty"`
+	HelperHeartbeatAt time.Time         `json:"helper_heartbeat_at,omitempty"`
+	HandoffAt         time.Time         `json:"handoff_at,omitempty"`
+	WaitingAt         time.Time         `json:"waiting_at,omitempty"`
+	ApplyingAt        time.Time         `json:"applying_at,omitempty"`
+	RestartedAt       time.Time         `json:"restarted_at,omitempty"`
+	ConfirmedAt       time.Time         `json:"confirmed_at,omitempty"`
+	UpdatedAt         time.Time         `json:"updated_at,omitempty"`
+	EndedAt           time.Time         `json:"ended_at,omitempty"`
 }
 
 type applyRuntimeDeps struct {
-	executable   func() (string, error)
-	launchHelper func(helperPath, manifestPath string) error
-	scheduleExit func()
+	executable    func() (string, error)
+	launchHelper  func(helperPath, manifestPath string) error
+	waitHelperAck func(string, time.Duration) error
+	scheduleExit  func()
 }
 
 func defaultApplyRuntime() applyRuntimeDeps {
 	return applyRuntimeDeps{
-		executable: os.Executable,
-		launchHelper: func(helperPath, manifestPath string) error {
-			cmd := exec.Command(helperPath, "--update-helper", manifestPath)
-			cmd.Dir = filepath.Dir(helperPath)
-			detachUpdateProcess(cmd)
-			hideChildWindow(cmd)
-			if err := cmd.Start(); err != nil {
-				return err
-			}
-			return cmd.Process.Release()
-		},
+		executable:    os.Executable,
+		launchHelper:  launchPreparedUpdateHelper,
+		waitHelperAck: waitForHelperAck,
 		scheduleExit: func() {
 			go func() {
 				time.Sleep(500 * time.Millisecond)
@@ -389,6 +384,7 @@ func readStatusLocked() UpdateStatus {
 }
 
 func normalizeStatusAfterRestart(st UpdateStatus) UpdateStatus {
+	st = normalizeInterruptedUpdate(st, time.Now())
 	current := Current()
 	return normalizeStatusForVersion(st, current.Version, current)
 }
@@ -442,7 +438,7 @@ func normalizeStatusForVersion(st UpdateStatus, actualVersion string, current Bu
 
 func updateTransactionStage(stage string) bool {
 	switch stage {
-	case "ready", "prepared", "starting_helper", "waiting_for_exit", "applying", "starting_replacement", "replacement_ready", "restarting":
+	case "ready", "prepared", "starting_helper", "waiting_for_exit", "applying", "starting_replacement", "replacement_ready", "restarting", "rolling_back":
 		return true
 	default:
 		return false
@@ -759,6 +755,7 @@ func AuthorizeRestart(operationID string) (UpdateStatus, error) {
 	}
 	var st UpdateStatus
 	var ready readyUpdate
+	var manifest UpdateManifest
 
 	updateMu.Lock()
 	err := withStatusFileLock(func() error {
@@ -769,7 +766,6 @@ func AuthorizeRestart(operationID string) (UpdateStatus, error) {
 		if st.ID != operationID {
 			return ErrUpdateSuperseded
 		}
-		var manifest UpdateManifest
 		var err error
 		ready, manifest, err = readReadyUpdate()
 		if err != nil {
@@ -782,6 +778,11 @@ func AuthorizeRestart(operationID string) (UpdateStatus, error) {
 		st.Progress = 92
 		st.Message = "restart authorized; starting upgrade helper"
 		st.Error = ""
+		st.HelperPID = 0
+		st.HelperStartedAt = time.Time{}
+		st.HelperHeartbeatAt = time.Time{}
+		st.WaitingAt = time.Time{}
+		st.HandoffAt = time.Time{}
 		return writeStatusLocked(st)
 	})
 	updateMu.Unlock()
@@ -789,16 +790,24 @@ func AuthorizeRestart(operationID string) (UpdateStatus, error) {
 		return st, err
 	}
 
-	if err := currentApplyRuntime.launchHelper(ready.HelperPath, ready.ManifestPath); err != nil {
-		launchErr := fmt.Errorf("launch update helper: %w", err)
+	launchErr := currentApplyRuntime.launchHelper(ready.HelperPath, ready.ManifestPath)
+	if launchErr == nil {
+		launchErr = currentApplyRuntime.waitHelperAck(operationID, defaultHelperAckTimeout)
+	}
+	if launchErr != nil {
+		launchErr = fmt.Errorf("start and acknowledge update helper: %w", launchErr)
 		rollbackErr := transitionUpdate(ready.OperationID, func(current *UpdateStatus) error {
-			if current.Stage != "starting_helper" {
+			if !current.Running || (current.Stage != "starting_helper" && current.Stage != "waiting_for_exit") || !current.HandoffAt.IsZero() {
 				return ErrUpdateSuperseded
 			}
 			current.Stage = "ready"
 			current.Progress = 90
-			current.Message = "升级助手启动失败；升级包仍可重试"
+			current.Message = "升级助手未确认启动；原服务继续运行，升级包仍可重试"
 			current.Error = launchErr.Error()
+			current.HelperPID = 0
+			current.HelperStartedAt = time.Time{}
+			current.HelperHeartbeatAt = time.Time{}
+			current.WaitingAt = time.Time{}
 			return nil
 		})
 		if rollbackErr != nil {
@@ -806,7 +815,19 @@ func AuthorizeRestart(operationID string) (UpdateStatus, error) {
 		}
 		return CurrentUpdateStatus(), launchErr
 	}
-	currentApplyRuntime.scheduleExit()
+	if err := transitionUpdate(operationID, func(current *UpdateStatus) error {
+		if !current.Running || current.Stage != "waiting_for_exit" || current.HelperPID <= 0 || current.HelperStartedAt.IsZero() || current.WaitingAt.IsZero() {
+			return errors.New("update helper acknowledgement changed before handoff")
+		}
+		current.HandoffAt = time.Now()
+		current.Message = "upgrade helper acknowledged; handing off the verified update"
+		return nil
+	}); err != nil {
+		return CurrentUpdateStatus(), err
+	}
+	if manifest.Systemd == nil {
+		currentApplyRuntime.scheduleExit()
+	}
 	return CurrentUpdateStatus(), nil
 }
 
@@ -1004,7 +1025,12 @@ func applyLatest(ctx context.Context, operationID string, progress func(stage, m
 	if err != nil || strings.TrimSpace(workingDir) == "" {
 		workingDir = filepath.Dir(exe)
 	}
+	service, err := currentUpdateService()
+	if err != nil {
+		return ApplyResult{}, fmt.Errorf("identify update service: %w", err)
+	}
 	manifest, err := buildUpdateManifest(updateManifestInput{
+		Systemd:       service,
 		OperationID:   operationID,
 		SourceVersion: effectiveVersion(),
 		TargetVersion: check.Latest.TagName,

@@ -21,40 +21,47 @@ const (
 // UpdateManifest is the durable hand-off between the running server and its
 // copied updater helper. Paths are immutable once the helper is launched.
 type UpdateManifest struct {
-	OperationID    string        `json:"operation_id"`
-	SourceVersion  string        `json:"source_version"`
-	TargetVersion  string        `json:"target_version"`
-	OldPID         int           `json:"old_pid"`
-	OriginalExe    string        `json:"original_exe"`
-	StagedExe      string        `json:"staged_exe"`
-	BackupExe      string        `json:"backup_exe"`
-	Worker         string        `json:"worker,omitempty"`
-	StagedWorker   string        `json:"staged_worker,omitempty"`
-	WorkerBackup   string        `json:"worker_backup,omitempty"`
-	StatusPath     string        `json:"status_path"`
-	OriginalArgs   []string      `json:"original_args,omitempty"`
-	WorkingDir     string        `json:"working_dir"`
-	ExitTimeout    time.Duration `json:"exit_timeout"`
-	ConfirmTimeout time.Duration `json:"confirm_timeout"`
-	StabilityTime  time.Duration `json:"stability_time"`
-	CreatedAt      time.Time     `json:"created_at"`
+	OperationID    string                `json:"operation_id"`
+	SourceVersion  string                `json:"source_version"`
+	TargetVersion  string                `json:"target_version"`
+	OldPID         int                   `json:"old_pid"`
+	OriginalExe    string                `json:"original_exe"`
+	StagedExe      string                `json:"staged_exe"`
+	BackupExe      string                `json:"backup_exe"`
+	Worker         string                `json:"worker,omitempty"`
+	StagedWorker   string                `json:"staged_worker,omitempty"`
+	WorkerBackup   string                `json:"worker_backup,omitempty"`
+	StatusPath     string                `json:"status_path"`
+	OriginalArgs   []string              `json:"original_args,omitempty"`
+	WorkingDir     string                `json:"working_dir"`
+	ExitTimeout    time.Duration         `json:"exit_timeout"`
+	ConfirmTimeout time.Duration         `json:"confirm_timeout"`
+	StabilityTime  time.Duration         `json:"stability_time"`
+	Systemd        *SystemdUpdateService `json:"systemd,omitempty"`
+	CreatedAt      time.Time             `json:"created_at"`
 }
 
 type transactionDeps struct {
-	waitPIDExit func(int, time.Duration) error
-	installFile func(string, string, os.FileMode) error
-	launch      func(UpdateManifest, bool) (*exec.Cmd, <-chan error, error)
-	stopChild   func(*exec.Cmd, <-chan error)
-	sleep       func(time.Duration)
+	waitPIDExit   func(int, time.Duration) error
+	installFile   func(string, string, os.FileMode) error
+	launch        func(UpdateManifest, bool) (*exec.Cmd, <-chan error, error)
+	stopChild     func(*exec.Cmd, <-chan error)
+	serviceAction func(UpdateManifest, string) error
+	servicePID    func(UpdateManifest) (int, error)
+	waitHandoff   func(UpdateManifest) error
+	sleep         func(time.Duration)
 }
 
 func defaultTransactionDeps() transactionDeps {
 	return transactionDeps{
-		waitPIDExit: waitForPIDExit,
-		installFile: copyFileAtomic,
-		launch:      launchManifestProcess,
-		stopChild:   stopOwnedChild,
-		sleep:       time.Sleep,
+		waitPIDExit:   waitForPIDExit,
+		installFile:   copyFileAtomic,
+		launch:        launchManifestProcess,
+		stopChild:     stopOwnedChild,
+		serviceAction: controlUpdateService,
+		servicePID:    updateServicePID,
+		waitHandoff:   waitForHelperHandoff,
+		sleep:         time.Sleep,
 	}
 }
 
@@ -70,6 +77,7 @@ type updateManifestInput struct {
 	StatusPath    string
 	OriginalArgs  []string
 	WorkingDir    string
+	Systemd       *SystemdUpdateService
 }
 
 func buildUpdateManifest(input updateManifestInput) (UpdateManifest, error) {
@@ -91,6 +99,7 @@ func buildUpdateManifest(input updateManifestInput) (UpdateManifest, error) {
 		ExitTimeout:    defaultExitTimeout,
 		ConfirmTimeout: defaultConfirmTimeout,
 		StabilityTime:  defaultStabilityTime,
+		Systemd:        input.Systemd,
 		CreatedAt:      time.Now(),
 	}
 	if manifest.Worker != "" {
@@ -196,6 +205,9 @@ func validateUpdateManifest(manifest UpdateManifest) error {
 	if manifest.BackupExe == manifest.OriginalExe || (manifest.Worker != "" && manifest.WorkerBackup == manifest.Worker) {
 		return errors.New("update backup path aliases an install target")
 	}
+	if manifest.Systemd != nil && !validServiceUnit(manifest.Systemd.Unit) {
+		return errors.New("update manifest has an invalid systemd service unit")
+	}
 	return nil
 }
 
@@ -225,18 +237,42 @@ func runReplacementTransaction(manifest UpdateManifest, deps transactionDeps) er
 	if manifest.StabilityTime <= 0 {
 		manifest.StabilityTime = defaultStabilityTime
 	}
+	if deps.waitHandoff == nil {
+		deps.waitHandoff = waitForHelperHandoff
+	}
 	if err := transitionUpdate(manifest.OperationID, func(st *UpdateStatus) error {
+		if !st.Running || st.Stage != "starting_helper" || st.HelperPID != 0 {
+			return ErrUpdateSuperseded
+		}
+		now := time.Now()
 		st.Stage = "waiting_for_exit"
 		st.Progress = 88
-		st.Message = "upgrade helper is waiting for the old process to exit"
+		st.Message = "upgrade helper is ready; waiting for the original process handoff"
 		st.HelperPID = os.Getpid()
+		st.HelperStartedAt = now
+		st.WaitingAt = now
+		st.HelperHeartbeatAt = now
 		return nil
 	}); err != nil {
 		return err
 	}
+	stopHeartbeat := startHelperHeartbeat(manifest.OperationID)
+	defer stopHeartbeat()
+	if err := deps.waitHandoff(manifest); err != nil {
+		return failUnstartedHandoff(manifest, err)
+	}
+	if manifest.Systemd != nil {
+		if err := deps.serviceAction(manifest, "stop"); err != nil {
+			return failAfterRollbackAndRestart(manifest, deps, nil, fmt.Errorf("stop original service: %w", err))
+		}
+	}
 	if manifest.OldPID > 0 {
 		if err := deps.waitPIDExit(manifest.OldPID, manifest.ExitTimeout); err != nil {
-			return failUpdateTransaction(manifest.OperationID, fmt.Errorf("old process did not exit: %w", err), "not_started")
+			cause := fmt.Errorf("old process did not exit: %w", err)
+			if manifest.Systemd != nil {
+				return failAfterRollbackAndRestart(manifest, deps, nil, cause)
+			}
+			return failUpdateTransaction(manifest.OperationID, cause, "not_started")
 		}
 	}
 	if err := transitionUpdate(manifest.OperationID, func(st *UpdateStatus) error {
@@ -261,32 +297,55 @@ func runReplacementTransaction(manifest UpdateManifest, deps transactionDeps) er
 	}); err != nil {
 		return failAfterRollbackAndRestart(manifest, deps, changed, err)
 	}
-	cmd, exited, err := deps.launch(manifest, true)
+	var cmd *exec.Cmd
+	var exited <-chan error
+	var newPID int
+	if manifest.Systemd != nil {
+		err = deps.serviceAction(manifest, "start")
+		if err == nil {
+			newPID, err = deps.servicePID(manifest)
+		}
+	} else {
+		cmd, exited, err = deps.launch(manifest, true)
+		if err == nil {
+			newPID = cmd.Process.Pid
+		}
+	}
 	if err != nil {
 		return failAfterRollbackAndRestart(manifest, deps, changed, fmt.Errorf("launch replacement: %w", err))
+	}
+	stopNewProcess := func() {
+		if manifest.Systemd == nil {
+			deps.stopChild(cmd, exited)
+		}
 	}
 	if err := transitionUpdate(manifest.OperationID, func(st *UpdateStatus) error {
 		switch st.Stage {
 		case "starting_replacement":
-			st.NewPID = cmd.Process.Pid
+			st.NewPID = newPID
 		case "replacement_ready":
-			if st.NewPID != cmd.Process.Pid {
-				return fmt.Errorf("replacement confirmation came from unexpected PID %d; launched %d", st.NewPID, cmd.Process.Pid)
+			if st.NewPID != newPID {
+				return fmt.Errorf("replacement confirmation came from unexpected PID %d; launched %d", st.NewPID, newPID)
 			}
 		default:
 			return fmt.Errorf("replacement entered unexpected stage %q after launch", st.Stage)
 		}
 		return nil
 	}); err != nil {
-		deps.stopChild(cmd, exited)
+		stopNewProcess()
 		return failAfterRollbackAndRestart(manifest, deps, changed, err)
 	}
-	if err := waitForReplacementConfirmation(manifest, exited, deps.sleep); err != nil {
-		deps.stopChild(cmd, exited)
+	if manifest.Systemd != nil {
+		err = waitForServiceReplacementConfirmation(manifest, newPID, deps)
+	} else {
+		err = waitForReplacementConfirmation(manifest, exited, deps.sleep)
+	}
+	if err != nil {
+		stopNewProcess()
 		return failAfterRollbackAndRestart(manifest, deps, changed, err)
 	}
 	if err := transitionUpdate(manifest.OperationID, func(st *UpdateStatus) error {
-		if st.Stage != "replacement_ready" || st.ConfirmedVersion != manifest.TargetVersion || st.NewPID != cmd.Process.Pid {
+		if st.Stage != "replacement_ready" || st.ConfirmedVersion != manifest.TargetVersion || st.NewPID != newPID {
 			return errors.New("replacement confirmation changed before commit")
 		}
 		now := time.Now()
@@ -298,7 +357,7 @@ func runReplacementTransaction(manifest UpdateManifest, deps transactionDeps) er
 		st.EndedAt = now
 		return nil
 	}); err != nil {
-		deps.stopChild(cmd, exited)
+		stopNewProcess()
 		return failAfterRollbackAndRestart(manifest, deps, changed, err)
 	}
 	_ = os.Remove(manifest.BackupExe)
@@ -373,11 +432,35 @@ func restoreBackup(backup, target string) error {
 }
 
 func failAfterRollbackAndRestart(manifest UpdateManifest, deps transactionDeps, changed []string, cause error) error {
+	// Disable listener-ready confirmation before stopping a replacement that
+	// may still be starting (or being restarted by its service manager).
+	if err := transitionUpdate(manifest.OperationID, func(st *UpdateStatus) error {
+		st.Stage = "rolling_back"
+		st.Message = "update failed; restoring the original service"
+		return nil
+	}); err != nil {
+		cause = errors.Join(cause, fmt.Errorf("persist rollback stage: %w", err))
+	}
+	if manifest.Systemd != nil {
+		if err := deps.serviceAction(manifest, "stop"); err != nil {
+			// Never restore an executable under a running service. Keep its
+			// operation-scoped backups intact for manual recovery.
+			return failUpdateTransaction(manifest.OperationID,
+				errors.Join(cause, fmt.Errorf("stop service before rollback: %w", err)),
+				"stop_failed: "+err.Error())
+		}
+	}
 	rollbackErr := restoreManifestFiles(manifest, changed)
 	if rollbackErr != nil {
 		return failAfterRollback(manifest.OperationID, cause, rollbackErr)
 	}
-	if _, _, restartErr := deps.launch(manifest, false); restartErr != nil {
+	var restartErr error
+	if manifest.Systemd != nil {
+		restartErr = deps.serviceAction(manifest, "start")
+	} else {
+		_, _, restartErr = deps.launch(manifest, false)
+	}
+	if restartErr != nil {
 		cause = errors.Join(cause, fmt.Errorf("restart original service: %w", restartErr))
 		return failUpdateTransaction(manifest.OperationID, cause, "restart_failed: "+restartErr.Error())
 	}
