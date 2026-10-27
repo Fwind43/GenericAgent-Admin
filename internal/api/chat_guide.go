@@ -104,7 +104,7 @@ func (s *Server) admitChatGuide(sid, queueID string) (string, error) {
 		return "guiding", nil
 	}
 	item := cs.QueuedMessages[itemIndex]
-	if item.Kind == conductorCompletionQueueKind {
+	if item.Kind == "conductor_completion" {
 		return "", errors.New("internal completion cannot be used as a chat guide")
 	}
 	files, refs, err := saveChatUploads(s.CfgStore.Snapshot(), item.Files)
