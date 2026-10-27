@@ -943,6 +943,18 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		token.QueueIDs = append(token.QueueIDs, item.ID)
 	}
 	s.ChatMu.Unlock()
+	// Queued sends need the same durable attachment metadata and worker image
+	// paths as a direct send; the worker does not consume inline upload objects.
+	saved, refs, err := saveChatUploads(s.CfgStore.Snapshot(), queuedItem.Files)
+	if err != nil {
+		s.SessionMu.Unlock()
+		s.endChatRunOwned(sid, token)
+		return false
+	}
+	display := queuedItem.Text
+	if len(refs) > 0 {
+		display += "\n\n[附件已保存]\n" + strings.Join(refs, "\n")
+	}
 	cs.QueuedMessages = append(cs.QueuedMessages[:queueIndex], cs.QueuedMessages[queueIndex+batchCount:]...)
 	cs.UpdatedAt = time.Now().Unix()
 
@@ -957,8 +969,8 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 	queuedUserMsg := chatMessage{
 		ID:        newChatID(),
 		Role:      "user",
-		Content:   queuedItem.Text,
-		Files:     convertChatUploadsToMaps(queuedItem.Files),
+		Content:   display,
+		Files:     saved,
 		CreatedAt: time.Now().Unix(),
 	}
 	// Internal completion evidence wakes the model, but is not a user turn.
@@ -975,8 +987,8 @@ func (s *Server) processQueuedMessage(sid, queueID string) bool {
 		cs.Settings.ReasoningEffort = queuedItem.ReasoningEffort
 	}
 	cmdReq := map[string]interface{}{
-		"prompt":                   queuedItem.Text,
-		"files":                    queuedItem.Files,
+		"prompt":                   display,
+		"images":                   chatVisionImagePaths(saved),
 		"history":                  workerHistory,
 		"raw_history":              cs.RawHistory,
 		"history_info":             cs.HistoryInfo,

@@ -129,6 +129,100 @@ func TestProcessNextQueuedMessageStartsAfterCompletedRun(t *testing.T) {
 	}
 }
 
+func TestProcessQueuedMessagePersistsUploadMetadata(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	sid := "queue-upload-metadata"
+	blockChatLoopTestWorker(t, s, sid)
+	saveChatLoopTestSession(t, s, chatSession{
+		ID: sid,
+		QueuedMessages: []chatQueuedMessage{{
+			ID: "queued-image", Text: "review this image",
+			Files: []chatUpload{{Name: "preview.png", Type: "image/png", DataURL: "data:image/png;base64,aW1hZ2U="}},
+		}},
+	})
+
+	if !s.processQueuedMessage(sid, "queued-image") {
+		t.Fatal("queued upload did not start")
+	}
+	stored, err := loadChatSession(s.CfgStore.Snapshot(), sid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored.QueuedMessages) != 0 || len(stored.Messages) != 2 {
+		t.Fatalf("unexpected queued upload state: %#v", stored)
+	}
+	message := stored.Messages[0]
+	if message.Role != "user" || len(message.Files) != 1 {
+		t.Fatalf("queued user message = %#v", message)
+	}
+	file := message.Files[0]
+	path, _ := file["path"].(string)
+	name, _ := file["name"].(string)
+	if path == "" || !strings.HasSuffix(name, "_preview.png") || file["mime"] != "image/png" || file["url"] != "/api/chat/file/"+name {
+		t.Fatalf("durable attachment metadata = %#v", file)
+	}
+	if file["dataURL"] != nil || file["data_url"] != nil {
+		t.Fatalf("inline upload leaked into persisted message: %#v", file)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil || string(raw) != "image" {
+		t.Fatalf("saved upload = %q, err=%v", raw, err)
+	}
+	if !strings.HasPrefix(message.Content, "review this image\n\n") || !strings.Contains(message.Content, "[image:"+path+"]") {
+		t.Fatalf("queued message lacks saved image reference: %q", message.Content)
+	}
+
+	s.ChatMu.Lock()
+	events := append([][]byte(nil), s.ChatRuns[sid].Events...)
+	s.ChatMu.Unlock()
+	for _, event := range events {
+		var streamed struct {
+			Type    string      `json:"type"`
+			Message chatMessage `json:"message"`
+		}
+		if err := json.Unmarshal(event, &streamed); err != nil {
+			t.Fatal(err)
+		}
+		if streamed.Type == "user" {
+			if streamed.Message.ID != message.ID || streamed.Message.Content != message.Content || !reflect.DeepEqual(streamed.Message.Files, message.Files) {
+				t.Fatalf("streamed attachment differs from persisted message: %#v", streamed.Message)
+			}
+			return
+		}
+	}
+	t.Fatal("queued upload did not publish a user event")
+}
+
+func TestProcessQueuedMessageKeepsQueueWhenUploadFails(t *testing.T) {
+	s := newChatLoopTestServer(t)
+	sid := "queue-upload-failure"
+	saveChatLoopTestSession(t, s, chatSession{
+		ID: sid,
+		QueuedMessages: []chatQueuedMessage{{
+			ID: "queued-invalid-image", Text: "keep this queued",
+			Files: []chatUpload{{Name: "preview.png", Type: "image/png", DataURL: "not-base64!"}},
+		}},
+	})
+	sessionPath := chatSessionPath(s.CfgStore.Snapshot(), sid)
+	before, err := os.ReadFile(sessionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.processQueuedMessage(sid, "queued-invalid-image") {
+		t.Fatal("invalid upload unexpectedly started")
+	}
+	if s.chatRunActive(sid) {
+		t.Fatal("failed upload left a run active")
+	}
+	after, err := os.ReadFile(sessionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("failed upload changed the durable session or consumed its queue item")
+	}
+}
+
 func TestChatGuideKeepsActiveRunUntilSafePointAcknowledgment(t *testing.T) {
 	s := newChatLoopTestServer(t)
 	sid := "guide-keeps-active-run"
