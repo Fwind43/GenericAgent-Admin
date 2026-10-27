@@ -44,8 +44,9 @@ func SetRepoURL(url string) {
 }
 
 // SetGitHubMirror configures an optional HTTP(S) prefix for GitHub release
-// asset downloads. For example, https://mirror.example turns a release URL
-// into https://mirror.example/https://github.com/owner/repo/releases/....
+// checks and asset downloads. The mirror must support api.github.com for checks;
+// requests use the form https://mirror.example/https://api.github.com/... or
+// https://mirror.example/https://github.com/owner/repo/releases/....
 func SetGitHubMirror(rawURL string) {
 	githubMirrorMu.Lock()
 	githubMirror = strings.TrimRight(strings.TrimSpace(rawURL), "/")
@@ -54,7 +55,11 @@ func SetGitHubMirror(rawURL string) {
 
 func resolveDownloadURL(rawURL string) string {
 	parsed, err := neturl.Parse(rawURL)
-	if err != nil || !strings.EqualFold(parsed.Hostname(), "github.com") {
+	if err != nil {
+		return rawURL
+	}
+	host := parsed.Hostname()
+	if !strings.EqualFold(host, "github.com") && !strings.EqualFold(host, "api.github.com") {
 		return rawURL
 	}
 	githubMirrorMu.RLock()
@@ -1226,8 +1231,9 @@ exec "$OLD" "$@"
 }
 
 func fetchLatest(ctx context.Context) (rel *Release, err error) {
+	checkURL := resolveDownloadURL(repoLatestURL)
 	err = retryHTTPRequest(ctx, "fetch latest release", func() error {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, repoLatestURL, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, checkURL, nil)
 		if err != nil {
 			return fmt.Errorf("create github release request: %w", err)
 		}

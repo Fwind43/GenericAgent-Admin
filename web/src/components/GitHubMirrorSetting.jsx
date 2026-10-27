@@ -5,17 +5,17 @@ import { confirmDanger } from '../lib/danger'
 const COPY = {
   zh: {
     title: 'GitHub 镜像地址', placeholder: '例如 https://mirror.example',
-    help: '仅用于更新包和校验文件，格式为镜像前缀/https://github.com/...。留空直连 GitHub，保存后立即生效，无需重启。',
+    help: '用于版本检查、更新包和校验文件，格式为镜像前缀/原始 URL。镜像需同时支持 github.com 和 api.github.com。留空直连 GitHub，保存后立即生效，无需重启。',
     save: '保存镜像', saving: '正在保存', loading: '正在读取镜像配置…', retry: '重新读取',
     saved: '镜像配置已保存', loadFailed: '读取镜像配置失败：', saveFailed: '保存失败：',
-    confirm: '保存 GitHub 镜像地址？仅修改更新下载镜像配置，留空将恢复直连 GitHub。',
+    confirm: '保存 GitHub 镜像地址？将用于版本检查及更新下载，留空将恢复直连 GitHub。',
   },
   en: {
     title: 'GitHub mirror URL', placeholder: 'For example, https://mirror.example',
-    help: 'For update packages and checksum files only, using mirror-prefix/https://github.com/.... Leave blank for direct GitHub access. Saving takes effect immediately; no restart needed.',
+    help: 'For version checks, update packages and checksum files, using mirror-prefix/original-URL. The mirror must support both github.com and api.github.com. Leave blank for direct GitHub access. Saving takes effect immediately; no restart needed.',
     save: 'Save mirror', saving: 'Saving', loading: 'Loading mirror settings…', retry: 'Retry loading',
     saved: 'Mirror settings saved.', loadFailed: 'Could not load mirror settings: ', saveFailed: 'Save failed: ',
-    confirm: 'Save the GitHub mirror URL? Only the update download mirror is changed. Leave blank to restore direct GitHub access.',
+    confirm: 'Save the GitHub mirror URL? It will be used for version checks and update downloads. Leave blank to restore direct GitHub access.',
   },
 }
 
