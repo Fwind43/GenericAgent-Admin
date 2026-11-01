@@ -919,6 +919,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
   const [queueEditingId, setQueueEditingId] = useState('')
   const [queueDraft, setQueueDraft] = useState('')
   const [guidingQueueId, setGuidingQueueId] = useState('')
+  const [pendingGuideIds, setPendingGuideIds] = useState([])
   const autorunEnabled = Boolean(sessions.find(entry => entry.id === sid)?.autorun?.enabled)
   const autorunSavingRef = useRef(false)
   const [dragging, setDragging] = useState(false)
@@ -2648,11 +2649,13 @@ export default function ChatApp({ onOpenSettings } = {}) {
     updateAttachments(attachmentsRef.current.filter(x => x.id !== id))
     persistSessionDraft(activeSidRef.current, promptRef.current?.value ?? prompt)
   }
-  const applyQueueSnapshot = (messages, sessionId = activeSidRef.current, instanceId = chatInstanceRef.current) => {
+  const applyQueueSnapshot = (messages, sessionId = activeSidRef.current, instanceId = chatInstanceRef.current, guidingIds = []) => {
     if (sessionId !== activeSidRef.current || instanceId !== chatInstanceRef.current) return []
     const next = Array.isArray(messages) ? messages : []
     queuedRef.current = next
     setQueuedMessages(next)
+    // Items admitted as guidance stay locked until the worker acknowledges them.
+    setPendingGuideIds(Array.isArray(guidingIds) ? guidingIds : [])
     return next
   }
   const requestQueue = (operation, payload = {}, sessionId = activeSidRef.current) => {
@@ -2665,7 +2668,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
       .then(async () => {
         const d = await api(queueURL, { method:'PATCH', body:JSON.stringify({ op:operation, ...payload }) })
         if (epoch !== chatRequestEpochRef.current || !isActiveSession(sessionId)) throw new DOMException('Chat instance changed', 'AbortError')
-        return applyQueueSnapshot(d.queued_messages, sessionId, instanceId)
+        return applyQueueSnapshot(d.queued_messages, sessionId, instanceId, d.guiding_ids)
       })
     queueWriteRef.current = request
     return request
@@ -2679,7 +2682,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
       .then(async () => {
         const d = await api(queueURL)
         if (epoch !== chatRequestEpochRef.current) return []
-        return applyQueueSnapshot(d.queued_messages, sessionId, instanceId)
+        return applyQueueSnapshot(d.queued_messages, sessionId, instanceId, d.guiding_ids)
       })
     queueWriteRef.current = request
     return request
@@ -3893,7 +3896,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
           <div id="oa-queue-list" className="oa-queue-list" hidden={queueCollapsed}>
           {queuedMessages.map((q, i) => {
             const isEditingQueue = queueEditingId === q.id
-            const isGuidingQueue = guidingQueueId === q.id
+            const isSubmittingGuide = guidingQueueId === q.id
+            const isAwaitingGuide = !isSubmittingGuide && pendingGuideIds.includes(q.id)
+            const isGuidingQueue = isSubmittingGuide || isAwaitingGuide
             return <div key={q.id} className={`oa-queued-item ${isEditingQueue ? 'is-editing' : ''} ${isGuidingQueue ? 'is-guiding' : ''}`}>
               <span className="oa-queue-index" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
               <div className="oa-queue-content" title={isEditingQueue ? '' : (q.text || ct('请处理这些附件', 'Please process these attachments'))}>
@@ -3907,9 +3912,9 @@ export default function ChatApp({ onOpenSettings } = {}) {
                   <button className="oa-queue-action is-confirm" type="button" onClick={()=>saveQueueEdit(q.id)} title={ct('保存队列消息', 'Save queued message')} aria-label={ct('保存队列消息', 'Save queued message')}><Check size={14}/></button>
                   <button className="oa-queue-action" type="button" onClick={cancelQueueEdit} title={ct('取消编辑', 'Cancel editing')} aria-label={ct('取消编辑', 'Cancel editing')}><X size={14}/></button>
                 </> : <>
-                  <button className="oa-guide-btn" type="button" onClick={()=>guideQueuedItem(q.id)} disabled={!isCurrentRunning || Boolean(guidingQueueId)} title={isGuidingQueue ? ct('正在提交引导，当前任务不会中断', 'Submitting guidance; the current task keeps running') : (isCurrentRunning ? ct(`将消息${i + 1}作为引导插入当前任务（不中断，下次模型调用时接收）`, `Send message ${i + 1} as guidance to the current task (no interruption; received at the next model call)`) : ct('回复结束后会自动发送', 'Will send automatically after the reply finishes'))}><Sparkles size={14}/>{isGuidingQueue ? ct('提交中…', 'Submitting…') : ct('引导发送', 'Send as guidance')}</button>
-                  <button className="oa-queue-action is-danger" type="button" onClick={()=>removeQueued(q.id)} title={ct('删除这条队列消息', 'Delete this queued message')} aria-label={ct('删除这条队列消息', 'Delete this queued message')}><Trash2 size={14}/></button>
-                  <button className="oa-queue-action" type="button" onClick={()=>editQueued(q.id)} title={ct('编辑这条队列消息', 'Edit this queued message')} aria-label={ct('编辑这条队列消息', 'Edit this queued message')}><Edit3 size={14}/></button>
+                  <button className="oa-guide-btn" type="button" onClick={()=>guideQueuedItem(q.id)} disabled={!isCurrentRunning || Boolean(guidingQueueId) || isAwaitingGuide} title={isAwaitingGuide ? ct('引导已提交，等待当前任务在下次模型调用时接收；接收前不可编辑或删除', 'Guidance submitted; waiting for the next model call. It cannot be edited or deleted until received') : isSubmittingGuide ? ct('正在提交引导，当前任务不会中断', 'Submitting guidance; the current task keeps running') : (isCurrentRunning ? ct(`将消息${i + 1}作为引导插入当前任务（不中断，下次模型调用时接收）`, `Send message ${i + 1} as guidance to the current task (no interruption; received at the next model call)`) : ct('回复结束后会自动发送', 'Will send automatically after the reply finishes'))}><Sparkles size={14}/>{isAwaitingGuide ? ct('等待接收', 'Awaiting') : isSubmittingGuide ? ct('提交中…', 'Submitting…') : ct('引导发送', 'Send as guidance')}</button>
+                  <button className="oa-queue-action is-danger" type="button" onClick={()=>removeQueued(q.id)} disabled={isGuidingQueue} title={ct('删除这条队列消息', 'Delete this queued message')} aria-label={ct('删除这条队列消息', 'Delete this queued message')}><Trash2 size={14}/></button>
+                  <button className="oa-queue-action" type="button" onClick={()=>editQueued(q.id)} disabled={isGuidingQueue} title={ct('编辑这条队列消息', 'Edit this queued message')} aria-label={ct('编辑这条队列消息', 'Edit this queued message')}><Edit3 size={14}/></button>
                 </>}
               </div>
             </div>

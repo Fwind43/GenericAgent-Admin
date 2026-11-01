@@ -54,6 +54,25 @@ func (s *Server) chatGuideQueueItemPending(cs chatSession, queueID string) bool 
 	return false
 }
 
+// chatGuidePendingQueueIDs lists queue items admitted as guidance for the
+// active run but not yet acknowledged. Called with SessionMu held; clients use
+// it to lock those items, matching the 409 guard on edit/remove/replace.
+func (s *Server) chatGuidePendingQueueIDs(cs chatSession) []string {
+	s.ChatMu.Lock()
+	defer s.ChatMu.Unlock()
+	ids := []string{}
+	run := s.ChatRuns[cs.ID]
+	if run == nil || run.Done || run.Canceled {
+		return ids
+	}
+	for _, guide := range cs.Guides {
+		if guide.RunID == run.ID && guide.Status == "queued" {
+			ids = append(ids, guide.ID)
+		}
+	}
+	return ids
+}
+
 // admitChatGuide uses the same SessionMu -> ChatMu order as run admission and
 // Conductor. A terminal safe-point check closes admission under these locks.
 func (s *Server) admitChatGuide(sid, queueID string) (string, error) {

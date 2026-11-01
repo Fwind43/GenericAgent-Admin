@@ -789,7 +789,7 @@ func (s *Server) chatGetQueue(w http.ResponseWriter, _ *http.Request, sid string
 		bad(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, map[string]interface{}{"queued_messages": cs.QueuedMessages})
+	writeJSON(w, map[string]interface{}{"queued_messages": cs.QueuedMessages, "guiding_ids": s.chatGuidePendingQueueIDs(cs)})
 }
 
 func (s *Server) chatPatchQueue(w http.ResponseWriter, r *http.Request, sid string) {
@@ -889,7 +889,7 @@ func (s *Server) chatPatchQueue(w http.ResponseWriter, r *http.Request, sid stri
 		return
 	}
 	s.publishChatQueueChanged(sid)
-	writeJSON(w, map[string]interface{}{"ok": true, "queued_messages": cs.QueuedMessages})
+	writeJSON(w, map[string]interface{}{"ok": true, "queued_messages": cs.QueuedMessages, "guiding_ids": s.chatGuidePendingQueueIDs(cs)})
 }
 
 func (s *Server) chatReplaceQueue(w http.ResponseWriter, r *http.Request, sid string) {
@@ -939,7 +939,7 @@ func (s *Server) chatReplaceQueue(w http.ResponseWriter, r *http.Request, sid st
 		return
 	}
 	s.publishChatQueueChanged(sid)
-	writeJSON(w, map[string]interface{}{"ok": true, "queued_messages": cs.QueuedMessages})
+	writeJSON(w, map[string]interface{}{"ok": true, "queued_messages": cs.QueuedMessages, "guiding_ids": s.chatGuidePendingQueueIDs(cs)})
 }
 
 func (s *Server) chatGuidePost(w http.ResponseWriter, r *http.Request, sid, queueID string) {
