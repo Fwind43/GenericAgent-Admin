@@ -40,11 +40,15 @@ export const scrollFollowAction = ({
 export const mergeStreamUserMessage = (messages = [], message = null, clientUserID = '', pendingAssistantID = '') => {
   const current = Array.isArray(messages) ? messages : []
   if (!message || typeof message !== 'object') return current
-  const optimisticIndex = clientUserID ? current.findIndex(item => item?.id === clientUserID) : -1
+  if (message.id && current.some(item => item?.id === message.id)) return current
+  // Running-turn guides are extra user messages of the same run; they must
+  // never replace the run's own user message, whose server id can equal the
+  // client id after the first authoritative user event.
+  const isGuide = String(message.id || '').startsWith('guided-')
+  const optimisticIndex = clientUserID && !isGuide ? current.findIndex(item => item?.id === clientUserID) : -1
   if (optimisticIndex >= 0) {
     return current.map((item, index) => index === optimisticIndex ? message : item)
   }
-  if (message.id && current.some(item => item?.id === message.id)) return current
   const pendingIndex = pendingAssistantID
     ? current.findIndex(item => item?.id === pendingAssistantID && item?.role === 'assistant')
     : -1

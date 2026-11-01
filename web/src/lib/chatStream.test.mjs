@@ -341,6 +341,15 @@ test('streamed user replay is idempotent by authoritative message id', () => {
   assert.equal(mergeStreamUserMessage(current, authoritative, 'missing-client-id'), current)
 })
 
+test('streamed guide never replaces the run user message that kept the client id', () => {
+  const runUser = { id:'u-1', role:'user', content:'original question' }
+  const guide = { id:'guided-q1', role:'user', content:'guidance' }
+  const pending = { id:'assistant-1', role:'assistant', content:'partial' }
+  const merged = mergeStreamUserMessage([runUser, pending], guide, 'u-1', 'assistant-1')
+  assert.deepEqual(merged, [runUser, guide, pending])
+  assert.equal(mergeStreamUserMessage(merged, guide, 'u-1', 'assistant-1'), merged)
+})
+
 test('run identity prefers pending id and safely falls back to start time', () => {
   assert.equal(sameStreamRun(
     { pendingId:'assistant-1', startedAtMs:10 },
