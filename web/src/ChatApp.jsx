@@ -3886,7 +3886,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
         {queuedMessages.length > 0 && <div className={`oa-queue-dock ${isCurrentRunning ? 'is-running' : 'is-idle'}`} aria-label={ct('待发送队列', 'Send queue')}>
           <div className="oa-queue-guide-hint">
             <Sparkles className="oa-queue-guide-icon" size={14} aria-hidden="true"/>
-            <span className="oa-queue-guide-copy"><b>待发送</b><small>{isCurrentRunning ? '回复进行中，可接管任意一条立即发送' : '回复结束后将按顺序发送'}</small></span>
+            <span className="oa-queue-guide-copy"><b>待发送</b><small>{isCurrentRunning ? ct('回复进行中，可将任意一条作为引导插入当前任务', 'Running: any item can be sent as guidance to the current task') : ct('回复结束后将按顺序发送', 'Will send in order after the reply finishes')}</small></span>
             <span className="oa-queue-count" aria-label={`${queuedMessages.length} 条待发送消息`}>{queuedMessages.length} 条</span>
             <button type="button" className="oa-queue-action oa-queue-toggle" onClick={() => setQueueCollapsed(value => !value)} aria-expanded={!queueCollapsed} aria-controls="oa-queue-list" aria-label={queueCollapsed ? ct('展开待发送队列', 'Expand send queue') : ct('收起待发送队列', 'Collapse send queue')} title={queueCollapsed ? ct('展开待发送队列', 'Expand send queue') : ct('收起待发送队列', 'Collapse send queue')}>{queueCollapsed ? <ChevronRight size={16}/> : <ChevronDown size={16}/>}</button>
           </div>
@@ -3907,7 +3907,7 @@ export default function ChatApp({ onOpenSettings } = {}) {
                   <button className="oa-queue-action is-confirm" type="button" onClick={()=>saveQueueEdit(q.id)} title={ct('保存队列消息', 'Save queued message')} aria-label={ct('保存队列消息', 'Save queued message')}><Check size={14}/></button>
                   <button className="oa-queue-action" type="button" onClick={cancelQueueEdit} title={ct('取消编辑', 'Cancel editing')} aria-label={ct('取消编辑', 'Cancel editing')}><X size={14}/></button>
                 </> : <>
-                  <button className="oa-guide-btn" type="button" onClick={()=>guideQueuedItem(q.id)} disabled={!isCurrentRunning || Boolean(guidingQueueId)} title={isGuidingQueue ? '正在中止当前回复并发送这条消息' : (isCurrentRunning ? `暂停当前输出，立即发送消息${i + 1}` : '回复结束后会自动发送')}><Sparkles size={14}/>{isGuidingQueue ? '接管中…' : '引导发送'}</button>
+                  <button className="oa-guide-btn" type="button" onClick={()=>guideQueuedItem(q.id)} disabled={!isCurrentRunning || Boolean(guidingQueueId)} title={isGuidingQueue ? ct('正在提交引导，当前任务不会中断', 'Submitting guidance; the current task keeps running') : (isCurrentRunning ? ct(`将消息${i + 1}作为引导插入当前任务（不中断，下次模型调用时接收）`, `Send message ${i + 1} as guidance to the current task (no interruption; received at the next model call)`) : ct('回复结束后会自动发送', 'Will send automatically after the reply finishes'))}><Sparkles size={14}/>{isGuidingQueue ? ct('提交中…', 'Submitting…') : ct('引导发送', 'Send as guidance')}</button>
                   <button className="oa-queue-action is-danger" type="button" onClick={()=>removeQueued(q.id)} title={ct('删除这条队列消息', 'Delete this queued message')} aria-label={ct('删除这条队列消息', 'Delete this queued message')}><Trash2 size={14}/></button>
                   <button className="oa-queue-action" type="button" onClick={()=>editQueued(q.id)} title={ct('编辑这条队列消息', 'Edit this queued message')} aria-label={ct('编辑这条队列消息', 'Edit this queued message')}><Edit3 size={14}/></button>
                 </>}
