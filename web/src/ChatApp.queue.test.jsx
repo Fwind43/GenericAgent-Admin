@@ -55,7 +55,7 @@ describe('session-scoped guided-message queue wiring', () => {
     expect(source).toContain('body:JSON.stringify({ op:operation, ...payload })')
     expect(source).not.toContain('body:JSON.stringify({ operation, ...payload })')
     expect(source).toContain('const d = await api(queueURL)')
-    expect(source).toContain('applyQueueSnapshot(d.queued_messages, sessionId, instanceId)')
+    expect(source).toContain('applyQueueSnapshot(d.queued_messages, sessionId, instanceId, d.guiding_ids)')
     expect(source.match(/queueWriteRef\.current = request/g)?.length).toBeGreaterThanOrEqual(2)
     expect(source).not.toContain('body:JSON.stringify({ messages:snapshot })')
   })

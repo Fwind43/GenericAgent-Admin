@@ -10,14 +10,14 @@ import * as icons from 'lucide-react'
 const source = readFileSync('src/ChatApp.jsx', 'utf8')
 const start = source.indexOf('        {queuedMessages.length > 0 && <div className={`oa-queue-dock')
 const markup = source.slice(start, source.indexOf('        {cmdDrawer.open', start)).trim().slice(1, -1)
-const names = ['React', 'queuedMessages', 'queueCollapsed', 'setQueueCollapsed', 'queueEditingId', 'queueDraft', 'setQueueDraft', 'guidingQueueId', 'isCurrentRunning', 'ct', 'saveQueueEdit', 'cancelQueueEdit', 'guideQueuedItem', 'removeQueued', 'editQueued', 'Sparkles', 'ChevronRight', 'ChevronDown', 'Check', 'X', 'Trash2', 'Edit3']
+const names = ['React', 'queuedMessages', 'queueCollapsed', 'setQueueCollapsed', 'queueEditingId', 'queueDraft', 'setQueueDraft', 'guidingQueueId', 'pendingGuideIds', 'isCurrentRunning', 'ct', 'saveQueueEdit', 'cancelQueueEdit', 'guideQueuedItem', 'removeQueued', 'editQueued', 'Sparkles', 'ChevronRight', 'ChevronDown', 'Check', 'X', 'Trash2', 'Edit3']
 const compiled = execFileSync(execPath, ['--input-type=module', '-e', "import { transformSync } from 'esbuild'; import { readFileSync } from 'node:fs'; process.stdout.write(transformSync(readFileSync(0, 'utf8'), { loader: 'jsx', jsx: 'transform' }).code)"], { input: `return (${markup})`, encoding: 'utf8' })
 const draw = new Function(...names, compiled)
 const actions = Array.from({ length: 5 }, () => vi.fn())
-function Queue({ messages, editing = '' }) {
+function Queue({ messages, editing = '', pending = [] }) {
   const [collapsed, setCollapsed] = useState(false)
   const [draft, setDraft] = useState('draft')
-  return draw(React, messages, collapsed, setCollapsed, editing, draft, setDraft, '', true, (_, en) => en, ...actions, icons.Sparkles, icons.ChevronRight, icons.ChevronDown, icons.Check, icons.X, icons.Trash2, icons.Edit3)
+  return draw(React, messages, collapsed, setCollapsed, editing, draft, setDraft, '', pending, true, (_, en) => en, ...actions, icons.Sparkles, icons.ChevronRight, icons.ChevronDown, icons.Check, icons.X, icons.Trash2, icons.Edit3)
 }
 const messages = Array.from({ length: 30 }, (_, i) => ({ id: String(i), text: `Message ${i}` }))
 afterEach(() => { cleanup(); vi.clearAllMocks() })
@@ -45,4 +45,12 @@ test('preserves unsaved editing across collapse and expansion; empty queue disap
   expect(view.getByRole('textbox').value).toBe('unsaved edit')
   view.rerender(<Queue messages={[]} />)
   expect(view.container.querySelector('.oa-queue-dock')).toBeNull()
+})
+
+test('locks guidance awaiting acknowledgment against edit and delete', () => {
+  const view = render(<Queue messages={messages.slice(0, 2)} pending={['0']} />)
+  const [locked, other] = view.container.querySelector('#oa-queue-list').children
+  for (const button of locked.querySelectorAll('button')) expect(button.disabled).toBe(true)
+  expect(other.querySelector('[aria-label="Delete this queued message"]').disabled).toBe(false)
+  expect(other.querySelector('[aria-label="Edit this queued message"]').disabled).toBe(false)
 })
